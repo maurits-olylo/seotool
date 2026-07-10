@@ -1,0 +1,12 @@
+services:
+  api:
+    ports: ["${API_PORT:-8000}:8000"]
+    restart: always
+  worker:
+    restart: always
+  scheduler:
+    restart: always
+  postgres:
+    restart: always
+  redis:
+    restart: always
