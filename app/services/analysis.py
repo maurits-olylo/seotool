@@ -7,7 +7,7 @@ from app.models.issues import Change
 from app.services.change_detection import compare_snapshots
 from app.services.issue_engine import reconcile_issues
 from app.services.job_posting import inspect_job_posting
-from app.services.technical_checks import inspect_snapshot
+from app.services.technical_checks import SNAPSHOT_ISSUE_TYPES, inspect_snapshot
 
 
 def analyze_snapshot(db: Session, snapshot: UrlSnapshot) -> None:
@@ -44,4 +44,5 @@ def analyze_snapshot(db: Session, snapshot: UrlSnapshot) -> None:
         crawl_run_id=snapshot.crawl_run_id,
         snapshot_id=snapshot.id,
         signals=signals,
+        checked_issue_types=SNAPSHOT_ISSUE_TYPES,
     )

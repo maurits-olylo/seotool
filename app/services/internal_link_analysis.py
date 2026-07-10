@@ -45,6 +45,7 @@ def detect_orphan_pages(db: Session, *, website_id: object, crawl_run_id: object
                     evidence={"url": url.normalized_url, "crawl_depth": None},
                 )
             ],
+            checked_issue_types={"orphan_page"},
         )
     orphan_ids = {url.id for url in orphan_urls}
     existing = list(

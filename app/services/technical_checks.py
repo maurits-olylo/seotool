@@ -2,6 +2,23 @@ from dataclasses import dataclass
 
 from app.models.crawl import UrlSnapshot
 
+SNAPSHOT_ISSUE_TYPES = {
+    "http_404",
+    "http_410",
+    "http_5xx",
+    "long_redirect_chain",
+    "missing_title",
+    "missing_meta_description",
+    "missing_h1",
+    "multiple_h1",
+    "thin_content",
+    "unexpected_noindex",
+    "canonical_other_url",
+    "conflicting_robots",
+    "expired_job_posting",
+    "job_posting_missing_fields",
+}
+
 
 @dataclass(frozen=True)
 class IssueSignal:

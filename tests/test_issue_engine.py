@@ -30,6 +30,7 @@ def test_issue_deduplication_resolution_verification_and_reopen() -> None:
             crawl_run_id=first_run.id,
             snapshot_id=first_snapshot.id,
             signals=[signal],
+            checked_issue_types={"http_404"},
         )
         second_run, second_snapshot = _run(db, website.id, url.id)
         reconcile_issues(
@@ -39,6 +40,7 @@ def test_issue_deduplication_resolution_verification_and_reopen() -> None:
             crawl_run_id=second_run.id,
             snapshot_id=second_snapshot.id,
             signals=[signal],
+            checked_issue_types={"http_404"},
         )
         assert len(list(db.scalars(select(Issue)))) == 1
         assert len(list(db.scalars(select(IssueOccurrence)))) == 2
@@ -51,6 +53,7 @@ def test_issue_deduplication_resolution_verification_and_reopen() -> None:
             crawl_run_id=third_run.id,
             snapshot_id=third_snapshot.id,
             signals=[],
+            checked_issue_types={"http_404"},
         )
         issue = db.scalar(select(Issue))
         assert issue and issue.status == "resolved"
@@ -65,6 +68,7 @@ def test_issue_deduplication_resolution_verification_and_reopen() -> None:
             crawl_run_id=fourth_run.id,
             snapshot_id=fourth_snapshot.id,
             signals=[signal],
+            checked_issue_types={"http_404"},
         )
         assert issue.status == "new"
 

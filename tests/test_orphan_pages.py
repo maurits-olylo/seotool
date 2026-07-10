@@ -7,6 +7,7 @@ from app.models.discovery import CrawlJob, Url, UrlSource
 from app.models.issues import Issue
 from app.models.website import Website, WebsiteSettings
 from app.services.internal_link_analysis import detect_orphan_pages
+from app.services.issue_engine import reconcile_issues
 
 
 def test_detects_sitemap_url_without_crawl_depth_as_orphan() -> None:
@@ -63,6 +64,17 @@ def test_detects_sitemap_url_without_crawl_depth_as_orphan() -> None:
         issue = db.scalar(select(Issue))
         assert issue and issue.issue_type == "orphan_page"
         assert issue.url_id == orphan.id
+
+        reconcile_issues(
+            db,
+            website_id=website.id,
+            url_id=orphan.id,
+            crawl_run_id=run.id,
+            snapshot_id=None,
+            signals=[],
+            checked_issue_types={"http_404", "thin_content"},
+        )
+        assert issue.status == "new"
 
         orphan.crawl_depth = 2
         assert (
