@@ -1,6 +1,7 @@
 import time
 import uuid
 from datetime import UTC, datetime
+from urllib.parse import urljoin
 
 import structlog
 from sqlalchemy import select, update
@@ -12,8 +13,11 @@ from app.models.discovery import CrawlJob, Url
 from app.models.website import Website
 from app.services.http_crawler import CrawlError, fetch_url
 from app.services.internal_link_analysis import detect_orphan_pages
+from app.services.issue_engine import reconcile_issues
+from app.services.robots import RobotsRules
 from app.services.sitemap import parse_sitemap
 from app.services.snapshot import store_fetch_result
+from app.services.technical_checks import IssueSignal
 from app.services.url_registry import register_url
 
 logger = structlog.get_logger()
@@ -55,6 +59,7 @@ def execute_crawl_job(job_id: str) -> None:
                 run.status = "succeeded" if run.failed_urls == 0 else "partially_succeeded"
                 job.status = run.status
                 return
+            robots = _load_robots_rules(db, job)
             urls = list(
                 db.scalars(
                     select(Url)
@@ -65,7 +70,7 @@ def execute_crawl_job(job_id: str) -> None:
             )
             run.discovered_urls = len(urls)
             for url in urls:
-                _crawl_one(db, job, run, url)
+                _crawl_one(db, job, run, url, robots=robots)
                 _respect_request_delay(job)
             run.status = "succeeded" if run.failed_urls == 0 else "partially_succeeded"
             job.status = run.status
@@ -137,6 +142,7 @@ def _crawl_full_site(db, job: CrawlJob, run: CrawlRun) -> None:  # type: ignore[
     )
     root.crawl_depth = 0
     db.commit()
+    robots = _load_robots_rules(db, job)
 
     pending: list[tuple[uuid.UUID, int]] = [(root.id, 0)]
     visited: set[uuid.UUID] = set()
@@ -150,7 +156,7 @@ def _crawl_full_site(db, job: CrawlJob, run: CrawlRun) -> None:  # type: ignore[
             continue
         url.crawl_depth = depth
         visited.add(url.id)
-        _crawl_one(db, job, run, url)
+        _crawl_one(db, job, run, url, robots=robots)
         _respect_request_delay(job)
         discovered = list(
             db.scalars(
@@ -186,8 +192,49 @@ def _respect_request_delay(job: CrawlJob) -> None:
         time.sleep(delay_ms / 1000)
 
 
-def _crawl_one(db, job: CrawlJob, run: CrawlRun, url: Url) -> None:  # type: ignore[no-untyped-def]
+def _crawl_one(  # type: ignore[no-untyped-def]
+    db,
+    job: CrawlJob,
+    run: CrawlRun,
+    url: Url,
+    *,
+    robots: RobotsRules | None = None,
+) -> None:
     settings = job.settings_snapshot
+    if robots and not robots.allows(url.normalized_url):
+        snapshot = UrlSnapshot(
+            url_id=url.id,
+            crawl_run_id=run.id,
+            requested_url=url.normalized_url,
+            error_message="Blocked by robots.txt",
+            is_indexable=False,
+        )
+        db.add(snapshot)
+        db.flush()
+        reconcile_issues(
+            db,
+            website_id=url.website_id,
+            url_id=url.id,
+            crawl_run_id=run.id,
+            snapshot_id=snapshot.id,
+            signals=[
+                IssueSignal(
+                    issue_type="robots_txt_blocked",
+                    category="indexation",
+                    severity="medium",
+                    title="URL geblokkeerd door robots.txt",
+                    description="De crawler mag deze bekende URL niet ophalen.",
+                    recommended_action=(
+                        "Controleer of deze robots.txt-blokkade voor de URL bewust is."
+                    ),
+                    evidence={"url": url.normalized_url},
+                )
+            ],
+            checked_issue_types={"robots_txt_blocked"},
+        )
+        run.failed_urls += 1
+        db.commit()
+        return
     try:
         result = fetch_url(
             url.normalized_url,
@@ -209,3 +256,29 @@ def _crawl_one(db, job: CrawlJob, run: CrawlRun, url: Url) -> None:  # type: ign
         )
         run.failed_urls += 1
         db.commit()
+
+
+def _load_robots_rules(db, job: CrawlJob) -> RobotsRules | None:  # type: ignore[no-untyped-def]
+    if not bool(job.settings_snapshot.get("respect_robots_txt", True)):
+        return None
+    website = db.get(Website, job.website_id)
+    if website is None:
+        raise RuntimeError("Website does not exist")
+    robots_url = urljoin(website.base_url, "/robots.txt")
+    try:
+        result = fetch_url(
+            robots_url,
+            timeout_seconds=int(job.settings_snapshot.get("request_timeout_seconds", 20)),
+            max_response_size=min(
+                int(job.settings_snapshot.get("max_response_size", 5_000_000)),
+                1_000_000,
+            ),
+        )
+    except CrawlError:
+        return None
+    if result.status_code != 200:
+        return None
+    return RobotsRules(
+        result.content.decode("utf-8", errors="replace"),
+        robots_url,
+    )

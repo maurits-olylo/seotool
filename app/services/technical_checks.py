@@ -17,6 +17,7 @@ SNAPSHOT_ISSUE_TYPES = {
     "conflicting_robots",
     "expired_job_posting",
     "job_posting_missing_fields",
+    "robots_txt_blocked",
 }
 
 

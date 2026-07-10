@@ -16,6 +16,16 @@ def test_full_site_crawl_assigns_breadth_first_depths(monkeypatch) -> None:  # t
     }
 
     def fake_fetch(url: str, **_: object) -> FetchResult:
+        if url.endswith("/robots.txt"):
+            return FetchResult(
+                requested_url=url,
+                final_url=url,
+                status_code=200,
+                redirect_chain=[],
+                headers={"content-type": "text/plain"},
+                content=b"User-agent: *\nAllow: /",
+                response_time_ms=1,
+            )
         return FetchResult(
             requested_url=url,
             final_url=url,
