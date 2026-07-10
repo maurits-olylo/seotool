@@ -1,3 +1,4 @@
+import time
 import uuid
 from datetime import UTC, datetime
 
@@ -59,11 +60,13 @@ def execute_crawl_job(job_id: str) -> None:
                     select(Url)
                     .where(Url.website_id == job.website_id, Url.is_active.is_(True))
                     .order_by(Url.normalized_url)
+                    .limit(int(job.settings_snapshot.get("max_urls", 10_000)))
                 )
             )
             run.discovered_urls = len(urls)
             for url in urls:
                 _crawl_one(db, job, run, url)
+                _respect_request_delay(job)
             run.status = "succeeded" if run.failed_urls == 0 else "partially_succeeded"
             job.status = run.status
         except Exception as exc:
@@ -148,6 +151,7 @@ def _crawl_full_site(db, job: CrawlJob, run: CrawlRun) -> None:  # type: ignore[
         url.crawl_depth = depth
         visited.add(url.id)
         _crawl_one(db, job, run, url)
+        _respect_request_delay(job)
         discovered = list(
             db.scalars(
                 select(Url)
@@ -174,6 +178,12 @@ def _crawl_full_site(db, job: CrawlJob, run: CrawlRun) -> None:  # type: ignore[
         crawl_run_id=run.id,
     )
     db.commit()
+
+
+def _respect_request_delay(job: CrawlJob) -> None:
+    delay_ms = max(0, int(job.settings_snapshot.get("request_delay_ms", 0)))
+    if delay_ms:
+        time.sleep(delay_ms / 1000)
 
 
 def _crawl_one(db, job: CrawlJob, run: CrawlRun, url: Url) -> None:  # type: ignore[no-untyped-def]
