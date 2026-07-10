@@ -55,8 +55,12 @@ def execute_crawl_job(job_id: str) -> None:
                 job.status = "succeeded"
                 return
             if job.job_type == "full_site_crawl":
-                _crawl_full_site(db, job, run)
-                run.status = "succeeded" if run.failed_urls == 0 else "partially_succeeded"
+                site_crawl_complete = _crawl_full_site(db, job, run)
+                run.status = (
+                    "succeeded"
+                    if run.failed_urls == 0 and site_crawl_complete
+                    else "partially_succeeded"
+                )
                 job.status = run.status
                 return
             robots = _load_robots_rules(db, job)
@@ -127,7 +131,7 @@ def _import_sitemaps(db, job: CrawlJob, run: CrawlRun) -> None:  # type: ignore[
         db.commit()
 
 
-def _crawl_full_site(db, job: CrawlJob, run: CrawlRun) -> None:  # type: ignore[no-untyped-def]
+def _crawl_full_site(db, job: CrawlJob, run: CrawlRun) -> bool:  # type: ignore[no-untyped-def]
     website = db.get(Website, job.website_id)
     if website is None:
         raise RuntimeError("Website does not exist")
@@ -178,12 +182,15 @@ def _crawl_full_site(db, job: CrawlJob, run: CrawlRun) -> None:  # type: ignore[
                 pending.append((target.id, next_depth))
         db.commit()
     run.discovered_urls = len(visited)
-    detect_orphan_pages(
-        db,
-        website_id=website.id,
-        crawl_run_id=run.id,
-    )
+    complete = not pending
+    if complete:
+        detect_orphan_pages(
+            db,
+            website_id=website.id,
+            crawl_run_id=run.id,
+        )
     db.commit()
+    return complete
 
 
 def _respect_request_delay(job: CrawlJob) -> None:
