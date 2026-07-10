@@ -1,5 +1,7 @@
 from fastapi.testclient import TestClient
 
+from app.core.config import get_settings
+
 
 def test_health(client: TestClient) -> None:
     response = client.get("/health")
@@ -27,6 +29,39 @@ def test_api_requires_key() -> None:
 
     response = TestClient(app).get("/api/v1/clients")
     assert response.status_code == 401
+
+
+def test_proxied_http_redirects_to_https_in_production(monkeypatch) -> None:
+    from app.main import app
+
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("API_KEY", "a-long-production-secret")
+    get_settings.cache_clear()
+    try:
+        response = TestClient(app).get(
+            "/health?probe=true",
+            headers={"X-Forwarded-Proto": "http", "Host": "seo.thact.nl"},
+            follow_redirects=False,
+        )
+    finally:
+        get_settings.cache_clear()
+
+    assert response.status_code == 308
+    assert response.headers["location"] == "https://seo.thact.nl/health?probe=true"
+
+
+def test_direct_production_healthcheck_is_not_redirected(monkeypatch) -> None:
+    from app.main import app
+
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("API_KEY", "a-long-production-secret")
+    get_settings.cache_clear()
+    try:
+        response = TestClient(app).get("/health")
+    finally:
+        get_settings.cache_clear()
+
+    assert response.status_code == 200
 
 
 def test_url_registry_deduplicates_and_creates_job(client: TestClient) -> None:

@@ -1,7 +1,9 @@
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 
 import structlog
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
+from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -23,6 +25,20 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title=get_settings().app_name, version="0.1.0", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def redirect_proxied_http_to_https(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    if (
+        get_settings().app_env == "production"
+        and request.headers.get("x-forwarded-proto") == "http"
+    ):
+        return RedirectResponse(request.url.replace(scheme="https"), status_code=308)
+    return await call_next(request)
+
+
 app.include_router(clients.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(websites.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(discovery.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
