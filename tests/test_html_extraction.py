@@ -29,3 +29,17 @@ def test_content_change_only_changes_relevant_hashes() -> None:
     )
     assert first.metadata_hash == second.metadata_hash
     assert first.main_content_hash != second.main_content_hash
+
+
+def test_uses_complete_body_when_page_contains_multiple_article_cards() -> None:
+    html = """
+    <html><body>
+      <header>Navigation</header>
+      <article class="card">First card</article>
+      <article class="card">Second card with useful content</article>
+      <footer>Footer links</footer>
+    </body></html>
+    """
+    page = extract_page(html, "https://example.com/")
+    assert page.main_content == "First card Second card with useful content"
+    assert page.word_count == 7
