@@ -34,9 +34,10 @@ def analyze_snapshot(db: Session, snapshot: UrlSnapshot) -> None:
             )
         )
     signals = inspect_snapshot(snapshot)
-    signals.extend(
-        inspect_job_posting(snapshot.schema_data or [], status_code=snapshot.status_code)
-    )
+    if not snapshot.redirect_chain:
+        signals.extend(
+            inspect_job_posting(snapshot.schema_data or [], status_code=snapshot.status_code)
+        )
     reconcile_issues(
         db,
         website_id=url.website_id,

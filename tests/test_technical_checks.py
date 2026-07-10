@@ -40,3 +40,24 @@ def test_detects_onpage_and_indexation_signals() -> None:
         "unexpected_noindex",
         "canonical_other_url",
     }
+
+
+def test_does_not_report_final_page_onpage_issues_on_redirect_source() -> None:
+    snapshot = UrlSnapshot(
+        url_id=uuid.uuid4(),
+        crawl_run_id=uuid.uuid4(),
+        requested_url="http://example.com/",
+        final_url="https://example.com/",
+        status_code=200,
+        title=None,
+        headings={"h1": ["One", "Two"]},
+        word_count=1,
+        redirect_chain=[
+            {
+                "url": "http://example.com/",
+                "status_code": 301,
+                "target": "https://example.com/",
+            }
+        ],
+    )
+    assert inspect_snapshot(snapshot) == []

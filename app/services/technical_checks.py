@@ -69,6 +69,8 @@ def inspect_snapshot(snapshot: UrlSnapshot) -> list[IssueSignal]:
                 redirects=len(snapshot.redirect_chain),
             )
         )
+    if snapshot.redirect_chain:
+        return signals
     if status == 200 and not snapshot.title:
         signals.append(
             _signal(
