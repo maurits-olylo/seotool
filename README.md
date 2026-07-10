@@ -1,0 +1,2 @@
+# seotool
+SEOtool
