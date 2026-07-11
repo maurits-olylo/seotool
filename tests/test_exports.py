@@ -1,9 +1,11 @@
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
 
 from app.db.session import SessionLocal
 from app.models.client import Client
+from app.models.common import utc_now
 from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url
 from app.models.exports import Export
@@ -56,8 +58,26 @@ def test_datasets_include_human_readable_urls() -> None:
         job = CrawlJob(website_id=website.id, job_type="full_site_crawl")
         db.add(job)
         db.flush()
-        run = CrawlRun(crawl_job_id=job.id, website_id=website.id, crawl_type="full_site_crawl")
+        run = CrawlRun(
+            crawl_job_id=job.id,
+            website_id=website.id,
+            crawl_type="full_site_crawl",
+            status="succeeded",
+            finished_at=utc_now(),
+        )
         db.add(run)
+        db.flush()
+        old_job = CrawlJob(website_id=website.id, job_type="full_site_crawl")
+        db.add(old_job)
+        db.flush()
+        old_run = CrawlRun(
+            crawl_job_id=old_job.id,
+            website_id=website.id,
+            crawl_type="full_site_crawl",
+            status="succeeded",
+            finished_at=utc_now() - timedelta(days=1),
+        )
+        db.add(old_run)
         db.flush()
         snapshot = UrlSnapshot(
             url_id=target.id,
@@ -92,6 +112,14 @@ def test_datasets_include_human_readable_urls() -> None:
                     is_internal=True,
                     is_nofollow=False,
                 ),
+                UrlLink(
+                    crawl_run_id=old_run.id,
+                    source_url_id=source.id,
+                    target_url=target.normalized_url,
+                    target_url_id=target.id,
+                    is_internal=True,
+                    is_nofollow=False,
+                ),
             ]
         )
         db.commit()
@@ -110,3 +138,4 @@ def test_datasets_include_human_readable_urls() -> None:
             "target_url",
         ]
         assert datasets["links"][1][0][1] == source.normalized_url
+        assert len(datasets["links"][1]) == 1

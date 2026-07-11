@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.models.crawl import UrlLink
+from app.models.crawl import CrawlRun, UrlLink
 from app.models.discovery import Url
 from app.models.exports import Export
 from app.models.issues import Change, Issue
@@ -54,9 +54,26 @@ def _datasets(db: Session, website_id: object) -> dict[str, tuple[list[str], lis
     url_by_id = {url.id: url.normalized_url for url in urls}
     issues = list(db.scalars(select(Issue).where(Issue.website_id == website_id)))
     changes = list(db.scalars(select(Change).where(Change.website_id == website_id)))
+    latest_full_run_id = db.scalar(
+        select(CrawlRun.id)
+        .where(
+            CrawlRun.website_id == website_id,
+            CrawlRun.crawl_type == "full_site_crawl",
+            CrawlRun.status == "succeeded",
+        )
+        .order_by(CrawlRun.finished_at.desc())
+        .limit(1)
+    )
     links = (
-        list(db.scalars(select(UrlLink).where(UrlLink.source_url_id.in_(url_ids))))
-        if url_ids
+        list(
+            db.scalars(
+                select(UrlLink).where(
+                    UrlLink.source_url_id.in_(url_ids),
+                    UrlLink.crawl_run_id == latest_full_run_id,
+                )
+            )
+        )
+        if url_ids and latest_full_run_id
         else []
     )
     return {
