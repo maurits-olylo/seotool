@@ -61,3 +61,37 @@ def test_does_not_report_final_page_onpage_issues_on_redirect_source() -> None:
         ],
     )
     assert inspect_snapshot(snapshot) == []
+
+
+def test_ignores_query_filter_canonical_to_same_path() -> None:
+    snapshot = UrlSnapshot(
+        requested_url="https://example.com/articles?c=doors",
+        final_url="https://example.com/articles?c=doors",
+        status_code=200,
+        canonical="https://example.com/articles",
+        title="Articles",
+        meta_description="Articles description",
+        headings={"h1": ["Articles"]},
+        word_count=100,
+        is_indexable=True,
+        redirect_chain=[],
+    )
+    types = {signal.issue_type for signal in inspect_snapshot(snapshot)}
+    assert "canonical_other_url" not in types
+
+
+def test_reports_paginated_canonical_to_first_page() -> None:
+    snapshot = UrlSnapshot(
+        requested_url="https://example.com/news?page=2&sort=date",
+        final_url="https://example.com/news?page=2&sort=date",
+        status_code=200,
+        canonical="https://example.com/news",
+        title="News page 2",
+        meta_description="Older news",
+        headings={"h1": ["News"]},
+        word_count=100,
+        is_indexable=True,
+        redirect_chain=[],
+    )
+    types = {signal.issue_type for signal in inspect_snapshot(snapshot)}
+    assert "canonical_other_url" in types

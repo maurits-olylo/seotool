@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from urllib.parse import parse_qs, urlsplit
 
 from app.models.crawl import UrlSnapshot
 
@@ -132,7 +133,7 @@ def inspect_snapshot(snapshot: UrlSnapshot) -> list[IssueSignal]:
     if (
         snapshot.canonical
         and snapshot.final_url
-        and snapshot.canonical.rstrip("/") != snapshot.final_url.rstrip("/")
+        and _canonical_difference_is_actionable(snapshot.final_url, snapshot.canonical)
     ):
         signals.append(
             _signal(
@@ -157,6 +158,26 @@ def inspect_snapshot(snapshot: UrlSnapshot) -> list[IssueSignal]:
             )
         )
     return signals
+
+
+def _canonical_difference_is_actionable(page_url: str, canonical: str) -> bool:
+    if canonical.rstrip("/") == page_url.rstrip("/"):
+        return False
+    page = urlsplit(page_url)
+    target = urlsplit(canonical)
+    same_page = (
+        page.scheme.lower(),
+        page.netloc.lower(),
+        page.path.rstrip("/"),
+    ) == (
+        target.scheme.lower(),
+        target.netloc.lower(),
+        target.path.rstrip("/"),
+    )
+    if not same_page or target.query:
+        return True
+    query_keys = set(parse_qs(page.query, keep_blank_values=True))
+    return bool(query_keys & {"page", "paged", "p"})
 
 
 def _signal(
