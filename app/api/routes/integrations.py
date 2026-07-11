@@ -14,11 +14,14 @@ from app.models.client import Client
 from app.models.integrations import IntegrationConnection, WebsiteIntegration
 from app.models.website import Website
 from app.schemas.integrations import (
+    GooglePropertiesRead,
     IntegrationConnectionCreate,
     IntegrationConnectionRead,
     WebsiteIntegrationCreate,
     WebsiteIntegrationRead,
+    WebsiteIntegrationUpsert,
 )
+from app.services.google_integrations import list_google_properties
 from app.services.oauth import (
     GOOGLE_SCOPES,
     encrypt_token,
@@ -151,6 +154,28 @@ def create_client_integration(
 
 
 @router.get(
+    "/clients/{client_id}/integrations/google/properties",
+    response_model=GooglePropertiesRead,
+)
+async def google_properties(
+    client_id: UUID, db: Session = Depends(get_db)
+) -> dict[str, list[dict[str, str]]]:
+    connection = db.scalar(
+        select(IntegrationConnection).where(
+            IntegrationConnection.client_id == client_id,
+            IntegrationConnection.provider == "google",
+            IntegrationConnection.status == "connected",
+        )
+    )
+    if not connection:
+        raise HTTPException(status_code=409, detail="Google account is not connected")
+    try:
+        return await list_google_properties(db, connection)
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.get(
     "/websites/{website_id}/integrations", response_model=list[WebsiteIntegrationRead]
 )
 def list_website_integrations(
@@ -193,5 +218,51 @@ def create_website_integration(
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(status_code=409, detail="Service already mapped") from exc
+    db.refresh(mapping)
+    return mapping
+
+
+@router.put(
+    "/websites/{website_id}/integrations/{service}",
+    response_model=WebsiteIntegrationRead,
+)
+def upsert_website_integration(
+    website_id: UUID,
+    service: str,
+    payload: WebsiteIntegrationUpsert,
+    db: Session = Depends(get_db),
+) -> WebsiteIntegration:
+    if service not in {"search_console", "ga4", "bing_webmaster"}:
+        raise HTTPException(status_code=422, detail="Unsupported integration service")
+    website = db.get(Website, website_id)
+    connection = db.get(IntegrationConnection, payload.connection_id)
+    if not website:
+        raise HTTPException(status_code=404, detail="Website not found")
+    if not connection or connection.client_id != website.client_id:
+        raise HTTPException(status_code=422, detail="Connection does not belong to this client")
+    expected_provider = "bing" if service == "bing_webmaster" else "google"
+    if connection.provider != expected_provider:
+        raise HTTPException(status_code=422, detail="Service and provider do not match")
+    mapping = db.scalar(
+        select(WebsiteIntegration).where(
+            WebsiteIntegration.website_id == website_id,
+            WebsiteIntegration.service == service,
+        )
+    )
+    if mapping is None:
+        mapping = WebsiteIntegration(
+            website_id=website_id,
+            service=service,
+            connection_id=payload.connection_id,
+            external_property_id=payload.external_property_id,
+            external_property_name=payload.external_property_name,
+        )
+        db.add(mapping)
+    else:
+        mapping.connection_id = payload.connection_id
+        mapping.external_property_id = payload.external_property_id
+        mapping.external_property_name = payload.external_property_name
+        mapping.status = "active"
+    db.commit()
     db.refresh(mapping)
     return mapping

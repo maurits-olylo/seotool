@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/ui/assets/actionable.css">
   <link rel="stylesheet" href="/ui/assets/integrations.css">
   <link rel="stylesheet" href="/ui/assets/oauth.css">
+  <link rel="stylesheet" href="/ui/assets/properties.css">
 </head>
 <body>
   <section id="login" class="login-shell hidden">
@@ -60,11 +61,11 @@
       <section id="integrations-view" class="hidden">
         <header><div><span class="eyebrow">DATABRONNEN</span><h1>Integraties</h1><p class="intro">Koppel databronnen op klantniveau en wijs properties toe aan websites.</p></div></header>
         <div class="integration-grid">
-          <article class="integration-card"><div class="provider-icon google">G</div><div><h2>Google</h2><p>Search Console en Google Analytics 4 via één Google-account.</p><span id="google-status" class="connection-status">Niet gekoppeld</span></div><button id="google-connect" disabled>Google koppelen</button></article>
+          <article class="integration-card"><div class="provider-icon google">G</div><div><h2>Google</h2><p>Search Console en Google Analytics 4 via één Google-account.</p><span id="google-status" class="connection-status">Niet gekoppeld</span></div><a id="google-connect" class="connect-link" aria-disabled="true">Google koppelen</a></article>
           <article class="integration-card"><div class="provider-icon bing">B</div><div><h2>Bing Webmaster Tools</h2><p>Zoekverkeer, keywords, crawl- en indexatiegegevens.</p><span id="bing-status" class="connection-status">Niet gekoppeld</span></div><button disabled>Bing koppelen</button></article>
         </div>
         <p id="integration-message" class="integration-message hidden"></p>
-        <section class="panel integration-note"><span class="eyebrow">PROPERTYKOPPELINGEN</span><h2>Na het verbinden</h2><p>Na Google-login kiezen we in de volgende stap de Search Console- en GA4-property voor iedere website.</p></section>
+        <section id="property-mapping" class="panel property-mapping hidden"><span class="eyebrow">PROPERTYKOPPELINGEN</span><h2>Properties voor <span id="mapping-website"></span></h2><div class="property-grid"><label>Search Console-property<select id="search-console-property"></select><button id="save-search-console" class="save-property">Opslaan</button></label><label>GA4-property<select id="ga4-property"></select><button id="save-ga4" class="save-property">Opslaan</button></label></div><p id="property-message" class="property-message"></p></section>
       </section>
     </main>
   </div>

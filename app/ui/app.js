@@ -7,7 +7,7 @@ const labels = {
   waiting_for_client: "Wacht op klant", resolved: "Opgelost", verified: "Geverifieerd",
   ignored: "Genegeerd", accepted_risk: "Risico geaccepteerd",
 };
-const state = { clients: [], websites: [], issues: [], urls: new Map(), filtered: [], page: 1, selectedIssueId: null };
+const state = { clients: [], websites: [], issues: [], urls: new Map(), filtered: [], page: 1, selectedIssueId: null, googleConnectionId: null };
 
 async function api(path, options = {}) {
   const response = await fetch(path, { credentials: "same-origin", ...options });
@@ -53,8 +53,64 @@ async function loadIntegrations() {
     const target = $(`#${provider}-status`);
     target.textContent = connection ? `${labels[connection.status] || connection.status}${connection.account_email ? ` · ${connection.account_email}` : ""}` : "Niet gekoppeld";
   }
-  $("#google-connect").disabled = !googleConfig.configured;
-  $("#google-connect").textContent = connections.some((item) => item.provider === "google" && item.status === "connected") ? "Opnieuw koppelen" : "Google koppelen";
+  const googleConnection = connections.find((item) => item.provider === "google" && item.status === "connected");
+  const googleLink = $("#google-connect");
+  googleLink.textContent = googleConnection ? "Opnieuw koppelen" : "Google koppelen";
+  if (googleConfig.configured) {
+    googleLink.href = `/api/v1/integrations/google/authorize?client_id=${clientId}`;
+    googleLink.setAttribute("aria-disabled", "false");
+  } else {
+    googleLink.removeAttribute("href");
+    googleLink.setAttribute("aria-disabled", "true");
+  }
+  if (googleConnection) {
+    state.googleConnectionId = googleConnection.id;
+    await loadGoogleProperties().catch(() => {
+      $("#integration-message").textContent = "Google-properties konden niet worden geladen. Controleer de API-rechten en probeer opnieuw.";
+      $("#integration-message").classList.remove("hidden");
+    });
+  } else {
+    state.googleConnectionId = null;
+    $("#property-mapping").classList.add("hidden");
+  }
+}
+
+async function loadGoogleProperties() {
+  const clientId = $("#client-select").value;
+  const websiteId = $("#website-select").value;
+  if (!clientId || !websiteId || !state.googleConnectionId) return;
+  const [properties, mappings] = await Promise.all([
+    api(`/api/v1/clients/${clientId}/integrations/google/properties`),
+    api(`/api/v1/websites/${websiteId}/integrations`),
+  ]);
+  const searchConsoleMapping = mappings.find((item) => item.service === "search_console");
+  const ga4Mapping = mappings.find((item) => item.service === "ga4");
+  fillPropertySelect("#search-console-property", properties.search_console, searchConsoleMapping);
+  fillPropertySelect("#ga4-property", properties.ga4, ga4Mapping);
+  $("#mapping-website").textContent = $("#website-select").selectedOptions[0]?.textContent || "website";
+  $("#property-mapping").classList.remove("hidden");
+}
+
+function fillPropertySelect(selector, properties, mapping) {
+  const select = $(selector);
+  select.innerHTML = `<option value="">Selecteer een property</option>${properties.map((property) => `<option value="${escapeHtml(property.id)}" data-name="${escapeHtml(property.name)}">${escapeHtml(property.name)}${property.account ? ` · ${escapeHtml(property.account)}` : ""}</option>`).join("")}`;
+  if (mapping) select.value = mapping.external_property_id;
+}
+
+async function saveProperty(service, selector) {
+  const websiteId = $("#website-select").value;
+  const select = $(selector);
+  if (!websiteId || !select.value || !state.googleConnectionId) return;
+  await api(`/api/v1/websites/${websiteId}/integrations/${service}`, {
+    method: "PUT",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      connection_id: state.googleConnectionId,
+      external_property_id: select.value,
+      external_property_name: select.selectedOptions[0]?.dataset.name || select.value,
+    }),
+  });
+  $("#property-message").textContent = "Propertykoppeling opgeslagen.";
 }
 
 function showView(view) {
@@ -168,7 +224,7 @@ $("#login-form").addEventListener("submit", async (event) => {
 });
 $("#logout").addEventListener("click", async () => { await fetch("/ui/logout", { method: "POST" }); showLogin(); });
 $("#client-select").addEventListener("change", async () => { await loadWebsites(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); });
-$("#website-select").addEventListener("change", loadIssues);
+$("#website-select").addEventListener("change", async () => { await loadIssues(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); });
 for (const selector of ["#severity-filter", "#type-filter", "#status-filter"]) $(selector).addEventListener("change", () => { state.page = 1; render(); });
 $("#search-filter").addEventListener("input", () => { state.page = 1; render(); });
 $("#previous-page").addEventListener("click", () => { state.page -= 1; render(); });
@@ -179,10 +235,8 @@ $("#close-dialog").addEventListener("click", () => $("#issue-dialog").close());
 $("#save-status").addEventListener("click", saveIssueStatus);
 $("#overview-nav").addEventListener("click", () => showView("overview"));
 $("#integrations-nav").addEventListener("click", () => showView("integrations"));
-$("#google-connect").addEventListener("click", () => {
-  const clientId = $("#client-select").value;
-  if (clientId) window.location.assign(`/api/v1/integrations/google/authorize?client_id=${clientId}`);
-});
+$("#save-search-console").addEventListener("click", () => saveProperty("search_console", "#search-console-property"));
+$("#save-ga4").addEventListener("click", () => saveProperty("ga4", "#ga4-property"));
 
 loadClients().then(() => {
   showApp();

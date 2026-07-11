@@ -41,3 +41,21 @@ class WebsiteIntegrationRead(Timestamped):
     status: str
     last_synced_at: datetime | None
     settings: dict[str, object]
+
+
+class WebsiteIntegrationUpsert(BaseModel):
+    connection_id: UUID
+    external_property_id: str = Field(min_length=1, max_length=512)
+    external_property_name: str | None = Field(default=None, max_length=512)
+
+
+class GoogleProperty(BaseModel):
+    id: str
+    name: str
+    permission: str | None = None
+    account: str | None = None
+
+
+class GooglePropertiesRead(BaseModel):
+    search_console: list[GoogleProperty]
+    ga4: list[GoogleProperty]
