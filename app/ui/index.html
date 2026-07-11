@@ -6,6 +6,7 @@
   <title>SEO Monitor</title>
   <link rel="stylesheet" href="/ui/assets/app.css">
   <link rel="stylesheet" href="/ui/assets/responsive.css">
+  <link rel="stylesheet" href="/ui/assets/dashboard.css">
 </head>
 <body>
   <section id="login" class="login-shell hidden">
@@ -38,17 +39,26 @@
       <section class="panel">
         <div class="panel-head">
           <div><span class="eyebrow">ACTIELIJST</span><h2>Openstaande issues</h2></div>
-          <select id="status-filter" aria-label="Statusfilter">
-            <option value="">Alle statussen</option><option value="new">Nieuw</option>
-            <option value="review">Review</option><option value="planned">Gepland</option>
-            <option value="in_progress">Bezig</option><option value="resolved">Opgelost</option>
-          </select>
+          <span id="result-count" class="result-count"></span>
         </div>
-        <div class="table-wrap"><table><thead><tr><th>Prioriteit</th><th>Issue</th><th>Status</th><th>Laatst gezien</th></tr></thead><tbody id="issues"></tbody></table></div>
+        <div class="filters">
+          <input id="search-filter" type="search" placeholder="Zoek op issue of URL" aria-label="Zoeken">
+          <select id="severity-filter" aria-label="Ernst"><option value="">Alle prioriteiten</option><option value="high">Hoog</option><option value="medium">Middel</option><option value="low">Laag</option></select>
+          <select id="type-filter" aria-label="Issue-type"><option value="">Alle issue-types</option></select>
+          <select id="status-filter" aria-label="Status"><option value="active">Alleen actief</option><option value="new">Nieuw</option><option value="review">Te beoordelen</option><option value="planned">Gepland</option><option value="in_progress">Bezig</option><option value="waiting_for_client">Wacht op klant</option><option value="all">Inclusief historie</option></select>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Prioriteit</th><th>Issue en pagina</th><th>Status</th><th>Laatst gezien</th><th></th></tr></thead><tbody id="issues"></tbody></table></div>
         <p id="empty" class="empty hidden">Geen issues gevonden.</p>
+        <footer class="pager"><button id="previous-page" class="page-button">Vorige</button><span id="page-label"></span><button id="next-page" class="page-button">Volgende</button></footer>
       </section>
     </main>
   </div>
+  <dialog id="issue-dialog">
+    <button id="close-dialog" class="dialog-close" aria-label="Sluiten">×</button>
+    <span class="eyebrow">ISSUEDETAIL</span><h2 id="detail-title"></h2>
+    <a id="detail-url" target="_blank" rel="noopener"></a>
+    <dl><div><dt>Prioriteit</dt><dd id="detail-severity"></dd></div><div><dt>Status</dt><dd id="detail-status"></dd></div><div><dt>Beschrijving</dt><dd id="detail-description"></dd></div><div><dt>Aanbevolen actie</dt><dd id="detail-action"></dd></div></dl>
+  </dialog>
   <script src="/ui/assets/app.js" defer></script>
 </body>
 </html>
