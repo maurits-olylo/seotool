@@ -7,7 +7,7 @@ const labels = {
   waiting_for_client: "Wacht op klant", resolved: "Opgelost", verified: "Geverifieerd",
   ignored: "Genegeerd", accepted_risk: "Risico geaccepteerd",
 };
-const state = { clients: [], websites: [], issues: [], urls: new Map(), filtered: [], page: 1 };
+const state = { clients: [], websites: [], issues: [], urls: new Map(), filtered: [], page: 1, selectedIssueId: null };
 
 async function api(path, options = {}) {
   const response = await fetch(path, { credentials: "same-origin", ...options });
@@ -68,8 +68,23 @@ function applyFilters() {
   }).sort((a, b) => ({high: 0, medium: 1, low: 2}[a.severity] - {high: 0, medium: 1, low: 2}[b.severity] || new Date(b.last_detected_at) - new Date(a.last_detected_at)));
 }
 
+function renderGroups() {
+  const query = $("#search-filter").value.trim().toLowerCase();
+  const severity = $("#severity-filter").value;
+  const status = $("#status-filter").value;
+  const counts = new Map();
+  state.issues.forEach((issue) => {
+    const statusMatch = status === "all" || (status === "active" ? ACTIVE_STATUSES.has(issue.status) : issue.status === status);
+    const searchText = `${issue.title} ${issue.issue_type} ${issueUrlLabel(issue)}`.toLowerCase();
+    if (statusMatch && (!severity || issue.severity === severity) && (!query || searchText.includes(query))) counts.set(issue.issue_type, (counts.get(issue.issue_type) || 0) + 1);
+  });
+  $("#issue-groups").innerHTML = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
+    .map(([type, count]) => `<button data-group-type="${escapeHtml(type)}"><strong>${count}</strong><span>${escapeHtml(type.replaceAll("_", " "))}</span></button>`).join("");
+}
+
 function render() {
   applyFilters();
+  renderGroups();
   const counts = { high: 0, medium: 0, low: 0, total: state.filtered.length };
   state.filtered.forEach((issue) => { if (counts[issue.severity] !== undefined) counts[issue.severity] += 1; });
   $("#summary").innerHTML = [["total","Actief"],["high","Hoog"],["medium","Middel"],["low","Laag"]]
@@ -92,17 +107,32 @@ function render() {
   $("#empty").classList.toggle("hidden", rows.length !== 0);
 }
 
-function showIssue(issueId) {
-  const issue = state.issues.find((item) => item.id === issueId);
+async function showIssue(issueId) {
+  const issue = await api(`/api/v1/issues/${issueId}`);
   if (!issue) return;
+  state.selectedIssueId = issueId;
   $("#detail-title").textContent = issue.title;
   const url = issueUrl(issue); $("#detail-url").textContent = url || "Websitebreed issue";
   if (url) $("#detail-url").href = url; else $("#detail-url").removeAttribute("href");
   $("#detail-severity").textContent = labels[issue.severity] || issue.severity;
-  $("#detail-status").textContent = labels[issue.status] || issue.status;
+  $("#detail-status").value = issue.status;
   $("#detail-description").textContent = issue.description;
   $("#detail-action").textContent = issue.recommended_action;
+  $("#detail-evidence").textContent = Object.entries(issue.evidence).map(([key, value]) => `${key.replaceAll("_", " ")}: ${value}`).join("\n") || "Geen aanvullend bewijs opgeslagen.";
+  $("#detail-sources").innerHTML = issue.source_urls.map((source) => `<li><a href="${escapeHtml(source)}" target="_blank" rel="noopener">${escapeHtml(source)}</a></li>`).join("");
+  $("#source-section").classList.toggle("hidden", issue.source_urls.length === 0);
   $("#issue-dialog").showModal();
+}
+
+async function saveIssueStatus() {
+  if (!state.selectedIssueId) return;
+  const updated = await api(`/api/v1/issues/${state.selectedIssueId}`, {
+    method: "PATCH", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({status: $("#detail-status").value}),
+  });
+  const index = state.issues.findIndex((issue) => issue.id === updated.id);
+  if (index >= 0) state.issues[index] = updated;
+  $("#issue-dialog").close(); state.selectedIssueId = null; render();
 }
 
 $("#login-form").addEventListener("submit", async (event) => {
@@ -119,6 +149,8 @@ $("#search-filter").addEventListener("input", () => { state.page = 1; render(); 
 $("#previous-page").addEventListener("click", () => { state.page -= 1; render(); });
 $("#next-page").addEventListener("click", () => { state.page += 1; render(); });
 $("#issues").addEventListener("click", (event) => { const button = event.target.closest("[data-issue-id]"); if (button) showIssue(button.dataset.issueId); });
+$("#issue-groups").addEventListener("click", (event) => { const button = event.target.closest("[data-group-type]"); if (button) { $("#type-filter").value = button.dataset.groupType; state.page = 1; render(); } });
 $("#close-dialog").addEventListener("click", () => $("#issue-dialog").close());
+$("#save-status").addEventListener("click", saveIssueStatus);
 
 loadClients().then(showApp).catch(() => showLogin());

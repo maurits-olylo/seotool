@@ -1,6 +1,12 @@
+from uuid import UUID
+
 from fastapi.testclient import TestClient
 
 from app.core.config import get_settings
+from app.db.session import SessionLocal
+from app.models.crawl import CrawlRun
+from app.models.discovery import CrawlJob
+from app.models.issues import Issue, IssueOccurrence
 
 
 def test_health(client: TestClient) -> None:
@@ -45,6 +51,51 @@ def test_interface_login_creates_http_only_session() -> None:
 
     assert browser.post("/ui/logout").status_code == 204
     assert browser.get("/api/v1/clients").status_code == 401
+
+
+def test_issue_detail_exposes_evidence_and_updates_status(client: TestClient) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Issue UI"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={"client_id": customer["id"], "name": "Issue site", "base_url": "https://example.com"},
+    ).json()
+    website_id = UUID(website["id"])
+    with SessionLocal() as db:
+        job = CrawlJob(website_id=website_id, job_type="full_site_crawl")
+        db.add(job)
+        db.flush()
+        run = CrawlRun(crawl_job_id=job.id, website_id=website_id, crawl_type="full_site_crawl")
+        db.add(run)
+        db.flush()
+        issue = Issue(
+            website_id=website_id,
+            issue_type="http_404",
+            category="reachability",
+            severity="high",
+            title="Pagina geeft 404",
+            description="De URL geeft een 404.",
+            recommended_action="Herstel de pagina.",
+        )
+        db.add(issue)
+        db.flush()
+        db.add(
+            IssueOccurrence(
+                issue_id=issue.id,
+                crawl_run_id=run.id,
+                evidence={"status_code": 404},
+            )
+        )
+        db.commit()
+        issue_id = issue.id
+
+    detail = client.get(f"/api/v1/issues/{issue_id}")
+    assert detail.status_code == 200
+    assert detail.json()["evidence"] == {"status_code": 404}
+    assert detail.json()["source_urls"] == []
+
+    updated = client.patch(f"/api/v1/issues/{issue_id}", json={"status": "planned"})
+    assert updated.status_code == 200
+    assert updated.json()["status"] == "planned"
 
 
 def test_proxied_http_redirects_to_https_in_production(monkeypatch) -> None:

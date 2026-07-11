@@ -53,6 +53,11 @@ class IssueRead(ORMModel):
     due_date: date | None
 
 
+class IssueDetailRead(IssueRead):
+    evidence: dict[str, object]
+    source_urls: list[str]
+
+
 class IssueUpdate(BaseModel):
     status: IssueStatus | None = None
     assigned_to: str | None = None
