@@ -18,6 +18,7 @@ from app.services.robots import RobotsRules
 from app.services.sitemap import parse_sitemap
 from app.services.snapshot import store_fetch_result
 from app.services.technical_checks import IssueSignal
+from app.services.url_filtering import is_probable_html_page
 from app.services.url_registry import register_url
 
 logger = structlog.get_logger()
@@ -175,6 +176,8 @@ def _crawl_full_site(db, job: CrawlJob, run: CrawlRun) -> bool:  # type: ignore[
             )
         )
         for target in discovered:
+            if not is_probable_html_page(target.normalized_url):
+                continue
             next_depth = depth + 1
             if target.crawl_depth is None or next_depth < target.crawl_depth:
                 target.crawl_depth = next_depth

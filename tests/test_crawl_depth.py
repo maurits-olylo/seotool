@@ -113,3 +113,63 @@ def test_limited_full_crawl_is_partial_and_skips_orphan_analysis(monkeypatch) ->
         completed = db.get(CrawlJob, job_id)
         assert completed and completed.status == "partially_succeeded"
     assert orphan_analysis_calls == []
+
+
+def test_full_site_crawl_keeps_asset_links_without_fetching_assets(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    fetched: list[str] = []
+
+    def fake_fetch(url: str, **_: object) -> FetchResult:
+        fetched.append(url)
+        if url.endswith("robots.txt"):
+            content = b"User-agent: *\nAllow: /"
+            content_type = "text/plain"
+        elif url == "https://example.com/":
+            content = (
+                b'<main><a href="/page">Page</a><a href="/file.pdf">PDF</a>'
+                b'<a href="/photo.JPG?download=1">Photo</a></main>'
+            )
+            content_type = "text/html"
+        else:
+            content = b"<main>Page</main>"
+            content_type = "text/html"
+        return FetchResult(
+            requested_url=url,
+            final_url=url,
+            status_code=200,
+            redirect_chain=[],
+            headers={"content-type": content_type},
+            content=content,
+            response_time_ms=1,
+        )
+
+    monkeypatch.setattr("app.jobs.fetch_url", fake_fetch)
+    with SessionLocal() as db:
+        client = Client(name="Asset client")
+        website = Website(client=client, name="Asset site", base_url="https://example.com/")
+        website.settings = WebsiteSettings(sitemap_urls=[], max_urls=10)
+        db.add(website)
+        db.flush()
+        job = CrawlJob(
+            website_id=website.id,
+            job_type="full_site_crawl",
+            settings_snapshot={"max_urls": 10},
+        )
+        db.add(job)
+        db.commit()
+        job_id = job.id
+
+    execute_crawl_job(str(job_id))
+
+    assert "https://example.com/file.pdf" not in fetched
+    assert "https://example.com/photo.JPG?download=1" not in fetched
+    with SessionLocal() as db:
+        depths = {
+            url.normalized_url: url.crawl_depth
+            for url in db.scalars(select(Url).order_by(Url.normalized_url))
+        }
+        assert depths["https://example.com/"] == 0
+        assert depths["https://example.com/page"] == 1
+        assert depths["https://example.com/file.pdf"] is None
+        assert depths["https://example.com/photo.JPG?download=1"] is None
+        completed = db.get(CrawlJob, job_id)
+        assert completed and completed.status == "succeeded"
