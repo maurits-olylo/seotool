@@ -113,6 +113,14 @@ def test_datasets_include_human_readable_urls() -> None:
                     is_nofollow=False,
                 ),
                 UrlLink(
+                    crawl_run_id=run.id,
+                    source_url_id=source.id,
+                    target_url=target.normalized_url,
+                    target_url_id=target.id,
+                    is_internal=True,
+                    is_nofollow=False,
+                ),
+                UrlLink(
                     crawl_run_id=old_run.id,
                     source_url_id=source.id,
                     target_url=target.normalized_url,

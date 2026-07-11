@@ -66,8 +66,18 @@ def _datasets(db: Session, website_id: object) -> dict[str, tuple[list[str], lis
     )
     links = (
         list(
-            db.scalars(
-                select(UrlLink).where(
+            db.execute(
+                select(
+                    UrlLink.source_url_id,
+                    UrlLink.target_url_id,
+                    UrlLink.target_url,
+                    UrlLink.anchor_text,
+                    UrlLink.is_internal,
+                    UrlLink.is_nofollow,
+                    UrlLink.http_status,
+                )
+                .distinct()
+                .where(
                     UrlLink.source_url_id.in_(url_ids),
                     UrlLink.crawl_run_id == latest_full_run_id,
                 )
