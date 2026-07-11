@@ -5,7 +5,7 @@ from app.jobs import execute_crawl_job
 from app.models.client import Client
 from app.models.discovery import CrawlJob, Url
 from app.models.website import Website, WebsiteSettings
-from app.services.http_crawler import FetchResult
+from app.services.http_crawler import FetchMetadata, FetchResult
 
 
 def test_full_site_crawl_assigns_breadth_first_depths(monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -117,6 +117,7 @@ def test_limited_full_crawl_is_partial_and_skips_orphan_analysis(monkeypatch) ->
 
 def test_full_site_crawl_keeps_asset_links_without_fetching_assets(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     fetched: list[str] = []
+    audited: list[str] = []
 
     def fake_fetch(url: str, **_: object) -> FetchResult:
         fetched.append(url)
@@ -142,7 +143,19 @@ def test_full_site_crawl_keeps_asset_links_without_fetching_assets(monkeypatch) 
             response_time_ms=1,
         )
 
+    def fake_metadata(url: str, **_: object) -> FetchMetadata:
+        audited.append(url)
+        return FetchMetadata(
+            requested_url=url,
+            final_url=url,
+            status_code=200,
+            redirect_chain=[],
+            headers={"content-type": "application/octet-stream", "content-length": "1000"},
+            response_time_ms=1,
+        )
+
     monkeypatch.setattr("app.jobs.fetch_url", fake_fetch)
+    monkeypatch.setattr("app.jobs.fetch_metadata", fake_metadata)
     with SessionLocal() as db:
         client = Client(name="Asset client")
         website = Website(client=client, name="Asset site", base_url="https://example.com/")
@@ -162,6 +175,10 @@ def test_full_site_crawl_keeps_asset_links_without_fetching_assets(monkeypatch) 
 
     assert "https://example.com/file.pdf" not in fetched
     assert "https://example.com/photo.JPG?download=1" not in fetched
+    assert sorted(audited) == [
+        "https://example.com/file.pdf",
+        "https://example.com/photo.JPG?download=1",
+    ]
     with SessionLocal() as db:
         depths = {
             url.normalized_url: url.crawl_depth

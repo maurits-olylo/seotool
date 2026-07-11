@@ -48,3 +48,7 @@ latere crawl wel intern bereikbaar wordt.
 
 Orphan-analyse draait alleen wanneer de breadth-first wachtrij volledig is verwerkt. Als `max_urls`
 de crawl afkapt, wordt de run `partially_succeeded` en blijven bestaande orphan-statussen ongewijzigd.
+
+Niet-HTML-assets blijven als URL en linkdoel bewaard, maar komen niet in de HTML-crawlwachtrij.
+Afbeeldingen en documenten krijgen een lichte HEAD-controle. Grote afbeeldingen (meer dan 2 MB) en
+documenten (meer dan 5 MB) leveren afzonderlijke issues op zonder de volledige bestanden te downloaden.

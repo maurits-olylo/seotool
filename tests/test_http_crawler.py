@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from app.services.http_crawler import CrawlError, fetch_url
+from app.services.http_crawler import CrawlError, fetch_metadata, fetch_url
 
 
 @pytest.fixture(autouse=True)
@@ -34,3 +34,17 @@ def test_limits_response_size() -> None:
     transport = httpx.MockTransport(lambda _: httpx.Response(200, content=b"x" * 11))
     with pytest.raises(CrawlError, match="maximum size"):
         fetch_url("https://example.com", max_response_size=10, transport=transport)
+
+
+def test_fetch_metadata_uses_head_without_downloading_body() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "HEAD"
+        return httpx.Response(
+            200,
+            headers={"Content-Type": "application/pdf", "Content-Length": "7500000"},
+            content=b"body that must not be consumed",
+        )
+
+    result = fetch_metadata("https://example.com/file.pdf", transport=httpx.MockTransport(handler))
+    assert result.status_code == 200
+    assert result.headers["content-length"] == "7500000"

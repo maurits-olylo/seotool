@@ -11,7 +11,8 @@ from app.models.common import utc_now
 from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url
 from app.models.website import Website
-from app.services.http_crawler import CrawlError, fetch_url
+from app.services.asset_checks import ASSET_ISSUE_TYPES, inspect_asset
+from app.services.http_crawler import CrawlError, fetch_metadata, fetch_url
 from app.services.internal_link_analysis import detect_orphan_pages
 from app.services.issue_engine import reconcile_issues
 from app.services.robots import RobotsRules
@@ -151,6 +152,7 @@ def _crawl_full_site(db, job: CrawlJob, run: CrawlRun) -> bool:  # type: ignore[
 
     pending: list[tuple[uuid.UUID, int]] = [(root.id, 0)]
     visited: set[uuid.UUID] = set()
+    audited_assets: set[uuid.UUID] = set()
     maximum = int(job.settings_snapshot.get("max_urls", website.settings.max_urls))
     while pending and len(visited) < maximum:
         url_id, depth = pending.pop(0)
@@ -177,6 +179,10 @@ def _crawl_full_site(db, job: CrawlJob, run: CrawlRun) -> bool:  # type: ignore[
         )
         for target in discovered:
             if not is_probable_html_page(target.normalized_url):
+                if target.id not in audited_assets:
+                    _audit_asset(db, job, run, target)
+                    audited_assets.add(target.id)
+                    _respect_request_delay(job)
                 continue
             next_depth = depth + 1
             if target.crawl_depth is None or next_depth < target.crawl_depth:
@@ -194,6 +200,52 @@ def _crawl_full_site(db, job: CrawlJob, run: CrawlRun) -> bool:  # type: ignore[
         )
     db.commit()
     return complete
+
+
+def _audit_asset(db, job: CrawlJob, run: CrawlRun, url: Url) -> None:  # type: ignore[no-untyped-def]
+    try:
+        result = fetch_metadata(
+            url.normalized_url,
+            timeout_seconds=int(job.settings_snapshot.get("request_timeout_seconds", 20)),
+        )
+        content_length = result.headers.get("content-length")
+        response_size = int(content_length) if content_length and content_length.isdigit() else None
+        snapshot = UrlSnapshot(
+            url_id=url.id,
+            crawl_run_id=run.id,
+            requested_url=result.requested_url,
+            final_url=result.final_url,
+            status_code=result.status_code,
+            redirect_chain=result.redirect_chain,
+            content_type=result.headers.get("content-type"),
+            response_time_ms=result.response_time_ms,
+            response_size=response_size,
+            etag=result.headers.get("etag"),
+            last_modified=result.headers.get("last-modified"),
+            is_indexable=False,
+        )
+        db.add(snapshot)
+        db.flush()
+        reconcile_issues(
+            db,
+            website_id=job.website_id,
+            url_id=url.id,
+            crawl_run_id=run.id,
+            snapshot_id=snapshot.id,
+            signals=inspect_asset(result.final_url, response_size),
+            checked_issue_types=ASSET_ISSUE_TYPES,
+        )
+    except CrawlError as exc:
+        db.add(
+            UrlSnapshot(
+                url_id=url.id,
+                crawl_run_id=run.id,
+                requested_url=url.normalized_url,
+                error_message=str(exc),
+                is_indexable=False,
+            )
+        )
+    db.commit()
 
 
 def _respect_request_delay(job: CrawlJob) -> None:
