@@ -12,6 +12,7 @@ from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url
 from app.models.website import Website
 from app.services.asset_checks import ASSET_ISSUE_TYPES, HTML_ONLY_ISSUE_TYPES, inspect_asset
+from app.services.contextual_404 import classify_404_issues
 from app.services.http_crawler import CrawlError, fetch_metadata, fetch_url
 from app.services.internal_link_analysis import detect_orphan_pages
 from app.services.issue_engine import reconcile_issues
@@ -58,6 +59,7 @@ def execute_crawl_job(job_id: str) -> None:
                 return
             if job.job_type == "full_site_crawl":
                 site_crawl_complete = _crawl_full_site(db, job, run)
+                classify_404_issues(db, website_id=job.website_id, crawl_run_id=run.id)
                 run.status = (
                     "succeeded"
                     if run.failed_urls == 0 and site_crawl_complete
@@ -81,6 +83,7 @@ def execute_crawl_job(job_id: str) -> None:
                 else:
                     _audit_asset(db, job, run, url)
                 _respect_request_delay(job)
+            classify_404_issues(db, website_id=job.website_id, crawl_run_id=run.id)
             run.status = "succeeded" if run.failed_urls == 0 else "partially_succeeded"
             job.status = run.status
         except Exception as exc:
