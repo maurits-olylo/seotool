@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="/ui/assets/dashboard.css">
   <link rel="stylesheet" href="/ui/assets/actionable.css">
   <link rel="stylesheet" href="/ui/assets/integrations.css">
+  <link rel="stylesheet" href="/ui/assets/oauth.css">
 </head>
 <body>
   <section id="login" class="login-shell hidden">
@@ -59,10 +60,11 @@
       <section id="integrations-view" class="hidden">
         <header><div><span class="eyebrow">DATABRONNEN</span><h1>Integraties</h1><p class="intro">Koppel databronnen op klantniveau en wijs properties toe aan websites.</p></div></header>
         <div class="integration-grid">
-          <article class="integration-card"><div class="provider-icon google">G</div><div><h2>Google</h2><p>Search Console en Google Analytics 4 via één Google-account.</p><span id="google-status" class="connection-status">Niet gekoppeld</span></div><button disabled>Google koppelen</button></article>
+          <article class="integration-card"><div class="provider-icon google">G</div><div><h2>Google</h2><p>Search Console en Google Analytics 4 via één Google-account.</p><span id="google-status" class="connection-status">Niet gekoppeld</span></div><button id="google-connect" disabled>Google koppelen</button></article>
           <article class="integration-card"><div class="provider-icon bing">B</div><div><h2>Bing Webmaster Tools</h2><p>Zoekverkeer, keywords, crawl- en indexatiegegevens.</p><span id="bing-status" class="connection-status">Niet gekoppeld</span></div><button disabled>Bing koppelen</button></article>
         </div>
-        <section class="panel integration-note"><span class="eyebrow">VOLGENDE STAP</span><h2>OAuth configureren</h2><p>De veilige opslag en propertykoppelingen zijn voorbereid. Voeg providercredentials toe om de koppelknoppen te activeren.</p></section>
+        <p id="integration-message" class="integration-message hidden"></p>
+        <section class="panel integration-note"><span class="eyebrow">PROPERTYKOPPELINGEN</span><h2>Na het verbinden</h2><p>Na Google-login kiezen we in de volgende stap de Search Console- en GA4-property voor iedere website.</p></section>
       </section>
     </main>
   </div>

@@ -47,6 +47,7 @@ app.include_router(crawls.router, prefix="/api/v1", dependencies=[Depends(requir
 app.include_router(issues.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(exports.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(integrations.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
+app.include_router(integrations.oauth_router, prefix="/api/v1")
 app.include_router(ui.router)
 app.mount("/ui/assets", StaticFiles(directory=ui.UI_ROOT), name="ui-assets")
 

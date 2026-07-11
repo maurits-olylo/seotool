@@ -1,10 +1,14 @@
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.db.session import get_db
 from app.models.client import Client
 from app.models.integrations import IntegrationConnection, WebsiteIntegration
@@ -15,8 +19,95 @@ from app.schemas.integrations import (
     WebsiteIntegrationCreate,
     WebsiteIntegrationRead,
 )
+from app.services.oauth import (
+    GOOGLE_SCOPES,
+    encrypt_token,
+    google_authorization_url,
+    google_is_configured,
+    parse_oauth_state,
+)
 
 router = APIRouter(tags=["integrations"])
+oauth_router = APIRouter(tags=["integrations"])
+
+
+@router.get("/integrations/google/config")
+def google_config() -> dict[str, bool]:
+    return {"configured": google_is_configured()}
+
+
+@router.get("/integrations/google/authorize")
+def authorize_google(
+    client_id: UUID = Query(), db: Session = Depends(get_db)
+) -> RedirectResponse:
+    if not google_is_configured():
+        raise HTTPException(status_code=503, detail="Google OAuth is not configured")
+    if not db.get(Client, client_id):
+        raise HTTPException(status_code=404, detail="Client not found")
+    return RedirectResponse(google_authorization_url(client_id), status_code=302)
+
+
+@oauth_router.get("/integrations/google/callback", include_in_schema=False)
+async def google_callback(
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+    db: Session = Depends(get_db),
+) -> RedirectResponse:
+    if error or not code or not state or not google_is_configured():
+        return RedirectResponse("/?integration=google-error", status_code=302)
+    try:
+        client_id = parse_oauth_state(state)
+    except ValueError:
+        return RedirectResponse("/?integration=google-error", status_code=302)
+    if not db.get(Client, client_id):
+        return RedirectResponse("/?integration=google-error", status_code=302)
+
+    settings = get_settings()
+    async with httpx.AsyncClient(timeout=20) as http:
+        token_response = await http.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "client_id": settings.google_client_id,
+                "client_secret": settings.google_client_secret,
+                "code": code,
+                "grant_type": "authorization_code",
+                "redirect_uri": settings.google_redirect_uri,
+            },
+        )
+        if token_response.status_code != 200:
+            return RedirectResponse("/?integration=google-error", status_code=302)
+        token_data = token_response.json()
+        user_response = await http.get(
+            "https://openidconnect.googleapis.com/v1/userinfo",
+            headers={"Authorization": f"Bearer {token_data['access_token']}"},
+        )
+        if user_response.status_code != 200:
+            return RedirectResponse("/?integration=google-error", status_code=302)
+        account_email = user_response.json().get("email")
+
+    connection = db.scalar(
+        select(IntegrationConnection).where(
+            IntegrationConnection.client_id == client_id,
+            IntegrationConnection.provider == "google",
+        )
+    )
+    if connection is None:
+        connection = IntegrationConnection(client_id=client_id, provider="google")
+        db.add(connection)
+    connection.account_email = account_email
+    connection.status = "connected"
+    connection.encrypted_access_token = encrypt_token(token_data.get("access_token"))
+    refresh_token = token_data.get("refresh_token")
+    if refresh_token:
+        connection.encrypted_refresh_token = encrypt_token(refresh_token)
+    connection.token_expires_at = datetime.now(UTC) + timedelta(
+        seconds=int(token_data.get("expires_in", 3600))
+    )
+    connection.scopes = token_data.get("scope", " ".join(GOOGLE_SCOPES)).split()
+    connection.last_error = None
+    db.commit()
+    return RedirectResponse("/?integration=google-connected", status_code=302)
 
 
 @router.get(

@@ -44,12 +44,17 @@ async function loadWebsites() {
 async function loadIntegrations() {
   const clientId = $("#client-select").value;
   if (!clientId) return;
-  const connections = await api(`/api/v1/clients/${clientId}/integrations`);
+  const [connections, googleConfig] = await Promise.all([
+    api(`/api/v1/clients/${clientId}/integrations`),
+    api("/api/v1/integrations/google/config"),
+  ]);
   for (const provider of ["google", "bing"]) {
     const connection = connections.find((item) => item.provider === provider);
     const target = $(`#${provider}-status`);
     target.textContent = connection ? `${labels[connection.status] || connection.status}${connection.account_email ? ` · ${connection.account_email}` : ""}` : "Niet gekoppeld";
   }
+  $("#google-connect").disabled = !googleConfig.configured;
+  $("#google-connect").textContent = connections.some((item) => item.provider === "google" && item.status === "connected") ? "Opnieuw koppelen" : "Google koppelen";
 }
 
 function showView(view) {
@@ -174,5 +179,18 @@ $("#close-dialog").addEventListener("click", () => $("#issue-dialog").close());
 $("#save-status").addEventListener("click", saveIssueStatus);
 $("#overview-nav").addEventListener("click", () => showView("overview"));
 $("#integrations-nav").addEventListener("click", () => showView("integrations"));
+$("#google-connect").addEventListener("click", () => {
+  const clientId = $("#client-select").value;
+  if (clientId) window.location.assign(`/api/v1/integrations/google/authorize?client_id=${clientId}`);
+});
 
-loadClients().then(showApp).catch(() => showLogin());
+loadClients().then(() => {
+  showApp();
+  const integrationResult = new URLSearchParams(window.location.search).get("integration");
+  if (integrationResult) {
+    showView("integrations");
+    $("#integration-message").textContent = integrationResult === "google-connected" ? "Google-account is succesvol gekoppeld." : "Google-koppeling is niet voltooid. Probeer opnieuw.";
+    $("#integration-message").classList.remove("hidden");
+    window.history.replaceState({}, "", "/");
+  }
+}).catch(() => showLogin());
