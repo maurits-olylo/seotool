@@ -51,6 +51,7 @@ def generate_export(export_id: str) -> None:
 def _datasets(db: Session, website_id: object) -> dict[str, tuple[list[str], list[list[object]]]]:
     urls = list(db.scalars(select(Url).where(Url.website_id == website_id)))
     url_ids = [url.id for url in urls]
+    url_by_id = {url.id: url.normalized_url for url in urls}
     issues = list(db.scalars(select(Issue).where(Issue.website_id == website_id)))
     changes = list(db.scalars(select(Change).where(Change.website_id == website_id)))
     links = (
@@ -60,9 +61,18 @@ def _datasets(db: Session, website_id: object) -> dict[str, tuple[list[str], lis
     )
     return {
         "urls": (
-            ["url", "status_code", "is_active", "is_indexable", "first_seen_at", "last_seen_at"],
+            [
+                "url_id",
+                "url",
+                "status_code",
+                "is_active",
+                "is_indexable",
+                "first_seen_at",
+                "last_seen_at",
+            ],
             [
                 [
+                    url.id,
                     url.normalized_url,
                     url.current_status_code,
                     url.is_active,
@@ -76,6 +86,7 @@ def _datasets(db: Session, website_id: object) -> dict[str, tuple[list[str], lis
         "issues": (
             [
                 "url_id",
+                "url",
                 "type",
                 "category",
                 "severity",
@@ -87,6 +98,7 @@ def _datasets(db: Session, website_id: object) -> dict[str, tuple[list[str], lis
             [
                 [
                     issue.url_id,
+                    url_by_id.get(issue.url_id),
                     issue.issue_type,
                     issue.category,
                     issue.severity,
@@ -99,10 +111,11 @@ def _datasets(db: Session, website_id: object) -> dict[str, tuple[list[str], lis
             ],
         ),
         "changes": (
-            ["url_id", "type", "field", "old_value", "new_value", "detected_at"],
+            ["url_id", "url", "type", "field", "old_value", "new_value", "detected_at"],
             [
                 [
                     change.url_id,
+                    url_by_id.get(change.url_id),
                     change.change_type,
                     change.field_name,
                     change.old_value,
@@ -113,10 +126,21 @@ def _datasets(db: Session, website_id: object) -> dict[str, tuple[list[str], lis
             ],
         ),
         "links": (
-            ["source_url_id", "target_url", "anchor_text", "internal", "nofollow", "status"],
+            [
+                "source_url_id",
+                "source_url",
+                "target_url_id",
+                "target_url",
+                "anchor_text",
+                "internal",
+                "nofollow",
+                "status",
+            ],
             [
                 [
                     link.source_url_id,
+                    url_by_id.get(link.source_url_id),
+                    link.target_url_id,
                     link.target_url,
                     link.anchor_text,
                     link.is_internal,
