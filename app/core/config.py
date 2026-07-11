@@ -12,6 +12,13 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"
     log_level: str = "INFO"
     user_agent: str = "SEO-Monitor-Bot/0.1"
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = ""
+    bing_client_id: str = ""
+    bing_client_secret: str = ""
+    bing_redirect_uri: str = ""
+    token_encryption_key: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

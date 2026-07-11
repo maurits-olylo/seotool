@@ -98,6 +98,37 @@ def test_issue_detail_exposes_evidence_and_updates_status(client: TestClient) ->
     assert updated.json()["status"] == "planned"
 
 
+def test_client_integration_and_website_property_mapping(client: TestClient) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Integrated client"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": customer["id"],
+            "name": "Integrated site",
+            "base_url": "https://integrated.example.com",
+        },
+    ).json()
+    connection = client.post(
+        f"/api/v1/clients/{customer['id']}/integrations",
+        json={"provider": "google", "account_email": "seo@example.com"},
+    )
+    assert connection.status_code == 201
+    assert "encrypted_refresh_token" not in connection.json()
+
+    mapping = client.post(
+        f"/api/v1/websites/{website['id']}/integrations",
+        json={
+            "connection_id": connection.json()["id"],
+            "service": "search_console",
+            "external_property_id": "sc-domain:integrated.example.com",
+        },
+    )
+    assert mapping.status_code == 201
+    assert mapping.json()["service"] == "search_console"
+    assert len(client.get(f"/api/v1/clients/{customer['id']}/integrations").json()) == 1
+    assert len(client.get(f"/api/v1/websites/{website['id']}/integrations").json()) == 1
+
+
 def test_proxied_http_redirects_to_https_in_production(monkeypatch) -> None:
     from app.main import app
 

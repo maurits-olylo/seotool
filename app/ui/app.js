@@ -41,6 +41,26 @@ async function loadWebsites() {
   await loadIssues();
 }
 
+async function loadIntegrations() {
+  const clientId = $("#client-select").value;
+  if (!clientId) return;
+  const connections = await api(`/api/v1/clients/${clientId}/integrations`);
+  for (const provider of ["google", "bing"]) {
+    const connection = connections.find((item) => item.provider === provider);
+    const target = $(`#${provider}-status`);
+    target.textContent = connection ? `${labels[connection.status] || connection.status}${connection.account_email ? ` · ${connection.account_email}` : ""}` : "Niet gekoppeld";
+  }
+}
+
+function showView(view) {
+  const integrations = view === "integrations";
+  $("#overview-view").classList.toggle("hidden", integrations);
+  $("#integrations-view").classList.toggle("hidden", !integrations);
+  $("#overview-nav").classList.toggle("nav-active", !integrations);
+  $("#integrations-nav").classList.toggle("nav-active", integrations);
+  if (integrations) loadIntegrations();
+}
+
 async function loadIssues() {
   const websiteId = $("#website-select").value;
   if (!websiteId) { state.issues = []; render(); return; }
@@ -142,7 +162,7 @@ $("#login-form").addEventListener("submit", async (event) => {
   $("#api-key").value = ""; showApp(); await loadClients();
 });
 $("#logout").addEventListener("click", async () => { await fetch("/ui/logout", { method: "POST" }); showLogin(); });
-$("#client-select").addEventListener("change", loadWebsites);
+$("#client-select").addEventListener("change", async () => { await loadWebsites(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); });
 $("#website-select").addEventListener("change", loadIssues);
 for (const selector of ["#severity-filter", "#type-filter", "#status-filter"]) $(selector).addEventListener("change", () => { state.page = 1; render(); });
 $("#search-filter").addEventListener("input", () => { state.page = 1; render(); });
@@ -152,5 +172,7 @@ $("#issues").addEventListener("click", (event) => { const button = event.target.
 $("#issue-groups").addEventListener("click", (event) => { const button = event.target.closest("[data-group-type]"); if (button) { $("#type-filter").value = button.dataset.groupType; state.page = 1; render(); } });
 $("#close-dialog").addEventListener("click", () => $("#issue-dialog").close());
 $("#save-status").addEventListener("click", saveIssueStatus);
+$("#overview-nav").addEventListener("click", () => showView("overview"));
+$("#integrations-nav").addEventListener("click", () => showView("integrations"));
 
 loadClients().then(showApp).catch(() => showLogin());
