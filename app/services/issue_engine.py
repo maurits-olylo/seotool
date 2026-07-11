@@ -71,17 +71,12 @@ def reconcile_issues(
         touched.append(issue)
 
     for issue in existing:
-        if (
-            issue.issue_type in checked_issue_types
-            and issue.issue_type not in signal_map
-            and issue.status
-            not in {
-                "resolved",
-                "verified",
-                "ignored",
-                "accepted_risk",
-            }
-        ):
+        if issue.issue_type not in checked_issue_types or issue.issue_type in signal_map:
+            continue
+        if issue.status == "resolved":
+            issue.status = "verified"
+            issue.verified_at = now
+        elif issue.status not in {"verified", "ignored", "accepted_risk"}:
             issue.status = "resolved"
             issue.resolved_at = now
     return touched

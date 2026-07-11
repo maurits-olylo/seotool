@@ -4,6 +4,18 @@ from app.services.url_filtering import asset_kind
 IMAGE_SIZE_LIMIT = 2_000_000
 DOCUMENT_SIZE_LIMIT = 5_000_000
 ASSET_ISSUE_TYPES = {"oversized_image", "oversized_document"}
+HTML_ONLY_ISSUE_TYPES = {
+    "canonical_other_url",
+    "conflicting_robots",
+    "expired_job_posting",
+    "job_posting_missing_fields",
+    "missing_h1",
+    "missing_meta_description",
+    "missing_title",
+    "multiple_h1",
+    "thin_content",
+    "unexpected_noindex",
+}
 
 
 def inspect_asset(url: str, response_size: int | None) -> list[IssueSignal]:

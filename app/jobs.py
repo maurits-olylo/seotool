@@ -11,7 +11,7 @@ from app.models.common import utc_now
 from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url
 from app.models.website import Website
-from app.services.asset_checks import ASSET_ISSUE_TYPES, inspect_asset
+from app.services.asset_checks import ASSET_ISSUE_TYPES, HTML_ONLY_ISSUE_TYPES, inspect_asset
 from app.services.http_crawler import CrawlError, fetch_metadata, fetch_url
 from app.services.internal_link_analysis import detect_orphan_pages
 from app.services.issue_engine import reconcile_issues
@@ -233,7 +233,7 @@ def _audit_asset(db, job: CrawlJob, run: CrawlRun, url: Url) -> None:  # type: i
             crawl_run_id=run.id,
             snapshot_id=snapshot.id,
             signals=inspect_asset(result.final_url, response_size),
-            checked_issue_types=ASSET_ISSUE_TYPES,
+            checked_issue_types=ASSET_ISSUE_TYPES | HTML_ONLY_ISSUE_TYPES,
         )
     except CrawlError as exc:
         db.add(

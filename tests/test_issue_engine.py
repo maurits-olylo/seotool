@@ -73,6 +73,55 @@ def test_issue_deduplication_resolution_verification_and_reopen() -> None:
         assert issue.status == "new"
 
 
+def test_second_clean_check_verifies_resolved_issue() -> None:
+    with SessionLocal() as db:
+        client = Client(name="Verification client")
+        website = Website(client=client, name="Verification site", base_url="https://example.com")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        url = Url(website_id=website.id, normalized_url="https://example.com/page")
+        db.add(url)
+        db.flush()
+        issue = Issue(
+            website_id=website.id,
+            url_id=url.id,
+            issue_type="missing_title",
+            category="onpage",
+            severity="medium",
+            title="Title ontbreekt",
+            description="Test",
+            recommended_action="Herstel",
+        )
+        db.add(issue)
+        db.flush()
+
+        first_run, first_snapshot = _run(db, website.id, url.id)
+        reconcile_issues(
+            db,
+            website_id=website.id,
+            url_id=url.id,
+            crawl_run_id=first_run.id,
+            snapshot_id=first_snapshot.id,
+            signals=[],
+            checked_issue_types={"missing_title"},
+        )
+        assert issue.status == "resolved"
+
+        second_run, second_snapshot = _run(db, website.id, url.id)
+        reconcile_issues(
+            db,
+            website_id=website.id,
+            url_id=url.id,
+            crawl_run_id=second_run.id,
+            snapshot_id=second_snapshot.id,
+            signals=[],
+            checked_issue_types={"missing_title"},
+        )
+        assert issue.status == "verified"
+        assert issue.verified_at is not None
+
+
 def _run(db, website_id, url_id):  # type: ignore[no-untyped-def]
     job = CrawlJob(website_id=website_id, job_type="light_check")
     db.add(job)
