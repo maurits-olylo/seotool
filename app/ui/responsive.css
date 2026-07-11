@@ -1,0 +1,11 @@
+header {
+  flex-wrap: wrap;
+}
+
+.selectors {
+  max-width: 100%;
+}
+
+.selectors select {
+  min-width: 0;
+}

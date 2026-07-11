@@ -31,6 +31,22 @@ def test_api_requires_key() -> None:
     assert response.status_code == 401
 
 
+def test_interface_login_creates_http_only_session() -> None:
+    from app.main import app
+
+    browser = TestClient(app)
+    assert browser.get("/").status_code == 200
+    assert browser.post("/ui/login", json={"api_key": "wrong"}).status_code == 401
+
+    login = browser.post("/ui/login", json={"api_key": "test-key"})
+    assert login.status_code == 204
+    assert "HttpOnly" in login.headers["set-cookie"]
+    assert browser.get("/api/v1/clients").status_code == 200
+
+    assert browser.post("/ui/logout").status_code == 204
+    assert browser.get("/api/v1/clients").status_code == 401
+
+
 def test_proxied_http_redirects_to_https_in_production(monkeypatch) -> None:
     from app.main import app
 

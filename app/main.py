@@ -4,10 +4,11 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.api.routes import clients, crawls, discovery, exports, issues, websites
+from app.api.routes import clients, crawls, discovery, exports, issues, ui, websites
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.core.security import require_api_key
@@ -45,6 +46,8 @@ app.include_router(discovery.router, prefix="/api/v1", dependencies=[Depends(req
 app.include_router(crawls.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(issues.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(exports.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
+app.include_router(ui.router)
+app.mount("/ui/assets", StaticFiles(directory=ui.UI_ROOT), name="ui-assets")
 
 
 @app.get("/health", tags=["health"])

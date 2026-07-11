@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SEO Monitor</title>
+  <link rel="stylesheet" href="/ui/assets/app.css">
+  <link rel="stylesheet" href="/ui/assets/responsive.css">
+</head>
+<body>
+  <section id="login" class="login-shell hidden">
+    <form id="login-form" class="login-card">
+      <span class="eyebrow">THACT</span>
+      <h1>SEO Monitor</h1>
+      <p>Meld aan met de productie API-key.</p>
+      <label for="api-key">API-key</label>
+      <input id="api-key" type="password" autocomplete="current-password" required>
+      <button type="submit">Aanmelden</button>
+      <p id="login-error" class="error" role="alert"></p>
+    </form>
+  </section>
+
+  <div id="app" class="app-shell hidden">
+    <aside>
+      <div><span class="eyebrow">THACT</span><h2>SEO Monitor</h2></div>
+      <nav><button class="nav-active">Overzicht</button><button disabled>URLs</button><button disabled>Wijzigingen</button></nav>
+      <button id="logout" class="quiet">Uitloggen</button>
+    </aside>
+    <main>
+      <header>
+        <div><span class="eyebrow">PRODUCTIE</span><h1>Technische SEO-acties</h1></div>
+        <div class="selectors">
+          <select id="client-select" aria-label="Klant"></select>
+          <select id="website-select" aria-label="Website"></select>
+        </div>
+      </header>
+      <section id="summary" class="cards"></section>
+      <section class="panel">
+        <div class="panel-head">
+          <div><span class="eyebrow">ACTIELIJST</span><h2>Openstaande issues</h2></div>
+          <select id="status-filter" aria-label="Statusfilter">
+            <option value="">Alle statussen</option><option value="new">Nieuw</option>
+            <option value="review">Review</option><option value="planned">Gepland</option>
+            <option value="in_progress">Bezig</option><option value="resolved">Opgelost</option>
+          </select>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Prioriteit</th><th>Issue</th><th>Status</th><th>Laatst gezien</th></tr></thead><tbody id="issues"></tbody></table></div>
+        <p id="empty" class="empty hidden">Geen issues gevonden.</p>
+      </section>
+    </main>
+  </div>
+  <script src="/ui/assets/app.js" defer></script>
+</body>
+</html>
