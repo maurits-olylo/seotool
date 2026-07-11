@@ -76,7 +76,10 @@ def execute_crawl_job(job_id: str) -> None:
             )
             run.discovered_urls = len(urls)
             for url in urls:
-                _crawl_one(db, job, run, url, robots=robots)
+                if is_probable_html_page(url.normalized_url):
+                    _crawl_one(db, job, run, url, robots=robots)
+                else:
+                    _audit_asset(db, job, run, url)
                 _respect_request_delay(job)
             run.status = "succeeded" if run.failed_urls == 0 else "partially_succeeded"
             job.status = run.status

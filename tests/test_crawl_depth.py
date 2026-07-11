@@ -190,3 +190,51 @@ def test_full_site_crawl_keeps_asset_links_without_fetching_assets(monkeypatch) 
         assert depths["https://example.com/photo.JPG?download=1"] is None
         completed = db.get(CrawlJob, job_id)
         assert completed and completed.status == "succeeded"
+
+
+def test_light_check_audits_asset_without_page_fetch(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    page_fetches: list[str] = []
+    asset_audits: list[str] = []
+
+    monkeypatch.setattr(
+        "app.jobs.fetch_url",
+        lambda url, **kwargs: page_fetches.append(url),
+    )
+
+    def fake_metadata(url: str, **_: object) -> FetchMetadata:
+        asset_audits.append(url)
+        return FetchMetadata(
+            requested_url=url,
+            final_url=url,
+            status_code=200,
+            redirect_chain=[],
+            headers={"content-type": "image/jpeg", "content-length": "3000000"},
+            response_time_ms=1,
+        )
+
+    monkeypatch.setattr("app.jobs.fetch_metadata", fake_metadata)
+    with SessionLocal() as db:
+        client = Client(name="Light asset client")
+        website = Website(client=client, name="Light asset site", base_url="https://example.com/")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        asset = Url(website_id=website.id, normalized_url="https://example.com/photo.jpg")
+        db.add(asset)
+        db.flush()
+        job = CrawlJob(
+            website_id=website.id,
+            job_type="light_check",
+            settings_snapshot={"max_urls": 10, "respect_robots_txt": False},
+        )
+        db.add(job)
+        db.commit()
+        job_id = job.id
+
+    execute_crawl_job(str(job_id))
+
+    assert page_fetches == []
+    assert asset_audits == ["https://example.com/photo.jpg"]
+    with SessionLocal() as db:
+        completed = db.get(CrawlJob, job_id)
+        assert completed and completed.status == "succeeded"

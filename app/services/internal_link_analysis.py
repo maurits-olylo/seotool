@@ -16,6 +16,8 @@ def detect_orphan_pages(db: Session, *, website_id: object, crawl_run_id: object
             .where(
                 Url.website_id == website_id,
                 Url.is_active.is_(True),
+                Url.current_status_code == 200,
+                Url.is_indexable.is_(True),
                 Url.crawl_depth.is_(None),
                 UrlSource.source_type == "sitemap",
             )

@@ -26,6 +26,8 @@ def test_detects_sitemap_url_without_crawl_depth_as_orphan() -> None:
             website_id=website.id,
             normalized_url="https://example.com/orphan",
             crawl_depth=None,
+            current_status_code=200,
+            is_indexable=True,
         )
         db.add_all([reachable, orphan])
         db.flush()
@@ -86,3 +88,41 @@ def test_detects_sitemap_url_without_crawl_depth_as_orphan() -> None:
             == []
         )
         assert issue.status == "resolved"
+
+
+def test_does_not_flag_unchecked_sitemap_url_as_orphan() -> None:
+    with SessionLocal() as db:
+        client = Client(name="Unchecked orphan client")
+        website = Website(client=client, name="Unchecked site", base_url="https://example.com")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        unchecked = Url(
+            website_id=website.id,
+            normalized_url="https://example.com/unchecked",
+            crawl_depth=None,
+        )
+        db.add(unchecked)
+        db.flush()
+        db.add(
+            UrlSource(
+                url_id=unchecked.id,
+                source_type="sitemap",
+                source_url="https://example.com/sitemap.xml",
+            )
+        )
+        job = CrawlJob(website_id=website.id, job_type="full_site_crawl")
+        db.add(job)
+        db.flush()
+        run = CrawlRun(
+            crawl_job_id=job.id,
+            website_id=website.id,
+            crawl_type="full_site_crawl",
+        )
+        db.add(run)
+        db.flush()
+
+        found = detect_orphan_pages(db, website_id=website.id, crawl_run_id=run.id)
+
+        assert found == []
+        assert db.scalar(select(Issue).where(Issue.url_id == unchecked.id)) is None
