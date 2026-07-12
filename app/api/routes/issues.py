@@ -26,12 +26,14 @@ router = APIRouter(tags=["issues"])
 def list_changes(
     website_id: UUID,
     limit: int = Query(default=100, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> list[Change]:
     query = (
         select(Change)
         .where(Change.website_id == website_id)
         .order_by(Change.detected_at.desc())
+        .offset(offset)
         .limit(limit)
     )
     return list(db.scalars(query))

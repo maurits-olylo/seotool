@@ -2,13 +2,14 @@ const $ = (selector) => document.querySelector(selector);
 const ACTIVE_STATUSES = new Set(["new", "review", "accepted", "planned", "in_progress", "waiting_for_client"]);
 const PAGE_SIZE = 25;
 const URL_PAGE_SIZE = 30;
+const CHANGE_PAGE_SIZE = 30;
 const labels = {
   high: "Hoog", medium: "Middel", low: "Laag", new: "Nieuw", review: "Te beoordelen",
   accepted: "Geaccepteerd", planned: "Gepland", in_progress: "Bezig",
   waiting_for_client: "Wacht op klant", resolved: "Opgelost", verified: "Geverifieerd",
   ignored: "Genegeerd", accepted_risk: "Risico geaccepteerd",
 };
-const state = { clients: [], websites: [], issues: [], urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], page: 1, urlPage: 1, selectedIssueId: null, googleConnectionId: null };
+const state = { clients: [], websites: [], issues: [], changes: [], urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null };
 
 async function api(path, options = {}) {
   const response = await fetch(path, { credentials: "same-origin", ...options });
@@ -168,12 +169,13 @@ async function syncGa4() {
 }
 
 function showView(view) {
-  for (const name of ["overview", "urls", "integrations"]) {
+  for (const name of ["overview", "urls", "changes", "integrations"]) {
     $(`#${name}-view`).classList.toggle("hidden", name !== view);
     $(`#${name}-nav`).classList.toggle("nav-active", name === view);
   }
   if (view === "integrations") loadIntegrations();
   if (view === "urls") renderUrls();
+  if (view === "changes") loadChanges();
 }
 
 async function loadIssues() {
@@ -251,6 +253,74 @@ async function showUrl(urlId) {
   $("#url-detail-snapshot").textContent = snapshot ? `${new Date(snapshot.checked_at).toLocaleString("nl-NL")} · ${snapshot.response_size ?? 0} bytes · ${snapshot.response_time_ms ?? "—"} ms · ${snapshot.word_count ?? "—"} woorden` : "Geen snapshot beschikbaar.";
   $("#url-detail-issues").textContent = issues.length ? issues.map((issue) => `${labels[issue.severity] || issue.severity}: ${issue.title}`).join("\n") : "Geen actieve issues.";
   $("#url-dialog").showModal();
+}
+
+function changeLabel(change) {
+  const known = {
+    new_url: "Nieuwe URL", disappeared_url: "URL verdwenen", status_code_changed: "Statuscode gewijzigd",
+    redirect_changed: "Redirect gewijzigd", title_changed: "Title gewijzigd", description_changed: "Description gewijzigd",
+    h1_changed: "H1 gewijzigd", canonical_changed: "Canonical gewijzigd", robots_changed: "Robots gewijzigd",
+    indexability_changed: "Indexeerbaarheid gewijzigd", content_changed: "Hoofdcontent gewijzigd",
+    links_changed: "Interne links gewijzigd", schema_changed: "Structured data gewijzigd",
+  };
+  return known[change.change_type] || change.change_type.replaceAll("_", " ");
+}
+
+async function loadChanges() {
+  const websiteId = $("#website-select").value;
+  if (!websiteId) return;
+  state.changes = [];
+  for (let offset = 0; ; offset += 1000) {
+    const batch = await api(`/api/v1/websites/${websiteId}/changes?limit=1000&offset=${offset}`);
+    state.changes.push(...batch);
+    if (batch.length < 1000) break;
+  }
+  const selected = $("#change-type-filter").value;
+  const types = [...new Set(state.changes.map((change) => change.change_type))].sort();
+  $("#change-type-filter").innerHTML = `<option value="">Alle wijzigingstypen</option>${types.map((type) => `<option value="${escapeHtml(type)}">${escapeHtml(changeLabel({change_type: type}))}</option>`).join("")}`;
+  if (types.includes(selected)) $("#change-type-filter").value = selected;
+  state.changePage = 1;
+  renderChanges();
+}
+
+function renderChanges() {
+  const query = $("#change-search").value.trim().toLowerCase();
+  const type = $("#change-type-filter").value;
+  const days = Number($("#change-period-filter").value || 0);
+  const since = days ? Date.now() - days * 86400000 : 0;
+  state.changeFiltered = state.changes.filter((change) => {
+    const url = state.urls.get(change.url_id) || "";
+    const text = `${url} ${changeLabel(change)} ${change.field_name || ""}`.toLowerCase();
+    return (!type || change.change_type === type) && (!since || new Date(change.detected_at).getTime() >= since) && (!query || text.includes(query));
+  });
+  const pages = Math.max(1, Math.ceil(state.changeFiltered.length / CHANGE_PAGE_SIZE));
+  state.changePage = Math.min(state.changePage, pages);
+  const start = (state.changePage - 1) * CHANGE_PAGE_SIZE;
+  const rows = state.changeFiltered.slice(start, start + CHANGE_PAGE_SIZE);
+  $("#changes-website-name").textContent = $("#website-select").selectedOptions[0]?.textContent || "de website";
+  $("#change-rows").innerHTML = rows.map((change) => {
+    const url = state.urls.get(change.url_id) || "Onbekende URL";
+    return `<tr><td>${new Date(change.detected_at).toLocaleString("nl-NL")}</td><td><a class="change-url" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a></td><td><span class="change-kind">${escapeHtml(changeLabel(change))}</span></td><td>${escapeHtml(change.field_name || "—")}</td><td><button class="detail-button" data-change-id="${change.id}">Bekijk</button></td></tr>`;
+  }).join("");
+  $("#change-result-count").textContent = `${state.changeFiltered.length} wijzigingen`;
+  $("#change-page-label").textContent = `Pagina ${state.changePage} van ${pages}`;
+  $("#change-previous-page").disabled = state.changePage === 1;
+  $("#change-next-page").disabled = state.changePage === pages;
+  $("#change-empty").classList.toggle("hidden", rows.length !== 0);
+}
+
+function showChange(changeId) {
+  const change = state.changes.find((item) => item.id === changeId);
+  if (!change) return;
+  const url = state.urls.get(change.url_id) || "Onbekende URL";
+  $("#change-detail-title").textContent = changeLabel(change);
+  $("#change-detail-url").textContent = url;
+  $("#change-detail-url").href = url;
+  $("#change-detail-date").textContent = new Date(change.detected_at).toLocaleString("nl-NL");
+  $("#change-detail-field").textContent = change.field_name || "Niet van toepassing";
+  $("#change-detail-old").textContent = change.old_value ?? "Geen eerdere waarde";
+  $("#change-detail-new").textContent = change.new_value ?? "Geen nieuwe waarde";
+  $("#change-dialog").showModal();
 }
 
 function applyFilters() {
@@ -354,7 +424,7 @@ $("#login-form").addEventListener("submit", async (event) => {
 });
 $("#logout").addEventListener("click", async () => { await fetch("/ui/logout", { method: "POST" }); showLogin(); });
 $("#client-select").addEventListener("change", async () => { await loadWebsites(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); });
-$("#website-select").addEventListener("change", async () => { await loadIssues(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); if (!$("#urls-view").classList.contains("hidden")) renderUrls(); });
+$("#website-select").addEventListener("change", async () => { await loadIssues(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); if (!$("#urls-view").classList.contains("hidden")) renderUrls(); if (!$("#changes-view").classList.contains("hidden")) await loadChanges(); });
 for (const selector of ["#severity-filter", "#type-filter", "#impact-filter", "#status-filter"]) $(selector).addEventListener("change", () => { state.page = 1; render(); });
 $("#search-filter").addEventListener("input", () => { state.page = 1; render(); });
 $("#previous-page").addEventListener("click", () => { state.page -= 1; render(); });
@@ -365,6 +435,7 @@ $("#close-dialog").addEventListener("click", () => $("#issue-dialog").close());
 $("#save-status").addEventListener("click", saveIssueStatus);
 $("#overview-nav").addEventListener("click", () => showView("overview"));
 $("#urls-nav").addEventListener("click", () => showView("urls"));
+$("#changes-nav").addEventListener("click", () => showView("changes"));
 $("#integrations-nav").addEventListener("click", () => showView("integrations"));
 for (const selector of ["#url-status-filter", "#url-index-filter", "#url-depth-filter"]) $(selector).addEventListener("change", () => { state.urlPage = 1; renderUrls(); });
 $("#url-search").addEventListener("input", () => { state.urlPage = 1; renderUrls(); });
@@ -372,6 +443,12 @@ $("#url-previous-page").addEventListener("click", () => { state.urlPage -= 1; re
 $("#url-next-page").addEventListener("click", () => { state.urlPage += 1; renderUrls(); });
 $("#url-rows").addEventListener("click", (event) => { const button = event.target.closest("[data-url-id]"); if (button) showUrl(button.dataset.urlId); });
 $("#close-url-dialog").addEventListener("click", () => $("#url-dialog").close());
+for (const selector of ["#change-type-filter", "#change-period-filter"]) $(selector).addEventListener("change", () => { state.changePage = 1; renderChanges(); });
+$("#change-search").addEventListener("input", () => { state.changePage = 1; renderChanges(); });
+$("#change-previous-page").addEventListener("click", () => { state.changePage -= 1; renderChanges(); });
+$("#change-next-page").addEventListener("click", () => { state.changePage += 1; renderChanges(); });
+$("#change-rows").addEventListener("click", (event) => { const button = event.target.closest("[data-change-id]"); if (button) showChange(button.dataset.changeId); });
+$("#close-change-dialog").addEventListener("click", () => $("#change-dialog").close());
 $("#save-search-console").addEventListener("click", () => saveProperty("search_console", "#search-console-property", "#save-search-console", "#search-console-message"));
 $("#save-ga4").addEventListener("click", () => saveProperty("ga4", "#ga4-property", "#save-ga4", "#ga4-message"));
 $("#sync-search-console").addEventListener("click", syncSearchConsole);

@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="/ui/assets/oauth.css">
   <link rel="stylesheet" href="/ui/assets/properties.css">
   <link rel="stylesheet" href="/ui/assets/urls.css">
+  <link rel="stylesheet" href="/ui/assets/changes.css">
 </head>
 <body>
   <section id="login" class="login-shell hidden">
@@ -29,7 +30,7 @@
   <div id="app" class="app-shell hidden">
     <aside>
       <div><span class="eyebrow">THACT</span><h2>SEO Monitor</h2></div>
-      <nav><button id="overview-nav" class="nav-active">Overzicht</button><button id="urls-nav">URLs</button><button disabled>Wijzigingen</button><button id="integrations-nav">Integraties</button></nav>
+      <nav><button id="overview-nav" class="nav-active">Overzicht</button><button id="urls-nav">URLs</button><button id="changes-nav">Wijzigingen</button><button id="integrations-nav">Integraties</button></nav>
       <button id="logout" class="quiet">Uitloggen</button>
     </aside>
     <main>
@@ -70,6 +71,16 @@
           <footer class="pager"><button id="url-previous-page" class="page-button">Vorige</button><span id="url-page-label"></span><button id="url-next-page" class="page-button">Volgende</button></footer>
         </section>
       </section>
+      <section id="changes-view" class="hidden">
+        <header><div><span class="eyebrow">HISTORIE</span><h1>Wijzigingen</h1><p class="intro">Verschillen tussen opeenvolgende crawls voor <strong id="changes-website-name"></strong>.</p></div></header>
+        <section class="panel changes-panel">
+          <div class="panel-head"><div><span class="eyebrow">WIJZIGINGSLOG</span><h2>Gedetecteerde veranderingen</h2></div><span id="change-result-count" class="result-count"></span></div>
+          <div class="change-filters"><input id="change-search" type="search" placeholder="Zoek op URL, veld of wijziging" aria-label="Zoek wijzigingen"><select id="change-type-filter"><option value="">Alle wijzigingstypen</option></select><select id="change-period-filter"><option value="">Volledige historie</option><option value="7">Afgelopen 7 dagen</option><option value="30">Afgelopen 30 dagen</option><option value="90">Afgelopen 90 dagen</option></select></div>
+          <div class="table-wrap"><table class="change-table"><thead><tr><th>Gedetecteerd</th><th>URL</th><th>Wijziging</th><th>Veld</th><th></th></tr></thead><tbody id="change-rows"></tbody></table></div>
+          <p id="change-empty" class="empty hidden">Geen wijzigingen gevonden.</p>
+          <footer class="pager"><button id="change-previous-page" class="page-button">Vorige</button><span id="change-page-label"></span><button id="change-next-page" class="page-button">Volgende</button></footer>
+        </section>
+      </section>
       <section id="integrations-view" class="hidden">
         <header><div><span class="eyebrow">DATABRONNEN</span><h1>Integraties</h1><p class="intro">Koppel databronnen op klantniveau en wijs properties toe aan websites.</p></div></header>
         <div class="integration-grid">
@@ -92,6 +103,12 @@
     <span class="eyebrow">URL-DETAIL</span><h2 id="url-detail-title">URL</h2>
     <a id="url-detail-link" target="_blank" rel="noopener"></a>
     <dl><div><dt>Actuele status</dt><dd id="url-detail-status"></dd></div><div><dt>Indexatie</dt><dd id="url-detail-indexation"></dd></div><div><dt>Crawl</dt><dd id="url-detail-crawl"></dd></div><div><dt>Laatste snapshot</dt><dd id="url-detail-snapshot"></dd></div><div><dt>Actieve issues</dt><dd id="url-detail-issues"></dd></div></dl>
+  </dialog>
+  <dialog id="change-dialog">
+    <button id="close-change-dialog" class="dialog-close" aria-label="Sluiten">×</button>
+    <span class="eyebrow">WIJZIGINGSDETAIL</span><h2 id="change-detail-title"></h2>
+    <a id="change-detail-url" target="_blank" rel="noopener"></a>
+    <dl><div><dt>Gedetecteerd</dt><dd id="change-detail-date"></dd></div><div><dt>Veld</dt><dd id="change-detail-field"></dd></div><div><dt>Oude waarde</dt><dd id="change-detail-old" class="change-value"></dd></div><div><dt>Nieuwe waarde</dt><dd id="change-detail-new" class="change-value"></dd></div></dl>
   </dialog>
   <script src="/ui/assets/app.js" defer></script>
 </body>
