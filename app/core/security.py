@@ -4,11 +4,15 @@ import hashlib
 import hmac
 import os
 import time
+from dataclasses import dataclass
 from uuid import UUID
 
-from fastapi import Cookie, Header, HTTPException, status
+from fastapi import Cookie, Depends, Header, HTTPException, status
+from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.db.session import get_db
+from app.models.user import User
 
 SESSION_TTL_SECONDS = 60 * 60 * 12
 
@@ -22,21 +26,25 @@ def create_session_token(user_id: UUID) -> str:
     return base64.urlsafe_b64encode(f"{payload}.{signature}".encode()).decode()
 
 
-def is_valid_session_token(token: str | None) -> bool:
+def session_user_id(token: str | None) -> UUID | None:
     if not token:
         return False
     try:
         decoded = base64.urlsafe_b64decode(token.encode()).decode()
         user_id, expires_at, signature = decoded.split(".", maxsplit=2)
-        UUID(user_id)
+        parsed_user_id = UUID(user_id)
         if int(expires_at) < int(time.time()):
-            return False
+            return None
     except (binascii.Error, ValueError, UnicodeDecodeError):
-        return False
+        return None
     expected = hmac.new(
         get_settings().api_key.encode(), f"{user_id}.{expires_at}".encode(), hashlib.sha256
     ).hexdigest()
-    return hmac.compare_digest(signature, expected)
+    return parsed_user_id if hmac.compare_digest(signature, expected) else None
+
+
+def is_valid_session_token(token: str | None) -> bool:
+    return session_user_id(token) is not None
 
 
 def hash_password(password: str) -> str:
@@ -65,10 +73,23 @@ def verify_password(password: str, encoded: str) -> bool:
     return hmac.compare_digest(digest.hex(), expected)
 
 
+@dataclass(frozen=True)
+class Principal:
+    user_id: UUID | None
+    role: str
+    is_api_key: bool = False
+
+
 def require_api_key(
     x_api_key: str | None = Header(default=None),
     seo_session: str | None = Cookie(default=None),
-) -> None:
+    db: Session = Depends(get_db),
+) -> Principal:
     valid_key = x_api_key is not None and hmac.compare_digest(x_api_key, get_settings().api_key)
-    if not valid_key and not is_valid_session_token(seo_session):
+    if valid_key:
+        return Principal(user_id=None, role="superuser", is_api_key=True)
+    user_id = session_user_id(seo_session)
+    user = db.get(User, user_id) if user_id else None
+    if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
+    return Principal(user_id=user.id, role=user.role)

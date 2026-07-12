@@ -11,7 +11,7 @@ const labels = {
   pending: "In wachtrij", running: "Bezig", succeeded: "Geslaagd",
   partially_succeeded: "Deels geslaagd", failed: "Mislukt", cancelled: "Geannuleerd",
 };
-const state = { clients: [], websites: [], issues: [], changes: [], changeGroups: [], crawlRuns: [], exports: [], operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null };
+const state = { currentUser: null, clients: [], websites: [], issues: [], changes: [], changeGroups: [], crawlRuns: [], exports: [], operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null };
 const VIEW_HASHES = {overview: "overzicht", urls: "urls", changes: "wijzigingen", operations: "beheer", integrations: "integraties"};
 let operationsPollTimer = null;
 
@@ -45,6 +45,14 @@ function impactMarkup(issue) {
 function issueUrlMarkup(issue) {
   const url = issueUrl(issue);
   return url ? `<a class="url" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a>` : `<span class="url">Websitebreed issue</span>`;
+}
+
+function applyRolePermissions() {
+  const canAdmin = ["superuser", "admin"].includes(state.currentUser?.role);
+  $("#integrations-nav").classList.toggle("hidden", !canAdmin);
+  $("#crawl-operation-card").classList.toggle("hidden", !canAdmin);
+  $("#current-user").textContent = state.currentUser?.email || "Technische toegang";
+  if (!canAdmin && window.location.hash === "#integraties") window.location.hash = "#overzicht";
 }
 
 async function loadClients() {
@@ -615,7 +623,11 @@ $("#save-bing").addEventListener("click", () => saveProperty("bing_webmaster", "
 $("#sync-search-console").addEventListener("click", syncSearchConsole);
 $("#sync-ga4").addEventListener("click", syncGa4);
 
-loadClients().then(() => {
+api("/api/v1/me").then((user) => {
+  state.currentUser = user;
+  applyRolePermissions();
+  return loadClients();
+}).then(() => {
   showApp();
   const integrationResult = new URLSearchParams(window.location.search).get("integration");
   if (integrationResult) {

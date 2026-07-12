@@ -9,18 +9,23 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.queue import get_queue
+from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.exports import Export
 from app.models.website import Website
 from app.schemas.exports import ExportCreate, ExportRead
+from app.services.authorization import require_website_access
 
 router = APIRouter(prefix="/exports", tags=["exports"])
 
 
 @router.post("", response_model=ExportRead, status_code=201)
-def create_export(payload: ExportCreate, db: Session = Depends(get_db)) -> Export:
-    if not db.get(Website, payload.website_id):
-        raise HTTPException(status_code=404, detail="Website not found")
+def create_export(
+    payload: ExportCreate,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> Export:
+    require_website_access(db, principal, payload.website_id)
     existing = db.scalar(
         select(Export.id).where(
             Export.website_id == payload.website_id,
@@ -53,9 +58,9 @@ def list_exports(
     website_id: UUID,
     limit: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
 ) -> list[Export]:
-    if not db.get(Website, website_id):
-        raise HTTPException(status_code=404, detail="Website not found")
+    require_website_access(db, principal, website_id)
     return list(
         db.scalars(
             select(Export)
@@ -67,18 +72,28 @@ def list_exports(
 
 
 @router.get("/{export_id}", response_model=ExportRead)
-def get_export(export_id: UUID, db: Session = Depends(get_db)) -> Export:
+def get_export(
+    export_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> Export:
     export = db.get(Export, export_id)
     if not export:
         raise HTTPException(status_code=404, detail="Export not found")
+    require_website_access(db, principal, export.website_id)
     return export
 
 
 @router.get("/{export_id}/download")
-def download_export(export_id: UUID, db: Session = Depends(get_db)) -> FileResponse:
+def download_export(
+    export_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> FileResponse:
     export = db.get(Export, export_id)
     if not export or export.status != "succeeded" or not export.file_path:
         raise HTTPException(status_code=404, detail="Export is not ready")
+    require_website_access(db, principal, export.website_id)
     path = Path(export.file_path)
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Export file is missing")

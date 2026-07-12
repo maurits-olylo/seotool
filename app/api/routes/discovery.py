@@ -7,10 +7,11 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.queue import get_queue
+from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.discovery import CrawlJob, Url
-from app.models.website import Website
 from app.schemas.discovery import CrawlJobCreate, CrawlJobRead, UrlRead, UrlRegister
+from app.services.authorization import require_website_access
 from app.services.url_registry import register_url
 
 router = APIRouter(tags=["discovery"])
@@ -23,9 +24,9 @@ def list_urls(
     limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
 ) -> list[Url]:
-    if not db.get(Website, website_id):
-        raise HTTPException(status_code=404, detail="Website not found")
+    require_website_access(db, principal, website_id)
     query = select(Url).where(Url.website_id == website_id).order_by(Url.normalized_url)
     if active is not None:
         query = query.where(Url.is_active == active)
@@ -35,10 +36,13 @@ def list_urls(
 @router.post(
     "/websites/{website_id}/urls", response_model=UrlRead, status_code=status.HTTP_201_CREATED
 )
-def add_url(website_id: UUID, payload: UrlRegister, db: Session = Depends(get_db)) -> Url:
-    website = db.get(Website, website_id)
-    if not website:
-        raise HTTPException(status_code=404, detail="Website not found")
+def add_url(
+    website_id: UUID,
+    payload: UrlRegister,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> Url:
+    website = require_website_access(db, principal, website_id, admin=True)
     try:
         url = register_url(
             db,
@@ -56,10 +60,12 @@ def add_url(website_id: UUID, payload: UrlRegister, db: Session = Depends(get_db
 
 
 @router.post("/crawl-jobs", response_model=CrawlJobRead, status_code=201)
-def create_crawl_job(payload: CrawlJobCreate, db: Session = Depends(get_db)) -> CrawlJob:
-    website = db.get(Website, payload.website_id)
-    if not website:
-        raise HTTPException(status_code=404, detail="Website not found")
+def create_crawl_job(
+    payload: CrawlJobCreate,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> CrawlJob:
+    website = require_website_access(db, principal, payload.website_id, admin=True)
     running = db.scalar(
         select(CrawlJob.id).where(
             CrawlJob.website_id == payload.website_id,
@@ -93,8 +99,13 @@ def create_crawl_job(payload: CrawlJobCreate, db: Session = Depends(get_db)) -> 
 
 
 @router.get("/crawl-jobs/{job_id}", response_model=CrawlJobRead)
-def get_crawl_job(job_id: UUID, db: Session = Depends(get_db)) -> CrawlJob:
+def get_crawl_job(
+    job_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> CrawlJob:
     job = db.get(CrawlJob, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Crawl job not found")
+    require_website_access(db, principal, job.website_id)
     return job

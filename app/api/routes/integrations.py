@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.client import Client
 from app.models.integrations import IntegrationConnection, WebsiteIntegration
@@ -22,6 +23,7 @@ from app.schemas.integrations import (
     WebsiteIntegrationRead,
     WebsiteIntegrationUpsert,
 )
+from app.services.authorization import require_client_access, require_website_access
 from app.services.bing_integrations import BING_TOKEN_URL, list_bing_sites
 from app.services.google_analytics import sync_google_analytics
 from app.services.google_integrations import list_google_properties
@@ -52,20 +54,30 @@ def bing_config() -> dict[str, bool]:
 
 
 @router.get("/integrations/google/authorize")
-def authorize_google(client_id: UUID = Query(), db: Session = Depends(get_db)) -> RedirectResponse:
+def authorize_google(
+    client_id: UUID = Query(),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> RedirectResponse:
     if not google_is_configured():
         raise HTTPException(status_code=503, detail="Google OAuth is not configured")
     if not db.get(Client, client_id):
         raise HTTPException(status_code=404, detail="Client not found")
+    require_client_access(db, principal, client_id, admin=True)
     return RedirectResponse(google_authorization_url(client_id), status_code=302)
 
 
 @router.get("/integrations/bing/authorize")
-def authorize_bing(client_id: UUID = Query(), db: Session = Depends(get_db)) -> RedirectResponse:
+def authorize_bing(
+    client_id: UUID = Query(),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> RedirectResponse:
     if not bing_is_configured():
         raise HTTPException(status_code=503, detail="Bing OAuth is not configured")
     if not db.get(Client, client_id):
         raise HTTPException(status_code=404, detail="Client not found")
+    require_client_access(db, principal, client_id, admin=True)
     return RedirectResponse(bing_authorization_url(client_id), status_code=302)
 
 
@@ -187,10 +199,13 @@ async def bing_callback(
 
 @router.get("/clients/{client_id}/integrations", response_model=list[IntegrationConnectionRead])
 def list_client_integrations(
-    client_id: UUID, db: Session = Depends(get_db)
+    client_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
 ) -> list[IntegrationConnection]:
     if not db.get(Client, client_id):
         raise HTTPException(status_code=404, detail="Client not found")
+    require_client_access(db, principal, client_id, admin=True)
     return list(
         db.scalars(
             select(IntegrationConnection)
@@ -209,9 +224,11 @@ def create_client_integration(
     client_id: UUID,
     payload: IntegrationConnectionCreate,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
 ) -> IntegrationConnection:
     if not db.get(Client, client_id):
         raise HTTPException(status_code=404, detail="Client not found")
+    require_client_access(db, principal, client_id, admin=True)
     connection = IntegrationConnection(client_id=client_id, **payload.model_dump())
     db.add(connection)
     try:
@@ -228,8 +245,11 @@ def create_client_integration(
     response_model=GooglePropertiesRead,
 )
 async def google_properties(
-    client_id: UUID, db: Session = Depends(get_db)
+    client_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
 ) -> dict[str, list[dict[str, str]]]:
+    require_client_access(db, principal, client_id, admin=True)
     connection = db.scalar(
         select(IntegrationConnection).where(
             IntegrationConnection.client_id == client_id,
@@ -250,8 +270,11 @@ async def google_properties(
     response_model=BingPropertiesRead,
 )
 async def bing_properties(
-    client_id: UUID, db: Session = Depends(get_db)
+    client_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
 ) -> dict[str, list[dict[str, str | bool]]]:
+    require_client_access(db, principal, client_id, admin=True)
     connection = db.scalar(
         select(IntegrationConnection).where(
             IntegrationConnection.client_id == client_id,
@@ -269,10 +292,11 @@ async def bing_properties(
 
 @router.get("/websites/{website_id}/integrations", response_model=list[WebsiteIntegrationRead])
 def list_website_integrations(
-    website_id: UUID, db: Session = Depends(get_db)
+    website_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
 ) -> list[WebsiteIntegration]:
-    if not db.get(Website, website_id):
-        raise HTTPException(status_code=404, detail="Website not found")
+    require_website_access(db, principal, website_id, admin=True)
     return list(
         db.scalars(
             select(WebsiteIntegration)
@@ -291,11 +315,13 @@ def create_website_integration(
     website_id: UUID,
     payload: WebsiteIntegrationCreate,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
 ) -> WebsiteIntegration:
     website = db.get(Website, website_id)
     connection = db.get(IntegrationConnection, payload.connection_id)
     if not website:
         raise HTTPException(status_code=404, detail="Website not found")
+    require_client_access(db, principal, website.client_id, admin=True)
     if not connection or connection.client_id != website.client_id:
         raise HTTPException(status_code=422, detail="Connection does not belong to this client")
     expected_provider = "bing" if payload.service == "bing_webmaster" else "google"
@@ -321,6 +347,7 @@ def upsert_website_integration(
     service: str,
     payload: WebsiteIntegrationUpsert,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
 ) -> WebsiteIntegration:
     if service not in {"search_console", "ga4", "bing_webmaster"}:
         raise HTTPException(status_code=422, detail="Unsupported integration service")
@@ -328,6 +355,7 @@ def upsert_website_integration(
     connection = db.get(IntegrationConnection, payload.connection_id)
     if not website:
         raise HTTPException(status_code=404, detail="Website not found")
+    require_client_access(db, principal, website.client_id, admin=True)
     if not connection or connection.client_id != website.client_id:
         raise HTTPException(status_code=422, detail="Connection does not belong to this client")
     expected_provider = "bing" if service == "bing_webmaster" else "google"
@@ -363,9 +391,9 @@ async def synchronize_search_console(
     website_id: UUID,
     days: int = Query(default=28, ge=1, le=90),
     db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
 ) -> dict[str, object]:
-    if not db.get(Website, website_id):
-        raise HTTPException(status_code=404, detail="Website not found")
+    require_website_access(db, principal, website_id, admin=True)
     try:
         return await sync_search_console(db, website_id, days)
     except ValueError as exc:
@@ -377,9 +405,9 @@ async def synchronize_google_analytics(
     website_id: UUID,
     days: int = Query(default=28, ge=1, le=90),
     db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
 ) -> dict[str, object]:
-    if not db.get(Website, website_id):
-        raise HTTPException(status_code=404, detail="Website not found")
+    require_website_access(db, principal, website_id, admin=True)
     try:
         return await sync_google_analytics(db, website_id, days)
     except ValueError as exc:

@@ -18,7 +18,7 @@
 <body>
   <div id="app" class="app-shell hidden">
     <aside>
-      <div><span class="eyebrow">THACT</span><h2>SEO Monitor</h2></div>
+      <div><span class="eyebrow">THACT</span><h2>SEO Monitor</h2><small id="current-user"></small></div>
       <nav><button id="overview-nav" class="nav-active">Overzicht</button><button id="urls-nav">URLs</button><button id="changes-nav">Wijzigingen</button><button id="operations-nav">Beheer</button><button id="integrations-nav">Integraties</button></nav>
       <button id="logout" class="quiet">Uitloggen</button>
     </aside>
@@ -73,7 +73,7 @@
       <section id="operations-view" class="hidden">
         <header><div><span class="eyebrow">OPERATIES</span><h1>Beheer</h1><p class="intro">Crawls en exports voor <strong id="operations-website-name"></strong>.</p></div></header>
         <div class="operations-grid">
-          <section class="panel operation-card"><span class="eyebrow">CRAWLEN</span><h2>Nieuwe controle</h2><p>Een light check controleert bekende URLs. Een volledige crawl vernieuwt discovery, links, snapshots, wijzigingen en issues.</p><div class="operation-actions"><button id="start-light-check" class="primary-button">Start light check</button><button id="start-full-crawl" class="secondary-button">Start volledige crawl</button></div><div id="crawl-live-status" class="live-status hidden"><span id="crawl-live-label"></span><div class="progress-track"><span></span></div></div><p id="crawl-action-message" class="operation-message"></p></section>
+          <section id="crawl-operation-card" class="panel operation-card"><span class="eyebrow">CRAWLEN</span><h2>Nieuwe controle</h2><p>Een light check controleert bekende URLs. Een volledige crawl vernieuwt discovery, links, snapshots, wijzigingen en issues.</p><div class="operation-actions"><button id="start-light-check" class="primary-button">Start light check</button><button id="start-full-crawl" class="secondary-button">Start volledige crawl</button></div><div id="crawl-live-status" class="live-status hidden"><span id="crawl-live-label"></span><div class="progress-track"><span></span></div></div><p id="crawl-action-message" class="operation-message"></p></section>
           <section class="panel operation-card"><span class="eyebrow">EXPORTEREN</span><h2>Actielijst downloaden</h2><p>Genereer een Excel-workbook met URLs, technische bevindingen, wijzigingen, issues en interne links.</p><button id="generate-excel" class="primary-button">Genereer Excel-export</button><div id="current-export" class="live-status hidden"><span id="current-export-label"></span><div id="export-progress" class="progress-track"><span></span></div><a id="current-export-download" class="detail-button hidden">Download Excel</a></div><p id="export-action-message" class="operation-message"></p></section>
         </div>
         <section class="panel operation-history"><div class="panel-head"><div><span class="eyebrow">HISTORIE</span><h2>Recente crawls</h2></div><button id="refresh-operations" class="detail-button">Vernieuwen</button></div><div class="table-wrap"><table class="operation-table"><thead><tr><th>Gestart</th><th>Type</th><th>Status</th><th>Ontdekt</th><th>Gecrawld</th><th>Mislukt</th><th>Duur</th></tr></thead><tbody id="crawl-run-rows"></tbody></table></div><p id="crawl-runs-empty" class="empty hidden">Nog geen crawls beschikbaar.</p></section>

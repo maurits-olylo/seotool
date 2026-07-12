@@ -15,6 +15,12 @@ unieke database-index begrenst de globale rol `superuser` tot één account. Ver
 klanttoewijzingen volgen via afzonderlijke memberships; klantaccounts zijn nog niet actief. De
 API-key blijft apart beschikbaar voor technische integraties en scripts.
 
+`client_memberships` koppelt interne gebruikers aan klanten met rol `admin`, `user` of later
+`client`. De superuser en technische API-key hebben globale toegang. Een admin kan klanten aanmaken
+en beheert alleen klanten waarvoor een admin-membership bestaat. Een user kan toegewezen data lezen,
+issuestatussen bijwerken en exports gebruiken, maar geen integraties, instellingen of crawls beheren.
+Deze rechten worden in API-routes afgedwongen; verborgen menu-items zijn alleen de UI-weergave ervan.
+
 ## URL-discovery
 
 `urls` bewaart één blijvende URL-identiteit per website; `url_sources` legt vast of een URL via

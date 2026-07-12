@@ -10,7 +10,7 @@ from app.db.session import SessionLocal
 from app.models.crawl import CrawlRun
 from app.models.discovery import CrawlJob
 from app.models.issues import Issue, IssueOccurrence
-from app.models.user import User
+from app.models.user import ClientMembership, User
 
 
 def test_health(client: TestClient) -> None:
@@ -99,6 +99,48 @@ def test_only_one_superuser_can_exist() -> None:
         )
         with pytest.raises(IntegrityError):
             db.commit()
+
+
+def test_user_only_sees_assigned_client_and_cannot_start_crawl(client: TestClient) -> None:
+    assigned = client.post("/api/v1/clients", json={"name": "Assigned"}).json()
+    hidden = client.post("/api/v1/clients", json={"name": "Hidden"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": assigned["id"],
+            "name": "Assigned site",
+            "base_url": "https://assigned.example.com",
+        },
+    ).json()
+    with SessionLocal() as db:
+        user = User(
+            email="viewer@example.com",
+            role="user",
+            password_hash=hash_password("viewer-secure-password"),
+        )
+        db.add(user)
+        db.flush()
+        db.add(ClientMembership(user_id=user.id, client_id=UUID(assigned["id"]), role="user"))
+        db.commit()
+
+    from app.main import app
+
+    browser = TestClient(app)
+    assert (
+        browser.post(
+            "/ui/login",
+            json={"email": "viewer@example.com", "password": "viewer-secure-password"},
+        ).status_code
+        == 204
+    )
+    visible = browser.get("/api/v1/clients")
+    assert [item["id"] for item in visible.json()] == [assigned["id"]]
+    assert hidden["id"] not in {item["id"] for item in visible.json()}
+    denied = browser.post(
+        "/api/v1/crawl-jobs",
+        json={"website_id": website["id"], "job_type": "light_check"},
+    )
+    assert denied.status_code == 403
 
 
 def test_issue_detail_exposes_evidence_and_updates_status(client: TestClient) -> None:

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
+from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
 from app.models.discovery import Url
@@ -20,6 +21,7 @@ from app.schemas.issues import (
     IssueRead,
     IssueUpdate,
 )
+from app.services.authorization import require_website_access
 
 router = APIRouter(tags=["issues"])
 
@@ -30,7 +32,9 @@ def list_changes(
     limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
 ) -> list[dict[str, object]]:
+    require_website_access(db, principal, website_id)
     query = (
         select(Change)
         .where(Change.website_id == website_id)
@@ -66,10 +70,15 @@ def list_changes(
 
 
 @router.get("/changes/{change_id}", response_model=ChangeDetailRead)
-def get_change(change_id: UUID, db: Session = Depends(get_db)) -> dict[str, object]:
+def get_change(
+    change_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, object]:
     change = db.get(Change, change_id)
     if not change:
         raise HTTPException(status_code=404, detail="Change not found")
+    require_website_access(db, principal, change.website_id)
     previous = (
         db.get(UrlSnapshot, change.previous_snapshot_id) if change.previous_snapshot_id else None
     )
@@ -193,7 +202,9 @@ def list_issues(
     website_id: UUID,
     issue_status: str | None = Query(default=None, alias="status"),
     db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
 ) -> list[dict[str, object]]:
+    require_website_access(db, principal, website_id)
     query = (
         select(Issue).where(Issue.website_id == website_id).order_by(Issue.last_detected_at.desc())
     )
@@ -211,10 +222,15 @@ def list_issues(
 
 
 @router.get("/issues/{issue_id}", response_model=IssueDetailRead)
-def get_issue(issue_id: UUID, db: Session = Depends(get_db)) -> dict[str, object]:
+def get_issue(
+    issue_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, object]:
     issue = db.get(Issue, issue_id)
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
+    require_website_access(db, principal, issue.website_id)
     occurrence = db.scalar(
         select(IssueOccurrence)
         .where(IssueOccurrence.issue_id == issue.id)
@@ -316,10 +332,16 @@ def _organic_impacts(db: Session, website_id: UUID) -> dict[UUID, dict[str, obje
 
 
 @router.patch("/issues/{issue_id}", response_model=IssueRead)
-def update_issue(issue_id: UUID, payload: IssueUpdate, db: Session = Depends(get_db)) -> Issue:
+def update_issue(
+    issue_id: UUID,
+    payload: IssueUpdate,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> Issue:
     issue = db.get(Issue, issue_id)
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
+    require_website_access(db, principal, issue.website_id)
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(issue, key, value)
     db.commit()
@@ -329,10 +351,15 @@ def update_issue(issue_id: UUID, payload: IssueUpdate, db: Session = Depends(get
 
 @router.post("/issues/{issue_id}/comments", response_model=CommentRead, status_code=201)
 def add_comment(
-    issue_id: UUID, payload: CommentCreate, db: Session = Depends(get_db)
+    issue_id: UUID,
+    payload: CommentCreate,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
 ) -> IssueComment:
-    if not db.get(Issue, issue_id):
+    issue = db.get(Issue, issue_id)
+    if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
+    require_website_access(db, principal, issue.website_id)
     comment = IssueComment(issue_id=issue_id, **payload.model_dump())
     db.add(comment)
     db.commit()
