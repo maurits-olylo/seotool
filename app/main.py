@@ -13,6 +13,7 @@ from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.core.security import require_api_key
 from app.db.session import engine
+from app.services.users import ensure_initial_superuser
 
 configure_logging()
 logger = structlog.get_logger()
@@ -21,6 +22,7 @@ logger = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     logger.info("application_started", environment=get_settings().app_env)
+    ensure_initial_superuser()
     yield
     engine.dispose()
 
@@ -37,7 +39,15 @@ async def redirect_proxied_http_to_https(
         and request.headers.get("x-forwarded-proto") == "http"
     ):
         return RedirectResponse(request.url.replace(scheme="https"), status_code=308)
-    return await call_next(request)
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; "
+        "connect-src 'self'; frame-ancestors 'none'"
+    )
+    return response
 
 
 app.include_router(clients.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])

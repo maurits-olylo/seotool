@@ -9,6 +9,7 @@ from app.models.integrations import (
     WebsiteIntegration,
 )
 from app.models.issues import Change, Issue, IssueComment, IssueOccurrence
+from app.models.user import User
 from app.models.website import Website, WebsiteSettings
 
 __all__ = [
@@ -27,6 +28,7 @@ __all__ = [
     "UrlLink",
     "UrlSnapshot",
     "UrlSource",
+    "User",
     "Website",
     "WebsiteIntegration",
     "WebsiteSettings",

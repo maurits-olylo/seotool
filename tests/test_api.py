@@ -1,12 +1,16 @@
 from uuid import UUID
 
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 
 from app.core.config import get_settings
+from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.models.crawl import CrawlRun
 from app.models.discovery import CrawlJob
 from app.models.issues import Issue, IssueOccurrence
+from app.models.user import User
 
 
 def test_health(client: TestClient) -> None:
@@ -42,15 +46,59 @@ def test_interface_login_creates_http_only_session() -> None:
 
     browser = TestClient(app)
     assert browser.get("/").status_code == 200
-    assert browser.post("/ui/login", json={"api_key": "wrong"}).status_code == 401
+    assert browser.get("/app", follow_redirects=False).headers["location"] == "/login"
+    with SessionLocal() as db:
+        db.add(
+            User(
+                email="team@example.com",
+                display_name="Team member",
+                role="admin",
+                password_hash=hash_password("correct-horse-battery-staple"),
+            )
+        )
+        db.commit()
+    assert (
+        browser.post(
+            "/ui/login",
+            json={"email": "team@example.com", "password": "wrong-password"},
+        ).status_code
+        == 401
+    )
 
-    login = browser.post("/ui/login", json={"api_key": "test-key"})
+    login = browser.post(
+        "/ui/login",
+        json={
+            "email": "team@example.com",
+            "password": "correct-horse-battery-staple",
+        },
+    )
     assert login.status_code == 204
     assert "HttpOnly" in login.headers["set-cookie"]
+    assert browser.get("/app").status_code == 200
     assert browser.get("/api/v1/clients").status_code == 200
 
     assert browser.post("/ui/logout").status_code == 204
     assert browser.get("/api/v1/clients").status_code == 401
+
+
+def test_only_one_superuser_can_exist() -> None:
+    with SessionLocal() as db:
+        db.add_all(
+            [
+                User(
+                    email="first@example.com",
+                    role="superuser",
+                    password_hash=hash_password("first-secure-password"),
+                ),
+                User(
+                    email="second@example.com",
+                    role="superuser",
+                    password_hash=hash_password("second-secure-password"),
+                ),
+            ]
+        )
+        with pytest.raises(IntegrityError):
+            db.commit()
 
 
 def test_issue_detail_exposes_evidence_and_updates_status(client: TestClient) -> None:

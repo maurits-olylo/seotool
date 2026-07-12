@@ -29,6 +29,8 @@ Gebruik in productie minimaal:
 ```dotenv
 APP_ENV=production
 API_KEY=een-lange-willekeurige-geheime-waarde
+INITIAL_SUPERUSER_EMAIL=maurits@thact.nl
+INITIAL_SUPERUSER_PASSWORD=een-uniek-wachtwoord-van-minimaal-12-tekens
 POSTGRES_DB=seo
 POSTGRES_USER=seo
 POSTGRES_PASSWORD=een-ander-lang-wachtwoord
@@ -50,7 +52,9 @@ curl http://127.0.0.1:8000/health
 ```
 
 Stel in Synology Reverse Proxy HTTPS in en stuur verkeer door naar poort `API_PORT`. Beperk toegang
-waar mogelijk via firewall of VPN. De API-key blijft ook achter de reverse proxy verplicht.
+waar mogelijk via firewall of VPN. De API-key blijft ook achter de reverse proxy verplicht voor
+technische API-clients. Teamleden loggen in met hun persoonlijke account; het initiële beheeraccount
+komt uit de environment.
 
 ## Updates
 

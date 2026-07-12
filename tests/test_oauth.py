@@ -96,7 +96,7 @@ def test_google_callback_stores_encrypted_tokens(client: TestClient, monkeypatch
             follow_redirects=False,
         )
         assert response.status_code == 302
-        assert response.headers["location"] == "/?integration=google-connected"
+        assert response.headers["location"] == "/app?integration=google-connected"
         with SessionLocal() as db:
             connection = db.scalar(select(IntegrationConnection))
             assert connection and connection.status == "connected"
@@ -245,7 +245,7 @@ def test_bing_callback_stores_encrypted_tokens(client: TestClient, monkeypatch) 
             follow_redirects=False,
         )
         assert response.status_code == 302
-        assert response.headers["location"] == "/?integration=bing-connected"
+        assert response.headers["location"] == "/app?integration=bing-connected"
         with SessionLocal() as db:
             connection = db.scalar(
                 select(IntegrationConnection).where(IntegrationConnection.provider == "bing")

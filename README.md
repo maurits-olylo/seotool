@@ -2,12 +2,13 @@
 
 Backend voor het beheren van klanten en websites, periodieke crawls, wijzigingsdetectie,
 technische SEO-issues en CSV-/Excel-export. De applicatie gebruikt FastAPI, PostgreSQL en Redis/RQ
-en draait als vijf losse Docker Compose-services.
+en draait als zes losse Docker Compose-services.
 
 ## Architectuur
 
 - `api`: REST API en OpenAPI-documentatie.
-- `worker`: crawls, analyse en exports.
+- `worker`: crawls en analyse.
+- `export-worker`: exports op een afzonderlijke queue.
 - `scheduler`: dagelijkse sitemap/light checks en wekelijkse sitecrawls.
 - `postgres`: blijvende configuratie, URL-register, snapshots en issues.
 - `redis`: jobqueue. Gegenereerde exports en databasegegevens staan in persistente volumes.
@@ -28,8 +29,10 @@ docker compose ps
 curl http://localhost:8000/health
 ```
 
-Wijzig minimaal `API_KEY` voordat de API via een netwerk bereikbaar wordt. OpenAPI staat op
-`http://localhost:8000/docs`; beveiligde routes vereisen de header `X-API-Key`.
+Wijzig minimaal `API_KEY`, `INITIAL_SUPERUSER_EMAIL` en `INITIAL_SUPERUSER_PASSWORD` voordat de applicatie
+via een netwerk bereikbaar wordt. Het eerste interne account wordt bij de eerste start aangemaakt.
+OpenAPI staat op `http://localhost:8000/docs`; technische toegang gebruikt `X-API-Key`, terwijl de
+interface persoonlijke accounts en een beveiligde sessiecookie gebruikt.
 
 ## Dagelijks beheer
 
@@ -98,4 +101,3 @@ Test restores periodiek op een aparte installatie. De scripts bewaren standaard 
 - Scheduler maakt geen jobs: alleen actieve websites worden gepland; controleer schedulerlogs.
 - Export ontbreekt: controleer workerlogs en het `exports_data`-volume.
 - Poort 8000 bezet: wijzig `API_PORT` en gebruik `compose.prod.yaml`.
-

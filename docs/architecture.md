@@ -7,6 +7,14 @@ HTTP-verzoeken. De scheduler wordt in fase 5 verantwoordelijk voor periodieke jo
 Alle database-ID's zijn UUID's en tijdstempels worden in UTC opgeslagen. Crawler-, snapshot-,
 wijzigings- en issuecomponenten blijven onderling gescheiden.
 
+## Authenticatie
+
+De publieke productschil is zonder sessie toegankelijk. Interne teamleden gebruiken een persoonlijk
+account met een scrypt-wachtwoordhash en een ondertekende, HTTP-only sessiecookie. Eén gedeeltelijk
+unieke database-index begrenst de globale rol `superuser` tot één account. Verdere rollen en
+klanttoewijzingen volgen via afzonderlijke memberships; klantaccounts zijn nog niet actief. De
+API-key blijft apart beschikbaar voor technische integraties en scripts.
+
 ## URL-discovery
 
 `urls` bewaart één blijvende URL-identiteit per website; `url_sources` legt vast of een URL via

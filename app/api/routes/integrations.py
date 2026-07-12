@@ -77,13 +77,13 @@ async def google_callback(
     db: Session = Depends(get_db),
 ) -> RedirectResponse:
     if error or not code or not state or not google_is_configured():
-        return RedirectResponse("/?integration=google-error", status_code=302)
+        return RedirectResponse("/app?integration=google-error", status_code=302)
     try:
         client_id = parse_oauth_state(state)
     except ValueError:
-        return RedirectResponse("/?integration=google-error", status_code=302)
+        return RedirectResponse("/app?integration=google-error", status_code=302)
     if not db.get(Client, client_id):
-        return RedirectResponse("/?integration=google-error", status_code=302)
+        return RedirectResponse("/app?integration=google-error", status_code=302)
 
     settings = get_settings()
     async with httpx.AsyncClient(timeout=20) as http:
@@ -98,14 +98,14 @@ async def google_callback(
             },
         )
         if token_response.status_code != 200:
-            return RedirectResponse("/?integration=google-error", status_code=302)
+            return RedirectResponse("/app?integration=google-error", status_code=302)
         token_data = token_response.json()
         user_response = await http.get(
             "https://openidconnect.googleapis.com/v1/userinfo",
             headers={"Authorization": f"Bearer {token_data['access_token']}"},
         )
         if user_response.status_code != 200:
-            return RedirectResponse("/?integration=google-error", status_code=302)
+            return RedirectResponse("/app?integration=google-error", status_code=302)
         account_email = user_response.json().get("email")
 
     connection = db.scalar(
@@ -129,7 +129,7 @@ async def google_callback(
     connection.scopes = token_data.get("scope", " ".join(GOOGLE_SCOPES)).split()
     connection.last_error = None
     db.commit()
-    return RedirectResponse("/?integration=google-connected", status_code=302)
+    return RedirectResponse("/app?integration=google-connected", status_code=302)
 
 
 @oauth_router.get("/integrations/bing/callback", include_in_schema=False)
@@ -140,13 +140,13 @@ async def bing_callback(
     db: Session = Depends(get_db),
 ) -> RedirectResponse:
     if error or not code or not state or not bing_is_configured():
-        return RedirectResponse("/?integration=bing-error", status_code=302)
+        return RedirectResponse("/app?integration=bing-error", status_code=302)
     try:
         client_id = parse_oauth_state(state)
     except ValueError:
-        return RedirectResponse("/?integration=bing-error", status_code=302)
+        return RedirectResponse("/app?integration=bing-error", status_code=302)
     if not db.get(Client, client_id):
-        return RedirectResponse("/?integration=bing-error", status_code=302)
+        return RedirectResponse("/app?integration=bing-error", status_code=302)
 
     settings = get_settings()
     async with httpx.AsyncClient(timeout=20) as http:
@@ -161,7 +161,7 @@ async def bing_callback(
             },
         )
     if response.status_code != 200:
-        return RedirectResponse("/?integration=bing-error", status_code=302)
+        return RedirectResponse("/app?integration=bing-error", status_code=302)
     token_data = response.json()
     connection = db.scalar(
         select(IntegrationConnection).where(
@@ -182,7 +182,7 @@ async def bing_callback(
     connection.scopes = token_data.get("scope", " ".join(BING_SCOPES)).split()
     connection.last_error = None
     db.commit()
-    return RedirectResponse("/?integration=bing-connected", status_code=302)
+    return RedirectResponse("/app?integration=bing-connected", status_code=302)
 
 
 @router.get("/clients/{client_id}/integrations", response_model=list[IntegrationConnectionRead])

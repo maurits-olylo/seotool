@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     bing_client_secret: str = ""
     bing_redirect_uri: str = ""
     token_encryption_key: str = ""
+    initial_superuser_email: str = ""
+    initial_superuser_password: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

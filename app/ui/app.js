@@ -22,8 +22,8 @@ async function api(path, options = {}) {
   return response.status === 204 ? null : response.json();
 }
 
-function showLogin() { stopOperationsPolling(); $("#app").classList.add("hidden"); $("#login").classList.remove("hidden"); }
-function showApp() { $("#login").classList.add("hidden"); $("#app").classList.remove("hidden"); }
+function showLogin() { stopOperationsPolling(); window.location.assign("/login"); }
+function showApp() { $("#app").classList.remove("hidden"); }
 function escapeHtml(value = "") { const node = document.createElement("span"); node.textContent = value; return node.innerHTML; }
 function option(item) { return `<option value="${item.id}">${escapeHtml(item.name)}</option>`; }
 function issueUrl(issue) { return state.urls.get(issue.url_id) || ""; }
@@ -576,13 +576,7 @@ async function saveIssueStatus() {
   $("#issue-dialog").close(); state.selectedIssueId = null; render();
 }
 
-$("#login-form").addEventListener("submit", async (event) => {
-  event.preventDefault(); $("#login-error").textContent = "";
-  const response = await fetch("/ui/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ api_key: $("#api-key").value }) });
-  if (!response.ok) { $("#login-error").textContent = "De API-key is ongeldig."; return; }
-  $("#api-key").value = ""; showApp(); await loadClients(); showView(viewFromHash(), false);
-});
-$("#logout").addEventListener("click", async () => { await fetch("/ui/logout", { method: "POST" }); showLogin(); });
+$("#logout").addEventListener("click", async () => { await fetch("/ui/logout", { method: "POST" }); window.location.assign("/"); });
 $("#client-select").addEventListener("change", async () => { await loadWebsites(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); });
 $("#website-select").addEventListener("change", async () => { await loadIssues(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); if (!$("#urls-view").classList.contains("hidden")) renderUrls(); if (!$("#changes-view").classList.contains("hidden")) await loadChanges(); if (!$("#operations-view").classList.contains("hidden")) await loadOperations(); });
 for (const selector of ["#severity-filter", "#type-filter", "#impact-filter", "#status-filter"]) $(selector).addEventListener("change", () => { state.page = 1; render(); });
@@ -634,6 +628,6 @@ loadClients().then(() => {
     };
     $("#integration-message").textContent = integrationMessages[integrationResult] || "De koppeling is niet voltooid. Probeer opnieuw.";
     $("#integration-message").classList.remove("hidden");
-    window.history.replaceState({}, "", "/#integraties");
+    window.history.replaceState({}, "", "/app#integraties");
   } else showView(viewFromHash(), false);
 }).catch(() => showLogin());
