@@ -155,6 +155,62 @@ def test_user_only_sees_assigned_client_and_cannot_start_crawl(client: TestClien
     assert denied.status_code == 403
 
 
+def test_client_role_is_report_only(client: TestClient) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Report customer"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": customer["id"],
+            "name": "Report site",
+            "base_url": "https://report.example.com",
+        },
+    ).json()
+    website_id = UUID(website["id"])
+    with SessionLocal() as db:
+        report_user = User(
+            email="client@example.com",
+            role="client",
+            password_hash=hash_password("client-secure-password"),
+        )
+        db.add(report_user)
+        db.flush()
+        db.add(
+            ClientMembership(
+                user_id=report_user.id,
+                client_id=UUID(customer["id"]),
+                role="client",
+            )
+        )
+        issue = Issue(
+            website_id=website_id,
+            issue_type="http_404",
+            category="reachability",
+            severity="high",
+            title="Pagina geeft 404",
+            description="De URL geeft een 404.",
+            recommended_action="Herstel de pagina.",
+        )
+        db.add(issue)
+        db.commit()
+        issue_id = issue.id
+
+    from app.main import app
+
+    browser = TestClient(app)
+    assert browser.post(
+        "/ui/login",
+        json={"email": "client@example.com", "password": "client-secure-password"},
+    ).status_code == 204
+    assert browser.get(f"/api/v1/websites/{website_id}/issues").status_code == 200
+    assert browser.patch(
+        f"/api/v1/issues/{issue_id}", json={"status": "planned"}
+    ).status_code == 403
+    assert browser.post(
+        "/api/v1/exports",
+        json={"website_id": str(website_id), "export_type": "excel"},
+    ).status_code == 403
+
+
 def test_superuser_invites_user_for_client(client: TestClient) -> None:
     customer = client.post("/api/v1/clients", json={"name": "Invitation client"}).json()
     with SessionLocal() as db:

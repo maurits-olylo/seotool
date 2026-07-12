@@ -21,7 +21,7 @@ from app.schemas.issues import (
     IssueRead,
     IssueUpdate,
 )
-from app.services.authorization import require_website_access
+from app.services.authorization import require_website_access, require_write_access
 
 router = APIRouter(tags=["issues"])
 
@@ -338,6 +338,7 @@ def update_issue(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> Issue:
+    require_write_access(principal)
     issue = db.get(Issue, issue_id)
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
@@ -356,6 +357,7 @@ def add_comment(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> IssueComment:
+    require_write_access(principal)
     issue = db.get(Issue, issue_id)
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")

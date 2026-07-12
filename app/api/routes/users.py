@@ -56,8 +56,8 @@ def create_invitation(
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     require_client_access(db, principal, payload.client_id, admin=True)
-    if principal.role == "admin" and payload.role != "user":
-        raise HTTPException(status_code=403, detail="Admins can only invite users")
+    if principal.role == "admin" and payload.role not in {"user", "client"}:
+        raise HTTPException(status_code=403, detail="Admins cannot invite other admins")
     if not principal.user_id:
         raise HTTPException(status_code=422, detail="A personal account is required")
     email = payload.email.strip().lower()

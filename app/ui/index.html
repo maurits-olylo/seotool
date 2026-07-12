@@ -20,13 +20,13 @@
   <div id="app" class="app-shell hidden">
     <aside>
       <div><span class="eyebrow">THACT</span><h2>SEO Monitor</h2><small id="current-user"></small></div>
-      <nav><button id="overview-nav" class="nav-active">Overzicht</button><button id="urls-nav">URLs</button><button id="changes-nav">Wijzigingen</button><button id="operations-nav">Beheer</button><button id="organization-nav">Organisatie</button><button id="integrations-nav">Integraties</button></nav>
+      <nav><button id="overview-nav" class="nav-active"><span id="overview-nav-label">Overzicht</span></button><button id="urls-nav">URLs</button><button id="changes-nav">Wijzigingen</button><button id="operations-nav">Beheer</button><button id="organization-nav">Organisatie</button><button id="integrations-nav">Integraties</button></nav>
       <button id="logout" class="quiet">Uitloggen</button>
     </aside>
     <main>
       <section id="overview-view">
       <header>
-        <div><span class="eyebrow">PRODUCTIE</span><h1>Technische SEO-acties</h1></div>
+        <div><span id="overview-eyebrow" class="eyebrow">PRODUCTIE</span><h1 id="overview-title">Technische SEO-acties</h1><p id="client-report-intro" class="intro hidden">Actuele technische gezondheid, prioriteiten en organische impact.</p></div>
         <div class="selectors">
           <select id="client-select" aria-label="Klant"></select>
           <select id="website-select" aria-label="Website"></select>
@@ -84,7 +84,7 @@
         <div class="organization-grid">
           <form id="client-form" class="panel organization-card"><span class="eyebrow">KLANT</span><h2>Nieuwe klant</h2><label>Naam<input id="new-client-name" required maxlength="255"></label><label>Interne referentie<input id="new-client-reference" maxlength="100"></label><button class="primary-button" type="submit">Klant toevoegen</button><p id="client-form-message" class="operation-message"></p></form>
           <form id="website-form" class="panel organization-card"><span class="eyebrow">WEBSITE</span><h2>Nieuwe website</h2><label>Klant<select id="new-website-client" required></select></label><label>Naam<input id="new-website-name" required maxlength="255"></label><label>Basis-URL<input id="new-website-url" type="url" required></label><button class="primary-button" type="submit">Website toevoegen</button><p id="website-form-message" class="operation-message"></p></form>
-          <form id="invitation-form" class="panel organization-card"><span class="eyebrow">TEAM</span><h2>Gebruiker uitnodigen</h2><label>Klant<select id="invitation-client" required></select></label><label>E-mailadres<input id="invitation-email" type="email" required></label><label>Rol<select id="invitation-role"><option value="user">User</option><option value="admin">Admin</option></select></label><button class="primary-button" type="submit">Uitnodiging maken</button><p id="invitation-form-message" class="operation-message"></p><div id="invitation-link-wrap" class="invitation-link hidden"><input id="invitation-link" readonly><button id="copy-invitation" type="button" class="detail-button">Kopieer link</button></div></form>
+          <form id="invitation-form" class="panel organization-card"><span class="eyebrow">TEAM</span><h2>Gebruiker uitnodigen</h2><label>Klant<select id="invitation-client" required></select></label><label>E-mailadres<input id="invitation-email" type="email" required></label><label>Rol<select id="invitation-role"><option value="user">User</option><option value="client">Client (alleen rapportage)</option><option value="admin">Admin</option></select></label><button class="primary-button" type="submit">Uitnodiging maken</button><p id="invitation-form-message" class="operation-message"></p><div id="invitation-link-wrap" class="invitation-link hidden"><input id="invitation-link" readonly><button id="copy-invitation" type="button" class="detail-button">Kopieer link</button></div></form>
         </div>
         <section class="panel organization-members"><div class="panel-head"><div><span class="eyebrow">TOEGANG</span><h2>Leden van geselecteerde klant</h2></div></div><div class="table-wrap"><table><thead><tr><th>Naam</th><th>E-mail</th><th>Rol</th><th>Status</th></tr></thead><tbody id="member-rows"></tbody></table></div><p id="members-empty" class="empty hidden">Nog geen leden toegewezen.</p></section>
       </section>
@@ -104,7 +104,7 @@
     <button id="close-dialog" class="dialog-close" aria-label="Sluiten">×</button>
     <span class="eyebrow">ISSUEDETAIL</span><h2 id="detail-title"></h2>
     <a id="detail-url" target="_blank" rel="noopener"></a><p id="detail-impact" class="impact-summary hidden"></p>
-    <dl><div><dt>Prioriteit</dt><dd id="detail-severity"></dd></div><div><dt>Status</dt><dd><select id="detail-status"><option value="new">Nieuw</option><option value="review">Te beoordelen</option><option value="accepted">Geaccepteerd</option><option value="planned">Gepland</option><option value="in_progress">Bezig</option><option value="waiting_for_client">Wacht op klant</option><option value="resolved">Opgelost</option><option value="ignored">Genegeerd</option><option value="accepted_risk">Risico geaccepteerd</option></select><button id="save-status" class="primary-button">Status opslaan</button></dd></div><div><dt>Beschrijving</dt><dd id="detail-description"></dd></div><div><dt>Aanbevolen actie</dt><dd id="detail-action"></dd></div><div><dt>Technisch bewijs</dt><dd id="detail-evidence"></dd></div><div id="source-section"><dt>Pagina’s met deze interne link</dt><dd><ul id="detail-sources"></ul></dd></div></dl>
+    <dl><div><dt>Prioriteit</dt><dd id="detail-severity"></dd></div><div><dt>Status</dt><dd><select id="detail-status"><option value="new">Nieuw</option><option value="review">Te beoordelen</option><option value="accepted">Geaccepteerd</option><option value="planned">Gepland</option><option value="in_progress">Bezig</option><option value="waiting_for_client">Wacht op klant</option><option value="resolved">Opgelost</option><option value="ignored">Genegeerd</option><option value="accepted_risk">Risico geaccepteerd</option></select><button id="save-status" class="primary-button">Status opslaan</button><span id="client-status-label" class="hidden"></span></dd></div><div><dt>Beschrijving</dt><dd id="detail-description"></dd></div><div><dt>Aanbevolen actie</dt><dd id="detail-action"></dd></div><div><dt>Technisch bewijs</dt><dd id="detail-evidence"></dd></div><div id="source-section"><dt>Pagina’s met deze interne link</dt><dd><ul id="detail-sources"></ul></dd></div></dl>
   </dialog>
   <dialog id="url-dialog">
     <button id="close-url-dialog" class="dialog-close" aria-label="Sluiten">×</button>

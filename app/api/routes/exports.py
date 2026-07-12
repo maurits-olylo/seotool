@@ -14,7 +14,7 @@ from app.db.session import get_db
 from app.models.exports import Export
 from app.models.website import Website
 from app.schemas.exports import ExportCreate, ExportRead
-from app.services.authorization import require_website_access
+from app.services.authorization import require_website_access, require_write_access
 
 router = APIRouter(prefix="/exports", tags=["exports"])
 
@@ -25,6 +25,7 @@ def create_export(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> Export:
+    require_write_access(principal)
     require_website_access(db, principal, payload.website_id)
     existing = db.scalar(
         select(Export.id).where(

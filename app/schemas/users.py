@@ -19,7 +19,7 @@ class CurrentUserRead(BaseModel):
 class InvitationCreate(BaseModel):
     email: EmailStr
     client_id: UUID
-    role: str = Field(pattern="^(admin|user)$")
+    role: str = Field(pattern="^(admin|user|client)$")
 
 
 class InvitationRead(BaseModel):

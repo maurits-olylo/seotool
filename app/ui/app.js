@@ -49,12 +49,22 @@ function issueUrlMarkup(issue) {
 
 function applyRolePermissions() {
   const canAdmin = ["superuser", "admin"].includes(state.currentUser?.role);
+  const isClient = state.currentUser?.role === "client";
   $("#integrations-nav").classList.toggle("hidden", !canAdmin);
   $("#organization-nav").classList.toggle("hidden", !canAdmin);
   $("#crawl-operation-card").classList.toggle("hidden", !canAdmin);
+  for (const selector of ["#urls-nav", "#changes-nav", "#operations-nav"]) $(selector).classList.toggle("hidden", isClient);
+  $("#overview-nav-label").textContent = isClient ? "Rapportage" : "Overzicht";
+  $("#overview-eyebrow").textContent = isClient ? "KLANTRAPPORTAGE" : "PRODUCTIE";
+  $("#overview-title").textContent = isClient ? "SEO-status" : "Technische SEO-acties";
+  $("#client-report-intro").classList.toggle("hidden", !isClient);
+  $("#detail-status").classList.toggle("hidden", isClient);
+  $("#save-status").classList.toggle("hidden", isClient);
+  $("#client-status-label").classList.toggle("hidden", !isClient);
   $("#invitation-role").querySelector('option[value="admin"]').disabled = state.currentUser?.role !== "superuser";
   $("#current-user").textContent = state.currentUser?.email || "Technische toegang";
-  if (!canAdmin && window.location.hash === "#integraties") window.location.hash = "#overzicht";
+  if (isClient && ["#urls", "#wijzigingen", "#beheer", "#organisatie", "#integraties"].includes(window.location.hash)) window.location.hash = "#overzicht";
+  else if (!canAdmin && ["#organisatie", "#integraties"].includes(window.location.hash)) window.location.hash = "#overzicht";
 }
 
 async function loadOrganization() {
@@ -601,6 +611,7 @@ async function showIssue(issueId) {
   if (url) $("#detail-url").href = url; else $("#detail-url").removeAttribute("href");
   $("#detail-severity").textContent = labels[issue.severity] || issue.severity;
   $("#detail-status").value = issue.status;
+  $("#client-status-label").textContent = labels[issue.status] || issue.status;
   $("#detail-description").textContent = issue.description;
   $("#detail-action").textContent = issue.recommended_action;
   const impact = issue.organic_impact;
