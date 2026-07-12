@@ -170,11 +170,139 @@ def test_google_properties_are_loaded_for_connected_client(client: TestClient, m
             db.add(connection)
             db.commit()
 
-        response = client.get(
-            f"/api/v1/clients/{customer['id']}/integrations/google/properties"
-        )
+        response = client.get(f"/api/v1/clients/{customer['id']}/integrations/google/properties")
         assert response.status_code == 200
         assert response.json()["search_console"][0]["id"] == "sc-domain:example.com"
         assert response.json()["ga4"][0]["id"] == "properties/123"
+    finally:
+        get_settings.cache_clear()
+
+
+def test_bing_authorize_uses_signed_state_and_read_scope(client: TestClient, monkeypatch) -> None:
+    monkeypatch.setenv("BING_CLIENT_ID", "bing-client-id")
+    monkeypatch.setenv("BING_CLIENT_SECRET", "bing-client-secret")
+    monkeypatch.setenv(
+        "BING_REDIRECT_URI",
+        "https://seo.example.com/api/v1/integrations/bing/callback",
+    )
+    monkeypatch.setenv("TOKEN_ENCRYPTION_KEY", "04" * 32)
+    get_settings.cache_clear()
+    try:
+        customer = client.post("/api/v1/clients", json={"name": "Bing OAuth client"}).json()
+        response = client.get(
+            f"/api/v1/integrations/bing/authorize?client_id={customer['id']}",
+            follow_redirects=False,
+        )
+        assert response.status_code == 302
+        query = parse_qs(urlparse(response.headers["location"]).query)
+        assert query["scope"] == ["webmaster.read"]
+        assert str(parse_oauth_state(query["state"][0])) == customer["id"]
+    finally:
+        get_settings.cache_clear()
+
+
+def test_bing_callback_stores_encrypted_tokens(client: TestClient, monkeypatch) -> None:
+    monkeypatch.setenv("BING_CLIENT_ID", "bing-client-id")
+    monkeypatch.setenv("BING_CLIENT_SECRET", "bing-client-secret")
+    monkeypatch.setenv(
+        "BING_REDIRECT_URI",
+        "https://seo.example.com/api/v1/integrations/bing/callback",
+    )
+    monkeypatch.setenv("TOKEN_ENCRYPTION_KEY", "05" * 32)
+    get_settings.cache_clear()
+
+    class FakeResponse:
+        status_code = 200
+
+        @staticmethod
+        def json() -> dict[str, object]:
+            return {
+                "access_token": "bing-access",
+                "refresh_token": "bing-refresh",
+                "expires_in": 3600,
+                "scope": "webmaster.read",
+            }
+
+    class FakeBingClient:
+        async def __aenter__(self):  # type: ignore[no-untyped-def]
+            return self
+
+        async def __aexit__(self, *args):  # type: ignore[no-untyped-def]
+            return None
+
+        async def post(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            return FakeResponse()
+
+    monkeypatch.setattr(
+        "app.api.routes.integrations.httpx.AsyncClient",
+        lambda **kwargs: FakeBingClient(),
+    )
+    try:
+        customer = client.post("/api/v1/clients", json={"name": "Bing callback client"}).json()
+        state = create_oauth_state(UUID(customer["id"]))
+        response = client.get(
+            f"/api/v1/integrations/bing/callback?code=auth-code&state={state}",
+            follow_redirects=False,
+        )
+        assert response.status_code == 302
+        assert response.headers["location"] == "/?integration=bing-connected"
+        with SessionLocal() as db:
+            connection = db.scalar(
+                select(IntegrationConnection).where(IntegrationConnection.provider == "bing")
+            )
+            assert connection and connection.status == "connected"
+            assert decrypt_token(connection.encrypted_refresh_token) == "bing-refresh"
+    finally:
+        get_settings.cache_clear()
+
+
+def test_bing_verified_sites_are_loaded(client: TestClient, monkeypatch) -> None:
+    monkeypatch.setenv("TOKEN_ENCRYPTION_KEY", "06" * 32)
+    get_settings.cache_clear()
+
+    class FakeResponse:
+        status_code = 200
+
+        @staticmethod
+        def json() -> dict[str, object]:
+            return {
+                "d": [
+                    {"Url": "https://example.com/", "IsVerified": True},
+                    {"Url": "https://unverified.example/", "IsVerified": False},
+                ]
+            }
+
+    class FakeBingClient:
+        async def __aenter__(self):  # type: ignore[no-untyped-def]
+            return self
+
+        async def __aexit__(self, *args):  # type: ignore[no-untyped-def]
+            return None
+
+        async def get(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            return FakeResponse()
+
+    monkeypatch.setattr(
+        "app.services.bing_integrations.httpx.AsyncClient",
+        lambda **kwargs: FakeBingClient(),
+    )
+    try:
+        customer = client.post("/api/v1/clients", json={"name": "Bing sites client"}).json()
+        with SessionLocal() as db:
+            connection = IntegrationConnection(
+                client_id=UUID(customer["id"]),
+                provider="bing",
+                status="connected",
+                encrypted_access_token=encrypt_token("bing-access"),
+                encrypted_refresh_token=encrypt_token("bing-refresh"),
+                token_expires_at=datetime.now(UTC) + timedelta(hours=1),
+            )
+            db.add(connection)
+            db.commit()
+        response = client.get(f"/api/v1/clients/{customer['id']}/integrations/bing/properties")
+        assert response.status_code == 200
+        assert response.json()["sites"] == [
+            {"id": "https://example.com/", "name": "https://example.com/", "verified": True}
+        ]
     finally:
         get_settings.cache_clear()

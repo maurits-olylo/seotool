@@ -14,6 +14,7 @@ from app.models.client import Client
 from app.models.integrations import IntegrationConnection, WebsiteIntegration
 from app.models.website import Website
 from app.schemas.integrations import (
+    BingPropertiesRead,
     GooglePropertiesRead,
     IntegrationConnectionCreate,
     IntegrationConnectionRead,
@@ -21,10 +22,14 @@ from app.schemas.integrations import (
     WebsiteIntegrationRead,
     WebsiteIntegrationUpsert,
 )
+from app.services.bing_integrations import BING_TOKEN_URL, list_bing_sites
 from app.services.google_analytics import sync_google_analytics
 from app.services.google_integrations import list_google_properties
 from app.services.oauth import (
+    BING_SCOPES,
     GOOGLE_SCOPES,
+    bing_authorization_url,
+    bing_is_configured,
     encrypt_token,
     google_authorization_url,
     google_is_configured,
@@ -41,6 +46,11 @@ def google_config() -> dict[str, bool]:
     return {"configured": google_is_configured()}
 
 
+@router.get("/integrations/bing/config")
+def bing_config() -> dict[str, bool]:
+    return {"configured": bing_is_configured()}
+
+
 @router.get("/integrations/google/authorize")
 def authorize_google(client_id: UUID = Query(), db: Session = Depends(get_db)) -> RedirectResponse:
     if not google_is_configured():
@@ -48,6 +58,15 @@ def authorize_google(client_id: UUID = Query(), db: Session = Depends(get_db)) -
     if not db.get(Client, client_id):
         raise HTTPException(status_code=404, detail="Client not found")
     return RedirectResponse(google_authorization_url(client_id), status_code=302)
+
+
+@router.get("/integrations/bing/authorize")
+def authorize_bing(client_id: UUID = Query(), db: Session = Depends(get_db)) -> RedirectResponse:
+    if not bing_is_configured():
+        raise HTTPException(status_code=503, detail="Bing OAuth is not configured")
+    if not db.get(Client, client_id):
+        raise HTTPException(status_code=404, detail="Client not found")
+    return RedirectResponse(bing_authorization_url(client_id), status_code=302)
 
 
 @oauth_router.get("/integrations/google/callback", include_in_schema=False)
@@ -113,6 +132,59 @@ async def google_callback(
     return RedirectResponse("/?integration=google-connected", status_code=302)
 
 
+@oauth_router.get("/integrations/bing/callback", include_in_schema=False)
+async def bing_callback(
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+    db: Session = Depends(get_db),
+) -> RedirectResponse:
+    if error or not code or not state or not bing_is_configured():
+        return RedirectResponse("/?integration=bing-error", status_code=302)
+    try:
+        client_id = parse_oauth_state(state)
+    except ValueError:
+        return RedirectResponse("/?integration=bing-error", status_code=302)
+    if not db.get(Client, client_id):
+        return RedirectResponse("/?integration=bing-error", status_code=302)
+
+    settings = get_settings()
+    async with httpx.AsyncClient(timeout=20) as http:
+        response = await http.post(
+            BING_TOKEN_URL,
+            data={
+                "client_id": settings.bing_client_id,
+                "client_secret": settings.bing_client_secret,
+                "code": code,
+                "grant_type": "authorization_code",
+                "redirect_uri": settings.bing_redirect_uri,
+            },
+        )
+    if response.status_code != 200:
+        return RedirectResponse("/?integration=bing-error", status_code=302)
+    token_data = response.json()
+    connection = db.scalar(
+        select(IntegrationConnection).where(
+            IntegrationConnection.client_id == client_id,
+            IntegrationConnection.provider == "bing",
+        )
+    )
+    if connection is None:
+        connection = IntegrationConnection(client_id=client_id, provider="bing")
+        db.add(connection)
+    connection.status = "connected"
+    connection.encrypted_access_token = encrypt_token(token_data.get("access_token"))
+    if token_data.get("refresh_token"):
+        connection.encrypted_refresh_token = encrypt_token(token_data["refresh_token"])
+    connection.token_expires_at = datetime.now(UTC) + timedelta(
+        seconds=int(token_data.get("expires_in", 3600))
+    )
+    connection.scopes = token_data.get("scope", " ".join(BING_SCOPES)).split()
+    connection.last_error = None
+    db.commit()
+    return RedirectResponse("/?integration=bing-connected", status_code=302)
+
+
 @router.get("/clients/{client_id}/integrations", response_model=list[IntegrationConnectionRead])
 def list_client_integrations(
     client_id: UUID, db: Session = Depends(get_db)
@@ -169,6 +241,28 @@ async def google_properties(
         raise HTTPException(status_code=409, detail="Google account is not connected")
     try:
         return await list_google_properties(db, connection)
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.get(
+    "/clients/{client_id}/integrations/bing/properties",
+    response_model=BingPropertiesRead,
+)
+async def bing_properties(
+    client_id: UUID, db: Session = Depends(get_db)
+) -> dict[str, list[dict[str, str | bool]]]:
+    connection = db.scalar(
+        select(IntegrationConnection).where(
+            IntegrationConnection.client_id == client_id,
+            IntegrationConnection.provider == "bing",
+            IntegrationConnection.status == "connected",
+        )
+    )
+    if not connection:
+        raise HTTPException(status_code=409, detail="Bing account is not connected")
+    try:
+        return {"sites": await list_bing_sites(db, connection)}
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

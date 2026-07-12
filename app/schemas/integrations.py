@@ -59,3 +59,13 @@ class GoogleProperty(BaseModel):
 class GooglePropertiesRead(BaseModel):
     search_console: list[GoogleProperty]
     ga4: list[GoogleProperty]
+
+
+class BingProperty(BaseModel):
+    id: str
+    name: str
+    verified: bool
+
+
+class BingPropertiesRead(BaseModel):
+    sites: list[BingProperty]

@@ -17,6 +17,7 @@ GOOGLE_SCOPES = [
     "https://www.googleapis.com/auth/webmasters.readonly",
     "https://www.googleapis.com/auth/analytics.readonly",
 ]
+BING_SCOPES = ["webmaster.read"]
 
 
 def google_is_configured() -> bool:
@@ -44,6 +45,30 @@ def google_authorization_url(client_id: UUID) -> str:
         "state": create_oauth_state(client_id),
     }
     return f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(parameters)}"
+
+
+def bing_is_configured() -> bool:
+    settings = get_settings()
+    return all(
+        [
+            settings.bing_client_id,
+            settings.bing_client_secret,
+            settings.bing_redirect_uri,
+            settings.token_encryption_key,
+        ]
+    )
+
+
+def bing_authorization_url(client_id: UUID) -> str:
+    settings = get_settings()
+    parameters = {
+        "client_id": settings.bing_client_id,
+        "redirect_uri": settings.bing_redirect_uri,
+        "response_type": "code",
+        "scope": " ".join(BING_SCOPES),
+        "state": create_oauth_state(client_id),
+    }
+    return f"https://www.bing.com/webmasters/oauth/authorize?{urlencode(parameters)}"
 
 
 def create_oauth_state(client_id: UUID, *, lifetime_seconds: int = 600) -> str:

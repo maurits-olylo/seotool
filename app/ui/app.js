@@ -11,7 +11,7 @@ const labels = {
   pending: "In wachtrij", running: "Bezig", succeeded: "Geslaagd",
   partially_succeeded: "Deels geslaagd", failed: "Mislukt", cancelled: "Geannuleerd",
 };
-const state = { clients: [], websites: [], issues: [], changes: [], changeGroups: [], crawlRuns: [], exports: [], operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null };
+const state = { clients: [], websites: [], issues: [], changes: [], changeGroups: [], crawlRuns: [], exports: [], operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null };
 const VIEW_HASHES = {overview: "overzicht", urls: "urls", changes: "wijzigingen", operations: "beheer", integrations: "integraties"};
 let operationsPollTimer = null;
 
@@ -64,9 +64,10 @@ async function loadWebsites() {
 async function loadIntegrations() {
   const clientId = $("#client-select").value;
   if (!clientId) return;
-  const [connections, googleConfig] = await Promise.all([
+  const [connections, googleConfig, bingConfig] = await Promise.all([
     api(`/api/v1/clients/${clientId}/integrations`),
     api("/api/v1/integrations/google/config"),
+    api("/api/v1/integrations/bing/config"),
   ]);
   for (const provider of ["google", "bing"]) {
     const connection = connections.find((item) => item.provider === provider);
@@ -83,6 +84,16 @@ async function loadIntegrations() {
     googleLink.removeAttribute("href");
     googleLink.setAttribute("aria-disabled", "true");
   }
+  const bingConnection = connections.find((item) => item.provider === "bing" && item.status === "connected");
+  const bingLink = $("#bing-connect");
+  bingLink.textContent = bingConnection ? "Opnieuw koppelen" : "Bing koppelen";
+  if (bingConfig.configured) {
+    bingLink.href = `/api/v1/integrations/bing/authorize?client_id=${clientId}`;
+    bingLink.setAttribute("aria-disabled", "false");
+  } else {
+    bingLink.removeAttribute("href");
+    bingLink.setAttribute("aria-disabled", "true");
+  }
   if (googleConnection) {
     state.googleConnectionId = googleConnection.id;
     await loadGoogleProperties().catch(() => {
@@ -92,6 +103,16 @@ async function loadIntegrations() {
   } else {
     state.googleConnectionId = null;
     $("#property-mapping").classList.add("hidden");
+  }
+  if (bingConnection) {
+    state.bingConnectionId = bingConnection.id;
+    await loadBingProperties().catch(() => {
+      $("#integration-message").textContent = "Bing-sites konden niet worden geladen. Controleer de API-rechten en probeer opnieuw.";
+      $("#integration-message").classList.remove("hidden");
+    });
+  } else {
+    state.bingConnectionId = null;
+    $("#bing-property-mapping").classList.add("hidden");
   }
 }
 
@@ -113,6 +134,21 @@ async function loadGoogleProperties() {
   $("#property-mapping").classList.remove("hidden");
 }
 
+async function loadBingProperties() {
+  const clientId = $("#client-select").value;
+  const websiteId = $("#website-select").value;
+  if (!clientId || !websiteId || !state.bingConnectionId) return;
+  const [properties, mappings] = await Promise.all([
+    api(`/api/v1/clients/${clientId}/integrations/bing/properties`),
+    api(`/api/v1/websites/${websiteId}/integrations`),
+  ]);
+  const mapping = mappings.find((item) => item.service === "bing_webmaster");
+  fillPropertySelect("#bing-property", properties.sites, mapping);
+  showMappingStatus(mapping, "#bing-property-message", "Bing Webmaster Tools");
+  $("#bing-mapping-website").textContent = $("#website-select").selectedOptions[0]?.textContent || "website";
+  $("#bing-property-mapping").classList.remove("hidden");
+}
+
 function showMappingStatus(mapping, selector, label) {
   const target = $(selector);
   if (!mapping) { target.textContent = ""; return; }
@@ -128,18 +164,19 @@ function fillPropertySelect(selector, properties, mapping) {
   if (mapping) select.value = mapping.external_property_id;
 }
 
-async function saveProperty(service, selector, buttonSelector, messageSelector) {
+async function saveProperty(service, selector, buttonSelector, messageSelector, connectionId) {
   const websiteId = $("#website-select").value;
   const select = $(selector);
-  if (!websiteId || !select.value || !state.googleConnectionId) return;
+  if (!websiteId || !select.value || !connectionId) return;
   const button = $(buttonSelector); const message = $(messageSelector);
   button.disabled = true; button.textContent = "Bezig…"; message.textContent = "";
   try {
     await api(`/api/v1/websites/${websiteId}/integrations/${service}`, {
       method: "PUT", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({ connection_id: state.googleConnectionId, external_property_id: select.value, external_property_name: select.selectedOptions[0]?.dataset.name || select.value }),
+      body: JSON.stringify({ connection_id: connectionId, external_property_id: select.value, external_property_name: select.selectedOptions[0]?.dataset.name || select.value }),
     });
-    button.textContent = "Opgeslagen ✓"; message.textContent = `${service === "ga4" ? "GA4" : "Search Console"}-property opgeslagen.`;
+    const serviceLabel = service === "ga4" ? "GA4" : service === "bing_webmaster" ? "Bing" : "Search Console";
+    button.textContent = "Opgeslagen ✓"; message.textContent = `${serviceLabel}-property opgeslagen.`;
   } catch (error) { button.textContent = "Opnieuw proberen"; message.textContent = "Opslaan is mislukt."; }
   finally { button.disabled = false; }
 }
@@ -578,8 +615,9 @@ $("#start-full-crawl").addEventListener("click", () => startCrawl("full_site_cra
 $("#generate-excel").addEventListener("click", generateExcel);
 $("#refresh-operations").addEventListener("click", loadOperations);
 $("#current-export-download").addEventListener("click", () => window.setTimeout(loadOperations, 2000));
-$("#save-search-console").addEventListener("click", () => saveProperty("search_console", "#search-console-property", "#save-search-console", "#search-console-message"));
-$("#save-ga4").addEventListener("click", () => saveProperty("ga4", "#ga4-property", "#save-ga4", "#ga4-message"));
+$("#save-search-console").addEventListener("click", () => saveProperty("search_console", "#search-console-property", "#save-search-console", "#search-console-message", state.googleConnectionId));
+$("#save-ga4").addEventListener("click", () => saveProperty("ga4", "#ga4-property", "#save-ga4", "#ga4-message", state.googleConnectionId));
+$("#save-bing").addEventListener("click", () => saveProperty("bing_webmaster", "#bing-property", "#save-bing", "#bing-property-message", state.bingConnectionId));
 $("#sync-search-console").addEventListener("click", syncSearchConsole);
 $("#sync-ga4").addEventListener("click", syncGa4);
 
@@ -588,7 +626,13 @@ loadClients().then(() => {
   const integrationResult = new URLSearchParams(window.location.search).get("integration");
   if (integrationResult) {
     showView("integrations");
-    $("#integration-message").textContent = integrationResult === "google-connected" ? "Google-account is succesvol gekoppeld." : "Google-koppeling is niet voltooid. Probeer opnieuw.";
+    const integrationMessages = {
+      "google-connected": "Google-account is succesvol gekoppeld.",
+      "bing-connected": "Bing Webmaster Tools-account is succesvol gekoppeld.",
+      "google-error": "Google-koppeling is niet voltooid. Probeer opnieuw.",
+      "bing-error": "Bing-koppeling is niet voltooid. Probeer opnieuw.",
+    };
+    $("#integration-message").textContent = integrationMessages[integrationResult] || "De koppeling is niet voltooid. Probeer opnieuw.";
     $("#integration-message").classList.remove("hidden");
     window.history.replaceState({}, "", "/#integraties");
   } else showView(viewFromHash(), false);
