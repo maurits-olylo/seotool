@@ -21,7 +21,7 @@ async def sync_search_console(db: Session, website_id: UUID, days: int = 28) -> 
         select(WebsiteIntegration).where(
             WebsiteIntegration.website_id == website_id,
             WebsiteIntegration.service == "search_console",
-            WebsiteIntegration.status == "active",
+            WebsiteIntegration.status.in_(["active", "error"]),
         )
     )
     if not mapping:

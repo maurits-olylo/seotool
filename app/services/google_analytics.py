@@ -23,7 +23,7 @@ async def sync_google_analytics(db: Session, website_id: UUID, days: int = 28) -
         select(WebsiteIntegration).where(
             WebsiteIntegration.website_id == website_id,
             WebsiteIntegration.service == "ga4",
-            WebsiteIntegration.status == "active",
+            WebsiteIntegration.status.in_(["active", "error"]),
         )
     )
     if not website or not mapping:

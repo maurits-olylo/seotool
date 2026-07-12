@@ -87,8 +87,19 @@ async function loadGoogleProperties() {
   const ga4Mapping = mappings.find((item) => item.service === "ga4");
   fillPropertySelect("#search-console-property", properties.search_console, searchConsoleMapping);
   fillPropertySelect("#ga4-property", properties.ga4, ga4Mapping);
+  showMappingStatus(searchConsoleMapping, "#search-console-message", "Search Console");
+  showMappingStatus(ga4Mapping, "#ga4-message", "GA4");
   $("#mapping-website").textContent = $("#website-select").selectedOptions[0]?.textContent || "website";
   $("#property-mapping").classList.remove("hidden");
+}
+
+function showMappingStatus(mapping, selector, label) {
+  const target = $(selector);
+  if (!mapping) { target.textContent = ""; return; }
+  if (mapping.status === "error") { target.textContent = `${label}: laatste synchronisatie mislukt.`; return; }
+  target.textContent = mapping.last_synced_at
+    ? `${label} laatst bijgewerkt: ${new Date(mapping.last_synced_at).toLocaleString("nl-NL")}.`
+    : `${label}-property gekoppeld; nog niet gesynchroniseerd.`;
 }
 
 function fillPropertySelect(selector, properties, mapping) {
