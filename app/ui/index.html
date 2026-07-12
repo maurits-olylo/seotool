@@ -76,7 +76,7 @@
         <section class="panel changes-panel">
           <div class="panel-head"><div><span class="eyebrow">WIJZIGINGSLOG</span><h2>Gedetecteerde veranderingen</h2></div><span id="change-result-count" class="result-count"></span></div>
           <div class="change-filters"><input id="change-search" type="search" placeholder="Zoek op URL, veld of wijziging" aria-label="Zoek wijzigingen"><select id="change-type-filter"><option value="">Alle wijzigingstypen</option></select><select id="change-period-filter"><option value="">Volledige historie</option><option value="7">Afgelopen 7 dagen</option><option value="30">Afgelopen 30 dagen</option><option value="90">Afgelopen 90 dagen</option></select></div>
-          <div class="table-wrap"><table class="change-table"><thead><tr><th>Gedetecteerd</th><th>URL</th><th>Wijziging</th><th>Veld</th><th></th></tr></thead><tbody id="change-rows"></tbody></table></div>
+          <div class="table-wrap"><table class="change-table"><thead><tr><th>Gedetecteerd</th><th>URL</th><th>Samenvatting</th><th>Onderdelen</th><th></th></tr></thead><tbody id="change-rows"></tbody></table></div>
           <p id="change-empty" class="empty hidden">Geen wijzigingen gevonden.</p>
           <footer class="pager"><button id="change-previous-page" class="page-button">Vorige</button><span id="change-page-label"></span><button id="change-next-page" class="page-button">Volgende</button></footer>
         </section>
@@ -109,7 +109,8 @@
     <span class="eyebrow">WIJZIGINGSDETAIL</span><h2 id="change-detail-title"></h2>
     <a id="change-detail-url" target="_blank" rel="noopener"></a>
     <p id="change-detail-summary" class="change-summary hidden"></p>
-    <dl><div><dt>Gedetecteerd</dt><dd id="change-detail-date"></dd></div><div><dt>Veld</dt><dd id="change-detail-field"></dd></div><div><dt id="change-old-label">Oude waarde</dt><dd id="change-detail-old" class="change-value"></dd></div><div><dt id="change-new-label">Nieuwe waarde</dt><dd id="change-detail-new" class="change-value"></dd></div></dl>
+    <dl><div><dt>Gedetecteerd</dt><dd id="change-detail-date"></dd></div></dl>
+    <div id="change-group-details"></div>
   </dialog>
   <script src="/ui/assets/app.js" defer></script>
 </body>

@@ -9,7 +9,7 @@ const labels = {
   waiting_for_client: "Wacht op klant", resolved: "Opgelost", verified: "Geverifieerd",
   ignored: "Genegeerd", accepted_risk: "Risico geaccepteerd",
 };
-const state = { clients: [], websites: [], issues: [], changes: [], urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null };
+const state = { clients: [], websites: [], issues: [], changes: [], changeGroups: [], urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null };
 
 async function api(path, options = {}) {
   const response = await fetch(path, { credentials: "same-origin", ...options });
@@ -275,12 +275,28 @@ async function loadChanges() {
     state.changes.push(...batch);
     if (batch.length < 1000) break;
   }
+  state.changeGroups = groupChanges(state.changes);
   const selected = $("#change-type-filter").value;
-  const types = [...new Set(state.changes.map((change) => change.change_type))].sort();
+  const types = [...new Set(state.changeGroups.flatMap((group) => group.changes.map((change) => change.change_type)))].sort();
   $("#change-type-filter").innerHTML = `<option value="">Alle wijzigingstypen</option>${types.map((type) => `<option value="${escapeHtml(type)}">${escapeHtml(changeLabel({change_type: type}))}</option>`).join("")}`;
   if (types.includes(selected)) $("#change-type-filter").value = selected;
   state.changePage = 1;
   renderChanges();
+}
+
+function groupChanges(changes) {
+  const groups = new Map();
+  changes.filter((change) => !change.is_baseline && isMeaningfulChange(change)).forEach((change) => {
+    const key = change.current_snapshot_id;
+    if (!groups.has(key)) groups.set(key, {id: key, url_id: change.url_id, detected_at: change.detected_at, changes: []});
+    groups.get(key).changes.push(change);
+  });
+  return [...groups.values()].sort((a, b) => new Date(b.detected_at) - new Date(a.detected_at));
+}
+
+function changeGroupLabel(group) {
+  const labels = [...new Set(group.changes.map(changeLabel))];
+  return labels.length === 1 ? labels[0] : `${labels.length} onderdelen gewijzigd`;
 }
 
 function renderChanges() {
@@ -288,21 +304,22 @@ function renderChanges() {
   const type = $("#change-type-filter").value;
   const days = Number($("#change-period-filter").value || 0);
   const since = days ? Date.now() - days * 86400000 : 0;
-  state.changeFiltered = state.changes.filter((change) => {
-    const url = state.urls.get(change.url_id) || "";
-    const text = `${url} ${changeLabel(change)} ${change.field_name || ""}`.toLowerCase();
-    return isMeaningfulChange(change) && (!type || change.change_type === type) && (!since || new Date(change.detected_at).getTime() >= since) && (!query || text.includes(query));
+  state.changeFiltered = state.changeGroups.filter((group) => {
+    const url = state.urls.get(group.url_id) || "";
+    const text = `${url} ${group.changes.map((change) => `${changeLabel(change)} ${change.field_name || ""}`).join(" ")}`.toLowerCase();
+    return (!type || group.changes.some((change) => change.change_type === type)) && (!since || new Date(group.detected_at).getTime() >= since) && (!query || text.includes(query));
   });
   const pages = Math.max(1, Math.ceil(state.changeFiltered.length / CHANGE_PAGE_SIZE));
   state.changePage = Math.min(state.changePage, pages);
   const start = (state.changePage - 1) * CHANGE_PAGE_SIZE;
   const rows = state.changeFiltered.slice(start, start + CHANGE_PAGE_SIZE);
   $("#changes-website-name").textContent = $("#website-select").selectedOptions[0]?.textContent || "de website";
-  $("#change-rows").innerHTML = rows.map((change) => {
-    const url = state.urls.get(change.url_id) || "Onbekende URL";
-    return `<tr><td>${new Date(change.detected_at).toLocaleString("nl-NL")}</td><td><a class="change-url" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a></td><td><span class="change-kind">${escapeHtml(changeLabel(change))}</span></td><td>${escapeHtml(change.field_name || "—")}</td><td><button class="detail-button" data-change-id="${change.id}">Bekijk</button></td></tr>`;
+  $("#change-rows").innerHTML = rows.map((group) => {
+    const url = state.urls.get(group.url_id) || "Onbekende URL";
+    const parts = [...new Set(group.changes.map(changeLabel))];
+    return `<tr><td>${new Date(group.detected_at).toLocaleString("nl-NL")}</td><td><a class="change-url" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a></td><td><span class="change-kind">${escapeHtml(changeGroupLabel(group))}</span></td><td>${parts.length}</td><td><button class="detail-button" data-change-group-id="${group.id}">Bekijk</button></td></tr>`;
   }).join("");
-  $("#change-result-count").textContent = `${state.changeFiltered.length} wijzigingen`;
+  $("#change-result-count").textContent = `${state.changeFiltered.length} gebeurtenissen`;
   $("#change-page-label").textContent = `Pagina ${state.changePage} van ${pages}`;
   $("#change-previous-page").disabled = state.changePage === 1;
   $("#change-next-page").disabled = state.changePage === pages;
@@ -310,28 +327,32 @@ function renderChanges() {
 }
 
 function isMeaningfulChange(change) {
+  if (["links_hash", "schema_hash"].includes(change.field_name)) return false;
   if (!["title_changed", "description_changed", "h1_changed", "robots_changed"].includes(change.change_type)) return true;
   const normalized = (value) => String(value ?? "").replace(/\s+/g, " ").trim();
   return normalized(change.old_value) !== normalized(change.new_value);
 }
 
-async function showChange(changeId) {
-  const change = await api(`/api/v1/changes/${changeId}`);
-  if (!change) return;
-  const url = state.urls.get(change.url_id) || "Onbekende URL";
-  $("#change-detail-title").textContent = changeLabel(change);
+async function showChangeGroup(groupId) {
+  const group = state.changeGroups.find((item) => item.id === groupId);
+  if (!group) return;
+  const changes = await Promise.all(group.changes.map((change) => api(`/api/v1/changes/${change.id}`)));
+  const url = state.urls.get(group.url_id) || "Onbekende URL";
+  $("#change-detail-title").textContent = changeGroupLabel(group);
   $("#change-detail-url").textContent = url;
   $("#change-detail-url").href = url;
-  $("#change-detail-date").textContent = new Date(change.detected_at).toLocaleString("nl-NL");
-  $("#change-detail-field").textContent = change.field_name || "Niet van toepassing";
-  const details = change.details || {};
-  $("#change-detail-summary").textContent = details.summary || "";
-  $("#change-detail-summary").classList.toggle("hidden", !details.summary);
-  const linkChange = change.field_name === "links_hash";
-  $("#change-old-label").textContent = linkChange ? "Verwijderde links" : "Oude waarde";
-  $("#change-new-label").textContent = linkChange ? "Toegevoegde links" : "Nieuwe waarde";
-  $("#change-detail-old").textContent = details.old_display ?? change.old_value ?? "Geen eerdere waarde";
-  $("#change-detail-new").textContent = details.new_display ?? change.new_value ?? "Geen nieuwe waarde";
+  $("#change-detail-date").textContent = new Date(group.detected_at).toLocaleString("nl-NL");
+  $("#change-detail-summary").textContent = `${changes.length} inhoudelijke onderdelen zijn bij dezelfde meting gewijzigd.`;
+  $("#change-detail-summary").classList.remove("hidden");
+  $("#change-group-details").innerHTML = changes.map((change) => {
+    const details = change.details || {};
+    const linkChange = ["links_hash", "internal_links"].includes(change.field_name);
+    const oldLabel = linkChange ? "Verwijderde links" : "Oude waarde";
+    const newLabel = linkChange ? "Toegevoegde links" : "Nieuwe waarde";
+    const oldValue = details.old_display ?? change.old_value ?? "Geen eerdere waarde";
+    const newValue = details.new_display ?? change.new_value ?? "Geen nieuwe waarde";
+    return `<section class="change-detail-part"><h3>${escapeHtml(changeLabel(change))}</h3>${details.summary ? `<p>${escapeHtml(details.summary)}</p>` : ""}<dl><div><dt>Veld</dt><dd>${escapeHtml(change.field_name || "Niet van toepassing")}</dd></div><div><dt>${oldLabel}</dt><dd class="change-value">${escapeHtml(String(oldValue))}</dd></div><div><dt>${newLabel}</dt><dd class="change-value">${escapeHtml(String(newValue))}</dd></div></dl></section>`;
+  }).join("");
   $("#change-dialog").showModal();
 }
 
@@ -459,7 +480,7 @@ for (const selector of ["#change-type-filter", "#change-period-filter"]) $(selec
 $("#change-search").addEventListener("input", () => { state.changePage = 1; renderChanges(); });
 $("#change-previous-page").addEventListener("click", () => { state.changePage -= 1; renderChanges(); });
 $("#change-next-page").addEventListener("click", () => { state.changePage += 1; renderChanges(); });
-$("#change-rows").addEventListener("click", (event) => { const button = event.target.closest("[data-change-id]"); if (button) showChange(button.dataset.changeId); });
+$("#change-rows").addEventListener("click", (event) => { const button = event.target.closest("[data-change-group-id]"); if (button) showChangeGroup(button.dataset.changeGroupId); });
 $("#close-change-dialog").addEventListener("click", () => $("#change-dialog").close());
 $("#save-search-console").addEventListener("click", () => saveProperty("search_console", "#search-console-property", "#save-search-console", "#search-console-message"));
 $("#save-ga4").addEventListener("click", () => saveProperty("ga4", "#ga4-property", "#save-ga4", "#ga4-message"));

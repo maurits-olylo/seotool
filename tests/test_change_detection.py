@@ -47,3 +47,14 @@ def test_ignores_whitespace_only_metadata_changes() -> None:
     current = snapshot(meta_description="  Een   duidelijke\nomschrijving. ")
 
     assert compare_snapshots(previous, current) == []
+
+
+def test_schema_comparison_ignores_script_order_but_detects_values() -> None:
+    previous = snapshot(schema_data=[{"@type": "Article", "@id": "/old"}, {"@type": "Person"}])
+    reordered = snapshot(schema_data=[{"@type": "Person"}, {"@id": "/old", "@type": "Article"}])
+    changed = snapshot(schema_data=[{"@type": "Person"}, {"@id": "/new", "@type": "Article"}])
+
+    assert compare_snapshots(previous, reordered) == []
+    assert [item.change_type for item in compare_snapshots(previous, changed)] == [
+        "structured_data_changed"
+    ]

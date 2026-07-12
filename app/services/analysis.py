@@ -1,10 +1,12 @@
+import json
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.crawl import UrlSnapshot
+from app.models.crawl import UrlLink, UrlSnapshot
 from app.models.discovery import Url
 from app.models.issues import Change
-from app.services.change_detection import compare_snapshots
+from app.services.change_detection import DetectedChange, compare_snapshots
 from app.services.issue_engine import reconcile_issues
 from app.services.job_posting import inspect_job_posting
 from app.services.technical_checks import SNAPSHOT_ISSUE_TYPES, inspect_snapshot
@@ -20,7 +22,20 @@ def analyze_snapshot(db: Session, snapshot: UrlSnapshot) -> None:
         .order_by(UrlSnapshot.checked_at.desc())
         .limit(1)
     )
-    for detected in compare_snapshots(previous, snapshot):
+    detected_changes = compare_snapshots(previous, snapshot)
+    if previous:
+        old_links = _internal_links(db, previous)
+        new_links = _internal_links(db, snapshot)
+        if old_links != new_links:
+            detected_changes.append(
+                DetectedChange(
+                    "internal_links_changed",
+                    "internal_links",
+                    json.dumps(old_links, ensure_ascii=False),
+                    json.dumps(new_links, ensure_ascii=False),
+                )
+            )
+    for detected in detected_changes:
         db.add(
             Change(
                 website_id=url.website_id,
@@ -46,4 +61,19 @@ def analyze_snapshot(db: Session, snapshot: UrlSnapshot) -> None:
         snapshot_id=snapshot.id,
         signals=signals,
         checked_issue_types=SNAPSHOT_ISSUE_TYPES,
+    )
+
+
+def _internal_links(db: Session, snapshot: UrlSnapshot) -> list[tuple[str, str, bool]]:
+    return sorted(
+        {
+            (target, anchor or "", nofollow)
+            for target, anchor, nofollow in db.execute(
+                select(UrlLink.target_url, UrlLink.anchor_text, UrlLink.is_nofollow).where(
+                    UrlLink.crawl_run_id == snapshot.crawl_run_id,
+                    UrlLink.source_url_id == snapshot.url_id,
+                    UrlLink.is_internal.is_(True),
+                )
+            )
+        }
     )

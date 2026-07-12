@@ -22,8 +22,6 @@ FIELDS = {
     "x_robots_tag": "robots_changed",
     "is_indexable": "indexability_changed",
     "main_content_hash": "main_content_changed",
-    "links_hash": "internal_links_changed",
-    "schema_hash": "structured_data_changed",
 }
 NORMALIZED_TEXT_FIELDS = {"title", "meta_description", "meta_robots", "x_robots_tag"}
 
@@ -43,6 +41,17 @@ def compare_snapshots(previous: UrlSnapshot | None, current: UrlSnapshot) -> lis
         changes.append(
             DetectedChange("h1_changed", "headings.h1", _serialize(old_h1), _serialize(new_h1))
         )
+    old_schema = _canonical_schema(previous.schema_data or [])
+    new_schema = _canonical_schema(current.schema_data or [])
+    if old_schema != new_schema:
+        changes.append(
+            DetectedChange(
+                "structured_data_changed",
+                "schema_data",
+                _serialize(old_schema),
+                _serialize(new_schema),
+            )
+        )
     return changes
 
 
@@ -50,6 +59,13 @@ def _values_equal(field: str, old: object, new: object) -> bool:
     if field in NORMALIZED_TEXT_FIELDS and isinstance(old, str) and isinstance(new, str):
         return " ".join(old.split()) == " ".join(new.split())
     return old == new
+
+
+def _canonical_schema(value: list[object]) -> list[object]:
+    return sorted(
+        value,
+        key=lambda item: json.dumps(item, sort_keys=True, ensure_ascii=False),
+    )
 
 
 def _serialize(value: object) -> str | None:

@@ -31,6 +31,7 @@ class ChangeRead(ORMModel):
     old_value: str | None
     new_value: str | None
     detected_at: datetime
+    is_baseline: bool = False
 
 
 class ChangeDetailRead(ChangeRead):

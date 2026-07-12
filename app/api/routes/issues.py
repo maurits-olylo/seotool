@@ -7,7 +7,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models.crawl import UrlLink, UrlSnapshot
+from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
 from app.models.discovery import Url
 from app.models.integrations import GoogleAnalyticsMetric, SearchConsoleMetric
 from app.models.issues import Change, Issue, IssueComment, IssueOccurrence
@@ -30,7 +30,7 @@ def list_changes(
     limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-) -> list[Change]:
+) -> list[dict[str, object]]:
     query = (
         select(Change)
         .where(Change.website_id == website_id)
@@ -38,7 +38,31 @@ def list_changes(
         .offset(offset)
         .limit(limit)
     )
-    return list(db.scalars(query))
+    changes = list(db.scalars(query))
+    baseline_run_id = db.scalar(
+        select(CrawlRun.id)
+        .where(
+            CrawlRun.website_id == website_id,
+            CrawlRun.crawl_type == "full_site_crawl",
+        )
+        .order_by(CrawlRun.started_at)
+        .limit(1)
+    )
+    snapshot_ids = [change.current_snapshot_id for change in changes]
+    snapshot_runs = {
+        snapshot_id: run_id
+        for snapshot_id, run_id in db.execute(
+            select(UrlSnapshot.id, UrlSnapshot.crawl_run_id).where(UrlSnapshot.id.in_(snapshot_ids))
+        )
+    }
+    return [
+        {
+            **ChangeRead.model_validate(change).model_dump(),
+            "is_baseline": baseline_run_id is not None
+            and snapshot_runs.get(change.current_snapshot_id) == baseline_run_id,
+        }
+        for change in changes
+    ]
 
 
 @router.get("/changes/{change_id}", response_model=ChangeDetailRead)
@@ -54,7 +78,7 @@ def get_change(change_id: UUID, db: Session = Depends(get_db)) -> dict[str, obje
         "old_display": change.old_value,
         "new_display": change.new_value,
     }
-    if change.field_name == "links_hash" and current:
+    if change.field_name in {"links_hash", "internal_links"} and current:
         old_links = _snapshot_links(db, previous, change.url_id)
         new_links = _snapshot_links(db, current, change.url_id)
         added = sorted(new_links - old_links)
@@ -66,18 +90,21 @@ def get_change(change_id: UUID, db: Session = Depends(get_db)) -> dict[str, obje
             "old_display": _link_display(removed, "Geen verwijderde links"),
             "new_display": _link_display(added, "Geen toegevoegde links"),
         }
-    elif change.field_name == "schema_hash" and current:
-        old_data = previous.schema_data if previous else []
-        new_data = current.schema_data or []
+    elif change.field_name in {"schema_hash", "schema_data"} and current:
+        old_data = _sort_schema_scripts(previous.schema_data if previous else [])
+        new_data = _sort_schema_scripts(current.schema_data or [])
         old_types = set(previous.schema_types or []) if previous else set()
         new_types = set(current.schema_types or [])
+        differences = _json_differences(old_data, new_data)
         details = {
             "summary": (
+                f"{len(differences)} structured-data-velden gewijzigd. "
                 f"Types toegevoegd: {', '.join(sorted(new_types - old_types)) or 'geen'}; "
-                f"verwijderd: {', '.join(sorted(old_types - new_types)) or 'geen'}"
+                f"verwijderd: {', '.join(sorted(old_types - new_types)) or 'geen'}."
             ),
-            "old_display": _truncate(json.dumps(old_data, indent=2, ensure_ascii=False)),
-            "new_display": _truncate(json.dumps(new_data, indent=2, ensure_ascii=False)),
+            "differences": differences[:100],
+            "old_display": _json_difference_display(differences, "old"),
+            "new_display": _json_difference_display(differences, "new"),
         }
     elif change.field_name == "main_content_hash" and current:
         details = {
@@ -122,6 +149,43 @@ def _truncate(value: str | None, limit: int = 8000) -> str:
     if not value:
         return "Geen inhoud"
     return value if len(value) <= limit else f"{value[:limit]}\n… (ingekort)"
+
+
+def _json_differences(old: object, new: object, path: str = "$") -> list[dict[str, object]]:
+    if isinstance(old, dict) and isinstance(new, dict):
+        differences: list[dict[str, object]] = []
+        for key in sorted(set(old) | set(new)):
+            differences.extend(_json_differences(old.get(key), new.get(key), f"{path}.{key}"))
+        return differences
+    if isinstance(old, list) and isinstance(new, list):
+        differences = []
+        for index in range(max(len(old), len(new))):
+            old_value = old[index] if index < len(old) else None
+            new_value = new[index] if index < len(new) else None
+            differences.extend(_json_differences(old_value, new_value, f"{path}[{index}]"))
+        return differences
+    if old == new:
+        return []
+    return [{"path": path, "old": old, "new": new}]
+
+
+def _sort_schema_scripts(value: list[object]) -> list[object]:
+    return sorted(
+        value,
+        key=lambda item: json.dumps(item, sort_keys=True, ensure_ascii=False),
+    )
+
+
+def _json_difference_display(differences: list[dict[str, object]], side: str) -> str:
+    if not differences:
+        return "Geen inhoudelijk verschil gevonden"
+    lines = [
+        f"{item['path']}: {json.dumps(item[side], ensure_ascii=False)}"
+        for item in differences[:100]
+    ]
+    if len(differences) > 100:
+        lines.append(f"… en {len(differences) - 100} andere wijzigingen")
+    return _truncate("\n".join(lines))
 
 
 @router.get("/websites/{website_id}/issues", response_model=list[IssueRead])
