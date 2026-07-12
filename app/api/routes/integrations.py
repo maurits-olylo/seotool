@@ -21,6 +21,7 @@ from app.schemas.integrations import (
     WebsiteIntegrationRead,
     WebsiteIntegrationUpsert,
 )
+from app.services.google_analytics import sync_google_analytics
 from app.services.google_integrations import list_google_properties
 from app.services.oauth import (
     GOOGLE_SCOPES,
@@ -273,5 +274,19 @@ async def synchronize_search_console(
         raise HTTPException(status_code=404, detail="Website not found")
     try:
         return await sync_search_console(db, website_id, days)
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.post("/websites/{website_id}/integrations/ga4/sync")
+async def synchronize_google_analytics(
+    website_id: UUID,
+    days: int = Query(default=28, ge=1, le=90),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    if not db.get(Website, website_id):
+        raise HTTPException(status_code=404, detail="Website not found")
+    try:
+        return await sync_google_analytics(db, website_id, days)
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.crawl import UrlLink
 from app.models.discovery import Url
-from app.models.integrations import SearchConsoleMetric
+from app.models.integrations import GoogleAnalyticsMetric, SearchConsoleMetric
 from app.models.issues import Change, Issue, IssueComment, IssueOccurrence
 from app.schemas.issues import (
     ChangeRead,
@@ -126,6 +126,29 @@ def _organic_impacts(db: Session, website_id: UUID) -> dict[UUID, dict[str, obje
             "average_position": round(float(position or 0), 1),
             "level": level,
         }
+    analytics_rows = db.execute(
+        select(
+            GoogleAnalyticsMetric.url_id,
+            func.sum(GoogleAnalyticsMetric.sessions),
+            func.sum(GoogleAnalyticsMetric.active_users),
+            func.sum(GoogleAnalyticsMetric.key_events),
+        )
+        .where(
+            GoogleAnalyticsMetric.website_id == website_id,
+            GoogleAnalyticsMetric.date >= since,
+            GoogleAnalyticsMetric.url_id.is_not(None),
+        )
+        .group_by(GoogleAnalyticsMetric.url_id)
+    )
+    for url_id, sessions, active_users, key_events in analytics_rows:
+        impact = result.setdefault(url_id, {"period_days": 28, "level": "unknown"})
+        impact.update(
+            {
+                "sessions": int(sessions or 0),
+                "active_users": int(active_users or 0),
+                "key_events": round(float(key_events or 0), 1),
+            }
+        )
     return result
 
 

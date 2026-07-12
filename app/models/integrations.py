@@ -70,3 +70,20 @@ class SearchConsoleMetric(UUIDTimestampMixin, Base):
     impressions: Mapped[int] = mapped_column(Integer, default=0)
     ctr: Mapped[float] = mapped_column(Float, default=0)
     position: Mapped[float] = mapped_column(Float, default=0)
+
+
+class GoogleAnalyticsMetric(UUIDTimestampMixin, Base):
+    __tablename__ = "google_analytics_metrics"
+    __table_args__ = (UniqueConstraint("website_id", "date", "landing_page"),)
+
+    website_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("websites.id", ondelete="CASCADE"), index=True
+    )
+    url_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("urls.id", ondelete="SET NULL"), index=True
+    )
+    date: Mapped[date] = mapped_column(Date, index=True)
+    landing_page: Mapped[str] = mapped_column(String(2048))
+    sessions: Mapped[int] = mapped_column(Integer, default=0)
+    active_users: Mapped[int] = mapped_column(Integer, default=0)
+    key_events: Mapped[float] = mapped_column(Float, default=0)

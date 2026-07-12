@@ -73,6 +73,7 @@ async def list_google_properties(
             "permission": item.get("permissionLevel", ""),
         }
         for item in search_console_response.json().get("siteEntry", [])
+        if item.get("permissionLevel") != "siteUnverifiedUser"
     ]
     ga4: list[dict[str, str]] = []
     for account in analytics_response.json().get("accountSummaries", []):

@@ -3,6 +3,7 @@ from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url, UrlSource
 from app.models.exports import Export
 from app.models.integrations import (
+    GoogleAnalyticsMetric,
     IntegrationConnection,
     SearchConsoleMetric,
     WebsiteIntegration,
@@ -20,6 +21,7 @@ __all__ = [
     "IssueComment",
     "IssueOccurrence",
     "IntegrationConnection",
+    "GoogleAnalyticsMetric",
     "SearchConsoleMetric",
     "Url",
     "UrlLink",

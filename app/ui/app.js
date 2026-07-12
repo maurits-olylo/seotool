@@ -127,6 +127,20 @@ async function syncSearchConsole() {
   finally { button.disabled = false; }
 }
 
+async function syncGa4() {
+  const websiteId = $("#website-select").value;
+  const button = $("#sync-ga4"); const message = $("#ga4-message");
+  if (!websiteId) return;
+  button.disabled = true; button.textContent = "Importeren…"; message.textContent = "";
+  try {
+    const result = await api(`/api/v1/websites/${websiteId}/integrations/ga4/sync`, {method: "POST"});
+    message.textContent = `${result.rows} dag/landingspagina-regels geïmporteerd; ${result.matched_urls} gekoppeld aan URLs.`;
+    button.textContent = "Opnieuw synchroniseren";
+    await loadIssues();
+  } catch (error) { message.textContent = "GA4-import is mislukt."; button.textContent = "Opnieuw proberen"; }
+  finally { button.disabled = false; }
+}
+
 function showView(view) {
   const integrations = view === "integrations";
   $("#overview-view").classList.toggle("hidden", integrations);
@@ -214,7 +228,15 @@ async function showIssue(issueId) {
   $("#detail-description").textContent = issue.description;
   $("#detail-action").textContent = issue.recommended_action;
   const impact = issue.organic_impact;
-  $("#detail-impact").textContent = impact ? `Organische impact (28 dagen): ${impact.clicks} klikken · ${impact.impressions} vertoningen · gemiddelde positie ${impact.average_position}` : "";
+  const impactParts = impact ? [
+    impact.clicks !== undefined ? `${impact.clicks} organische klikken` : null,
+    impact.impressions !== undefined ? `${impact.impressions} vertoningen` : null,
+    impact.average_position !== undefined ? `gemiddelde positie ${impact.average_position}` : null,
+    impact.sessions !== undefined ? `${impact.sessions} sessies` : null,
+    impact.active_users !== undefined ? `${impact.active_users} actieve gebruikers` : null,
+    impact.key_events !== undefined ? `${impact.key_events} belangrijke gebeurtenissen` : null,
+  ].filter(Boolean) : [];
+  $("#detail-impact").textContent = impactParts.length ? `Impact (28 dagen): ${impactParts.join(" · ")}` : "";
   $("#detail-impact").classList.toggle("hidden", !impact);
   $("#detail-evidence").textContent = Object.entries(issue.evidence).map(([key, value]) => `${key.replaceAll("_", " ")}: ${value}`).join("\n") || "Geen aanvullend bewijs opgeslagen.";
   $("#detail-sources").innerHTML = issue.source_urls.map((source) => `<li><a href="${escapeHtml(source)}" target="_blank" rel="noopener">${escapeHtml(source)}</a></li>`).join("");
@@ -255,6 +277,7 @@ $("#integrations-nav").addEventListener("click", () => showView("integrations"))
 $("#save-search-console").addEventListener("click", () => saveProperty("search_console", "#search-console-property", "#save-search-console", "#search-console-message"));
 $("#save-ga4").addEventListener("click", () => saveProperty("ga4", "#ga4-property", "#save-ga4", "#ga4-message"));
 $("#sync-search-console").addEventListener("click", syncSearchConsole);
+$("#sync-ga4").addEventListener("click", syncGa4);
 
 loadClients().then(() => {
   showApp();
