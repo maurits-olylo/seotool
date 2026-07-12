@@ -22,6 +22,20 @@ function escapeHtml(value = "") { const node = document.createElement("span"); n
 function option(item) { return `<option value="${item.id}">${escapeHtml(item.name)}</option>`; }
 function issueUrl(issue) { return state.urls.get(issue.url_id) || ""; }
 function issueUrlLabel(issue) { return issueUrl(issue) || "Websitebreed issue"; }
+function impactLevel(issue) { return issue.organic_impact?.level || "none"; }
+function impactRank(issue) { return ({high: 0, medium: 1, low: 2, unknown: 3, none: 4})[impactLevel(issue)] ?? 4; }
+function impactVolume(issue) {
+  const impact = issue.organic_impact || {};
+  return (impact.key_events || 0) * 10000 + (impact.sessions || 0) * 10 + (impact.clicks || 0) + (impact.impressions || 0) / 1000;
+}
+function impactMarkup(issue) {
+  const impact = issue.organic_impact;
+  if (!impact) return `<span class="impact-badge">Geen data</span>`;
+  const label = {high: "Hoog", medium: "Middel", low: "Laag", unknown: "Onbekend"}[impact.level] || "Onbekend";
+  const primary = impact.sessions !== undefined ? `${impact.sessions} sessies` : `${impact.clicks || 0} klikken`;
+  const secondary = impact.key_events ? ` · ${impact.key_events} gebeurtenissen` : "";
+  return `<span class="impact-badge ${impact.level}">${label}</span><span class="impact-metrics">${primary}${secondary}</span>`;
+}
 function issueUrlMarkup(issue) {
   const url = issueUrl(issue);
   return url ? `<a class="url" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a>` : `<span class="url">Websitebreed issue</span>`;
@@ -180,23 +194,25 @@ function applyFilters() {
   const query = $("#search-filter").value.trim().toLowerCase();
   const severity = $("#severity-filter").value;
   const type = $("#type-filter").value;
+  const impact = $("#impact-filter").value;
   const status = $("#status-filter").value;
   state.filtered = state.issues.filter((issue) => {
     const statusMatch = status === "all" || (status === "active" ? ACTIVE_STATUSES.has(issue.status) : issue.status === status);
     const searchText = `${issue.title} ${issue.issue_type} ${issueUrlLabel(issue)}`.toLowerCase();
-    return statusMatch && (!severity || issue.severity === severity) && (!type || issue.issue_type === type) && (!query || searchText.includes(query));
-  }).sort((a, b) => ({high: 0, medium: 1, low: 2}[a.severity] - {high: 0, medium: 1, low: 2}[b.severity] || new Date(b.last_detected_at) - new Date(a.last_detected_at)));
+    return statusMatch && (!severity || issue.severity === severity) && (!type || issue.issue_type === type) && (!impact || impactLevel(issue) === impact) && (!query || searchText.includes(query));
+  }).sort((a, b) => ({high: 0, medium: 1, low: 2}[a.severity] - {high: 0, medium: 1, low: 2}[b.severity] || impactRank(a) - impactRank(b) || impactVolume(b) - impactVolume(a) || new Date(b.last_detected_at) - new Date(a.last_detected_at)));
 }
 
 function renderGroups() {
   const query = $("#search-filter").value.trim().toLowerCase();
   const severity = $("#severity-filter").value;
+  const impact = $("#impact-filter").value;
   const status = $("#status-filter").value;
   const counts = new Map();
   state.issues.forEach((issue) => {
     const statusMatch = status === "all" || (status === "active" ? ACTIVE_STATUSES.has(issue.status) : issue.status === status);
     const searchText = `${issue.title} ${issue.issue_type} ${issueUrlLabel(issue)}`.toLowerCase();
-    if (statusMatch && (!severity || issue.severity === severity) && (!query || searchText.includes(query))) counts.set(issue.issue_type, (counts.get(issue.issue_type) || 0) + 1);
+    if (statusMatch && (!severity || issue.severity === severity) && (!impact || impactLevel(issue) === impact) && (!query || searchText.includes(query))) counts.set(issue.issue_type, (counts.get(issue.issue_type) || 0) + 1);
   });
   $("#issue-groups").innerHTML = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
     .map(([type, count]) => `<button data-group-type="${escapeHtml(type)}"><strong>${count}</strong><span>${escapeHtml(type.replaceAll("_", " "))}</span></button>`).join("");
@@ -216,6 +232,7 @@ function render() {
   $("#issues").innerHTML = rows.map((issue) => `<tr>
     <td><span class="severity ${issue.severity}">${labels[issue.severity] || issue.severity}</span></td>
     <td><strong>${escapeHtml(issue.title)}</strong>${issueUrlMarkup(issue)}</td>
+    <td>${impactMarkup(issue)}</td>
     <td><span class="badge">${labels[issue.status] || issue.status}</span></td>
     <td>${new Date(issue.last_detected_at).toLocaleDateString("nl-NL")}</td>
     <td><button class="detail-button" data-issue-id="${issue.id}">Bekijk</button></td>
@@ -275,7 +292,7 @@ $("#login-form").addEventListener("submit", async (event) => {
 $("#logout").addEventListener("click", async () => { await fetch("/ui/logout", { method: "POST" }); showLogin(); });
 $("#client-select").addEventListener("change", async () => { await loadWebsites(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); });
 $("#website-select").addEventListener("change", async () => { await loadIssues(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); });
-for (const selector of ["#severity-filter", "#type-filter", "#status-filter"]) $(selector).addEventListener("change", () => { state.page = 1; render(); });
+for (const selector of ["#severity-filter", "#type-filter", "#impact-filter", "#status-filter"]) $(selector).addEventListener("change", () => { state.page = 1; render(); });
 $("#search-filter").addEventListener("input", () => { state.page = 1; render(); });
 $("#previous-page").addEventListener("click", () => { state.page -= 1; render(); });
 $("#next-page").addEventListener("click", () => { state.page += 1; render(); });

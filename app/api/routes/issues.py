@@ -125,6 +125,7 @@ def _organic_impacts(db: Session, website_id: UUID) -> dict[UUID, dict[str, obje
             "impressions": impression_count,
             "average_position": round(float(position or 0), 1),
             "level": level,
+            "basis": "GSC-klikken en vertoningen",
         }
     analytics_rows = db.execute(
         select(
@@ -142,11 +143,22 @@ def _organic_impacts(db: Session, website_id: UUID) -> dict[UUID, dict[str, obje
     )
     for url_id, sessions, active_users, key_events in analytics_rows:
         impact = result.setdefault(url_id, {"period_days": 28, "level": "unknown"})
+        session_count = int(sessions or 0)
+        event_count = round(float(key_events or 0), 1)
+        ga_level = (
+            "high"
+            if event_count >= 5 or session_count >= 500
+            else ("medium" if event_count >= 1 or session_count >= 100 else "low")
+        )
+        levels = {"unknown": 0, "low": 1, "medium": 2, "high": 3}
+        if levels[ga_level] > levels[str(impact["level"])]:
+            impact["level"] = ga_level
         impact.update(
             {
-                "sessions": int(sessions or 0),
+                "sessions": session_count,
                 "active_users": int(active_users or 0),
-                "key_events": round(float(key_events or 0), 1),
+                "key_events": event_count,
+                "basis": "GSC-zoekbereik en GA4-landingspaginaverkeer",
             }
         )
     return result
