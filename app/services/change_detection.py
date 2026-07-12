@@ -25,6 +25,7 @@ FIELDS = {
     "links_hash": "internal_links_changed",
     "schema_hash": "structured_data_changed",
 }
+NORMALIZED_TEXT_FIELDS = {"title", "meta_description", "meta_robots", "x_robots_tag"}
 
 
 def compare_snapshots(previous: UrlSnapshot | None, current: UrlSnapshot) -> list[DetectedChange]:
@@ -34,7 +35,7 @@ def compare_snapshots(previous: UrlSnapshot | None, current: UrlSnapshot) -> lis
     for field, change_type in FIELDS.items():
         old = getattr(previous, field)
         new = getattr(current, field)
-        if old != new:
+        if not _values_equal(field, old, new):
             changes.append(DetectedChange(change_type, field, _serialize(old), _serialize(new)))
     old_h1 = (previous.headings or {}).get("h1", [])
     new_h1 = (current.headings or {}).get("h1", [])
@@ -43,6 +44,12 @@ def compare_snapshots(previous: UrlSnapshot | None, current: UrlSnapshot) -> lis
             DetectedChange("h1_changed", "headings.h1", _serialize(old_h1), _serialize(new_h1))
         )
     return changes
+
+
+def _values_equal(field: str, old: object, new: object) -> bool:
+    if field in NORMALIZED_TEXT_FIELDS and isinstance(old, str) and isinstance(new, str):
+        return " ".join(old.split()) == " ".join(new.split())
+    return old == new
 
 
 def _serialize(value: object) -> str | None:

@@ -6,6 +6,7 @@ from urllib.parse import urljoin, urlsplit
 from bs4 import BeautifulSoup
 
 from app.services.hashing import stable_hash
+from app.services.url_normalization import InvalidUrlError, normalize_url
 
 
 @dataclass(frozen=True)
@@ -67,10 +68,23 @@ def extract_page(html: str, page_url: str) -> ExtractedPage:
         "robots": robots,
         "headings": headings,
     }
+    link_values: set[tuple[str, str, bool]] = set()
+    for link in links:
+        if not link.is_internal:
+            continue
+        try:
+            target_url = normalize_url(link.target_url)
+        except InvalidUrlError:
+            continue
+        link_values.add((target_url, link.anchor_text, link.is_nofollow))
     link_data = [
-        {"url": link.target_url, "anchor": link.anchor_text, "nofollow": link.is_nofollow}
-        for link in links
+        {"url": url, "anchor": anchor, "nofollow": nofollow}
+        for url, anchor, nofollow in sorted(link_values)
     ]
+    stable_schema_data = sorted(
+        schema_data,
+        key=lambda value: json.dumps(value, sort_keys=True, ensure_ascii=False),
+    )
     return ExtractedPage(
         title=title,
         meta_description=description,
@@ -87,7 +101,7 @@ def extract_page(html: str, page_url: str) -> ExtractedPage:
         main_content_hash=stable_hash(main_content),
         metadata_hash=stable_hash(metadata),
         links_hash=stable_hash(link_data),
-        schema_hash=stable_hash(schema_data),
+        schema_hash=stable_hash(stable_schema_data),
     )
 
 
@@ -100,7 +114,7 @@ def _text(tag: object) -> str | None:
 
 def _meta_content(soup: BeautifulSoup, name: str) -> str | None:
     tag = soup.find("meta", attrs={"name": re.compile(f"^{re.escape(name)}$", re.I)})
-    return str(tag.get("content")).strip() if tag and tag.get("content") else None
+    return _clean_text(str(tag.get("content"))) if tag and tag.get("content") else None
 
 
 def _clean_text(value: str) -> str:

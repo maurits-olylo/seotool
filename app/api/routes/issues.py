@@ -1,3 +1,4 @@
+import json
 from datetime import date, timedelta
 from uuid import UUID
 
@@ -6,11 +7,12 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models.crawl import UrlLink
+from app.models.crawl import UrlLink, UrlSnapshot
 from app.models.discovery import Url
 from app.models.integrations import GoogleAnalyticsMetric, SearchConsoleMetric
 from app.models.issues import Change, Issue, IssueComment, IssueOccurrence
 from app.schemas.issues import (
+    ChangeDetailRead,
     ChangeRead,
     CommentCreate,
     CommentRead,
@@ -37,6 +39,89 @@ def list_changes(
         .limit(limit)
     )
     return list(db.scalars(query))
+
+
+@router.get("/changes/{change_id}", response_model=ChangeDetailRead)
+def get_change(change_id: UUID, db: Session = Depends(get_db)) -> dict[str, object]:
+    change = db.get(Change, change_id)
+    if not change:
+        raise HTTPException(status_code=404, detail="Change not found")
+    previous = (
+        db.get(UrlSnapshot, change.previous_snapshot_id) if change.previous_snapshot_id else None
+    )
+    current = db.get(UrlSnapshot, change.current_snapshot_id)
+    details: dict[str, object] = {
+        "old_display": change.old_value,
+        "new_display": change.new_value,
+    }
+    if change.field_name == "links_hash" and current:
+        old_links = _snapshot_links(db, previous, change.url_id)
+        new_links = _snapshot_links(db, current, change.url_id)
+        added = sorted(new_links - old_links)
+        removed = sorted(old_links - new_links)
+        details = {
+            "summary": f"{len(added)} interne links toegevoegd, {len(removed)} verwijderd",
+            "added_links": [_link_detail(item) for item in added],
+            "removed_links": [_link_detail(item) for item in removed],
+            "old_display": _link_display(removed, "Geen verwijderde links"),
+            "new_display": _link_display(added, "Geen toegevoegde links"),
+        }
+    elif change.field_name == "schema_hash" and current:
+        old_data = previous.schema_data if previous else []
+        new_data = current.schema_data or []
+        old_types = set(previous.schema_types or []) if previous else set()
+        new_types = set(current.schema_types or [])
+        details = {
+            "summary": (
+                f"Types toegevoegd: {', '.join(sorted(new_types - old_types)) or 'geen'}; "
+                f"verwijderd: {', '.join(sorted(old_types - new_types)) or 'geen'}"
+            ),
+            "old_display": _truncate(json.dumps(old_data, indent=2, ensure_ascii=False)),
+            "new_display": _truncate(json.dumps(new_data, indent=2, ensure_ascii=False)),
+        }
+    elif change.field_name == "main_content_hash" and current:
+        details = {
+            "summary": "De zichtbare hoofdcontent van de pagina is gewijzigd.",
+            "old_display": _truncate(previous.main_content if previous else None),
+            "new_display": _truncate(current.main_content),
+        }
+    return {**ChangeRead.model_validate(change).model_dump(), "details": details}
+
+
+def _snapshot_links(
+    db: Session, snapshot: UrlSnapshot | None, url_id: UUID
+) -> set[tuple[str, str, bool]]:
+    if not snapshot:
+        return set()
+    return {
+        (target, anchor or "", nofollow)
+        for target, anchor, nofollow in db.execute(
+            select(UrlLink.target_url, UrlLink.anchor_text, UrlLink.is_nofollow).where(
+                UrlLink.crawl_run_id == snapshot.crawl_run_id,
+                UrlLink.source_url_id == url_id,
+                UrlLink.is_internal.is_(True),
+            )
+        )
+    }
+
+
+def _link_detail(item: tuple[str, str, bool]) -> dict[str, object]:
+    return {"url": item[0], "anchor": item[1], "nofollow": item[2]}
+
+
+def _link_display(items: list[tuple[str, str, bool]], empty: str) -> str:
+    if not items:
+        return empty
+    return "\n".join(
+        f"{url}{f' — {anchor}' if anchor else ''}{' [nofollow]' if nofollow else ''}"
+        for url, anchor, nofollow in items
+    )
+
+
+def _truncate(value: str | None, limit: int = 8000) -> str:
+    if not value:
+        return "Geen inhoud"
+    return value if len(value) <= limit else f"{value[:limit]}\n… (ingekort)"
 
 
 @router.get("/websites/{website_id}/issues", response_model=list[IssueRead])

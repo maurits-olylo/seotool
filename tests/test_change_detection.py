@@ -40,3 +40,10 @@ def test_detects_selected_snapshot_changes() -> None:
 
 def test_first_snapshot_is_new_url() -> None:
     assert compare_snapshots(None, snapshot())[0].change_type == "new_url"
+
+
+def test_ignores_whitespace_only_metadata_changes() -> None:
+    previous = snapshot(meta_description="Een duidelijke omschrijving.")
+    current = snapshot(meta_description="  Een   duidelijke\nomschrijving. ")
+
+    assert compare_snapshots(previous, current) == []

@@ -258,10 +258,10 @@ async function showUrl(urlId) {
 function changeLabel(change) {
   const known = {
     new_url: "Nieuwe URL", disappeared_url: "URL verdwenen", status_code_changed: "Statuscode gewijzigd",
-    redirect_changed: "Redirect gewijzigd", title_changed: "Title gewijzigd", description_changed: "Description gewijzigd",
+    redirect_target_changed: "Redirect gewijzigd", title_changed: "Title gewijzigd", description_changed: "Description gewijzigd",
     h1_changed: "H1 gewijzigd", canonical_changed: "Canonical gewijzigd", robots_changed: "Robots gewijzigd",
-    indexability_changed: "Indexeerbaarheid gewijzigd", content_changed: "Hoofdcontent gewijzigd",
-    links_changed: "Interne links gewijzigd", schema_changed: "Structured data gewijzigd",
+    indexability_changed: "Indexeerbaarheid gewijzigd", main_content_changed: "Hoofdcontent gewijzigd",
+    internal_links_changed: "Interne links gewijzigd", structured_data_changed: "Structured data gewijzigd",
   };
   return known[change.change_type] || change.change_type.replaceAll("_", " ");
 }
@@ -291,7 +291,7 @@ function renderChanges() {
   state.changeFiltered = state.changes.filter((change) => {
     const url = state.urls.get(change.url_id) || "";
     const text = `${url} ${changeLabel(change)} ${change.field_name || ""}`.toLowerCase();
-    return (!type || change.change_type === type) && (!since || new Date(change.detected_at).getTime() >= since) && (!query || text.includes(query));
+    return isMeaningfulChange(change) && (!type || change.change_type === type) && (!since || new Date(change.detected_at).getTime() >= since) && (!query || text.includes(query));
   });
   const pages = Math.max(1, Math.ceil(state.changeFiltered.length / CHANGE_PAGE_SIZE));
   state.changePage = Math.min(state.changePage, pages);
@@ -309,8 +309,14 @@ function renderChanges() {
   $("#change-empty").classList.toggle("hidden", rows.length !== 0);
 }
 
-function showChange(changeId) {
-  const change = state.changes.find((item) => item.id === changeId);
+function isMeaningfulChange(change) {
+  if (!["title_changed", "description_changed", "h1_changed", "robots_changed"].includes(change.change_type)) return true;
+  const normalized = (value) => String(value ?? "").replace(/\s+/g, " ").trim();
+  return normalized(change.old_value) !== normalized(change.new_value);
+}
+
+async function showChange(changeId) {
+  const change = await api(`/api/v1/changes/${changeId}`);
   if (!change) return;
   const url = state.urls.get(change.url_id) || "Onbekende URL";
   $("#change-detail-title").textContent = changeLabel(change);
@@ -318,8 +324,14 @@ function showChange(changeId) {
   $("#change-detail-url").href = url;
   $("#change-detail-date").textContent = new Date(change.detected_at).toLocaleString("nl-NL");
   $("#change-detail-field").textContent = change.field_name || "Niet van toepassing";
-  $("#change-detail-old").textContent = change.old_value ?? "Geen eerdere waarde";
-  $("#change-detail-new").textContent = change.new_value ?? "Geen nieuwe waarde";
+  const details = change.details || {};
+  $("#change-detail-summary").textContent = details.summary || "";
+  $("#change-detail-summary").classList.toggle("hidden", !details.summary);
+  const linkChange = change.field_name === "links_hash";
+  $("#change-old-label").textContent = linkChange ? "Verwijderde links" : "Oude waarde";
+  $("#change-new-label").textContent = linkChange ? "Toegevoegde links" : "Nieuwe waarde";
+  $("#change-detail-old").textContent = details.old_display ?? change.old_value ?? "Geen eerdere waarde";
+  $("#change-detail-new").textContent = details.new_display ?? change.new_value ?? "Geen nieuwe waarde";
   $("#change-dialog").showModal();
 }
 

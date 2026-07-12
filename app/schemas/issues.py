@@ -33,6 +33,10 @@ class ChangeRead(ORMModel):
     detected_at: datetime
 
 
+class ChangeDetailRead(ChangeRead):
+    details: dict[str, object]
+
+
 class IssueRead(ORMModel):
     id: UUID
     website_id: UUID

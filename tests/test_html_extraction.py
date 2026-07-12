@@ -43,3 +43,25 @@ def test_uses_complete_body_when_page_contains_multiple_article_cards() -> None:
     page = extract_page(html, "https://example.com/")
     assert page.main_content == "First card Second card with useful content"
     assert page.word_count == 7
+
+
+def test_link_and_schema_hashes_ignore_order_and_external_links() -> None:
+    first = extract_page(
+        '<html><body><a href="/b">B</a><a href="/a">A</a>'
+        '<a href="https://external.example/one">Extern</a>'
+        '<script type="application/ld+json">{"@type":"Article"}</script>'
+        '<script type="application/ld+json">{"@type":"Person"}</script>'
+        "</body></html>",
+        "https://example.com/page",
+    )
+    second = extract_page(
+        '<html><body><a href="https://external.example/two">Anders</a>'
+        '<a href="/a">A</a><a href="/b">B</a>'
+        '<script type="application/ld+json">{"@type":"Person"}</script>'
+        '<script type="application/ld+json">{"@type":"Article"}</script>'
+        "</body></html>",
+        "https://example.com/page",
+    )
+
+    assert first.links_hash == second.links_hash
+    assert first.schema_hash == second.schema_hash
