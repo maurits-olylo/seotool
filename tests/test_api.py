@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import get_settings
-from app.core.security import hash_password
+from app.core.security import create_session_token, hash_password
 from app.db.session import SessionLocal
 from app.models.crawl import CrawlRun
 from app.models.discovery import CrawlJob
@@ -80,6 +80,17 @@ def test_interface_login_creates_http_only_session() -> None:
 
     assert browser.post("/ui/logout").status_code == 204
     assert browser.get("/api/v1/clients").status_code == 401
+
+
+def test_login_clears_session_for_missing_user() -> None:
+    from app.main import app
+
+    browser = TestClient(app)
+    browser.cookies.set("seo_session", create_session_token(UUID(int=999)))
+    response = browser.get("/login", follow_redirects=False)
+    assert response.status_code == 200
+    assert "seo_session=" in response.headers["set-cookie"]
+    assert "Max-Age=0" in response.headers["set-cookie"]
 
 
 def test_only_one_superuser_can_exist() -> None:

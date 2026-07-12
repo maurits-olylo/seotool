@@ -11,7 +11,7 @@ from app.core.config import get_settings
 from app.core.security import (
     create_session_token,
     hash_password,
-    is_valid_session_token,
+    session_user_id,
     verify_password,
 )
 from app.db.session import get_db
@@ -35,16 +35,29 @@ def interface() -> FileResponse:
 
 
 @router.get("/login", include_in_schema=False)
-def login_page(seo_session: str | None = Cookie(default=None)) -> Response:
-    if is_valid_session_token(seo_session):
+def login_page(
+    seo_session: str | None = Cookie(default=None), db: Session = Depends(get_db)
+) -> Response:
+    user_id = session_user_id(seo_session)
+    user = db.get(User, user_id) if user_id else None
+    if user and user.is_active:
         return RedirectResponse("/app", status_code=302)
-    return FileResponse(UI_ROOT / "login.html")
+    response = FileResponse(UI_ROOT / "login.html")
+    if seo_session:
+        response.delete_cookie("seo_session", samesite="lax")
+    return response
 
 
 @router.get("/app", include_in_schema=False)
-def app_interface(seo_session: str | None = Cookie(default=None)) -> Response:
-    if not is_valid_session_token(seo_session):
-        return RedirectResponse("/login", status_code=302)
+def app_interface(
+    seo_session: str | None = Cookie(default=None), db: Session = Depends(get_db)
+) -> Response:
+    user_id = session_user_id(seo_session)
+    user = db.get(User, user_id) if user_id else None
+    if not user or not user.is_active:
+        response = RedirectResponse("/login", status_code=302)
+        response.delete_cookie("seo_session", samesite="lax")
+        return response
     return FileResponse(UI_ROOT / "index.html")
 
 
