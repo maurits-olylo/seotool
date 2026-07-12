@@ -29,6 +29,7 @@ from app.services.oauth import (
     google_is_configured,
     parse_oauth_state,
 )
+from app.services.search_console import sync_search_console
 
 router = APIRouter(tags=["integrations"])
 oauth_router = APIRouter(tags=["integrations"])
@@ -40,9 +41,7 @@ def google_config() -> dict[str, bool]:
 
 
 @router.get("/integrations/google/authorize")
-def authorize_google(
-    client_id: UUID = Query(), db: Session = Depends(get_db)
-) -> RedirectResponse:
+def authorize_google(client_id: UUID = Query(), db: Session = Depends(get_db)) -> RedirectResponse:
     if not google_is_configured():
         raise HTTPException(status_code=503, detail="Google OAuth is not configured")
     if not db.get(Client, client_id):
@@ -113,9 +112,7 @@ async def google_callback(
     return RedirectResponse("/?integration=google-connected", status_code=302)
 
 
-@router.get(
-    "/clients/{client_id}/integrations", response_model=list[IntegrationConnectionRead]
-)
+@router.get("/clients/{client_id}/integrations", response_model=list[IntegrationConnectionRead])
 def list_client_integrations(
     client_id: UUID, db: Session = Depends(get_db)
 ) -> list[IntegrationConnection]:
@@ -175,9 +172,7 @@ async def google_properties(
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
-@router.get(
-    "/websites/{website_id}/integrations", response_model=list[WebsiteIntegrationRead]
-)
+@router.get("/websites/{website_id}/integrations", response_model=list[WebsiteIntegrationRead])
 def list_website_integrations(
     website_id: UUID, db: Session = Depends(get_db)
 ) -> list[WebsiteIntegration]:
@@ -266,3 +261,17 @@ def upsert_website_integration(
     db.commit()
     db.refresh(mapping)
     return mapping
+
+
+@router.post("/websites/{website_id}/integrations/search_console/sync")
+async def synchronize_search_console(
+    website_id: UUID,
+    days: int = Query(default=28, ge=1, le=90),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    if not db.get(Website, website_id):
+        raise HTTPException(status_code=404, detail="Website not found")
+    try:
+        return await sync_search_console(db, website_id, days)
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc

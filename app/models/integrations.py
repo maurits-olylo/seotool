@@ -1,7 +1,17 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -42,3 +52,21 @@ class WebsiteIntegration(UUIDTimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(30), default="active", index=True)
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     settings: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+
+
+class SearchConsoleMetric(UUIDTimestampMixin, Base):
+    __tablename__ = "search_console_metrics"
+    __table_args__ = (UniqueConstraint("website_id", "date", "page_url"),)
+
+    website_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("websites.id", ondelete="CASCADE"), index=True
+    )
+    url_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("urls.id", ondelete="SET NULL"), index=True
+    )
+    date: Mapped[date] = mapped_column(Date, index=True)
+    page_url: Mapped[str] = mapped_column(String(2048))
+    clicks: Mapped[float] = mapped_column(Float, default=0)
+    impressions: Mapped[int] = mapped_column(Integer, default=0)
+    ctr: Mapped[float] = mapped_column(Float, default=0)
+    position: Mapped[float] = mapped_column(Float, default=0)

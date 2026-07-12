@@ -65,14 +65,14 @@
           <article class="integration-card"><div class="provider-icon bing">B</div><div><h2>Bing Webmaster Tools</h2><p>Zoekverkeer, keywords, crawl- en indexatiegegevens.</p><span id="bing-status" class="connection-status">Niet gekoppeld</span></div><button disabled>Bing koppelen</button></article>
         </div>
         <p id="integration-message" class="integration-message hidden"></p>
-        <section id="property-mapping" class="panel property-mapping hidden"><span class="eyebrow">PROPERTYKOPPELINGEN</span><h2>Properties voor <span id="mapping-website"></span></h2><div class="property-grid"><label>Search Console-property<select id="search-console-property"></select><button id="save-search-console" class="save-property">Opslaan</button></label><label>GA4-property<select id="ga4-property"></select><button id="save-ga4" class="save-property">Opslaan</button></label></div><p id="property-message" class="property-message"></p></section>
+        <section id="property-mapping" class="panel property-mapping hidden"><span class="eyebrow">PROPERTYKOPPELINGEN</span><h2>Properties voor <span id="mapping-website"></span></h2><div class="property-grid"><label>Search Console-property<select id="search-console-property"></select><button id="save-search-console" class="save-property">Opslaan</button><span id="search-console-message" class="property-message"></span><button id="sync-search-console" class="save-property secondary-property">GSC-data synchroniseren</button></label><label>GA4-property<select id="ga4-property"></select><button id="save-ga4" class="save-property">Opslaan</button><span id="ga4-message" class="property-message"></span></label></div></section>
       </section>
     </main>
   </div>
   <dialog id="issue-dialog">
     <button id="close-dialog" class="dialog-close" aria-label="Sluiten">×</button>
     <span class="eyebrow">ISSUEDETAIL</span><h2 id="detail-title"></h2>
-    <a id="detail-url" target="_blank" rel="noopener"></a>
+    <a id="detail-url" target="_blank" rel="noopener"></a><p id="detail-impact" class="impact-summary hidden"></p>
     <dl><div><dt>Prioriteit</dt><dd id="detail-severity"></dd></div><div><dt>Status</dt><dd><select id="detail-status"><option value="new">Nieuw</option><option value="review">Te beoordelen</option><option value="accepted">Geaccepteerd</option><option value="planned">Gepland</option><option value="in_progress">Bezig</option><option value="waiting_for_client">Wacht op klant</option><option value="resolved">Opgelost</option><option value="ignored">Genegeerd</option><option value="accepted_risk">Risico geaccepteerd</option></select><button id="save-status" class="primary-button">Status opslaan</button></dd></div><div><dt>Beschrijving</dt><dd id="detail-description"></dd></div><div><dt>Aanbevolen actie</dt><dd id="detail-action"></dd></div><div><dt>Technisch bewijs</dt><dd id="detail-evidence"></dd></div><div id="source-section"><dt>Pagina’s met deze interne link</dt><dd><ul id="detail-sources"></ul></dd></div></dl>
   </dialog>
   <script src="/ui/assets/app.js" defer></script>

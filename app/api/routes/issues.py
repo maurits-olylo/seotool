@@ -1,12 +1,14 @@
+from datetime import date, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.crawl import UrlLink
 from app.models.discovery import Url
+from app.models.integrations import SearchConsoleMetric
 from app.models.issues import Change, Issue, IssueComment, IssueOccurrence
 from app.schemas.issues import (
     ChangeRead,
@@ -40,13 +42,21 @@ def list_issues(
     website_id: UUID,
     issue_status: str | None = Query(default=None, alias="status"),
     db: Session = Depends(get_db),
-) -> list[Issue]:
+) -> list[dict[str, object]]:
     query = (
         select(Issue).where(Issue.website_id == website_id).order_by(Issue.last_detected_at.desc())
     )
     if issue_status:
         query = query.where(Issue.status == issue_status)
-    return list(db.scalars(query))
+    issues = list(db.scalars(query))
+    impacts = _organic_impacts(db, website_id)
+    return [
+        {
+            **IssueRead.model_validate(issue).model_dump(),
+            "organic_impact": impacts.get(issue.url_id),
+        }
+        for issue in issues
+    ]
 
 
 @router.get("/issues/{issue_id}", response_model=IssueDetailRead)
@@ -78,9 +88,45 @@ def get_issue(issue_id: UUID, db: Session = Depends(get_db)) -> dict[str, object
         )
     return {
         **IssueRead.model_validate(issue).model_dump(),
+        "organic_impact": _organic_impacts(db, issue.website_id).get(issue.url_id),
         "evidence": occurrence.evidence if occurrence else {},
         "source_urls": source_urls,
     }
+
+
+def _organic_impacts(db: Session, website_id: UUID) -> dict[UUID, dict[str, object]]:
+    since = date.today() - timedelta(days=28)
+    rows = db.execute(
+        select(
+            SearchConsoleMetric.url_id,
+            func.sum(SearchConsoleMetric.clicks),
+            func.sum(SearchConsoleMetric.impressions),
+            func.avg(SearchConsoleMetric.position),
+        )
+        .where(
+            SearchConsoleMetric.website_id == website_id,
+            SearchConsoleMetric.date >= since,
+            SearchConsoleMetric.url_id.is_not(None),
+        )
+        .group_by(SearchConsoleMetric.url_id)
+    )
+    result: dict[UUID, dict[str, object]] = {}
+    for url_id, clicks, impressions, position in rows:
+        click_count = round(float(clicks or 0), 1)
+        impression_count = int(impressions or 0)
+        level = (
+            "high"
+            if click_count >= 50 or impression_count >= 5000
+            else ("medium" if click_count >= 10 or impression_count >= 1000 else "low")
+        )
+        result[url_id] = {
+            "period_days": 28,
+            "clicks": click_count,
+            "impressions": impression_count,
+            "average_position": round(float(position or 0), 1),
+            "level": level,
+        }
+    return result
 
 
 @router.patch("/issues/{issue_id}", response_model=IssueRead)

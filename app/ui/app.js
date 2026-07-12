@@ -97,20 +97,34 @@ function fillPropertySelect(selector, properties, mapping) {
   if (mapping) select.value = mapping.external_property_id;
 }
 
-async function saveProperty(service, selector) {
+async function saveProperty(service, selector, buttonSelector, messageSelector) {
   const websiteId = $("#website-select").value;
   const select = $(selector);
   if (!websiteId || !select.value || !state.googleConnectionId) return;
-  await api(`/api/v1/websites/${websiteId}/integrations/${service}`, {
-    method: "PUT",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({
-      connection_id: state.googleConnectionId,
-      external_property_id: select.value,
-      external_property_name: select.selectedOptions[0]?.dataset.name || select.value,
-    }),
-  });
-  $("#property-message").textContent = "Propertykoppeling opgeslagen.";
+  const button = $(buttonSelector); const message = $(messageSelector);
+  button.disabled = true; button.textContent = "Bezig…"; message.textContent = "";
+  try {
+    await api(`/api/v1/websites/${websiteId}/integrations/${service}`, {
+      method: "PUT", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ connection_id: state.googleConnectionId, external_property_id: select.value, external_property_name: select.selectedOptions[0]?.dataset.name || select.value }),
+    });
+    button.textContent = "Opgeslagen ✓"; message.textContent = `${service === "ga4" ? "GA4" : "Search Console"}-property opgeslagen.`;
+  } catch (error) { button.textContent = "Opnieuw proberen"; message.textContent = "Opslaan is mislukt."; }
+  finally { button.disabled = false; }
+}
+
+async function syncSearchConsole() {
+  const websiteId = $("#website-select").value;
+  const button = $("#sync-search-console"); const message = $("#search-console-message");
+  if (!websiteId) return;
+  button.disabled = true; button.textContent = "Importeren…"; message.textContent = "";
+  try {
+    const result = await api(`/api/v1/websites/${websiteId}/integrations/search_console/sync`, {method: "POST"});
+    message.textContent = `${result.rows} dag/pagina-regels geïmporteerd; ${result.matched_urls} gekoppeld aan URLs.`;
+    button.textContent = "Opnieuw synchroniseren";
+    await loadIssues();
+  } catch (error) { message.textContent = "GSC-import is mislukt."; button.textContent = "Opnieuw proberen"; }
+  finally { button.disabled = false; }
 }
 
 function showView(view) {
@@ -199,6 +213,9 @@ async function showIssue(issueId) {
   $("#detail-status").value = issue.status;
   $("#detail-description").textContent = issue.description;
   $("#detail-action").textContent = issue.recommended_action;
+  const impact = issue.organic_impact;
+  $("#detail-impact").textContent = impact ? `Organische impact (28 dagen): ${impact.clicks} klikken · ${impact.impressions} vertoningen · gemiddelde positie ${impact.average_position}` : "";
+  $("#detail-impact").classList.toggle("hidden", !impact);
   $("#detail-evidence").textContent = Object.entries(issue.evidence).map(([key, value]) => `${key.replaceAll("_", " ")}: ${value}`).join("\n") || "Geen aanvullend bewijs opgeslagen.";
   $("#detail-sources").innerHTML = issue.source_urls.map((source) => `<li><a href="${escapeHtml(source)}" target="_blank" rel="noopener">${escapeHtml(source)}</a></li>`).join("");
   $("#source-section").classList.toggle("hidden", issue.source_urls.length === 0);
@@ -235,8 +252,9 @@ $("#close-dialog").addEventListener("click", () => $("#issue-dialog").close());
 $("#save-status").addEventListener("click", saveIssueStatus);
 $("#overview-nav").addEventListener("click", () => showView("overview"));
 $("#integrations-nav").addEventListener("click", () => showView("integrations"));
-$("#save-search-console").addEventListener("click", () => saveProperty("search_console", "#search-console-property"));
-$("#save-ga4").addEventListener("click", () => saveProperty("ga4", "#ga4-property"));
+$("#save-search-console").addEventListener("click", () => saveProperty("search_console", "#search-console-property", "#save-search-console", "#search-console-message"));
+$("#save-ga4").addEventListener("click", () => saveProperty("ga4", "#ga4-property", "#save-ga4", "#ga4-message"));
+$("#sync-search-console").addEventListener("click", syncSearchConsole);
 
 loadClients().then(() => {
   showApp();

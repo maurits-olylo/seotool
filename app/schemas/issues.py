@@ -51,6 +51,7 @@ class IssueRead(ORMModel):
     verified_at: datetime | None
     assigned_to: str | None
     due_date: date | None
+    organic_impact: dict[str, object] | None = None
 
 
 class IssueDetailRead(IssueRead):
