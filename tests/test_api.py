@@ -193,6 +193,11 @@ def test_url_registry_deduplicates_and_creates_job(client: TestClient) -> None:
     )
     assert export.status_code == 201
     assert export.json()["status"] == "pending"
+    duplicate_export = client.post(
+        "/api/v1/exports",
+        json={"website_id": website["id"], "export_type": "excel"},
+    )
+    assert duplicate_export.status_code == 409
     exports = client.get(f"/api/v1/exports?website_id={website['id']}")
     assert exports.status_code == 200
     assert [item["id"] for item in exports.json()] == [export.json()["id"]]

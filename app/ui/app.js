@@ -11,7 +11,9 @@ const labels = {
   pending: "In wachtrij", running: "Bezig", succeeded: "Geslaagd",
   partially_succeeded: "Deels geslaagd", failed: "Mislukt", cancelled: "Geannuleerd",
 };
-const state = { clients: [], websites: [], issues: [], changes: [], changeGroups: [], crawlRuns: [], exports: [], urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null };
+const state = { clients: [], websites: [], issues: [], changes: [], changeGroups: [], crawlRuns: [], exports: [], operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null };
+const VIEW_HASHES = {overview: "overzicht", urls: "urls", changes: "wijzigingen", operations: "beheer", integrations: "integraties"};
+let operationsPollTimer = null;
 
 async function api(path, options = {}) {
   const response = await fetch(path, { credentials: "same-origin", ...options });
@@ -20,7 +22,7 @@ async function api(path, options = {}) {
   return response.status === 204 ? null : response.json();
 }
 
-function showLogin() { $("#app").classList.add("hidden"); $("#login").classList.remove("hidden"); }
+function showLogin() { stopOperationsPolling(); $("#app").classList.add("hidden"); $("#login").classList.remove("hidden"); }
 function showApp() { $("#login").classList.add("hidden"); $("#app").classList.remove("hidden"); }
 function escapeHtml(value = "") { const node = document.createElement("span"); node.textContent = value; return node.innerHTML; }
 function option(item) { return `<option value="${item.id}">${escapeHtml(item.name)}</option>`; }
@@ -170,7 +172,7 @@ async function syncGa4() {
   finally { button.disabled = false; }
 }
 
-function showView(view) {
+function showView(view, updateHash = true) {
   for (const name of ["overview", "urls", "changes", "operations", "integrations"]) {
     $(`#${name}-view`).classList.toggle("hidden", name !== view);
     $(`#${name}-nav`).classList.toggle("nav-active", name === view);
@@ -178,7 +180,23 @@ function showView(view) {
   if (view === "integrations") loadIntegrations();
   if (view === "urls") renderUrls();
   if (view === "changes") loadChanges();
-  if (view === "operations") loadOperations();
+  if (view === "operations") { loadOperations(); startOperationsPolling(); } else stopOperationsPolling();
+  if (updateHash) window.history.replaceState({}, "", `#${VIEW_HASHES[view]}`);
+}
+
+function viewFromHash() {
+  const hash = window.location.hash.slice(1);
+  return Object.keys(VIEW_HASHES).find((view) => VIEW_HASHES[view] === hash) || "overview";
+}
+
+function startOperationsPolling() {
+  stopOperationsPolling();
+  operationsPollTimer = window.setInterval(loadOperations, 4000);
+}
+
+function stopOperationsPolling() {
+  if (operationsPollTimer) window.clearInterval(operationsPollTimer);
+  operationsPollTimer = null;
 }
 
 async function loadIssues() {
@@ -260,13 +278,16 @@ async function showUrl(urlId) {
 
 async function loadOperations() {
   const websiteId = $("#website-select").value;
-  if (!websiteId) return;
-  [state.crawlRuns, state.exports] = await Promise.all([
-    api(`/api/v1/websites/${websiteId}/crawl-runs?limit=20`),
-    api(`/api/v1/exports?website_id=${websiteId}&limit=20`),
-  ]);
-  $("#operations-website-name").textContent = $("#website-select").selectedOptions[0]?.textContent || "de website";
-  renderOperations();
+  if (!websiteId || state.operationsLoading) return;
+  state.operationsLoading = true;
+  try {
+    [state.crawlRuns, state.exports] = await Promise.all([
+      api(`/api/v1/websites/${websiteId}/crawl-runs?limit=20`),
+      api(`/api/v1/exports?website_id=${websiteId}&limit=20`),
+    ]);
+    $("#operations-website-name").textContent = $("#website-select").selectedOptions[0]?.textContent || "de website";
+    renderOperations();
+  } finally { state.operationsLoading = false; }
 }
 
 function durationLabel(run) {
@@ -279,8 +300,27 @@ function renderOperations() {
   const runLabels = {light_check: "Light check", full_site_crawl: "Volledige crawl", fetch_sitemap: "Sitemap", full_page_analysis: "Pagina-analyse"};
   $("#crawl-run-rows").innerHTML = state.crawlRuns.map((run) => `<tr><td>${new Date(run.started_at).toLocaleString("nl-NL")}</td><td>${runLabels[run.crawl_type] || escapeHtml(run.crawl_type)}</td><td><span class="run-status ${run.status}">${labels[run.status] || run.status}</span></td><td>${run.discovered_urls}</td><td>${run.crawled_urls}</td><td>${run.failed_urls}</td><td>${durationLabel(run)}</td></tr>`).join("");
   $("#crawl-runs-empty").classList.toggle("hidden", state.crawlRuns.length !== 0);
-  $("#export-rows").innerHTML = state.exports.map((item) => `<tr><td>${new Date(item.created_at).toLocaleString("nl-NL")}</td><td>${item.export_type === "excel" ? "Excel" : escapeHtml(item.export_type)}</td><td><span class="run-status ${item.status}">${labels[item.status] || item.status}</span></td><td>${item.finished_at ? new Date(item.finished_at).toLocaleString("nl-NL") : "—"}</td><td>${item.status === "succeeded" ? `<a class="detail-button download-link" href="/api/v1/exports/${item.id}/download">Download</a>` : ""}</td></tr>`).join("");
-  $("#exports-empty").classList.toggle("hidden", state.exports.length !== 0);
+  const runningCrawl = state.crawlRuns.find((run) => run.status === "running");
+  $("#crawl-live-status").classList.toggle("hidden", !runningCrawl);
+  $("#start-light-check").disabled = Boolean(runningCrawl);
+  $("#start-full-crawl").disabled = Boolean(runningCrawl);
+  if (runningCrawl) $("#crawl-live-label").textContent = `${runLabels[runningCrawl.crawl_type] || runningCrawl.crawl_type} bezig · ${runningCrawl.crawled_urls} gecrawld · ${runningCrawl.failed_urls} mislukt`;
+  const currentExport = state.exports.find((item) => !item.downloaded_at && ["pending", "running", "succeeded"].includes(item.status));
+  const exportPanel = $("#current-export"); const exportButton = $("#generate-excel"); const download = $("#current-export-download");
+  exportPanel.classList.toggle("hidden", !currentExport);
+  exportButton.disabled = Boolean(currentExport);
+  if (currentExport) {
+    $("#current-export-label").textContent = currentExport.status === "succeeded" ? "Excel-export is gereed voor download." : currentExport.status === "running" ? "Excel-export wordt opgebouwd…" : "Excel-export staat in de wachtrij…";
+    $("#export-progress").classList.toggle("hidden", currentExport.status === "succeeded");
+    download.classList.toggle("hidden", currentExport.status !== "succeeded");
+    if (currentExport.status === "succeeded") download.href = `/api/v1/exports/${currentExport.id}/download`;
+  } else if (state.exports[0]?.status === "failed") {
+    $("#export-action-message").classList.add("error");
+    $("#export-action-message").textContent = state.exports[0].error_message || "De laatste export is mislukt.";
+  } else {
+    $("#export-action-message").classList.remove("error");
+    if (state.exports[0]?.downloaded_at) $("#export-action-message").textContent = "De laatste export is gedownload. Je kunt een nieuwe genereren.";
+  }
 }
 
 async function startCrawl(jobType) {
@@ -292,24 +332,17 @@ async function startCrawl(jobType) {
     const job = await api("/api/v1/crawl-jobs", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({website_id: $("#website-select").value, job_type: jobType, settings_snapshot: {}})});
     message.textContent = `${jobType === "light_check" ? "Light check" : "Volledige crawl"} is gestart (${job.id.slice(0, 8)}).`;
     setTimeout(loadOperations, 2000);
-  } catch (error) { message.classList.add("error"); message.textContent = error.message; }
-  finally { button.disabled = false; }
+  } catch (error) { message.classList.add("error"); message.textContent = error.message; button.disabled = false; }
 }
 
 async function generateExcel() {
   const button = $("#generate-excel"); const message = $("#export-action-message");
   button.disabled = true; message.classList.remove("error"); message.textContent = "Excel-export wordt opgebouwd…";
   try {
-    let item = await api("/api/v1/exports", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({website_id: $("#website-select").value, export_type: "excel"})});
-    for (let attempt = 0; attempt < 150 && ["pending", "running"].includes(item.status); attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      item = await api(`/api/v1/exports/${item.id}`);
-    }
-    if (item.status !== "succeeded") throw new Error(item.error_message || "Export kon niet worden voltooid.");
-    message.innerHTML = `Export gereed. <a href="/api/v1/exports/${item.id}/download">Download Excel</a>`;
+    await api("/api/v1/exports", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({website_id: $("#website-select").value, export_type: "excel"})});
+    message.textContent = "Export gestart; de status wordt automatisch bijgewerkt.";
     await loadOperations();
-  } catch (error) { message.classList.add("error"); message.textContent = error.message; }
-  finally { button.disabled = false; }
+  } catch (error) { message.classList.add("error"); message.textContent = error.message; button.disabled = false; }
 }
 
 function changeLabel(change) {
@@ -510,7 +543,7 @@ $("#login-form").addEventListener("submit", async (event) => {
   event.preventDefault(); $("#login-error").textContent = "";
   const response = await fetch("/ui/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ api_key: $("#api-key").value }) });
   if (!response.ok) { $("#login-error").textContent = "De API-key is ongeldig."; return; }
-  $("#api-key").value = ""; showApp(); await loadClients();
+  $("#api-key").value = ""; showApp(); await loadClients(); showView(viewFromHash(), false);
 });
 $("#logout").addEventListener("click", async () => { await fetch("/ui/logout", { method: "POST" }); showLogin(); });
 $("#client-select").addEventListener("change", async () => { await loadWebsites(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); });
@@ -544,6 +577,7 @@ $("#start-light-check").addEventListener("click", () => startCrawl("light_check"
 $("#start-full-crawl").addEventListener("click", () => startCrawl("full_site_crawl"));
 $("#generate-excel").addEventListener("click", generateExcel);
 $("#refresh-operations").addEventListener("click", loadOperations);
+$("#current-export-download").addEventListener("click", () => window.setTimeout(loadOperations, 2000));
 $("#save-search-console").addEventListener("click", () => saveProperty("search_console", "#search-console-property", "#save-search-console", "#search-console-message"));
 $("#save-ga4").addEventListener("click", () => saveProperty("ga4", "#ga4-property", "#save-ga4", "#ga4-message"));
 $("#sync-search-console").addEventListener("click", syncSearchConsole);
@@ -556,6 +590,6 @@ loadClients().then(() => {
     showView("integrations");
     $("#integration-message").textContent = integrationResult === "google-connected" ? "Google-account is succesvol gekoppeld." : "Google-koppeling is niet voltooid. Probeer opnieuw.";
     $("#integration-message").classList.remove("hidden");
-    window.history.replaceState({}, "", "/");
-  }
+    window.history.replaceState({}, "", "/#integraties");
+  } else showView(viewFromHash(), false);
 }).catch(() => showLogin());

@@ -1,9 +1,10 @@
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -20,12 +21,30 @@ router = APIRouter(prefix="/exports", tags=["exports"])
 def create_export(payload: ExportCreate, db: Session = Depends(get_db)) -> Export:
     if not db.get(Website, payload.website_id):
         raise HTTPException(status_code=404, detail="Website not found")
+    existing = db.scalar(
+        select(Export.id).where(
+            Export.website_id == payload.website_id,
+            or_(
+                Export.status.in_(["pending", "running"]),
+                and_(Export.status == "succeeded", Export.downloaded_at.is_(None)),
+            ),
+        )
+    )
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail="Er staat al een export klaar of in de wachtrij",
+        )
     export = Export(**payload.model_dump())
     db.add(export)
     db.commit()
     db.refresh(export)
     if get_settings().app_env != "test":
-        get_queue().enqueue("app.services.exports.generate_export", str(export.id))
+        get_queue("exports").enqueue(
+            "app.services.exports.generate_export",
+            str(export.id),
+            job_id=f"export-{export.id}",
+        )
     return export
 
 
@@ -63,4 +82,11 @@ def download_export(export_id: UUID, db: Session = Depends(get_db)) -> FileRespo
     path = Path(export.file_path)
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Export file is missing")
-    return FileResponse(path, filename=path.name)
+    export.downloaded_at = datetime.now(UTC)
+    db.commit()
+    website = db.get(Website, export.website_id)
+    website_name = website.name if website else "Website"
+    export_date = (export.finished_at or export.created_at).date().isoformat()
+    label = "Issuelijst" if export.export_type == "excel" else export.export_type.title()
+    filename = f"Export {label} - {website_name} - {export_date} - SEOMonitor{path.suffix}"
+    return FileResponse(path, filename=filename)

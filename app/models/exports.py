@@ -21,3 +21,4 @@ class Export(Base):
     error_message: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    downloaded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

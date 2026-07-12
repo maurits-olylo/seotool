@@ -134,16 +134,16 @@ def test_datasets_include_human_readable_urls() -> None:
 
         datasets = export_service._datasets(db, website.id)
 
-        assert datasets["urls"][0][:2] == ["url_id", "url"]
-        assert datasets["issues"][0][:2] == ["url_id", "url"]
-        assert datasets["issues"][1][0][1] == target.normalized_url
-        assert datasets["changes"][0][:2] == ["url_id", "url"]
-        assert datasets["changes"][1][0][1] == target.normalized_url
-        assert datasets["links"][0][:4] == [
-            "source_url_id",
-            "source_url",
-            "target_url_id",
-            "target_url",
-        ]
-        assert datasets["links"][1][0][1] == source.normalized_url
+        assert datasets["urls"][0][0] == "url"
+        assert datasets["issues"][0][0] == "url"
+        assert datasets["issues"][1][0][0] == target.normalized_url
+        assert datasets["changes"][0][0] == "url"
+        assert datasets["changes"][1][0][0] == target.normalized_url
+        assert datasets["links"][0][:2] == ["source_url", "target_url"]
+        assert datasets["links"][1][0][0] == source.normalized_url
+        assert all(
+            not header.endswith("_id")
+            for headers, _ in datasets.values()
+            for header in headers
+        )
         assert len(datasets["links"][1]) == 1

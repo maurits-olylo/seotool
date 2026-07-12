@@ -27,6 +27,21 @@ services:
       timeout: 5s
       retries: 3
     restart: unless-stopped
+  export-worker:
+    build: .
+    env_file: .env
+    environment: ["WORKER_QUEUES=exports"]
+    command: python -m app.worker
+    volumes: ["exports_data:/app/exports"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "from app.core.queue import get_redis; assert get_redis().ping()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
   scheduler:
     build: .
     env_file: .env

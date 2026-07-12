@@ -8,5 +8,5 @@ def get_redis() -> Redis:
     return Redis.from_url(get_settings().redis_url)
 
 
-def get_queue() -> Queue:
-    return Queue("default", connection=get_redis(), default_timeout=3600)
+def get_queue(name: str = "default") -> Queue:
+    return Queue(name, connection=get_redis(), default_timeout=3600)

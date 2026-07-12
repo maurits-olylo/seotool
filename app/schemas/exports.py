@@ -20,3 +20,4 @@ class ExportRead(ORMModel):
     error_message: str | None
     created_at: datetime
     finished_at: datetime | None
+    downloaded_at: datetime | None

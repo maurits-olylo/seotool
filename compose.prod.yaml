@@ -4,6 +4,8 @@ services:
     restart: always
   worker:
     restart: always
+  export-worker:
+    restart: always
   scheduler:
     restart: always
   postgres:
