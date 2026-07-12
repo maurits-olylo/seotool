@@ -8,13 +8,15 @@ const labels = {
   accepted: "Geaccepteerd", planned: "Gepland", in_progress: "Bezig",
   waiting_for_client: "Wacht op klant", resolved: "Opgelost", verified: "Geverifieerd",
   ignored: "Genegeerd", accepted_risk: "Risico geaccepteerd",
+  pending: "In wachtrij", running: "Bezig", succeeded: "Geslaagd",
+  partially_succeeded: "Deels geslaagd", failed: "Mislukt", cancelled: "Geannuleerd",
 };
-const state = { clients: [], websites: [], issues: [], changes: [], changeGroups: [], urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null };
+const state = { clients: [], websites: [], issues: [], changes: [], changeGroups: [], crawlRuns: [], exports: [], urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null };
 
 async function api(path, options = {}) {
   const response = await fetch(path, { credentials: "same-origin", ...options });
   if (response.status === 401) { showLogin(); throw new Error("Niet aangemeld"); }
-  if (!response.ok) throw new Error(`API-fout ${response.status}`);
+  if (!response.ok) { const payload = await response.json().catch(() => ({})); throw new Error(payload.detail || `API-fout ${response.status}`); }
   return response.status === 204 ? null : response.json();
 }
 
@@ -169,13 +171,14 @@ async function syncGa4() {
 }
 
 function showView(view) {
-  for (const name of ["overview", "urls", "changes", "integrations"]) {
+  for (const name of ["overview", "urls", "changes", "operations", "integrations"]) {
     $(`#${name}-view`).classList.toggle("hidden", name !== view);
     $(`#${name}-nav`).classList.toggle("nav-active", name === view);
   }
   if (view === "integrations") loadIntegrations();
   if (view === "urls") renderUrls();
   if (view === "changes") loadChanges();
+  if (view === "operations") loadOperations();
 }
 
 async function loadIssues() {
@@ -253,6 +256,60 @@ async function showUrl(urlId) {
   $("#url-detail-snapshot").textContent = snapshot ? `${new Date(snapshot.checked_at).toLocaleString("nl-NL")} · ${snapshot.response_size ?? 0} bytes · ${snapshot.response_time_ms ?? "—"} ms · ${snapshot.word_count ?? "—"} woorden` : "Geen snapshot beschikbaar.";
   $("#url-detail-issues").textContent = issues.length ? issues.map((issue) => `${labels[issue.severity] || issue.severity}: ${issue.title}`).join("\n") : "Geen actieve issues.";
   $("#url-dialog").showModal();
+}
+
+async function loadOperations() {
+  const websiteId = $("#website-select").value;
+  if (!websiteId) return;
+  [state.crawlRuns, state.exports] = await Promise.all([
+    api(`/api/v1/websites/${websiteId}/crawl-runs?limit=20`),
+    api(`/api/v1/exports?website_id=${websiteId}&limit=20`),
+  ]);
+  $("#operations-website-name").textContent = $("#website-select").selectedOptions[0]?.textContent || "de website";
+  renderOperations();
+}
+
+function durationLabel(run) {
+  if (!run.finished_at) return run.status === "running" ? "Bezig" : "—";
+  const seconds = Math.max(0, Math.round((new Date(run.finished_at) - new Date(run.started_at)) / 1000));
+  return seconds >= 60 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : `${seconds}s`;
+}
+
+function renderOperations() {
+  const runLabels = {light_check: "Light check", full_site_crawl: "Volledige crawl", fetch_sitemap: "Sitemap", full_page_analysis: "Pagina-analyse"};
+  $("#crawl-run-rows").innerHTML = state.crawlRuns.map((run) => `<tr><td>${new Date(run.started_at).toLocaleString("nl-NL")}</td><td>${runLabels[run.crawl_type] || escapeHtml(run.crawl_type)}</td><td><span class="run-status ${run.status}">${labels[run.status] || run.status}</span></td><td>${run.discovered_urls}</td><td>${run.crawled_urls}</td><td>${run.failed_urls}</td><td>${durationLabel(run)}</td></tr>`).join("");
+  $("#crawl-runs-empty").classList.toggle("hidden", state.crawlRuns.length !== 0);
+  $("#export-rows").innerHTML = state.exports.map((item) => `<tr><td>${new Date(item.created_at).toLocaleString("nl-NL")}</td><td>${item.export_type === "excel" ? "Excel" : escapeHtml(item.export_type)}</td><td><span class="run-status ${item.status}">${labels[item.status] || item.status}</span></td><td>${item.finished_at ? new Date(item.finished_at).toLocaleString("nl-NL") : "—"}</td><td>${item.status === "succeeded" ? `<a class="detail-button download-link" href="/api/v1/exports/${item.id}/download">Download</a>` : ""}</td></tr>`).join("");
+  $("#exports-empty").classList.toggle("hidden", state.exports.length !== 0);
+}
+
+async function startCrawl(jobType) {
+  if (jobType === "full_site_crawl" && !window.confirm("Volledige crawl starten? Dit controleert de gehele website.")) return;
+  const button = jobType === "light_check" ? $("#start-light-check") : $("#start-full-crawl");
+  const message = $("#crawl-action-message");
+  button.disabled = true; message.classList.remove("error"); message.textContent = "Crawl wordt ingepland…";
+  try {
+    const job = await api("/api/v1/crawl-jobs", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({website_id: $("#website-select").value, job_type: jobType, settings_snapshot: {}})});
+    message.textContent = `${jobType === "light_check" ? "Light check" : "Volledige crawl"} is gestart (${job.id.slice(0, 8)}).`;
+    setTimeout(loadOperations, 2000);
+  } catch (error) { message.classList.add("error"); message.textContent = error.message; }
+  finally { button.disabled = false; }
+}
+
+async function generateExcel() {
+  const button = $("#generate-excel"); const message = $("#export-action-message");
+  button.disabled = true; message.classList.remove("error"); message.textContent = "Excel-export wordt opgebouwd…";
+  try {
+    let item = await api("/api/v1/exports", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({website_id: $("#website-select").value, export_type: "excel"})});
+    for (let attempt = 0; attempt < 150 && ["pending", "running"].includes(item.status); attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      item = await api(`/api/v1/exports/${item.id}`);
+    }
+    if (item.status !== "succeeded") throw new Error(item.error_message || "Export kon niet worden voltooid.");
+    message.innerHTML = `Export gereed. <a href="/api/v1/exports/${item.id}/download">Download Excel</a>`;
+    await loadOperations();
+  } catch (error) { message.classList.add("error"); message.textContent = error.message; }
+  finally { button.disabled = false; }
 }
 
 function changeLabel(change) {
@@ -457,7 +514,7 @@ $("#login-form").addEventListener("submit", async (event) => {
 });
 $("#logout").addEventListener("click", async () => { await fetch("/ui/logout", { method: "POST" }); showLogin(); });
 $("#client-select").addEventListener("change", async () => { await loadWebsites(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); });
-$("#website-select").addEventListener("change", async () => { await loadIssues(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); if (!$("#urls-view").classList.contains("hidden")) renderUrls(); if (!$("#changes-view").classList.contains("hidden")) await loadChanges(); });
+$("#website-select").addEventListener("change", async () => { await loadIssues(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); if (!$("#urls-view").classList.contains("hidden")) renderUrls(); if (!$("#changes-view").classList.contains("hidden")) await loadChanges(); if (!$("#operations-view").classList.contains("hidden")) await loadOperations(); });
 for (const selector of ["#severity-filter", "#type-filter", "#impact-filter", "#status-filter"]) $(selector).addEventListener("change", () => { state.page = 1; render(); });
 $("#search-filter").addEventListener("input", () => { state.page = 1; render(); });
 $("#previous-page").addEventListener("click", () => { state.page -= 1; render(); });
@@ -469,6 +526,7 @@ $("#save-status").addEventListener("click", saveIssueStatus);
 $("#overview-nav").addEventListener("click", () => showView("overview"));
 $("#urls-nav").addEventListener("click", () => showView("urls"));
 $("#changes-nav").addEventListener("click", () => showView("changes"));
+$("#operations-nav").addEventListener("click", () => showView("operations"));
 $("#integrations-nav").addEventListener("click", () => showView("integrations"));
 for (const selector of ["#url-status-filter", "#url-index-filter", "#url-depth-filter"]) $(selector).addEventListener("change", () => { state.urlPage = 1; renderUrls(); });
 $("#url-search").addEventListener("input", () => { state.urlPage = 1; renderUrls(); });
@@ -482,6 +540,10 @@ $("#change-previous-page").addEventListener("click", () => { state.changePage -=
 $("#change-next-page").addEventListener("click", () => { state.changePage += 1; renderChanges(); });
 $("#change-rows").addEventListener("click", (event) => { const button = event.target.closest("[data-change-group-id]"); if (button) showChangeGroup(button.dataset.changeGroupId); });
 $("#close-change-dialog").addEventListener("click", () => $("#change-dialog").close());
+$("#start-light-check").addEventListener("click", () => startCrawl("light_check"));
+$("#start-full-crawl").addEventListener("click", () => startCrawl("full_site_crawl"));
+$("#generate-excel").addEventListener("click", generateExcel);
+$("#refresh-operations").addEventListener("click", loadOperations);
 $("#save-search-console").addEventListener("click", () => saveProperty("search_console", "#search-console-property", "#save-search-console", "#search-console-message"));
 $("#save-ga4").addEventListener("click", () => saveProperty("ga4", "#ga4-property", "#save-ga4", "#ga4-message"));
 $("#sync-search-console").addEventListener("click", syncSearchConsole);

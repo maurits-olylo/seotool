@@ -1,8 +1,9 @@
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -26,6 +27,24 @@ def create_export(payload: ExportCreate, db: Session = Depends(get_db)) -> Expor
     if get_settings().app_env != "test":
         get_queue().enqueue("app.services.exports.generate_export", str(export.id))
     return export
+
+
+@router.get("", response_model=list[ExportRead])
+def list_exports(
+    website_id: UUID,
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> list[Export]:
+    if not db.get(Website, website_id):
+        raise HTTPException(status_code=404, detail="Website not found")
+    return list(
+        db.scalars(
+            select(Export)
+            .where(Export.website_id == website_id)
+            .order_by(Export.created_at.desc())
+            .limit(limit)
+        )
+    )
 
 
 @router.get("/{export_id}", response_model=ExportRead)
