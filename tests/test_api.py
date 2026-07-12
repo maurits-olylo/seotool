@@ -2,6 +2,7 @@ from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import get_settings
@@ -141,6 +142,48 @@ def test_user_only_sees_assigned_client_and_cannot_start_crawl(client: TestClien
         json={"website_id": website["id"], "job_type": "light_check"},
     )
     assert denied.status_code == 403
+
+
+def test_superuser_invites_user_for_client(client: TestClient) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Invitation client"}).json()
+    with SessionLocal() as db:
+        db.add(
+            User(
+                email="owner@example.com",
+                role="superuser",
+                password_hash=hash_password("owner-secure-password"),
+            )
+        )
+        db.commit()
+
+    from app.main import app
+
+    browser = TestClient(app)
+    assert (
+        browser.post(
+            "/ui/login",
+            json={"email": "owner@example.com", "password": "owner-secure-password"},
+        ).status_code
+        == 204
+    )
+    invitation = browser.post(
+        "/api/v1/invitations",
+        json={"email": "member@example.com", "client_id": customer["id"], "role": "user"},
+    )
+    assert invitation.status_code == 201
+    token = invitation.json()["accept_path"].split("token=", maxsplit=1)[1]
+    accepted = TestClient(app).post(
+        f"/api/v1/invitations/{token}/accept",
+        json={"display_name": "Member", "password": "member-secure-password"},
+    )
+    assert accepted.status_code == 204
+    with SessionLocal() as db:
+        member = db.scalar(select(User).where(User.email == "member@example.com"))
+        assert member and member.role == "user"
+        membership = db.scalar(
+            select(ClientMembership).where(ClientMembership.user_id == member.id)
+        )
+        assert membership and str(membership.client_id) == customer["id"]
 
 
 def test_issue_detail_exposes_evidence_and_updates_status(client: TestClient) -> None:

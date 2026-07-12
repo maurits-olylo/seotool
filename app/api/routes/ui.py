@@ -58,6 +58,11 @@ def terms() -> FileResponse:
     return FileResponse(UI_ROOT / "terms.html")
 
 
+@router.get("/uitnodiging", include_in_schema=False)
+def invitation_page() -> FileResponse:
+    return FileResponse(UI_ROOT / "invitation.html")
+
+
 @router.post("/ui/login", include_in_schema=False, status_code=status.HTTP_204_NO_CONTENT)
 def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)) -> Response:
     settings = get_settings()

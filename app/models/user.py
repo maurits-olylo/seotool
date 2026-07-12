@@ -39,3 +39,19 @@ class ClientMembership(UUIDTimestampMixin, Base):
         ForeignKey("clients.id", ondelete="CASCADE"), index=True
     )
     role: Mapped[str] = mapped_column(String(30), index=True)
+
+
+class UserInvitation(UUIDTimestampMixin, Base):
+    __tablename__ = "user_invitations"
+
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    role: Mapped[str] = mapped_column(String(30))
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), index=True
+    )
+    invited_by_user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

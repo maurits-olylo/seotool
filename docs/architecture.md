@@ -21,6 +21,10 @@ en beheert alleen klanten waarvoor een admin-membership bestaat. Een user kan to
 issuestatussen bijwerken en exports gebruiken, maar geen integraties, instellingen of crawls beheren.
 Deze rechten worden in API-routes afgedwongen; verborgen menu-items zijn alleen de UI-weergave ervan.
 
+Interne gebruikers worden via een klantgebonden uitnodiging toegevoegd. De eenmalige token is alleen
+als SHA-256-hash opgeslagen, verloopt na zeven dagen en levert bij acceptatie zowel het account als de
+membership op. Admins kunnen alleen users uitnodigen; alleen de superuser kan admins uitnodigen.
+
 ## URL-discovery
 
 `urls` bewaart één blijvende URL-identiteit per website; `url_sources` legt vast of een URL via

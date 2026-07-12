@@ -12,7 +12,7 @@ const labels = {
   partially_succeeded: "Deels geslaagd", failed: "Mislukt", cancelled: "Geannuleerd",
 };
 const state = { currentUser: null, clients: [], websites: [], issues: [], changes: [], changeGroups: [], crawlRuns: [], exports: [], operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null };
-const VIEW_HASHES = {overview: "overzicht", urls: "urls", changes: "wijzigingen", operations: "beheer", integrations: "integraties"};
+const VIEW_HASHES = {overview: "overzicht", urls: "urls", changes: "wijzigingen", operations: "beheer", organization: "organisatie", integrations: "integraties"};
 let operationsPollTimer = null;
 
 async function api(path, options = {}) {
@@ -50,9 +50,55 @@ function issueUrlMarkup(issue) {
 function applyRolePermissions() {
   const canAdmin = ["superuser", "admin"].includes(state.currentUser?.role);
   $("#integrations-nav").classList.toggle("hidden", !canAdmin);
+  $("#organization-nav").classList.toggle("hidden", !canAdmin);
   $("#crawl-operation-card").classList.toggle("hidden", !canAdmin);
+  $("#invitation-role").querySelector('option[value="admin"]').disabled = state.currentUser?.role !== "superuser";
   $("#current-user").textContent = state.currentUser?.email || "Technische toegang";
   if (!canAdmin && window.location.hash === "#integraties") window.location.hash = "#overzicht";
+}
+
+async function loadOrganization() {
+  const options = state.clients.map(option).join("");
+  $("#new-website-client").innerHTML = options;
+  $("#invitation-client").innerHTML = options;
+  if ($("#client-select").value) {
+    $("#new-website-client").value = $("#client-select").value;
+    $("#invitation-client").value = $("#client-select").value;
+  }
+  await loadMembers();
+}
+
+async function loadMembers() {
+  const clientId = $("#invitation-client").value;
+  if (!clientId) { $("#member-rows").innerHTML = ""; return; }
+  const members = await api(`/api/v1/clients/${clientId}/members`);
+  $("#member-rows").innerHTML = members.map((member) => `<tr><td>${escapeHtml(member.display_name || "—")}</td><td>${escapeHtml(member.email)}</td><td>${escapeHtml(member.client_role)}</td><td>${member.is_active ? "Actief" : "Geblokkeerd"}</td></tr>`).join("");
+  $("#members-empty").classList.toggle("hidden", members.length !== 0);
+}
+
+async function createClient(event) {
+  event.preventDefault(); const message = $("#client-form-message");
+  try {
+    await api("/api/v1/clients", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({name:$("#new-client-name").value, internal_reference:$("#new-client-reference").value || null})});
+    event.currentTarget.reset(); message.textContent = "Klant toegevoegd."; await loadClients(); await loadOrganization();
+  } catch (error) { message.textContent = error.message; }
+}
+
+async function createWebsite(event) {
+  event.preventDefault(); const message = $("#website-form-message");
+  try {
+    await api("/api/v1/websites", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({client_id:$("#new-website-client").value, name:$("#new-website-name").value, base_url:$("#new-website-url").value})});
+    event.currentTarget.reset(); message.textContent = "Website toegevoegd."; await loadClients(); await loadOrganization();
+  } catch (error) { message.textContent = error.message; }
+}
+
+async function createInvitation(event) {
+  event.preventDefault(); const message = $("#invitation-form-message");
+  try {
+    const invitation = await api("/api/v1/invitations", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({client_id:$("#invitation-client").value, email:$("#invitation-email").value, role:$("#invitation-role").value})});
+    $("#invitation-link").value = `${window.location.origin}${invitation.accept_path}`;
+    $("#invitation-link-wrap").classList.remove("hidden"); message.textContent = "Uitnodiging gemaakt; deel de eenmalige link veilig.";
+  } catch (error) { message.textContent = error.message; }
 }
 
 async function loadClients() {
@@ -218,11 +264,12 @@ async function syncGa4() {
 }
 
 function showView(view, updateHash = true) {
-  for (const name of ["overview", "urls", "changes", "operations", "integrations"]) {
+  for (const name of ["overview", "urls", "changes", "operations", "organization", "integrations"]) {
     $(`#${name}-view`).classList.toggle("hidden", name !== view);
     $(`#${name}-nav`).classList.toggle("nav-active", name === view);
   }
   if (view === "integrations") loadIntegrations();
+  if (view === "organization") loadOrganization();
   if (view === "urls") renderUrls();
   if (view === "changes") loadChanges();
   if (view === "operations") { loadOperations(); startOperationsPolling(); } else stopOperationsPolling();
@@ -599,7 +646,13 @@ $("#overview-nav").addEventListener("click", () => showView("overview"));
 $("#urls-nav").addEventListener("click", () => showView("urls"));
 $("#changes-nav").addEventListener("click", () => showView("changes"));
 $("#operations-nav").addEventListener("click", () => showView("operations"));
+$("#organization-nav").addEventListener("click", () => showView("organization"));
 $("#integrations-nav").addEventListener("click", () => showView("integrations"));
+$("#client-form").addEventListener("submit", createClient);
+$("#website-form").addEventListener("submit", createWebsite);
+$("#invitation-form").addEventListener("submit", createInvitation);
+$("#invitation-client").addEventListener("change", loadMembers);
+$("#copy-invitation").addEventListener("click", async () => { await navigator.clipboard.writeText($("#invitation-link").value); $("#invitation-form-message").textContent = "Link gekopieerd."; });
 for (const selector of ["#url-status-filter", "#url-index-filter", "#url-depth-filter"]) $(selector).addEventListener("change", () => { state.urlPage = 1; renderUrls(); });
 $("#url-search").addEventListener("input", () => { state.urlPage = 1; renderUrls(); });
 $("#url-previous-page").addEventListener("click", () => { state.urlPage -= 1; renderUrls(); });

@@ -14,12 +14,13 @@
   <link rel="stylesheet" href="/ui/assets/urls.css">
   <link rel="stylesheet" href="/ui/assets/changes.css">
   <link rel="stylesheet" href="/ui/assets/operations.css">
+  <link rel="stylesheet" href="/ui/assets/organization.css">
 </head>
 <body>
   <div id="app" class="app-shell hidden">
     <aside>
       <div><span class="eyebrow">THACT</span><h2>SEO Monitor</h2><small id="current-user"></small></div>
-      <nav><button id="overview-nav" class="nav-active">Overzicht</button><button id="urls-nav">URLs</button><button id="changes-nav">Wijzigingen</button><button id="operations-nav">Beheer</button><button id="integrations-nav">Integraties</button></nav>
+      <nav><button id="overview-nav" class="nav-active">Overzicht</button><button id="urls-nav">URLs</button><button id="changes-nav">Wijzigingen</button><button id="operations-nav">Beheer</button><button id="organization-nav">Organisatie</button><button id="integrations-nav">Integraties</button></nav>
       <button id="logout" class="quiet">Uitloggen</button>
     </aside>
     <main>
@@ -77,6 +78,15 @@
           <section class="panel operation-card"><span class="eyebrow">EXPORTEREN</span><h2>Actielijst downloaden</h2><p>Genereer een Excel-workbook met URLs, technische bevindingen, wijzigingen, issues en interne links.</p><button id="generate-excel" class="primary-button">Genereer Excel-export</button><div id="current-export" class="live-status hidden"><span id="current-export-label"></span><div id="export-progress" class="progress-track"><span></span></div><a id="current-export-download" class="detail-button hidden">Download Excel</a></div><p id="export-action-message" class="operation-message"></p></section>
         </div>
         <section class="panel operation-history"><div class="panel-head"><div><span class="eyebrow">HISTORIE</span><h2>Recente crawls</h2></div><button id="refresh-operations" class="detail-button">Vernieuwen</button></div><div class="table-wrap"><table class="operation-table"><thead><tr><th>Gestart</th><th>Type</th><th>Status</th><th>Ontdekt</th><th>Gecrawld</th><th>Mislukt</th><th>Duur</th></tr></thead><tbody id="crawl-run-rows"></tbody></table></div><p id="crawl-runs-empty" class="empty hidden">Nog geen crawls beschikbaar.</p></section>
+      </section>
+      <section id="organization-view" class="hidden">
+        <header><div><span class="eyebrow">BEHEER</span><h1>Organisatie</h1><p class="intro">Beheer klanten, websites en interne toegang.</p></div></header>
+        <div class="organization-grid">
+          <form id="client-form" class="panel organization-card"><span class="eyebrow">KLANT</span><h2>Nieuwe klant</h2><label>Naam<input id="new-client-name" required maxlength="255"></label><label>Interne referentie<input id="new-client-reference" maxlength="100"></label><button class="primary-button" type="submit">Klant toevoegen</button><p id="client-form-message" class="operation-message"></p></form>
+          <form id="website-form" class="panel organization-card"><span class="eyebrow">WEBSITE</span><h2>Nieuwe website</h2><label>Klant<select id="new-website-client" required></select></label><label>Naam<input id="new-website-name" required maxlength="255"></label><label>Basis-URL<input id="new-website-url" type="url" required></label><button class="primary-button" type="submit">Website toevoegen</button><p id="website-form-message" class="operation-message"></p></form>
+          <form id="invitation-form" class="panel organization-card"><span class="eyebrow">TEAM</span><h2>Gebruiker uitnodigen</h2><label>Klant<select id="invitation-client" required></select></label><label>E-mailadres<input id="invitation-email" type="email" required></label><label>Rol<select id="invitation-role"><option value="user">User</option><option value="admin">Admin</option></select></label><button class="primary-button" type="submit">Uitnodiging maken</button><p id="invitation-form-message" class="operation-message"></p><div id="invitation-link-wrap" class="invitation-link hidden"><input id="invitation-link" readonly><button id="copy-invitation" type="button" class="detail-button">Kopieer link</button></div></form>
+        </div>
+        <section class="panel organization-members"><div class="panel-head"><div><span class="eyebrow">TOEGANG</span><h2>Leden van geselecteerde klant</h2></div></div><div class="table-wrap"><table><thead><tr><th>Naam</th><th>E-mail</th><th>Rol</th><th>Status</th></tr></thead><tbody id="member-rows"></tbody></table></div><p id="members-empty" class="empty hidden">Nog geen leden toegewezen.</p></section>
       </section>
       <section id="integrations-view" class="hidden">
         <header><div><span class="eyebrow">DATABRONNEN</span><h1>Integraties</h1><p class="intro">Koppel databronnen op klantniveau en wijs properties toe aan websites.</p></div></header>

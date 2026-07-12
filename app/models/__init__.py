@@ -9,7 +9,7 @@ from app.models.integrations import (
     WebsiteIntegration,
 )
 from app.models.issues import Change, Issue, IssueComment, IssueOccurrence
-from app.models.user import ClientMembership, User
+from app.models.user import ClientMembership, User, UserInvitation
 from app.models.website import Website, WebsiteSettings
 
 __all__ = [
@@ -30,6 +30,7 @@ __all__ = [
     "UrlSnapshot",
     "UrlSource",
     "User",
+    "UserInvitation",
     "Website",
     "WebsiteIntegration",
     "WebsiteSettings",
