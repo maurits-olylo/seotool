@@ -14,8 +14,14 @@ class UrlRead(ORMModel):
     first_seen_at: datetime
     last_seen_at: datetime
     current_status_code: int | None
+    current_final_url: str | None
     is_active: bool
+    is_indexable: bool | None
+    is_important: bool
+    page_type: str | None
     crawl_depth: int | None
+    last_light_checked_at: datetime | None
+    last_full_analyzed_at: datetime | None
 
 
 class UrlRegister(BaseModel):

@@ -1,13 +1,14 @@
 const $ = (selector) => document.querySelector(selector);
 const ACTIVE_STATUSES = new Set(["new", "review", "accepted", "planned", "in_progress", "waiting_for_client"]);
 const PAGE_SIZE = 25;
+const URL_PAGE_SIZE = 30;
 const labels = {
   high: "Hoog", medium: "Middel", low: "Laag", new: "Nieuw", review: "Te beoordelen",
   accepted: "Geaccepteerd", planned: "Gepland", in_progress: "Bezig",
   waiting_for_client: "Wacht op klant", resolved: "Opgelost", verified: "Geverifieerd",
   ignored: "Genegeerd", accepted_risk: "Risico geaccepteerd",
 };
-const state = { clients: [], websites: [], issues: [], urls: new Map(), filtered: [], page: 1, selectedIssueId: null, googleConnectionId: null };
+const state = { clients: [], websites: [], issues: [], urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], page: 1, urlPage: 1, selectedIssueId: null, googleConnectionId: null };
 
 async function api(path, options = {}) {
   const response = await fetch(path, { credentials: "same-origin", ...options });
@@ -167,12 +168,12 @@ async function syncGa4() {
 }
 
 function showView(view) {
-  const integrations = view === "integrations";
-  $("#overview-view").classList.toggle("hidden", integrations);
-  $("#integrations-view").classList.toggle("hidden", !integrations);
-  $("#overview-nav").classList.toggle("nav-active", !integrations);
-  $("#integrations-nav").classList.toggle("nav-active", integrations);
-  if (integrations) loadIntegrations();
+  for (const name of ["overview", "urls", "integrations"]) {
+    $(`#${name}-view`).classList.toggle("hidden", name !== view);
+    $(`#${name}-nav`).classList.toggle("nav-active", name === view);
+  }
+  if (view === "integrations") loadIntegrations();
+  if (view === "urls") renderUrls();
 }
 
 async function loadIssues() {
@@ -180,14 +181,76 @@ async function loadIssues() {
   if (!websiteId) { state.issues = []; render(); return; }
   const [issues, urls] = await Promise.all([
     api(`/api/v1/websites/${websiteId}/issues`),
-    api(`/api/v1/websites/${websiteId}/urls?limit=1000`),
+    loadAllUrls(websiteId),
   ]);
   state.issues = issues;
+  state.urlRecords = urls;
   state.urls = new Map(urls.map((url) => [url.id, url.normalized_url]));
   const types = [...new Set(issues.map((issue) => issue.issue_type))].sort();
   $("#type-filter").innerHTML = `<option value="">Alle issue-types</option>${types.map((type) => `<option value="${escapeHtml(type)}">${escapeHtml(type)}</option>`).join("")}`;
   state.page = 1;
   render();
+}
+
+async function loadAllUrls(websiteId) {
+  const urls = [];
+  for (let offset = 0; ; offset += 1000) {
+    const batch = await api(`/api/v1/websites/${websiteId}/urls?limit=1000&offset=${offset}`);
+    urls.push(...batch);
+    if (batch.length < 1000) return urls;
+  }
+}
+
+function urlIndexState(url) {
+  if (url.is_indexable === true) return "indexable";
+  if (url.is_indexable === false) return "blocked";
+  return "unknown";
+}
+
+function renderUrls() {
+  const query = $("#url-search").value.trim().toLowerCase();
+  const status = $("#url-status-filter").value;
+  const indexation = $("#url-index-filter").value;
+  const depth = $("#url-depth-filter").value;
+  state.urlFiltered = state.urlRecords.filter((url) => {
+    const code = url.current_status_code;
+    const statusMatch = !status || (status === "none" ? code === null : code >= Number(status[0]) * 100 && code < (Number(status[0]) + 1) * 100);
+    const indexMatch = !indexation || urlIndexState(url) === indexation;
+    const depthMatch = !depth || (depth === "none" ? url.crawl_depth === null : depth === "0-2" ? url.crawl_depth >= 0 && url.crawl_depth <= 2 : depth === "3-4" ? url.crawl_depth >= 3 && url.crawl_depth <= 4 : url.crawl_depth >= 5);
+    return statusMatch && indexMatch && depthMatch && (!query || url.normalized_url.toLowerCase().includes(query));
+  });
+  const pages = Math.max(1, Math.ceil(state.urlFiltered.length / URL_PAGE_SIZE));
+  state.urlPage = Math.min(state.urlPage, pages);
+  const start = (state.urlPage - 1) * URL_PAGE_SIZE;
+  const rows = state.urlFiltered.slice(start, start + URL_PAGE_SIZE);
+  $("#urls-website-name").textContent = $("#website-select").selectedOptions[0]?.textContent || "de website";
+  $("#url-rows").innerHTML = rows.map((url) => {
+    const indexState = urlIndexState(url);
+    const indexLabel = {indexable: "Indexeerbaar", blocked: "Niet indexeerbaar", unknown: "Onbekend"}[indexState];
+    const checked = url.last_full_analyzed_at ? new Date(url.last_full_analyzed_at).toLocaleDateString("nl-NL") : "—";
+    return `<tr><td><a class="url-address" href="${escapeHtml(url.normalized_url)}" target="_blank" rel="noopener">${escapeHtml(url.normalized_url)}</a></td><td><span class="status-code">${url.current_status_code ?? "—"}</span></td><td><span class="index-state ${indexState}">${indexLabel}</span></td><td>${url.crawl_depth ?? "—"}</td><td>${checked}</td><td><button class="detail-button" data-url-id="${url.id}">Bekijk</button></td></tr>`;
+  }).join("");
+  $("#url-result-count").textContent = `${state.urlFiltered.length} URLs`;
+  $("#url-page-label").textContent = `Pagina ${state.urlPage} van ${pages}`;
+  $("#url-previous-page").disabled = state.urlPage === 1;
+  $("#url-next-page").disabled = state.urlPage === pages;
+  $("#url-empty").classList.toggle("hidden", rows.length !== 0);
+}
+
+async function showUrl(urlId) {
+  const url = state.urlRecords.find((item) => item.id === urlId);
+  if (!url) return;
+  const snapshots = await api(`/api/v1/urls/${urlId}/snapshots?limit=1`);
+  const snapshot = snapshots[0];
+  const issues = state.issues.filter((issue) => issue.url_id === urlId && ACTIVE_STATUSES.has(issue.status));
+  $("#url-detail-link").textContent = url.normalized_url;
+  $("#url-detail-link").href = url.normalized_url;
+  $("#url-detail-status").textContent = `${url.current_status_code ?? "Niet gecontroleerd"}${url.current_final_url && url.current_final_url !== url.normalized_url ? ` → ${url.current_final_url}` : ""}`;
+  $("#url-detail-indexation").textContent = {indexable: "Indexeerbaar", blocked: "Niet indexeerbaar", unknown: "Onbekend"}[urlIndexState(url)];
+  $("#url-detail-crawl").textContent = `Crawl-diepte: ${url.crawl_depth ?? "onbekend"} · Paginatype: ${url.page_type || "onbekend"}`;
+  $("#url-detail-snapshot").textContent = snapshot ? `${new Date(snapshot.checked_at).toLocaleString("nl-NL")} · ${snapshot.response_size ?? 0} bytes · ${snapshot.response_time_ms ?? "—"} ms · ${snapshot.word_count ?? "—"} woorden` : "Geen snapshot beschikbaar.";
+  $("#url-detail-issues").textContent = issues.length ? issues.map((issue) => `${labels[issue.severity] || issue.severity}: ${issue.title}`).join("\n") : "Geen actieve issues.";
+  $("#url-dialog").showModal();
 }
 
 function applyFilters() {
@@ -291,7 +354,7 @@ $("#login-form").addEventListener("submit", async (event) => {
 });
 $("#logout").addEventListener("click", async () => { await fetch("/ui/logout", { method: "POST" }); showLogin(); });
 $("#client-select").addEventListener("change", async () => { await loadWebsites(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); });
-$("#website-select").addEventListener("change", async () => { await loadIssues(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); });
+$("#website-select").addEventListener("change", async () => { await loadIssues(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); if (!$("#urls-view").classList.contains("hidden")) renderUrls(); });
 for (const selector of ["#severity-filter", "#type-filter", "#impact-filter", "#status-filter"]) $(selector).addEventListener("change", () => { state.page = 1; render(); });
 $("#search-filter").addEventListener("input", () => { state.page = 1; render(); });
 $("#previous-page").addEventListener("click", () => { state.page -= 1; render(); });
@@ -301,7 +364,14 @@ $("#issue-groups").addEventListener("click", (event) => { const button = event.t
 $("#close-dialog").addEventListener("click", () => $("#issue-dialog").close());
 $("#save-status").addEventListener("click", saveIssueStatus);
 $("#overview-nav").addEventListener("click", () => showView("overview"));
+$("#urls-nav").addEventListener("click", () => showView("urls"));
 $("#integrations-nav").addEventListener("click", () => showView("integrations"));
+for (const selector of ["#url-status-filter", "#url-index-filter", "#url-depth-filter"]) $(selector).addEventListener("change", () => { state.urlPage = 1; renderUrls(); });
+$("#url-search").addEventListener("input", () => { state.urlPage = 1; renderUrls(); });
+$("#url-previous-page").addEventListener("click", () => { state.urlPage -= 1; renderUrls(); });
+$("#url-next-page").addEventListener("click", () => { state.urlPage += 1; renderUrls(); });
+$("#url-rows").addEventListener("click", (event) => { const button = event.target.closest("[data-url-id]"); if (button) showUrl(button.dataset.urlId); });
+$("#close-url-dialog").addEventListener("click", () => $("#url-dialog").close());
 $("#save-search-console").addEventListener("click", () => saveProperty("search_console", "#search-console-property", "#save-search-console", "#search-console-message"));
 $("#save-ga4").addEventListener("click", () => saveProperty("ga4", "#ga4-property", "#save-ga4", "#ga4-message"));
 $("#sync-search-console").addEventListener("click", syncSearchConsole);
