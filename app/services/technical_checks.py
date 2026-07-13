@@ -17,6 +17,8 @@ SNAPSHOT_ISSUE_TYPES = {
     "canonical_other_url",
     "conflicting_robots",
     "expired_job_posting",
+    "expired_job_posting_linked",
+    "expired_job_posting_404",
     "job_posting_missing_fields",
     "robots_txt_blocked",
 }

@@ -1,6 +1,6 @@
 import json
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.crawl import UrlLink, UrlSnapshot
@@ -50,8 +50,33 @@ def analyze_snapshot(db: Session, snapshot: UrlSnapshot) -> None:
         )
     signals = inspect_snapshot(snapshot)
     if not snapshot.redirect_chain:
+        inbound_internal_links = db.scalar(
+            select(func.count(UrlLink.id)).where(
+                UrlLink.crawl_run_id == snapshot.crawl_run_id,
+                UrlLink.target_url_id == url.id,
+                UrlLink.is_internal.is_(True),
+            )
+        ) or 0
+        application_cta = db.scalar(
+            select(UrlLink.id).where(
+                UrlLink.crawl_run_id == snapshot.crawl_run_id,
+                UrlLink.source_url_id == url.id,
+                UrlLink.is_internal.is_(True),
+                UrlLink.anchor_text.ilike("%solliciteer%")
+                | UrlLink.anchor_text.ilike("%reageer%")
+                | UrlLink.anchor_text.ilike("%aanmelden%"),
+            )
+        ) is not None
         signals.extend(
-            inspect_job_posting(snapshot.schema_data or [], status_code=snapshot.status_code)
+            inspect_job_posting(
+                snapshot.schema_data or [],
+                status_code=snapshot.status_code,
+                page_url=url.normalized_url,
+                main_content=snapshot.main_content,
+                has_application_cta=application_cta,
+                inbound_internal_links=inbound_internal_links,
+                was_job_posting=bool(previous and "JobPosting" in (previous.schema_types or [])),
+            )
         )
     reconcile_issues(
         db,
