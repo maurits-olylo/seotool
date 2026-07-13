@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 from uuid import UUID
 
 import pytest
@@ -10,6 +11,7 @@ from app.core.security import create_session_token, hash_password
 from app.db.session import SessionLocal
 from app.models.crawl import CrawlRun
 from app.models.discovery import CrawlJob
+from app.models.integrations import GoogleAnalyticsMetric, SearchConsoleMetric
 from app.models.issues import Issue, IssueOccurrence
 from app.models.user import ClientMembership, User
 
@@ -267,6 +269,85 @@ def test_admin_can_manage_other_client_members(client: TestClient) -> None:
     with SessionLocal() as db:
         removed = db.get(User, member_id)
         assert removed and removed.is_active is False
+    reinvited = browser.post(
+        "/api/v1/invitations",
+        json={"email": "managed@example.com", "client_id": customer["id"], "role": "client"},
+    )
+    assert reinvited.status_code == 201
+    token = reinvited.json()["accept_path"].split("token=", maxsplit=1)[1]
+    accepted = TestClient(app).post(
+        f"/api/v1/invitations/{token}/accept",
+        json={"password": "Restored-secure-password-1!"},
+    )
+    assert accepted.status_code == 204
+    with SessionLocal() as db:
+        restored = db.get(User, member_id)
+        membership = db.scalar(
+            select(ClientMembership).where(ClientMembership.user_id == member_id)
+        )
+        assert restored and restored.is_active is True
+        assert membership and membership.role == "client"
+
+
+def test_client_report_contains_performance_and_work(client: TestClient) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Reporting"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": customer["id"],
+            "name": "Reporting site",
+            "base_url": "https://reporting.example.com",
+        },
+    ).json()
+    website_id = UUID(website["id"])
+    yesterday = date.today() - timedelta(days=1)
+    with SessionLocal() as db:
+        db.add_all(
+            [
+                SearchConsoleMetric(
+                    website_id=website_id,
+                    date=yesterday,
+                    page_url="https://reporting.example.com/",
+                    clicks=25,
+                    impressions=500,
+                    ctr=0.05,
+                    position=4,
+                ),
+                GoogleAnalyticsMetric(
+                    website_id=website_id,
+                    date=yesterday,
+                    landing_page="/",
+                    sessions=40,
+                    active_users=30,
+                    key_events=3,
+                ),
+                SearchConsoleMetric(
+                    website_id=website_id,
+                    date=yesterday - timedelta(days=30),
+                    page_url="https://reporting.example.com/",
+                    clicks=10,
+                    impressions=200,
+                    ctr=0.05,
+                    position=6,
+                ),
+                SearchConsoleMetric(
+                    website_id=website_id,
+                    date=yesterday - timedelta(days=59),
+                    page_url="https://reporting.example.com/archive",
+                    clicks=0,
+                    impressions=1,
+                    ctr=0,
+                    position=10,
+                ),
+            ]
+        )
+        db.commit()
+    report = client.get(f"/api/v1/websites/{website_id}/client-report?period=month")
+    assert report.status_code == 200
+    assert report.json()["current"]["clicks"] == 25
+    assert report.json()["current"]["key_events"] == 3
+    assert report.json()["comparisons"]["clicks"] == 150
+    assert report.json()["monthly"]
 
 
 def test_superuser_invites_user_for_client(client: TestClient) -> None:

@@ -64,8 +64,14 @@ def create_invitation(
     if not principal.user_id:
         raise HTTPException(status_code=422, detail="A personal account is required")
     email = payload.email.strip().lower()
-    if db.scalar(select(User.id).where(func.lower(User.email) == email)):
-        raise HTTPException(status_code=409, detail="User already exists")
+    existing_user = db.scalar(select(User).where(func.lower(User.email) == email))
+    if existing_user and db.scalar(
+        select(ClientMembership.id).where(
+            ClientMembership.user_id == existing_user.id,
+            ClientMembership.client_id == payload.client_id,
+        )
+    ):
+        raise HTTPException(status_code=409, detail="Gebruiker heeft al toegang tot deze klant")
     token = secrets.token_urlsafe(32)
     invitation = UserInvitation(
         email=email,
@@ -218,15 +224,29 @@ def accept_invitation(
 ) -> Response:
     invitation = _valid_invitation(token, db)
     now = datetime.now(UTC)
-    user = User(
-        email=invitation.email,
-        display_name=None,
-        role=invitation.role,
-        password_hash=hash_password(payload.password),
-    )
-    db.add(user)
-    db.flush()
+    user = db.scalar(select(User).where(func.lower(User.email) == invitation.email.lower()))
+    if user:
+        if db.scalar(
+            select(ClientMembership.id).where(
+                ClientMembership.user_id == user.id,
+                ClientMembership.client_id == invitation.client_id,
+            )
+        ):
+            raise HTTPException(status_code=409, detail="Gebruiker heeft al toegang tot deze klant")
+        user.password_hash = hash_password(payload.password)
+        user.is_active = True
+    else:
+        user = User(
+            email=invitation.email,
+            display_name=None,
+            role=invitation.role,
+            password_hash=hash_password(payload.password),
+        )
+        db.add(user)
+        db.flush()
     db.add(ClientMembership(user_id=user.id, client_id=invitation.client_id, role=invitation.role))
+    db.flush()
+    _sync_global_role(db, user)
     invitation.accepted_at = now
     db.commit()
     response.set_cookie(

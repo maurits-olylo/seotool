@@ -16,7 +16,9 @@ from app.services.google_integrations import get_google_access_token
 from app.services.url_normalization import InvalidUrlError, normalize_url
 
 
-async def sync_search_console(db: Session, website_id: UUID, days: int = 28) -> dict[str, object]:
+async def sync_search_console(
+    db: Session, website_id: UUID, days: int | None = None
+) -> dict[str, object]:
     mapping = db.scalar(
         select(WebsiteIntegration).where(
             WebsiteIntegration.website_id == website_id,
@@ -29,6 +31,15 @@ async def sync_search_console(db: Session, website_id: UUID, days: int = 28) -> 
     connection = db.get(IntegrationConnection, mapping.connection_id)
     if not connection or connection.status != "connected":
         raise ValueError("Google account is not connected")
+
+    if days is None:
+        target_start = date.today() - timedelta(days=480)
+        imported_start = mapping.settings.get("last_import_start")
+        days = (
+            480
+            if not imported_start or date.fromisoformat(str(imported_start)) > target_start
+            else 28
+        )
 
     end_date = date.today() - timedelta(days=1)
     start_date = end_date - timedelta(days=days - 1)

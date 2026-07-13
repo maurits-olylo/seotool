@@ -11,7 +11,7 @@ const labels = {
   pending: "In wachtrij", running: "Bezig", succeeded: "Geslaagd",
   partially_succeeded: "Deels geslaagd", failed: "Mislukt", cancelled: "Geannuleerd",
 };
-const state = { currentUser: null, clients: [], websites: [], issues: [], changes: [], changeGroups: [], crawlRuns: [], exports: [], operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null };
+const state = { currentUser: null, clients: [], websites: [], issues: [], changes: [], changeGroups: [], crawlRuns: [], exports: [], operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month" };
 const VIEW_HASHES = {overview: "overzicht", urls: "urls", changes: "wijzigingen", operations: "beheer", organization: "organisatie", integrations: "integraties"};
 let operationsPollTimer = null;
 
@@ -45,53 +45,49 @@ function impactMarkup(issue) {
 
 function renderClientReport() {
   if (state.currentUser?.role !== "client") return;
-  const active = state.issues.filter((issue) => ACTIVE_STATUSES.has(issue.status));
-  const high = active.filter((issue) => issue.severity === "high");
-  const impacted = active.filter((issue) => issue.organic_impact && impactLevel(issue) !== "none");
-  const completed = state.issues.filter((issue) => ["resolved", "verified"].includes(issue.status));
-  const conclusion = high.length === 0
-    ? "De technische basis is momenteel stabiel"
-    : high.length <= 5
-      ? "Een beperkt aantal prioriteiten vraagt aandacht"
-      : "Meerdere technische prioriteiten vragen aandacht";
-  $("#report-conclusion").textContent = conclusion;
-  $("#report-explanation").textContent = high.length
-    ? `${high.length} punten hebben hoge prioriteit. Hieronder staat wat dit betekent en welke vervolgstappen het meeste effect hebben.`
-    : "Er zijn geen actieve punten met hoge prioriteit. Blijf de middelgrote aandachtspunten planmatig verbeteren.";
-  $("#report-date").textContent = new Date().toLocaleDateString("nl-NL", {day:"numeric", month:"long", year:"numeric"});
-  const metrics = [
-    [active.length, "Actieve aandachtspunten"],
-    [high.length, "Hoge prioriteit"],
-    [impacted.length, "Met gemeten bereik"],
-    [completed.length, "Opgelost of geverifieerd"],
-  ];
-  $("#report-metrics").innerHTML = metrics.map(([value, label]) => `<article class="report-metric"><strong>${value}</strong><span>${label}</span></article>`).join("");
+  const report = state.clientReport;
+  if (!report) { $("#report-conclusion").textContent = "Rapportage wordt geladen…"; return; }
+  const current = report.current || {};
+  const comparisons = report.comparisons || {};
+  const signal = current.key_events ? "key_events" : current.sessions ? "sessions" : "clicks";
+  const signalLabels = {key_events:"belangrijke gebeurtenissen",sessions:"organische sessies",clicks:"organische klikken"};
+  const change = comparisons[signal];
+  $("#report-conclusion").textContent = change === null || change === undefined
+    ? `${Number(current[signal] || 0).toLocaleString("nl-NL")} ${signalLabels[signal]} in deze periode`
+    : change >= 0 ? `Organische prestaties zijn ${Math.abs(change)}% gestegen` : `Organische prestaties zijn ${Math.abs(change)}% gedaald`;
+  $("#report-explanation").textContent = "Rendement wordt benaderd met organisch bereik, websitebezoek en belangrijke gebeurtenissen. Voor financieel rendement is aanvullende omzetdata nodig.";
+  $("#report-date").textContent = `${new Date(report.start_date).toLocaleDateString("nl-NL")} – ${new Date(report.end_date).toLocaleDateString("nl-NL")}`;
+  $("#report-coverage").textContent = report.coverage?.from ? `Data beschikbaar vanaf ${new Date(report.coverage.from).toLocaleDateString("nl-NL")}` : "Nog geen GSC/GA4-data beschikbaar";
+  const metricDefinitions = [["clicks","Organische klikken"],["impressions","Vertoningen in Google"],["sessions","Organische sessies"],["key_events","Belangrijke gebeurtenissen"]];
+  $("#report-metrics").innerHTML = metricDefinitions.map(([key, label]) => {
+    const delta = comparisons[key];
+    const deltaLabel = delta === null || delta === undefined ? "Geen vergelijkingsdata" : `${delta >= 0 ? "+" : ""}${delta}% t.o.v. vorige periode`;
+    return `<article class="report-metric"><strong>${Number(current[key] || 0).toLocaleString("nl-NL")}</strong><span>${label}</span><small class="${delta > 0 ? "positive" : delta < 0 ? "negative" : ""}">${deltaLabel}</small></article>`;
+  }).join("");
 
-  const categoryContent = {
-    reachability: ["Bereikbaarheid", "Pagina's en links die bezoekers mogelijk niet goed kunnen bereiken."],
-    indexation: ["Vindbaarheid", "Signalen die invloed hebben op opname en weergave in zoekmachines."],
-    onpage: ["Pagina-inhoud", "Technische paginavelden die zoekmachines helpen de inhoud te begrijpen."],
-    internal_links: ["Interne navigatie", "De manier waarop pagina's binnen de website met elkaar verbonden zijn."],
-    structured_data: ["Gestructureerde data", "Aanvullende informatie waarmee zoekmachines pagina's interpreteren."],
-    performance: ["Bestandsgrootte", "Afbeeldingen en documenten die onnodig zwaar zijn voor bezoekers."],
-  };
-  const categoryCounts = new Map();
-  active.forEach((issue) => categoryCounts.set(issue.category, (categoryCounts.get(issue.category) || 0) + 1));
-  $("#report-categories").innerHTML = [...categoryCounts.entries()].sort((a, b) => b[1] - a[1]).map(([category, count]) => {
-    const [title, description] = categoryContent[category] || [category.replaceAll("_", " "), "Technische aandachtspunten binnen dit onderdeel."];
-    return `<article class="report-category"><strong>${escapeHtml(title)}</strong><span>${count}</span><p>${escapeHtml(description)}</p></article>`;
-  }).join("") || `<p class="report-empty">Geen actieve technische aandachtspunten.</p>`;
+  const months = (report.monthly || []).slice(-12);
+  const chartMetric = months.some((month) => month.sessions) ? "sessions" : "clicks";
+  const maxValue = Math.max(1, ...months.map((month) => Number(month[chartMetric] || 0)));
+  $("#report-trend-label").textContent = chartMetric === "sessions" ? "Organische sessies" : "Organische klikken";
+  $("#report-chart").innerHTML = months.map((month) => `<div class="report-bar"><span class="report-bar-value">${Number(month[chartMetric] || 0).toLocaleString("nl-NL")}</span><div style="height:${Math.max(3, Number(month[chartMetric] || 0) / maxValue * 100)}%"></div><small>${month.month.slice(5)}/${month.month.slice(2,4)}</small></div>`).join("") || `<p class="report-empty">Nog onvoldoende historische data voor een maandtrend.</p>`;
 
-  const priorities = [...active].sort((a, b) => {
-    const severityOrder = {high: 0, medium: 1, low: 2};
-    return severityOrder[a.severity] - severityOrder[b.severity]
-      || impactRank(a) - impactRank(b)
-      || impactVolume(b) - impactVolume(a);
-  }).slice(0, 5);
-  $("#report-priorities").innerHTML = priorities.map((issue) => {
-    const url = issueUrl(issue);
-    return `<article class="report-priority"><div class="report-priority-head"><span class="severity ${issue.severity}">${labels[issue.severity] || issue.severity}</span><h3>${escapeHtml(issue.title)}</h3></div><p>${escapeHtml(issue.recommended_action)}</p>${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a>` : ""}</article>`;
-  }).join("") || `<p class="report-empty">Er zijn momenteel geen vervolgstappen nodig.</p>`;
+  const changes = Object.entries(report.work_completed?.changes || {}).slice(0, 6);
+  $("#report-completed").innerHTML = `<article class="report-work-summary"><strong>${report.work_completed?.resolved_issues || 0}</strong><span>issues opgelost of geverifieerd</span></article>${changes.map(([type, count]) => `<article class="report-list-item"><strong>${count}× ${escapeHtml(changeLabel({change_type:type}))}</strong><p>Gedetecteerd in de gekozen periode.</p></article>`).join("")}`;
+  $("#report-planned").innerHTML = renderReportIssues(report.planned, "Er staan nog geen acties met status gepland of bezig.");
+  $("#report-new-issues").innerHTML = renderReportIssues(report.new_issues, "Geen nieuwe aandachtspunten in deze periode.");
+}
+
+function renderReportIssues(issues = [], emptyText) {
+  if (!issues.length) return `<p class="report-empty">${emptyText}</p>`;
+  return issues.map((issue) => `<article class="report-list-item"><div><span class="severity ${issue.severity}">${labels[issue.severity] || issue.severity}</span><span class="badge">${labels[issue.status] || issue.status}</span></div><strong>${escapeHtml(issue.title)}</strong><p>${escapeHtml(issue.recommended_action)}</p></article>`).join("");
+}
+
+async function loadClientReport() {
+  if (state.currentUser?.role !== "client") return;
+  const websiteId = $("#website-select").value;
+  if (!websiteId) return;
+  state.clientReport = await api(`/api/v1/websites/${websiteId}/client-report?period=${state.reportPeriod}`);
+  renderClientReport();
 }
 function issueUrlMarkup(issue) {
   const url = issueUrl(issue);
@@ -395,6 +391,7 @@ async function loadIssues() {
   $("#type-filter").innerHTML = `<option value="">Alle issue-types</option>${types.map((type) => `<option value="${escapeHtml(type)}">${escapeHtml(type)}</option>`).join("")}`;
   state.page = 1;
   render();
+  await loadClientReport();
 }
 
 async function loadAllUrls(websiteId) {
@@ -732,6 +729,7 @@ $("#previous-page").addEventListener("click", () => { state.page -= 1; render();
 $("#next-page").addEventListener("click", () => { state.page += 1; render(); });
 $("#issues").addEventListener("click", (event) => { const button = event.target.closest("[data-issue-id]"); if (button) showIssue(button.dataset.issueId); });
 $("#issue-groups").addEventListener("click", (event) => { const button = event.target.closest("[data-group-type]"); if (button) { $("#type-filter").value = button.dataset.groupType; state.page = 1; render(); } });
+$("#report-periods").addEventListener("click", async (event) => { const button = event.target.closest("[data-report-period]"); if (!button) return; state.reportPeriod = button.dataset.reportPeriod; $("#report-periods").querySelectorAll("button").forEach((item) => item.classList.toggle("active", item === button)); state.clientReport = null; renderClientReport(); await loadClientReport(); });
 $("#close-dialog").addEventListener("click", () => $("#issue-dialog").close());
 $("#save-status").addEventListener("click", saveIssueStatus);
 $("#overview-nav").addEventListener("click", () => showView("overview"));

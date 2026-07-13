@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="/ui/assets/organization.css">
   <link rel="stylesheet" href="/ui/assets/report.css">
   <link rel="stylesheet" href="/ui/assets/member-management.css">
+  <link rel="stylesheet" href="/ui/assets/report-performance.css">
 </head>
 <body>
   <div id="app" class="app-shell hidden">
@@ -35,15 +36,20 @@
         </div>
       </header>
       <section id="client-report" class="client-report hidden">
+        <nav id="report-periods" class="report-periods" aria-label="Rapportageperiode">
+          <button data-report-period="month" class="active">Maand</button><button data-report-period="quarter">Kwartaal</button><button data-report-period="half_year">6 maanden</button><button data-report-period="year">Jaar</button><button data-report-period="ytd">YTD</button>
+        </nav>
         <section class="report-hero">
           <div><span class="eyebrow">SAMENVATTING</span><h2 id="report-conclusion"></h2><p id="report-explanation"></p></div>
-          <div class="report-period"><span>Rapportagedatum</span><strong id="report-date"></strong></div>
+          <div class="report-period"><span>Meetperiode</span><strong id="report-date"></strong><small id="report-coverage"></small></div>
         </section>
         <section id="report-metrics" class="report-metrics"></section>
-        <div class="report-columns">
-          <section class="panel report-section"><div class="panel-head"><div><span class="eyebrow">PER ONDERDEEL</span><h2>Waar aandacht nodig is</h2></div></div><div id="report-categories" class="report-categories"></div></section>
-          <section class="panel report-section"><div class="panel-head"><div><span class="eyebrow">ADVIES</span><h2>Belangrijkste vervolgstappen</h2></div></div><div id="report-priorities" class="report-priorities"></div></section>
+        <section class="panel report-trend"><div class="panel-head"><div><span class="eyebrow">ONTWIKKELING</span><h2>Organische prestaties per maand</h2></div><span id="report-trend-label" class="result-count"></span></div><div id="report-chart" class="report-chart"></div></section>
+        <div class="report-columns report-work">
+          <section class="panel report-section"><div class="panel-head"><div><span class="eyebrow">TERUGBLIK</span><h2>Wat is er gedaan?</h2></div></div><div id="report-completed" class="report-list"></div></section>
+          <section class="panel report-section"><div class="panel-head"><div><span class="eyebrow">VOORUITBLIK</span><h2>Wat gaan we doen?</h2></div></div><div id="report-planned" class="report-list"></div></section>
         </div>
+        <section class="panel report-section report-new"><div class="panel-head"><div><span class="eyebrow">NIEUW GESIGNALEERD</span><h2>Nieuwe aandachtspunten</h2></div></div><div id="report-new-issues" class="report-list report-list-grid"></div></section>
       </section>
       <section id="summary" class="cards"></section>
       <section id="internal-action-panel" class="panel">

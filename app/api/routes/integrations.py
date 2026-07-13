@@ -389,7 +389,7 @@ def upsert_website_integration(
 @router.post("/websites/{website_id}/integrations/search_console/sync")
 async def synchronize_search_console(
     website_id: UUID,
-    days: int = Query(default=28, ge=1, le=90),
+    days: int = Query(default=28, ge=1, le=480),
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> dict[str, object]:
@@ -403,7 +403,7 @@ async def synchronize_search_console(
 @router.post("/websites/{website_id}/integrations/ga4/sync")
 async def synchronize_google_analytics(
     website_id: UUID,
-    days: int = Query(default=28, ge=1, le=90),
+    days: int = Query(default=28, ge=1, le=480),
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> dict[str, object]:
