@@ -72,6 +72,20 @@ def inspect_job_posting(
             )
         ]
 
+    if not jobs and _looks_like_job_detail_page(page_url, main_content or ""):
+        signals.append(
+            IssueSignal(
+                "job_posting_schema_missing",
+                "structured_data",
+                "high",
+                "Vacature mist JobPosting-schema",
+                "Deze individuele vacaturepagina is herkend aan URL en inhoud, maar bevat geen JobPosting-schema.",
+                "Voeg volledig JobPosting-schema toe met onder meer titel, omschrijving, werkgever, datum en vacaturelocatie.",
+                {"source": "url_and_page_text", "page_url": page_url},
+                confidence="medium",
+            )
+        )
+
     expiration_evidence: dict[str, object] = {}
     for job in jobs:
         signals.extend(
@@ -222,6 +236,12 @@ def _google_for_jobs_signals(
             )
         )
     return signals
+
+
+def _looks_like_job_detail_page(page_url: str | None, main_content: str) -> bool:
+    if not page_url or not JOB_DETAIL_URL_RE.search(urlsplit(page_url).path):
+        return False
+    return bool(JOB_TERMS_RE.search(main_content))
 
 
 def _missing_required_job_fields(job: dict[str, object]) -> list[str]:

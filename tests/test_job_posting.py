@@ -30,6 +30,16 @@ def test_job_posting_missing_required_fields() -> None:
     ]
 
 
+def test_recognized_vacancy_without_schema_gets_google_for_jobs_issue() -> None:
+    signals = inspect_job_posting(
+        [],
+        page_url="https://example.com/over/vacatures/seo-specialist",
+        main_content="Deze vacature is voor een SEO specialist. Solliciteer direct.",
+    )
+
+    assert [signal.issue_type for signal in signals] == ["job_posting_schema_missing"]
+
+
 def test_google_for_jobs_validation_detects_remote_and_application_problems() -> None:
     signals = inspect_job_posting(
         [

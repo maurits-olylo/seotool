@@ -8,6 +8,7 @@ HTML_ONLY_ISSUE_TYPES = {
     "canonical_other_url",
     "conflicting_robots",
     "expired_job_posting",
+    "job_posting_schema_missing",
     "job_posting_missing_fields",
     "job_posting_invalid_dates",
     "job_posting_missing_application",
