@@ -70,3 +70,12 @@ de crawl afkapt, wordt de run `partially_succeeded` en blijven bestaande orphan-
 Niet-HTML-assets blijven als URL en linkdoel bewaard, maar komen niet in de HTML-crawlwachtrij.
 Afbeeldingen en documenten krijgen een lichte HEAD-controle. Grote afbeeldingen (meer dan 2 MB) en
 documenten (meer dan 5 MB) leveren afzonderlijke issues op zonder de volledige bestanden te downloaden.
+
+## Vacaturemonitor
+
+`job_listings` bewaart de actuele, genormaliseerde toestand van herkende vacaturepagina’s per
+website en URL. Herkenning gebruikt JobPosting-schema, vacature-URL-patronen en zichtbare
+vacaturetekst. Google for Jobs-signalen blijven gewone, dedupliceerbare issues zodat hun bewijs,
+status en lifecycle overeenkomen met andere technische bevindingen. De interne vacatureweergave
+combineert deze blijvende vacaturegegevens met alleen actieve vacature-issues; geldige vacatures
+verschijnen daardoor ook wanneer zij geen issue veroorzaken.

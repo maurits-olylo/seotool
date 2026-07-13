@@ -11,8 +11,8 @@ const labels = {
   pending: "In wachtrij", running: "Bezig", succeeded: "Geslaagd",
   partially_succeeded: "Deels geslaagd", failed: "Mislukt", cancelled: "Geannuleerd",
 };
-const state = { currentUser: null, clients: [], websites: [], issues: [], changes: [], changeGroups: [], crawlRuns: [], exports: [], operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
-const VIEW_HASHES = {overview: "overzicht", urls: "urls", changes: "wijzigingen", operations: "beheer", organization: "organisatie", integrations: "integraties"};
+const state = { currentUser: null, clients: [], websites: [], issues: [], changes: [], changeGroups: [], jobListings: [], jobSummary: {}, crawlRuns: [], exports: [], operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
+const VIEW_HASHES = {overview: "overzicht", urls: "urls", changes: "wijzigingen", vacancies: "vacatures", operations: "beheer", organization: "organisatie", integrations: "integraties"};
 let operationsPollTimer = null;
 
 async function api(path, options = {}) {
@@ -198,7 +198,7 @@ function applyRolePermissions() {
   $("#integrations-nav").classList.toggle("hidden", !canAdmin);
   $("#organization-nav").classList.toggle("hidden", !canAdmin);
   $("#crawl-operation-card").classList.toggle("hidden", !canAdmin);
-  for (const selector of ["#urls-nav", "#changes-nav", "#operations-nav"]) $(selector).classList.toggle("hidden", isClient);
+  for (const selector of ["#urls-nav", "#changes-nav", "#vacancies-nav", "#operations-nav"]) $(selector).classList.toggle("hidden", isClient);
   $("#overview-nav-label").textContent = isClient ? "Rapportage" : "Overzicht";
   $("#overview-eyebrow").textContent = isClient ? "SEO-RAPPORTAGE" : "PRODUCTIE";
   $("#overview-title").textContent = isClient ? "Organische groei & SEO" : "Technische SEO-acties";
@@ -212,7 +212,7 @@ function applyRolePermissions() {
   $("#client-status-label").classList.toggle("hidden", !isClient);
   $("#invitation-role").querySelector('option[value="admin"]').disabled = state.currentUser?.role !== "superuser";
   $("#current-user").textContent = state.currentUser?.email || "Technische toegang";
-  if (isClient && ["#urls", "#wijzigingen", "#beheer", "#organisatie", "#integraties"].includes(window.location.hash)) window.location.hash = "#overzicht";
+  if (isClient && ["#urls", "#wijzigingen", "#vacatures", "#beheer", "#organisatie", "#integraties"].includes(window.location.hash)) window.location.hash = "#overzicht";
   else if (!canAdmin && ["#organisatie", "#integraties"].includes(window.location.hash)) window.location.hash = "#overzicht";
 }
 
@@ -524,7 +524,7 @@ async function pollIntegrationHistory(websiteId) {
 }
 
 function showView(view, updateHash = true) {
-  for (const name of ["overview", "urls", "changes", "operations", "organization", "integrations"]) {
+  for (const name of ["overview", "urls", "changes", "vacancies", "operations", "organization", "integrations"]) {
     $(`#${name}-view`).classList.toggle("hidden", name !== view);
     $(`#${name}-nav`).classList.toggle("nav-active", name === view);
   }
@@ -532,6 +532,7 @@ function showView(view, updateHash = true) {
   if (view === "organization") loadOrganization();
   if (view === "urls") renderUrls();
   if (view === "changes") loadChanges();
+  if (view === "vacancies") loadJobListings();
   if (view === "operations") { loadOperations(); startOperationsPolling(); } else stopOperationsPolling();
   if (updateHash) window.history.replaceState({}, "", `#${VIEW_HASHES[view]}`);
 }
@@ -575,6 +576,41 @@ async function loadAllUrls(websiteId) {
     urls.push(...batch);
     if (batch.length < 1000) return urls;
   }
+}
+
+const vacancyLifecycleLabels = {active: "Actief", expiring_soon: "Loopt bijna af", expired: "Verlopen", removed: "Verwijderd", redirected: "Doorgestuurd"};
+const vacancyValidationLabels = {error: "Fout", warning: "Waarschuwing", valid: "Geldig", not_available: "Geen schema"};
+
+async function loadJobListings() {
+  const websiteId = $("#website-select").value;
+  if (!websiteId) return;
+  const result = await api(`/api/v1/websites/${websiteId}/job-listings`);
+  state.jobListings = result.job_listings || [];
+  state.jobSummary = result.summary || {};
+  $("#vacancies-website-name").textContent = $("#website-select").selectedOptions[0]?.textContent || "de website";
+  renderJobListings();
+}
+
+function renderJobListings() {
+  const query = $("#vacancy-search").value.trim().toLowerCase();
+  const lifecycle = $("#vacancy-status-filter").value;
+  const validation = $("#vacancy-validation-filter").value;
+  state.vacancyFiltered = state.jobListings.filter((listing) => {
+    const searchable = `${listing.title || ""} ${listing.url || ""} ${listing.employer || ""}`.toLowerCase();
+    return (!query || searchable.includes(query)) && (!lifecycle || listing.lifecycle_status === lifecycle) && (!validation || listing.validation_status === validation);
+  });
+  const summary = state.jobSummary || {};
+  $("#vacancy-summary").innerHTML = [["total", "Herkend"], ["active", "Actief"], ["expiring_soon", "Loopt bijna af"], ["needs_attention", "Met aandachtspunt"]]
+    .map(([key, label]) => `<article class="card"><strong>${Number(summary[key] || 0).toLocaleString("nl-NL")}</strong><span>${label}</span></article>`).join("");
+  $("#vacancy-result-count").textContent = `${state.vacancyFiltered.length} vacatures`;
+  $("#vacancy-rows").innerHTML = state.vacancyFiltered.map((listing) => {
+    const date = listing.valid_through ? `Geldig t/m ${new Date(`${listing.valid_through}T12:00:00`).toLocaleDateString("nl-NL")}` : listing.date_posted ? `Geplaatst ${new Date(`${listing.date_posted}T12:00:00`).toLocaleDateString("nl-NL")}` : "Geen datum in schema";
+    const issueMarkup = listing.issues.length
+      ? listing.issues.map((issue) => `<button class="vacancy-issue ${issue.severity}" data-issue-id="${issue.id}">${escapeHtml(issue.title)}</button>`).join("")
+      : `<span class="vacancy-ok">Geen actieve vacature-issues</span>`;
+    return `<tr><td><strong>${escapeHtml(listing.title || "Naam ontbreekt")}</strong><a class="url" href="${escapeHtml(listing.url)}" target="_blank" rel="noopener">${escapeHtml(listing.url)}</a></td><td><span class="vacancy-badge lifecycle-${escapeHtml(listing.lifecycle_status)}">${escapeHtml(vacancyLifecycleLabels[listing.lifecycle_status] || listing.lifecycle_status)}</span></td><td><span class="vacancy-badge validation-${escapeHtml(listing.validation_status)}">${escapeHtml(vacancyValidationLabels[listing.validation_status] || listing.validation_status)}</span><small>${listing.has_job_posting_schema ? "JobPosting gevonden" : "Herkenning via URL en inhoud"}</small></td><td>${date}</td><td>${listing.inbound_internal_links || 0}</td><td class="vacancy-issues">${issueMarkup}</td></tr>`;
+  }).join("");
+  $("#vacancy-empty").classList.toggle("hidden", state.vacancyFiltered.length !== 0);
 }
 
 function urlIndexState(url) {
@@ -896,7 +932,7 @@ async function saveIssueStatus() {
 
 $("#logout").addEventListener("click", async () => { await fetch("/ui/logout", { method: "POST" }); window.location.assign("/"); });
 $("#client-select").addEventListener("change", async () => { await loadWebsites(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); });
-$("#website-select").addEventListener("change", async () => { state.selectedReportSnapshotId = null; await loadIssues(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); if (!$("#urls-view").classList.contains("hidden")) renderUrls(); if (!$("#changes-view").classList.contains("hidden")) await loadChanges(); if (!$("#operations-view").classList.contains("hidden")) await loadOperations(); });
+$("#website-select").addEventListener("change", async () => { state.selectedReportSnapshotId = null; await loadIssues(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); if (!$("#urls-view").classList.contains("hidden")) renderUrls(); if (!$("#changes-view").classList.contains("hidden")) await loadChanges(); if (!$("#vacancies-view").classList.contains("hidden")) await loadJobListings(); if (!$("#operations-view").classList.contains("hidden")) await loadOperations(); });
 for (const selector of ["#severity-filter", "#type-filter", "#impact-filter", "#status-filter"]) $(selector).addEventListener("change", () => { state.page = 1; render(); });
 $("#search-filter").addEventListener("input", () => { state.page = 1; render(); });
 $("#previous-page").addEventListener("click", () => { state.page -= 1; render(); });
@@ -910,10 +946,12 @@ $("#report-archive").addEventListener("click", async (event) => {
   if (event.target.closest("[data-report-live]")) { state.selectedReportSnapshotId = null; await loadClientReport(); await loadReportSnapshots(); }
 });
 $("#close-dialog").addEventListener("click", () => $("#issue-dialog").close());
+for (const dialog of document.querySelectorAll("dialog")) dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
 $("#save-status").addEventListener("click", saveIssueStatus);
 $("#overview-nav").addEventListener("click", () => showView("overview"));
 $("#urls-nav").addEventListener("click", () => showView("urls"));
 $("#changes-nav").addEventListener("click", () => showView("changes"));
+$("#vacancies-nav").addEventListener("click", () => showView("vacancies"));
 $("#operations-nav").addEventListener("click", () => showView("operations"));
 $("#organization-nav").addEventListener("click", () => showView("organization"));
 $("#integrations-nav").addEventListener("click", () => showView("integrations"));
@@ -935,6 +973,9 @@ $("#change-search").addEventListener("input", () => { state.changePage = 1; rend
 $("#change-previous-page").addEventListener("click", () => { state.changePage -= 1; renderChanges(); });
 $("#change-next-page").addEventListener("click", () => { state.changePage += 1; renderChanges(); });
 $("#change-rows").addEventListener("click", (event) => { const button = event.target.closest("[data-change-group-id]"); if (button) showChangeGroup(button.dataset.changeGroupId); });
+for (const selector of ["#vacancy-status-filter", "#vacancy-validation-filter"]) $(selector).addEventListener("change", renderJobListings);
+$("#vacancy-search").addEventListener("input", renderJobListings);
+$("#vacancy-rows").addEventListener("click", (event) => { const button = event.target.closest("[data-issue-id]"); if (button) showIssue(button.dataset.issueId); });
 $("#close-change-dialog").addEventListener("click", () => $("#change-dialog").close());
 $("#start-light-check").addEventListener("click", () => startCrawl("light_check"));
 $("#start-full-crawl").addEventListener("click", () => startCrawl("full_site_crawl"));

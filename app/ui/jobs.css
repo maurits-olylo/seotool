@@ -1,0 +1,17 @@
+.vacancy-cards { margin-bottom: 16px; }
+.vacancy-filters { display: grid; grid-template-columns: minmax(260px, 1.5fr) repeat(2, minmax(180px, .7fr); gap: 10px; padding: 16px 24px; border-bottom: 1px solid var(--line); background: #f9faf9; }
+.vacancy-filters input { min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.vacancy-table td:first-child { min-width: 330px; }
+.vacancy-table td:nth-child(6) { min-width: 260px; }
+.vacancy-table small { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; }
+.vacancy-badge { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #edf1ee; color: #45564d; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.lifecycle-active, .validation-valid { background: #e7f6ec; color: #087a43; }
+.lifecycle-expiring_soon, .validation-warning { background: #fff4df; color: #9a6200; }
+.lifecycle-expired, .lifecycle-removed, .validation-error { background: #fff0ed; color: #b42318; }
+.vacancy-issue { display: block; width: 100%; margin: 3px 0; padding: 5px 0; border: 0; background: transparent; color: var(--green); text-align: left; font: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; }
+.vacancy-issue.high { color: var(--red); }
+.vacancy-issue.medium { color: var(--amber); }
+.vacancy-ok { color: var(--muted); font-size: 13px; }
+dialog { max-height: calc(100vh - 32px); overflow: auto; }
+dialog .dialog-close { position: sticky; top: -18px; z-index: 2; float: right; margin: -18px -18px 0 16px; border-radius: 8px; background: #fff; line-height: 1.2; }
+@media(max-width:850px) { .vacancy-filters { grid-template-columns: 1fr; padding: 14px; } }

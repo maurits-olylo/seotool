@@ -19,12 +19,13 @@
   <link rel="stylesheet" href="/ui/assets/member-management.css">
   <link rel="stylesheet" href="/ui/assets/report-performance.css?v=20260713-6">
   <link rel="stylesheet" href="/ui/assets/key-events.css">
+  <link rel="stylesheet" href="/ui/assets/jobs.css">
 </head>
 <body>
   <div id="app" class="app-shell hidden">
     <aside>
       <div><span class="eyebrow">THACT</span><h2>SEO Monitor</h2><small id="current-user"></small></div>
-      <nav><button id="overview-nav" class="nav-active"><span id="overview-nav-label">Overzicht</span></button><button id="urls-nav">URLs</button><button id="changes-nav">Wijzigingen</button><button id="operations-nav">Beheer</button><button id="organization-nav">Organisatie</button><button id="integrations-nav">Integraties</button></nav>
+      <nav><button id="overview-nav" class="nav-active"><span id="overview-nav-label">Overzicht</span></button><button id="urls-nav">URLs</button><button id="changes-nav">Wijzigingen</button><button id="vacancies-nav">Vacatures</button><button id="operations-nav">Beheer</button><button id="organization-nav">Organisatie</button><button id="integrations-nav">Integraties</button></nav>
       <section id="report-archive" class="report-archive hidden"><span class="eyebrow">RAPPORTAGES</span><button type="button" data-report-live>Live status</button><div id="report-archive-list"></div></section>
       <button id="logout" class="quiet">Uitloggen</button>
     </aside>
@@ -92,6 +93,16 @@
           <div class="table-wrap"><table class="change-table"><thead><tr><th>Gedetecteerd</th><th>URL</th><th>Samenvatting</th><th>Onderdelen</th><th></th></tr></thead><tbody id="change-rows"></tbody></table></div>
           <p id="change-empty" class="empty hidden">Geen wijzigingen gevonden.</p>
           <footer class="pager"><button id="change-previous-page" class="page-button">Vorige</button><span id="change-page-label"></span><button id="change-next-page" class="page-button">Volgende</button></footer>
+        </section>
+      </section>
+      <section id="vacancies-view" class="hidden">
+        <header><div><span class="eyebrow">VACATUREMONITOR</span><h1>Vacatures</h1><p class="intro">Actuele vacatures, lifecycle en Google for Jobs-controles voor <strong id="vacancies-website-name"></strong>.</p></div></header>
+        <section id="vacancy-summary" class="cards vacancy-cards"></section>
+        <section class="panel vacancies-panel">
+          <div class="panel-head"><div><span class="eyebrow">VACATUREOVERZICHT</span><h2>Herkende vacaturepagina’s</h2></div><span id="vacancy-result-count" class="result-count"></span></div>
+          <div class="vacancy-filters"><input id="vacancy-search" type="search" placeholder="Zoek op vacature, URL of werkgever" aria-label="Zoek vacatures"><select id="vacancy-status-filter" aria-label="Vacaturestatus"><option value="">Alle statussen</option><option value="active">Actief</option><option value="expiring_soon">Loopt bijna af</option><option value="expired">Verlopen</option><option value="removed">Verwijderd</option><option value="redirected">Doorgestuurd</option></select><select id="vacancy-validation-filter" aria-label="Google for Jobs-validatie"><option value="">Alle validaties</option><option value="error">Fouten</option><option value="warning">Waarschuwingen</option><option value="valid">Geldig schema</option><option value="not_available">Geen schema</option></select></div>
+          <div class="table-wrap"><table class="vacancy-table"><thead><tr><th>Vacature</th><th>Lifecycle</th><th>Google for Jobs</th><th>Datum</th><th>Interne links</th><th>Bevindingen</th></tr></thead><tbody id="vacancy-rows"></tbody></table></div>
+          <p id="vacancy-empty" class="empty hidden">Geen vacatures gevonden.</p>
         </section>
       </section>
       <section id="operations-view" class="hidden">
