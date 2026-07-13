@@ -1,7 +1,16 @@
+import re
 from dataclasses import dataclass
 from urllib.parse import parse_qs, urlsplit
 
 from app.models.crawl import UrlSnapshot
+
+THIN_CONTENT_WORD_LIMIT = 150
+FUNCTIONAL_PATH_RE = re.compile(
+    r"/(?:(?:bedankt|bevestiging|confirmation|thank-you|success|succes)(?:-[^/]*)?|"
+    r"inloggen|login|uitloggen|logout|winkelwagen|cart|checkout|afrekenen)(?:/|$)",
+    re.IGNORECASE,
+)
+VARIANT_QUERY_PARAMETERS = {"c", "filter", "page", "paged", "p", "q", "search", "sort"}
 
 SNAPSHOT_ISSUE_TYPES = {
     "http_404",
@@ -117,15 +126,21 @@ def inspect_snapshot(snapshot: UrlSnapshot) -> list[IssueSignal]:
                 count=len(h1_values),
             )
         )
-    if status == 200 and snapshot.word_count is not None and snapshot.word_count < 50:
+    if _should_report_thin_content(snapshot):
+        word_count = snapshot.word_count or 0
+        nearly_empty = word_count < 30
         signals.append(
             _signal(
                 "thin_content",
                 "onpage",
-                "low",
-                "Zeer weinig hoofdcontent",
-                "Controleer of de pagina voldoende nuttige hoofdcontent bevat.",
-                word_count=snapshot.word_count,
+                "medium" if nearly_empty else "low",
+                "Nagenoeg lege pagina" if nearly_empty else "Beperkte hoofdcontent",
+                "Controleer of deze indexeerbare pagina de zoekvraag zelfstandig en volledig "
+                "beantwoordt. Een laag woordenaantal is een controlesignaal, "
+                "geen automatische fout.",
+                word_count=word_count,
+                threshold=THIN_CONTENT_WORD_LIMIT,
+                content_level="nearly_empty" if nearly_empty else "limited",
                 confidence="medium",
             )
         )
@@ -167,6 +182,27 @@ def inspect_snapshot(snapshot: UrlSnapshot) -> list[IssueSignal]:
             )
         )
     return signals
+
+
+def _should_report_thin_content(snapshot: UrlSnapshot) -> bool:
+    if (
+        snapshot.status_code != 200
+        or snapshot.redirect_chain
+        or snapshot.is_indexable is False
+        or snapshot.word_count is None
+        or snapshot.word_count >= THIN_CONTENT_WORD_LIMIT
+    ):
+        return False
+    page_url = snapshot.final_url or snapshot.requested_url
+    if not page_url:
+        return True
+    parsed = urlsplit(page_url)
+    if FUNCTIONAL_PATH_RE.search(parsed.path):
+        return False
+    query_parameters = set(parse_qs(parsed.query, keep_blank_values=True))
+    if query_parameters & VARIANT_QUERY_PARAMETERS:
+        return False
+    return not bool({"SearchResultsPage"} & set(snapshot.schema_types or []))
 
 
 def _canonical_difference_is_actionable(page_url: str, canonical: str) -> bool:

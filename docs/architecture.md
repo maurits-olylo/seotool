@@ -73,6 +73,11 @@ Niet-HTML-assets blijven als URL en linkdoel bewaard, maar komen niet in de HTML
 Afbeeldingen en documenten krijgen een lichte HEAD-controle. Grote afbeeldingen (meer dan 2 MB) en
 documenten (meer dan 5 MB) leveren afzonderlijke issues op zonder de volledige bestanden te downloaden.
 
+Thin content is een controlesignaal voor indexeerbare HTML-pagina's met minder dan 150 woorden
+hoofdcontent. Nagenoeg lege pagina's krijgen meer urgentie. Niet-indexeerbare pagina's,
+zoek-/filtervarianten en duidelijke bevestigings-, login- en checkoutpagina's worden uitgesloten om
+functionele pagina's niet als contentfout te behandelen.
+
 ## Vacaturemonitor
 
 `job_listings` bewaart de actuele, genormaliseerde toestand van herkende vacaturepagina’s per

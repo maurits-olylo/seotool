@@ -36,10 +36,78 @@ def test_detects_onpage_and_indexation_signals() -> None:
         "missing_title",
         "missing_meta_description",
         "missing_h1",
-        "thin_content",
         "unexpected_noindex",
         "canonical_other_url",
     }
+
+
+def test_reports_limited_content_only_for_indexable_content_pages() -> None:
+    snapshot = UrlSnapshot(
+        requested_url="https://example.com/diensten/seo",
+        final_url="https://example.com/diensten/seo",
+        status_code=200,
+        title="SEO",
+        meta_description="SEO-diensten",
+        headings={"h1": ["SEO"]},
+        word_count=100,
+        is_indexable=True,
+        redirect_chain=[],
+    )
+
+    signal = next(item for item in inspect_snapshot(snapshot) if item.issue_type == "thin_content")
+
+    assert signal.title == "Beperkte hoofdcontent"
+    assert signal.severity == "low"
+    assert signal.evidence == {
+        "word_count": 100,
+        "threshold": 150,
+        "content_level": "limited",
+    }
+
+
+def test_reports_nearly_empty_indexable_page_with_more_urgency() -> None:
+    snapshot = UrlSnapshot(
+        requested_url="https://example.com/diensten/seo",
+        final_url="https://example.com/diensten/seo",
+        status_code=200,
+        title="SEO",
+        headings={"h1": ["SEO"]},
+        word_count=12,
+        is_indexable=True,
+        redirect_chain=[],
+    )
+
+    signal = next(item for item in inspect_snapshot(snapshot) if item.issue_type == "thin_content")
+
+    assert signal.title == "Nagenoeg lege pagina"
+    assert signal.severity == "medium"
+    assert signal.evidence["content_level"] == "nearly_empty"
+
+
+def test_ignores_thin_confirmation_and_filter_pages() -> None:
+    snapshots = [
+        UrlSnapshot(
+            requested_url="https://example.com/bevestiging-aanvraag",
+            final_url="https://example.com/bevestiging-aanvraag",
+            status_code=200,
+            word_count=10,
+            is_indexable=True,
+            redirect_chain=[],
+        ),
+        UrlSnapshot(
+            requested_url="https://example.com/nieuws?page=2",
+            final_url="https://example.com/nieuws?page=2",
+            status_code=200,
+            word_count=10,
+            is_indexable=True,
+            redirect_chain=[],
+        ),
+    ]
+
+    for snapshot in snapshots:
+        assert "thin_content" not in {
+            signal.issue_type for signal in inspect_snapshot(snapshot)
+        }
 
 
 def test_does_not_report_final_page_onpage_issues_on_redirect_source() -> None:
