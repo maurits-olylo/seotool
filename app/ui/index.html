@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="/ui/assets/operations.css">
   <link rel="stylesheet" href="/ui/assets/organization.css">
   <link rel="stylesheet" href="/ui/assets/report.css">
+  <link rel="stylesheet" href="/ui/assets/member-management.css">
 </head>
 <body>
   <div id="app" class="app-shell hidden">
@@ -98,7 +99,7 @@
           <form id="website-form" class="panel organization-card"><span class="eyebrow">WEBSITE</span><h2>Nieuwe website</h2><label>Klant<select id="new-website-client" required></select></label><label>Naam<input id="new-website-name" required maxlength="255"></label><label>Basis-URL<input id="new-website-url" type="url" required></label><button class="primary-button" type="submit">Website toevoegen</button><p id="website-form-message" class="operation-message"></p></form>
           <form id="invitation-form" class="panel organization-card"><span class="eyebrow">TEAM</span><h2>Gebruiker uitnodigen</h2><label>Klant<select id="invitation-client" required></select></label><label>E-mailadres<input id="invitation-email" type="email" required></label><label>Rol<select id="invitation-role"><option value="user">User</option><option value="client">Client (alleen rapportage)</option><option value="admin">Admin</option></select></label><button class="primary-button" type="submit">Uitnodiging maken</button><p id="invitation-form-message" class="operation-message"></p><div id="invitation-link-wrap" class="invitation-link hidden"><input id="invitation-link" readonly><button id="copy-invitation" type="button" class="detail-button">Kopieer link</button></div></form>
         </div>
-        <section class="panel organization-members"><div class="panel-head"><div><span class="eyebrow">TOEGANG</span><h2>Leden van geselecteerde klant</h2></div></div><div class="table-wrap"><table><thead><tr><th>Naam</th><th>E-mail</th><th>Rol</th><th>Status</th></tr></thead><tbody id="member-rows"></tbody></table></div><p id="members-empty" class="empty hidden">Nog geen leden toegewezen.</p></section>
+        <section class="panel organization-members"><div class="panel-head"><div><span class="eyebrow">TOEGANG</span><h2>Leden van geselecteerde klant</h2><p>Wijzig rollen of trek toegang tot deze klant in.</p></div></div><div class="table-wrap"><table><thead><tr><th>Naam</th><th>E-mail</th><th>Rol</th><th>Status</th><th></th></tr></thead><tbody id="member-rows"></tbody></table></div><p id="members-empty" class="empty hidden">Nog geen leden toegewezen.</p><p id="members-message" class="operation-message"></p></section>
       </section>
       <section id="integrations-view" class="hidden">
         <header><div><span class="eyebrow">DATABRONNEN</span><h1>Integraties</h1><p class="intro">Koppel databronnen op klantniveau en wijs properties toe aan websites.</p></div></header>

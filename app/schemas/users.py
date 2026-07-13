@@ -63,3 +63,7 @@ class ClientMemberRead(BaseModel):
     global_role: str
     client_role: str
     is_active: bool
+
+
+class ClientMemberUpdate(BaseModel):
+    role: str = Field(pattern="^(admin|user|client)$")

@@ -13,6 +13,7 @@ from app.db.session import get_db
 from app.models.user import ClientMembership, User, UserInvitation
 from app.schemas.users import (
     ClientMemberRead,
+    ClientMemberUpdate,
     CurrentUserRead,
     InvitationAccept,
     InvitationCreate,
@@ -110,6 +111,85 @@ def list_client_members(
         }
         for user, membership in rows
     ]
+
+
+def _sync_global_role(db: Session, user: User) -> None:
+    roles = set(
+        db.scalars(select(ClientMembership.role).where(ClientMembership.user_id == user.id))
+    )
+    user.is_active = bool(roles)
+    if "admin" in roles:
+        user.role = "admin"
+    elif "user" in roles:
+        user.role = "user"
+    elif "client" in roles:
+        user.role = "client"
+
+
+@router.patch("/clients/{client_id}/members/{user_id}", response_model=ClientMemberRead)
+def update_client_member(
+    client_id: UUID,
+    user_id: UUID,
+    payload: ClientMemberUpdate,
+    principal: Principal = Depends(require_api_key),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    require_client_access(db, principal, client_id, admin=True)
+    if principal.user_id == user_id:
+        raise HTTPException(status_code=409, detail="Je kunt je eigen rol niet wijzigen")
+    user = db.get(User, user_id)
+    membership = db.scalar(
+        select(ClientMembership).where(
+            ClientMembership.client_id == client_id,
+            ClientMembership.user_id == user_id,
+        )
+    )
+    if not user or not membership:
+        raise HTTPException(status_code=404, detail="Gebruiker niet gevonden")
+    if user.role == "superuser":
+        raise HTTPException(status_code=403, detail="De superuser kan niet worden gewijzigd")
+    membership.role = payload.role
+    _sync_global_role(db, user)
+    db.commit()
+    db.refresh(user)
+    return {
+        "id": user.id,
+        "email": user.email,
+        "display_name": user.display_name,
+        "global_role": user.role,
+        "client_role": membership.role,
+        "is_active": user.is_active,
+    }
+
+
+@router.delete(
+    "/clients/{client_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+def delete_client_member(
+    client_id: UUID,
+    user_id: UUID,
+    principal: Principal = Depends(require_api_key),
+    db: Session = Depends(get_db),
+) -> Response:
+    require_client_access(db, principal, client_id, admin=True)
+    if principal.user_id == user_id:
+        raise HTTPException(status_code=409, detail="Je kunt je eigen toegang niet verwijderen")
+    user = db.get(User, user_id)
+    membership = db.scalar(
+        select(ClientMembership).where(
+            ClientMembership.client_id == client_id,
+            ClientMembership.user_id == user_id,
+        )
+    )
+    if not user or not membership:
+        raise HTTPException(status_code=404, detail="Gebruiker niet gevonden")
+    if user.role == "superuser":
+        raise HTTPException(status_code=403, detail="De superuser kan niet worden verwijderd")
+    db.delete(membership)
+    db.flush()
+    _sync_global_role(db, user)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 def _valid_invitation(token: str, db: Session) -> UserInvitation:

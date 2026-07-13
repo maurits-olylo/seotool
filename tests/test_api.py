@@ -211,6 +211,64 @@ def test_client_role_is_report_only(client: TestClient) -> None:
     ).status_code == 403
 
 
+def test_admin_can_manage_other_client_members(client: TestClient) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Managed customer"}).json()
+    with SessionLocal() as db:
+        admin = User(
+            email="admin@example.com",
+            role="admin",
+            password_hash=hash_password("Admin-secure-password-1!"),
+        )
+        member = User(
+            email="managed@example.com",
+            role="client",
+            password_hash=hash_password("Managed-secure-password-1!"),
+        )
+        db.add_all([admin, member])
+        db.flush()
+        db.add_all(
+            [
+                ClientMembership(
+                    user_id=admin.id,
+                    client_id=UUID(customer["id"]),
+                    role="admin",
+                ),
+                ClientMembership(
+                    user_id=member.id,
+                    client_id=UUID(customer["id"]),
+                    role="client",
+                ),
+            ]
+        )
+        db.commit()
+        admin_id = admin.id
+        member_id = member.id
+
+    from app.main import app
+
+    browser = TestClient(app)
+    assert browser.post(
+        "/ui/login",
+        json={"email": "admin@example.com", "password": "Admin-secure-password-1!"},
+    ).status_code == 204
+    upgraded = browser.patch(
+        f"/api/v1/clients/{customer['id']}/members/{member_id}",
+        json={"role": "user"},
+    )
+    assert upgraded.status_code == 200
+    assert upgraded.json()["client_role"] == "user"
+    assert browser.patch(
+        f"/api/v1/clients/{customer['id']}/members/{admin_id}",
+        json={"role": "client"},
+    ).status_code == 409
+    assert browser.delete(
+        f"/api/v1/clients/{customer['id']}/members/{member_id}"
+    ).status_code == 204
+    with SessionLocal() as db:
+        removed = db.get(User, member_id)
+        assert removed and removed.is_active is False
+
+
 def test_superuser_invites_user_for_client(client: TestClient) -> None:
     customer = client.post("/api/v1/clients", json={"name": "Invitation client"}).json()
     with SessionLocal() as db:

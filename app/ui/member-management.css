@@ -1,0 +1,22 @@
+.organization-members .panel-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+.organization-members .member-role {
+  min-width: 120px;
+}
+
+.organization-members .member-remove {
+  color: var(--red);
+}
+
+.organization-members button:disabled,
+.organization-members select:disabled {
+  cursor: not-allowed;
+  opacity: .5;
+}
+
+.organization-members > .operation-message {
+  padding: 0 24px 18px;
+}

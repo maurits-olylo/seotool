@@ -136,8 +136,34 @@ async function loadMembers() {
   const clientId = $("#invitation-client").value;
   if (!clientId) { $("#member-rows").innerHTML = ""; return; }
   const members = await api(`/api/v1/clients/${clientId}/members`);
-  $("#member-rows").innerHTML = members.map((member) => `<tr><td>${escapeHtml(member.display_name || "—")}</td><td>${escapeHtml(member.email)}</td><td>${escapeHtml(member.client_role)}</td><td>${member.is_active ? "Actief" : "Geblokkeerd"}</td></tr>`).join("");
+  $("#member-rows").innerHTML = members.map((member) => {
+    const isSelf = member.id === state.currentUser?.id;
+    const roles = [["admin","Admin"],["user","User"],["client","Client"]];
+    const roleOptions = roles.map(([value, label]) => `<option value="${value}" ${member.client_role === value ? "selected" : ""}>${label}</option>`).join("");
+    return `<tr><td>${escapeHtml(member.display_name || "—")}</td><td>${escapeHtml(member.email)}</td><td><select class="member-role" data-member-id="${member.id}" ${isSelf ? "disabled" : ""}>${roleOptions}</select></td><td>${member.is_active ? "Actief" : "Geblokkeerd"}</td><td><button class="member-remove detail-button" data-member-id="${member.id}" data-member-email="${escapeHtml(member.email)}" ${isSelf ? "disabled" : ""}>Verwijder</button></td></tr>`;
+  }).join("");
   $("#members-empty").classList.toggle("hidden", members.length !== 0);
+}
+
+async function updateMemberRole(memberId, role) {
+  const clientId = $("#invitation-client").value;
+  const message = $("#members-message");
+  try {
+    await api(`/api/v1/clients/${clientId}/members/${memberId}`, {method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({role})});
+    message.textContent = "Rol bijgewerkt.";
+    await loadMembers();
+  } catch (error) { message.textContent = error.message; await loadMembers(); }
+}
+
+async function removeMember(memberId, email) {
+  if (!window.confirm(`Toegang voor ${email} tot deze klant verwijderen?`)) return;
+  const clientId = $("#invitation-client").value;
+  const message = $("#members-message");
+  try {
+    await api(`/api/v1/clients/${clientId}/members/${memberId}`, {method:"DELETE"});
+    message.textContent = "Toegang verwijderd.";
+    await loadMembers();
+  } catch (error) { message.textContent = error.message; }
 }
 
 async function createClient(event) {
@@ -718,6 +744,8 @@ $("#client-form").addEventListener("submit", createClient);
 $("#website-form").addEventListener("submit", createWebsite);
 $("#invitation-form").addEventListener("submit", createInvitation);
 $("#invitation-client").addEventListener("change", loadMembers);
+$("#member-rows").addEventListener("change", (event) => { const select = event.target.closest(".member-role"); if (select) updateMemberRole(select.dataset.memberId, select.value); });
+$("#member-rows").addEventListener("click", (event) => { const button = event.target.closest(".member-remove"); if (button) removeMember(button.dataset.memberId, button.dataset.memberEmail); });
 $("#copy-invitation").addEventListener("click", async () => { await navigator.clipboard.writeText($("#invitation-link").value); $("#invitation-form-message").textContent = "Link gekopieerd."; });
 for (const selector of ["#url-status-filter", "#url-index-filter", "#url-depth-filter"]) $(selector).addEventListener("change", () => { state.urlPage = 1; renderUrls(); });
 $("#url-search").addEventListener("input", () => { state.urlPage = 1; renderUrls(); });
