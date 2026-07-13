@@ -179,8 +179,8 @@ function applyRolePermissions() {
   $("#crawl-operation-card").classList.toggle("hidden", !canAdmin);
   for (const selector of ["#urls-nav", "#changes-nav", "#operations-nav"]) $(selector).classList.toggle("hidden", isClient);
   $("#overview-nav-label").textContent = isClient ? "Rapportage" : "Overzicht";
-  $("#overview-eyebrow").textContent = isClient ? "KLANTRAPPORTAGE" : "PRODUCTIE";
-  $("#overview-title").textContent = isClient ? "SEO-status" : "Technische SEO-acties";
+  $("#overview-eyebrow").textContent = isClient ? "SEO-RAPPORTAGE" : "PRODUCTIE";
+  $("#overview-title").textContent = isClient ? "Organische groei & SEO" : "Technische SEO-acties";
   $("#client-report-intro").classList.toggle("hidden", !isClient);
   $("#client-report").classList.toggle("hidden", !isClient);
   $("#report-archive").classList.toggle("hidden", !isClient);
@@ -193,6 +193,14 @@ function applyRolePermissions() {
   $("#current-user").textContent = state.currentUser?.email || "Technische toegang";
   if (isClient && ["#urls", "#wijzigingen", "#beheer", "#organisatie", "#integraties"].includes(window.location.hash)) window.location.hash = "#overzicht";
   else if (!canAdmin && ["#organisatie", "#integraties"].includes(window.location.hash)) window.location.hash = "#overzicht";
+}
+
+function updateReportSelectors() {
+  const isClient = state.currentUser?.role === "client";
+  const showWebsiteSelector = !isClient || state.websites.length > 1;
+  $("#client-selector-wrap").classList.toggle("hidden", isClient);
+  $("#website-selector-wrap").classList.toggle("hidden", !showWebsiteSelector);
+  $("#report-selectors").classList.toggle("hidden", isClient && !showWebsiteSelector);
 }
 
 async function loadOrganization() {
@@ -276,6 +284,7 @@ async function loadWebsites() {
   if (!clientId) { state.websites = []; state.issues = []; render(); return; }
   state.websites = await api(`/api/v1/websites?client_id=${clientId}`);
   $("#website-select").innerHTML = state.websites.map(option).join("");
+  updateReportSelectors();
   await loadIssues();
 }
 
