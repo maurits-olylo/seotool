@@ -19,6 +19,7 @@ from app.models.integrations import (
 from app.models.issues import ActivityLog, Change, Issue
 from app.models.reporting import MonthlyReportSnapshot
 from app.services.authorization import require_website_access
+from app.services.search_insights import build_search_insights
 
 router = APIRouter(tags=["reports"])
 Period = Literal["month", "quarter", "half_year", "year", "ytd"]
@@ -331,6 +332,9 @@ def build_client_report(
                 )
             ],
         },
+        "search_insights": build_search_insights(
+            db, website_id, start, end, previous_start, previous_end
+        ),
         "work_completed": {
             "technically_verified": completed,
             "activities": [

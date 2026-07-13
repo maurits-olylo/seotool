@@ -81,6 +81,7 @@ function renderClientReport() {
     ? `<div class="panel-head"><div><span class="eyebrow">CONVERSIES</span><h2>Gekwalificeerde leads uit organic</h2></div></div><div class="conversion-breakdown">${conversionEvents.map((event) => `<article><strong>${Number(event.key_events).toLocaleString("nl-NL")}</strong><span>${escapeHtml(event.event_name)}</span></article>`).join("") || `<p class="report-empty">Geen gekwalificeerde leads in deze periode.</p>`}</div>`
     : `<div class="panel-head"><div><span class="eyebrow">CONVERSIES</span><h2>Gekwalificeerde leads nog niet ingesteld</h2><p>Selecteer als admin de relevante GA4-events bij Integraties.</p></div></div>`;
   renderReportInsights(report, signal);
+  renderSearchInsights(report.search_insights || []);
 
   const months = (report.monthly || [])
     .filter((month) => month.month !== String(report.end_date || "").slice(0, 7))
@@ -116,6 +117,27 @@ function renderReportInsights(report, signal) {
   const action = newIssues ? `${newIssues} nieuwe aandachtspunten; ${resolved} issues opgelost of geverifieerd.` : planned ? `${planned} acties gepland of in uitvoering; ${resolved} issues opgelost of geverifieerd.` : `${resolved} issues opgelost of geverifieerd; geen nieuwe technische aandachtspunten.`;
   $("#report-insights").innerHTML = [["PRESTATIE", performance], ["ZICHTBAARHEID", visibility], ["ACTIE", action]]
     .map(([label, text]) => `<article><span>${label}</span><p>${text}</p></article>`).join("");
+}
+
+function renderSearchInsights(insights) {
+  const panel = $("#report-search-insights");
+  const header = '<div class="panel-head"><div><span class="eyebrow">ZOEKZICHTBAARHEID</span><h2>Zoekwoordkansen</h2>';
+  if (!insights.length) {
+    panel.innerHTML = header + '<p>Nog geen duidelijke kansen binnen de beschikbare GSC-querydata.</p></div></div>';
+    return;
+  }
+  const labels = {cannibalization: "Meerdere pagina’s", ctr_opportunity: "CTR-kans", declining_query: "Daling"};
+  const items = insights.map((insight) => {
+    const link = insight.url
+      ? '<a href="' + escapeHtml(insight.url) + '" target="_blank" rel="noopener">Bekijk pagina</a>'
+      : "";
+    return '<article class="report-list-item"><span class="badge">' +
+      escapeHtml(labels[insight.type] || "Kans") + '</span><strong>' +
+      escapeHtml(insight.title) + '</strong><p>' + escapeHtml(insight.description) +
+      '</p>' + link + '</article>';
+  }).join("");
+  panel.innerHTML = header + '<p>Gebaseerd op beschikbare Search Console-querydata.</p></div></div>' +
+    '<div class="report-list report-list-grid">' + items + '</div>';
 }
 
 function renderTrendChart(months, metric) {

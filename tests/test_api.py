@@ -379,6 +379,7 @@ def test_client_report_contains_performance_and_work(client: TestClient) -> None
     assert report.json()["monthly"]
     assert report.json()["primary_metric"] == "key_events"
     assert report.json()["comparison_context"] == "dezelfde dagen in de vorige maand"
+    assert report.json()["search_insights"] == []
 
 
 def test_report_ytd_and_half_year_use_year_over_year_windows() -> None:
