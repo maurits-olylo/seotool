@@ -3,7 +3,7 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,7 @@ from app.models.integrations import (
     WebsiteIntegration,
 )
 from app.models.issues import ActivityLog, Change, Issue
+from app.models.reporting import MonthlyReportSnapshot
 from app.services.authorization import require_website_access
 
 router = APIRouter(tags=["reports"])
@@ -68,16 +69,15 @@ def _issue_summary(issue: Issue) -> dict[str, object]:
     }
 
 
-@router.get("/websites/{website_id}/client-report")
-def client_report(
+def build_client_report(
     website_id: UUID,
-    period: Period = Query(default="month"),
-    db: Session = Depends(get_db),
-    principal: Principal = Depends(require_api_key),
+    period: str,
+    start: date,
+    end: date,
+    previous_start: date,
+    previous_end: date,
+    db: Session,
 ) -> dict[str, object]:
-    require_website_access(db, principal, website_id)
-    end = date.today() - timedelta(days=1)
-    start, _, previous_start, previous_end = _period_dates(period, end)
     daily: dict[date, dict[str, float]] = defaultdict(dict)
     gsc_dates: list[date] = []
     ga_dates: list[date] = []
@@ -274,3 +274,69 @@ def client_report(
         "planned": [_issue_summary(issue) for issue in planned],
         "new_issues": [_issue_summary(issue) for issue in new_issues],
     }
+
+
+@router.get("/websites/{website_id}/client-report")
+def client_report(
+    website_id: UUID,
+    period: Period = Query(default="month"),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, object]:
+    require_website_access(db, principal, website_id)
+    end = date.today() - timedelta(days=1)
+    start, _,previous_start, previous_end = _period_dates(period, end)
+    return build_client_report(
+        website_id,
+        period,
+        start,
+        end,
+        previous_start,
+        previous_end,
+        db,
+    )
+
+
+@router.get("/websites/{website_id}/monthly-reports")
+def list_monthly_reports(
+    website_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> list[dict[str, object]]:
+    require_website_access(db, principal, website_id)
+    snapshots = list(
+        db.scalars(
+            select(MonthlyReportSnapshot)
+            .where(MonthlyReportSnapshot.website_id == website_id)
+            .order_by(MonthlyReportSnapshot.period_start.desc())
+            .limit(36)
+        )
+    )
+    return [
+        {
+            "id": str(snapshot.id),
+            "period_start": snapshot.period_start,
+            "period_end": snapshot.period_end,
+            "generated_at": snapshot.generated_at,
+        }
+        for snapshot in snapshots
+    ]
+
+
+@router.get("/websites/{website_id}/monthly-reports/{snapshot_id}")
+def get_monthly_report(
+    website_id: UUID,
+    snapshot_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, object]:
+    require_website_access(db, principal, website_id)
+    snapshot = db.scalar(
+        select(MonthlyReportSnapshot).where(
+            MonthlyReportSnapshot.id == snapshot_id,
+            MonthlyReportSnapshot.website_id == website_id,
+        )
+    )
+    if not snapshot:
+        raise HTTPException(status_code=404, detail="Maandrapportage niet gevonden")
+    return snapshot.report_data

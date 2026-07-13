@@ -22,6 +22,20 @@
   color: #fff;
 }
 
+.report-insights { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 16px 0; background: #e5ebe7; border: 1px solid var(--line); border-radius: 13px; overflow: hidden; }
+.report-insights article { min-height: 112px; padding: 18px 22px; background: #fff; }
+.report-insights span { color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .1em; }
+.report-insights p { margin: 9px 0 0; font-weight: 700; line-height: 1.35; }
+.report-archive { margin: 18px 0 auto; }
+.report-archive > .eyebrow { display: block; margin: 0 18px 8px; color: #b7c9c0; }
+.report-archive button { display: block; width: 100%; padding: 9px 18px; border: 0; background: transparent; color: #d9e5df; text-align: left; font: inherit; cursor: pointer; }
+.report-archive button:hover, .report-archive button.active { background: #2a604f; color: #fff; }
+.report-archive details { margin-top: 4px; }
+.report-archive summary { padding: 8px 18px; color: #d9e5df; cursor: pointer; list-style: none; font-weight: 700; }
+.report-archive summary::before { content: "+"; display: inline-block; width: 16px; color: var(--lime); }
+.report-archive details[open] summary::before { content: "–"; }
+.report-archive p { margin: 8px 18px; color: #b7c9c0; font-size: 12px; line-height: 1.4; }
+
 .report-period small {
   display: block;
   margin-top: 8px;
@@ -53,6 +67,7 @@
 .report-chart-grid text, .report-line-chart g > text { fill: var(--muted); font-size: 12px; }
 .report-chart-line { fill: none; stroke: var(--green); stroke-width: 4; stroke-linejoin: round; stroke-linecap: round; }
 .report-line-chart circle { fill: #fff; stroke: var(--green); stroke-width: 3; }
+.report-line-chart::after { content: ""; }
 .report-work { margin-bottom: 16px; }
 .report-list { padding: 8px 24px 18px; }
 .report-list-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
@@ -69,4 +84,5 @@
   .report-line-chart { min-width: 680px; }
   .report-list-grid { grid-template-columns: 1fr; }
   .conversion-breakdown { grid-template-columns: 1fr 1fr; }
+  .report-insights { grid-template-columns: 1fr; }
 }

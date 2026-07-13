@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
 import pytest
@@ -19,6 +19,7 @@ from app.models.integrations import (
     WebsiteIntegration,
 )
 from app.models.issues import Issue, IssueOccurrence
+from app.models.reporting import MonthlyReportSnapshot
 from app.models.user import ClientMembership, User
 
 
@@ -375,6 +376,36 @@ def test_client_report_contains_performance_and_work(client: TestClient) -> None
     ]
     assert report.json()["comparisons"]["clicks"] == 150
     assert report.json()["monthly"]
+
+
+def test_monthly_report_snapshots_are_listed_and_readable(client: TestClient) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Archive"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": customer["id"],
+            "name": "Archive site",
+            "base_url": "https://archive.example.com",
+        },
+    ).json()
+    website_id = UUID(website["id"])
+    with SessionLocal() as db:
+        snapshot = MonthlyReportSnapshot(
+            website_id=website_id,
+            period_start=date(2026, 6, 1),
+            period_end=date(2026, 6, 30),
+            generated_at=datetime.now(UTC),
+            report_data={"period": "monthly_snapshot", "current": {"sessions": 42}},
+        )
+        db.add(snapshot)
+        db.commit()
+        snapshot_id = snapshot.id
+    listed = client.get(f"/api/v1/websites/{website_id}/monthly-reports")
+    assert listed.status_code == 200
+    assert listed.json()[0]["id"] == str(snapshot_id)
+    detail = client.get(f"/api/v1/websites/{website_id}/monthly-reports/{snapshot_id}")
+    assert detail.status_code == 200
+    assert detail.json()["current"]["sessions"] == 42
 
 
 def test_superuser_invites_user_for_client(client: TestClient) -> None:

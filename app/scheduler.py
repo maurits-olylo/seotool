@@ -1,15 +1,18 @@
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import structlog
 from rq import Retry
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
+from app.api.routes.reports import build_client_report
 from app.core.logging import configure_logging
 from app.core.queue import get_queue
 from app.db.session import SessionLocal
 from app.models.discovery import CrawlJob
 from app.models.integrations import WebsiteIntegration
+from app.models.reporting import MonthlyReportSnapshot
 from app.models.website import Website
 
 logger = structlog.get_logger()
@@ -108,16 +111,82 @@ def schedule_integration_syncs() -> int:
     return created
 
 
+def schedule_monthly_report_snapshots() -> int:
+    """Freeze the prior calendar month during the first two local days of a new month."""
+    local_today = datetime.now(ZoneInfo("Europe/Amsterdam")).date()
+    if local_today.day > 2:
+        return 0
+    period_end = local_today.replace(day=1) - timedelta(days=1)
+    period_start = period_end.replace(day=1)
+    previous_end = period_start - timedelta(days=1)
+    previous_start = previous_end.replace(day=1)
+    retention_cutoff = period_start - timedelta(days=3 * 366)
+    created = 0
+    with SessionLocal() as db:
+        websites = list(db.scalars(select(Website).where(Website.status == "active")))
+        for website in websites:
+            reporting_start = max(website.client.created_at.date(), website.created_at.date())
+            if reporting_start > period_start:
+                continue
+            exists = db.scalar(
+                select(MonthlyReportSnapshot.id).where(
+                    MonthlyReportSnapshot.website_id == website.id,
+                    MonthlyReportSnapshot.period_start == period_start,
+                )
+            )
+            if exists:
+                continue
+            report = build_client_report(
+                website.id,
+                "monthly_snapshot",
+                period_start,
+                period_end,
+                previous_start,
+                previous_end,
+                db,
+            )
+            db.add(
+                MonthlyReportSnapshot(
+                    website_id=website.id,
+                    period_start=period_start,
+                    period_end=period_end,
+                    generated_at=datetime.now(UTC),
+                    report_data=_json_ready(report),
+                )
+            )
+            db.execute(
+                delete(MonthlyReportSnapshot).where(
+                    MonthlyReportSnapshot.website_id == website.id,
+                    MonthlyReportSnapshot.period_start < retention_cutoff,
+                )
+            )
+            db.commit()
+            created += 1
+    return created
+
+
+def _json_ready(value: object) -> object:
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {key: _json_ready(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_json_ready(item) for item in value]
+    return value
+
+
 def main() -> None:
     configure_logging()
     while True:
         try:
             crawl_count = schedule_due_jobs()
             integration_count = schedule_integration_syncs()
+            report_count = schedule_monthly_report_snapshots()
             logger.info(
                 "scheduler_cycle",
                 jobs_created=crawl_count,
                 integration_syncs_created=integration_count,
+                report_snapshots_created=report_count,
             )
         except Exception:
             logger.exception("scheduler_cycle_failed")

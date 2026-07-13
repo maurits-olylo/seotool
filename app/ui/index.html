@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="/ui/assets/organization.css">
   <link rel="stylesheet" href="/ui/assets/report.css">
   <link rel="stylesheet" href="/ui/assets/member-management.css">
-  <link rel="stylesheet" href="/ui/assets/report-performance.css?v=20260713-2">
+  <link rel="stylesheet" href="/ui/assets/report-performance.css?v=20260713-3">
   <link rel="stylesheet" href="/ui/assets/key-events.css">
 </head>
 <body>
@@ -25,6 +25,7 @@
     <aside>
       <div><span class="eyebrow">THACT</span><h2>SEO Monitor</h2><small id="current-user"></small></div>
       <nav><button id="overview-nav" class="nav-active"><span id="overview-nav-label">Overzicht</span></button><button id="urls-nav">URLs</button><button id="changes-nav">Wijzigingen</button><button id="operations-nav">Beheer</button><button id="organization-nav">Organisatie</button><button id="integrations-nav">Integraties</button></nav>
+      <section id="report-archive" class="report-archive hidden"><span class="eyebrow">RAPPORTAGES</span><button type="button" data-report-live>Live status</button><div id="report-archive-list"></div></section>
       <button id="logout" class="quiet">Uitloggen</button>
     </aside>
     <main>
@@ -44,6 +45,7 @@
           <div><span class="eyebrow">SAMENVATTING</span><h2 id="report-conclusion"></h2><p id="report-explanation"></p></div>
           <div class="report-period"><span>Meetperiode</span><strong id="report-date"></strong><small id="report-coverage"></small></div>
         </section>
+        <section id="report-insights" class="report-insights"></section>
         <section id="report-metrics" class="report-metrics"></section>
         <section id="report-conversions" class="panel report-conversions"></section>
         <section class="panel report-trend"><div class="panel-head"><div><span class="eyebrow">ONTWIKKELING</span><h2>Organische prestaties per maand</h2></div><span id="report-trend-label" class="result-count"></span></div><div id="report-chart" class="report-chart"></div></section>
@@ -142,6 +144,6 @@
     <dl><div><dt>Gedetecteerd</dt><dd id="change-detail-date"></dd></div></dl>
     <div id="change-group-details"></div>
   </dialog>
-  <script src="/ui/assets/app.js?v=20260713-2" defer></script>
+  <script src="/ui/assets/app.js?v=20260713-3" defer></script>
 </body>
 </html>

@@ -11,7 +11,7 @@ const labels = {
   pending: "In wachtrij", running: "Bezig", succeeded: "Geslaagd",
   partially_succeeded: "Deels geslaagd", failed: "Mislukt", cancelled: "Geannuleerd",
 };
-const state = { currentUser: null, clients: [], websites: [], issues: [], changes: [], changeGroups: [], crawlRuns: [], exports: [], operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month" };
+const state = { currentUser: null, clients: [], websites: [], issues: [], changes: [], changeGroups: [], crawlRuns: [], exports: [], operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
 const VIEW_HASHES = {overview: "overzicht", urls: "urls", changes: "wijzigingen", operations: "beheer", organization: "organisatie", integrations: "integraties"};
 let operationsPollTimer = null;
 
@@ -56,7 +56,7 @@ function renderClientReport() {
   $("#report-conclusion").textContent = change === null || change === undefined
     ? `${Number(current[signal] || 0).toLocaleString("nl-NL")} ${signalLabels[signal]} in deze periode`
     : change >= 0 ? `Organische prestaties zijn ${Math.abs(change)}% gestegen` : `Organische prestaties zijn ${Math.abs(change)}% gedaald`;
-  $("#report-explanation").textContent = "Rendement wordt benaderd met organisch bereik, websitebezoek en belangrijke gebeurtenissen. Voor financieel rendement is aanvullende omzetdata nodig.";
+  $("#report-explanation").textContent = "Deze rapportage combineert organische zichtbaarheid, bezoek, gekwalificeerde leads en technische voortgang.";
   $("#report-date").textContent = `${new Date(report.start_date).toLocaleDateString("nl-NL")} – ${new Date(report.end_date).toLocaleDateString("nl-NL")}`;
   $("#report-coverage").textContent = report.coverage?.from ? `Data beschikbaar vanaf ${new Date(report.coverage.from).toLocaleDateString("nl-NL")}` : "Nog geen GSC/GA4-data beschikbaar";
   const metricDefinitions = [["clicks","Organische klikken"],["impressions","Vertoningen in Google"],["sessions","Organische sessies"],["key_events","Gekwalificeerde leads"]];
@@ -69,12 +69,15 @@ function renderClientReport() {
   $("#report-conversions").innerHTML = qualifiedEvents.configured
     ? `<div class="panel-head"><div><span class="eyebrow">CONVERSIES</span><h2>Gekwalificeerde leads uit organic</h2></div></div><div class="conversion-breakdown">${conversionEvents.map((event) => `<article><strong>${Number(event.key_events).toLocaleString("nl-NL")}</strong><span>${escapeHtml(event.event_name)}</span></article>`).join("") || `<p class="report-empty">Geen gekwalificeerde leads in deze periode.</p>`}</div>`
     : `<div class="panel-head"><div><span class="eyebrow">CONVERSIES</span><h2>Gekwalificeerde leads nog niet ingesteld</h2><p>Selecteer als admin de relevante GA4-events bij Integraties.</p></div></div>`;
+  renderReportInsights(report, signal);
 
   const months = (report.monthly || [])
     .filter((month) => month.month !== String(report.end_date || "").slice(0, 7))
     .slice(-12);
   const chartMetric = months.some((month) => month.sessions) ? "sessions" : "clicks";
-  $("#report-trend-label").textContent = `${chartMetric === "sessions" ? "Organische sessies" : "Organische klikken"} · volledige maanden`;
+  const trendValues = months.map((month) => Number(month[chartMetric] || 0));
+  const trendRange = trendValues.length ? `${Math.min(...trendValues).toLocaleString("nl-NL")}–${Math.max(...trendValues).toLocaleString("nl-NL")}` : "—";
+  $("#report-trend-label").textContent = `${chartMetric === "sessions" ? "Organische sessies" : "Organische klikken"} · schaal ${trendRange} · volledige maanden`;
   $("#report-chart").innerHTML = renderTrendChart(months, chartMetric);
 
   const activities = report.work_completed?.activities || [];
@@ -83,6 +86,24 @@ function renderClientReport() {
     : `<p class="report-empty">Nog geen handmatig werk gelogd in deze periode.</p><article class="report-work-summary"><strong>${report.work_completed?.technically_verified || 0}</strong><span>technische issues geverifieerd of opgelost</span></article>`;
   $("#report-planned").innerHTML = renderReportIssues(report.planned, "Er staan nog geen acties met status gepland of bezig.");
   $("#report-new-issues").innerHTML = renderReportIssues(report.new_issues, "Geen nieuwe aandachtspunten in deze periode.");
+}
+
+function renderReportInsights(report, signal) {
+  const current = report.current || {}; const comparisons = report.comparisons || {};
+  const signalName = {key_events:"gekwalificeerde leads", sessions:"organische sessies", clicks:"organische klikken"}[signal];
+  const delta = comparisons[signal];
+  const performance = delta === null || delta === undefined
+    ? `${Number(current[signal] || 0).toLocaleString("nl-NL")} ${signalName} gemeten.`
+    : `${signalName[0].toUpperCase()}${signalName.slice(1)} ${delta >= 0 ? "stegen" : "daalden"} ${Math.abs(delta)}% t.o.v. de vorige periode.`;
+  const clickDelta = comparisons.clicks;
+  const visibility = clickDelta === null || clickDelta === undefined
+    ? `${Number(current.impressions || 0).toLocaleString("nl-NL")} vertoningen in Google.`
+    : `Organische klikken ${clickDelta >= 0 ? "+" : ""}${clickDelta}% t.o.v. de vorige periode.`;
+  const newIssues = (report.new_issues || []).length;
+  const planned = (report.planned || []).length;
+  const action = newIssues ? `${newIssues} nieuwe aandachtspunten vragen opvolging.` : planned ? `${planned} acties staan gepland of zijn in uitvoering.` : "Geen nieuwe technische aandachtspunten in deze periode.";
+  $("#report-insights").innerHTML = [["PRESTATIE", performance], ["ZICHTBAARHEID", visibility], ["ACTIE", action]]
+    .map(([label, text]) => `<article><span>${label}</span><p>${text}</p></article>`).join("");
 }
 
 function renderTrendChart(months, metric) {
@@ -108,8 +129,22 @@ async function loadClientReport() {
   if (state.currentUser?.role !== "client") return;
   const websiteId = $("#website-select").value;
   if (!websiteId) return;
-  state.clientReport = await api(`/api/v1/websites/${websiteId}/client-report?period=${state.reportPeriod}`);
+  state.clientReport = state.selectedReportSnapshotId
+    ? await api(`/api/v1/websites/${websiteId}/monthly-reports/${state.selectedReportSnapshotId}`)
+    : await api(`/api/v1/websites/${websiteId}/client-report?period=${state.reportPeriod}`);
   renderClientReport();
+}
+
+async function loadReportSnapshots() {
+  if (state.currentUser?.role !== "client") return;
+  const websiteId = $("#website-select").value;
+  if (!websiteId) return;
+  state.reportSnapshots = await api(`/api/v1/websites/${websiteId}/monthly-reports`);
+  const byYear = state.reportSnapshots.reduce((groups, snapshot) => {
+    const year = snapshot.period_start.slice(0, 4); (groups[year] ||= []).push(snapshot); return groups;
+  }, {});
+  const monthName = (value) => new Intl.DateTimeFormat("nl-NL", {month:"long", year:"numeric"}).format(new Date(`${value}T12:00:00`));
+  $("#report-archive-list").innerHTML = Object.entries(byYear).map(([year, snapshots]) => `<details><summary>${year}</summary>${snapshots.map((snapshot) => `<button type="button" data-report-snapshot="${snapshot.id}" class="${snapshot.id === state.selectedReportSnapshotId ? "active" : ""}">${escapeHtml(monthName(snapshot.period_start))}</button>`).join("")}</details>`).join("") || `<p>Het eerste maandrapport verschijnt na de eerste volledige maand.</p>`;
 }
 function issueUrlMarkup(issue) {
   const url = issueUrl(issue);
@@ -128,6 +163,7 @@ function applyRolePermissions() {
   $("#overview-title").textContent = isClient ? "SEO-status" : "Technische SEO-acties";
   $("#client-report-intro").classList.toggle("hidden", !isClient);
   $("#client-report").classList.toggle("hidden", !isClient);
+  $("#report-archive").classList.toggle("hidden", !isClient);
   $("#summary").classList.toggle("hidden", isClient);
   $("#internal-action-panel").classList.toggle("hidden", isClient);
   $("#detail-status").classList.toggle("hidden", isClient);
@@ -479,7 +515,7 @@ async function loadIssues() {
   $("#type-filter").innerHTML = `<option value="">Alle issue-types</option>${types.map((type) => `<option value="${escapeHtml(type)}">${escapeHtml(type)}</option>`).join("")}`;
   state.page = 1;
   render();
-  await loadClientReport();
+  await Promise.all([loadClientReport(), loadReportSnapshots()]);
 }
 
 async function loadAllUrls(websiteId) {
@@ -810,7 +846,7 @@ async function saveIssueStatus() {
 
 $("#logout").addEventListener("click", async () => { await fetch("/ui/logout", { method: "POST" }); window.location.assign("/"); });
 $("#client-select").addEventListener("change", async () => { await loadWebsites(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); });
-$("#website-select").addEventListener("change", async () => { await loadIssues(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); if (!$("#urls-view").classList.contains("hidden")) renderUrls(); if (!$("#changes-view").classList.contains("hidden")) await loadChanges(); if (!$("#operations-view").classList.contains("hidden")) await loadOperations(); });
+$("#website-select").addEventListener("change", async () => { state.selectedReportSnapshotId = null; await loadIssues(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); if (!$("#urls-view").classList.contains("hidden")) renderUrls(); if (!$("#changes-view").classList.contains("hidden")) await loadChanges(); if (!$("#operations-view").classList.contains("hidden")) await loadOperations(); });
 for (const selector of ["#severity-filter", "#type-filter", "#impact-filter", "#status-filter"]) $(selector).addEventListener("change", () => { state.page = 1; render(); });
 $("#search-filter").addEventListener("input", () => { state.page = 1; render(); });
 $("#previous-page").addEventListener("click", () => { state.page -= 1; render(); });
@@ -818,6 +854,11 @@ $("#next-page").addEventListener("click", () => { state.page += 1; render(); });
 $("#issues").addEventListener("click", (event) => { const button = event.target.closest("[data-issue-id]"); if (button) showIssue(button.dataset.issueId); });
 $("#issue-groups").addEventListener("click", (event) => { const button = event.target.closest("[data-group-type]"); if (button) { $("#type-filter").value = button.dataset.groupType; state.page = 1; render(); } });
 $("#report-periods").addEventListener("click", async (event) => { const button = event.target.closest("[data-report-period]"); if (!button) return; state.reportPeriod = button.dataset.reportPeriod; $("#report-periods").querySelectorAll("button").forEach((item) => item.classList.toggle("active", item === button)); state.clientReport = null; renderClientReport(); await loadClientReport(); });
+$("#report-archive").addEventListener("click", async (event) => {
+  const snapshot = event.target.closest("[data-report-snapshot]");
+  if (snapshot) { state.selectedReportSnapshotId = snapshot.dataset.reportSnapshot; await loadClientReport(); await loadReportSnapshots(); return; }
+  if (event.target.closest("[data-report-live]")) { state.selectedReportSnapshotId = null; await loadClientReport(); await loadReportSnapshots(); }
+});
 $("#close-dialog").addEventListener("click", () => $("#issue-dialog").close());
 $("#save-status").addEventListener("click", saveIssueStatus);
 $("#overview-nav").addEventListener("click", () => showView("overview"));
