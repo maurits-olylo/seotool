@@ -20,6 +20,9 @@ API-key blijft apart beschikbaar voor technische integraties en scripts.
 en beheert alleen klanten waarvoor een admin-membership bestaat. Een user kan toegewezen data lezen,
 issuestatussen bijwerken en exports gebruiken, maar geen integraties, instellingen of crawls beheren.
 Deze rechten worden in API-routes afgedwongen; verborgen menu-items zijn alleen de UI-weergave ervan.
+Iedere ingelogde rol kan de klantgebonden rapportages lezen. Client-accounts landen uitsluitend in
+de rapportageomgeving; users, admins en de superuser kunnen dezelfde rapportage naast hun toegestane
+operationele schermen openen. Website- en klantscoping blijft voor alle rollen door de API afgedwongen.
 
 Interne gebruikers worden via een klantgebonden uitnodiging toegevoegd. De eenmalige token is alleen
 als SHA-256-hash opgeslagen, verloopt na zeven dagen en levert bij acceptatie zowel het account als de
@@ -84,6 +87,8 @@ gelijkende pagina's worden met vijfwoord-shingles en een hoge overlapdrempel als
 gemarkeerd. Veelvoorkomende template-shingles worden buiten de vergelijking gehouden. De GSC-analyse
 blijft daarnaast apart signaleren wanneer één zoekopdracht over meerdere landingspagina's is verdeeld;
 dat is een zoekintentiesignaal en geen bewijs van dubbele tekst.
+Dezelfde sitebrede stap groepeert genormaliseerde titles en meta descriptions om identieke metadata
+over meerdere indexeerbare pagina's als afzonderlijke, dedupliceerbare issues te volgen.
 
 ## Vacaturemonitor
 

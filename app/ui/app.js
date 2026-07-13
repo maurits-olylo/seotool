@@ -12,7 +12,7 @@ const labels = {
   partially_succeeded: "Deels geslaagd", failed: "Mislukt", cancelled: "Geannuleerd",
 };
 const state = { currentUser: null, clients: [], websites: [], issues: [], changes: [], changeGroups: [], jobListings: [], jobSummary: {}, crawlRuns: [], exports: [], operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
-const VIEW_HASHES = {overview: "overzicht", urls: "urls", changes: "wijzigingen", vacancies: "vacatures", operations: "beheer", organization: "organisatie", integrations: "integraties"};
+const VIEW_HASHES = {overview: "overzicht", reports: "rapportage", urls: "urls", changes: "wijzigingen", vacancies: "vacatures", operations: "beheer", organization: "organisatie", integrations: "integraties"};
 let operationsPollTimer = null;
 
 async function api(path, options = {}) {
@@ -44,7 +44,6 @@ function impactMarkup(issue) {
 }
 
 function renderClientReport() {
-  if (state.currentUser?.role !== "client") return;
   const report = state.clientReport;
   if (!report) { $("#report-conclusion").textContent = "Rapportage wordt geladen…"; return; }
   const current = report.current || {};
@@ -160,7 +159,6 @@ function renderReportIssues(issues = [], emptyText) {
 }
 
 async function loadClientReport() {
-  if (state.currentUser?.role !== "client") return;
   const websiteId = $("#website-select").value;
   if (!websiteId) return;
   state.clientReport = state.selectedReportSnapshotId
@@ -177,7 +175,6 @@ async function loadClientReport() {
 }
 
 async function loadReportSnapshots() {
-  if (state.currentUser?.role !== "client") return;
   const websiteId = $("#website-select").value;
   if (!websiteId) return;
   state.reportSnapshots = await api(`/api/v1/websites/${websiteId}/monthly-reports`);
@@ -198,22 +195,14 @@ function applyRolePermissions() {
   $("#integrations-nav").classList.toggle("hidden", !canAdmin);
   $("#organization-nav").classList.toggle("hidden", !canAdmin);
   $("#crawl-operation-card").classList.toggle("hidden", !canAdmin);
+  $("#overview-nav").classList.toggle("hidden", isClient);
   for (const selector of ["#urls-nav", "#changes-nav", "#vacancies-nav", "#operations-nav"]) $(selector).classList.toggle("hidden", isClient);
-  $("#overview-nav-label").textContent = isClient ? "Rapportage" : "Overzicht";
-  $("#overview-eyebrow").textContent = isClient ? "SEO-RAPPORTAGE" : "PRODUCTIE";
-  $("#overview-title").textContent = isClient ? "Organische groei & SEO" : "Technische SEO-acties";
-  $("#client-report-intro").classList.toggle("hidden", !isClient);
-  $("#client-report").classList.toggle("hidden", !isClient);
-  $("#report-archive").classList.toggle("hidden", !isClient);
-  $("#summary").classList.toggle("hidden", isClient);
-  $("#vacancy-dashboard").classList.toggle("hidden", isClient);
-  $("#internal-action-panel").classList.toggle("hidden", isClient);
   $("#detail-status").classList.toggle("hidden", isClient);
   $("#save-status").classList.toggle("hidden", isClient);
   $("#client-status-label").classList.toggle("hidden", !isClient);
   $("#invitation-role").querySelector('option[value="admin"]').disabled = state.currentUser?.role !== "superuser";
   $("#current-user").textContent = state.currentUser?.email || "Technische toegang";
-  if (isClient && ["#urls", "#wijzigingen", "#vacatures", "#beheer", "#organisatie", "#integraties"].includes(window.location.hash)) window.location.hash = "#overzicht";
+  if (isClient && window.location.hash !== "#rapportage") window.location.hash = "#rapportage";
   else if (!canAdmin && ["#organisatie", "#integraties"].includes(window.location.hash)) window.location.hash = "#overzicht";
 }
 
@@ -525,9 +514,18 @@ async function pollIntegrationHistory(websiteId) {
 }
 
 function showView(view, updateHash = true) {
+  if (state.currentUser?.role === "client") view = "reports";
+  const visibleView = view === "reports" ? "overview" : view;
   for (const name of ["overview", "urls", "changes", "vacancies", "operations", "organization", "integrations"]) {
-    $(`#${name}-view`).classList.toggle("hidden", name !== view);
+    $(`#${name}-view`).classList.toggle("hidden", name !== visibleView);
+  }
+  for (const name of Object.keys(VIEW_HASHES)) {
     $(`#${name}-nav`).classList.toggle("nav-active", name === view);
+  }
+  applyOverviewPresentation(view === "reports");
+  if (view === "reports") {
+    loadClientReport().catch(() => { $("#report-conclusion").textContent = "Rapportage kon niet worden geladen."; });
+    loadReportSnapshots().catch(() => { $("#report-archive-list").innerHTML = "<p>Rapportagehistorie kon niet worden geladen.</p>"; });
   }
   if (view === "integrations") loadIntegrations();
   if (view === "organization") loadOrganization();
@@ -540,7 +538,19 @@ function showView(view, updateHash = true) {
 
 function viewFromHash() {
   const hash = window.location.hash.slice(1);
-  return Object.keys(VIEW_HASHES).find((view) => VIEW_HASHES[view] === hash) || "overview";
+  const view = Object.keys(VIEW_HASHES).find((name) => VIEW_HASHES[name] === hash) || "overview";
+  return state.currentUser?.role === "client" ? "reports" : view;
+}
+
+function applyOverviewPresentation(reportMode) {
+  $("#overview-eyebrow").textContent = reportMode ? "SEO-RAPPORTAGE" : "PRODUCTIE";
+  $("#overview-title").textContent = reportMode ? "Organische groei & SEO" : "Technische SEO-acties";
+  $("#client-report-intro").classList.toggle("hidden", !reportMode);
+  $("#client-report").classList.toggle("hidden", !reportMode);
+  $("#report-archive").classList.toggle("hidden", !reportMode);
+  $("#summary").classList.toggle("hidden", reportMode);
+  $("#vacancy-dashboard").classList.toggle("hidden", reportMode);
+  $("#internal-action-panel").classList.toggle("hidden", reportMode);
 }
 
 function startOperationsPolling() {
@@ -974,6 +984,7 @@ $("#close-dialog").addEventListener("click", () => $("#issue-dialog").close());
 for (const dialog of document.querySelectorAll("dialog")) dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
 $("#save-status").addEventListener("click", saveIssueStatus);
 $("#overview-nav").addEventListener("click", () => showView("overview"));
+$("#reports-nav").addEventListener("click", () => showView("reports"));
 $("#urls-nav").addEventListener("click", () => showView("urls"));
 $("#changes-nav").addEventListener("click", () => showView("changes"));
 $("#vacancies-nav").addEventListener("click", () => showView("vacancies"));

@@ -11,7 +11,12 @@ from app.models.issues import Issue
 from app.services.issue_engine import reconcile_issues
 from app.services.technical_checks import IssueSignal
 
-CONTENT_SIMILARITY_ISSUE_TYPES = {"duplicate_content", "near_duplicate_content"}
+CONTENT_SIMILARITY_ISSUE_TYPES = {
+    "duplicate_content",
+    "duplicate_meta_description",
+    "duplicate_title",
+    "near_duplicate_content",
+}
 MINIMUM_WORDS = 100
 SHINGLE_SIZE = 5
 NEAR_DUPLICATE_CONTAINMENT = 0.85
@@ -43,6 +48,7 @@ def detect_duplicate_content(
     near_groups = _near_duplicate_groups(rows, excluded_indices=exact_members)
 
     signals_by_index: dict[int, list[IssueSignal]] = defaultdict(list)
+    _add_duplicate_metadata_signals(rows, signals_by_index)
     for group in exact_groups:
         urls = [rows[index][0].normalized_url for index in group]
         for index in group:
@@ -109,6 +115,64 @@ def detect_duplicate_content(
     return touched
 
 
+def _add_duplicate_metadata_signals(
+    rows: list[tuple[Url, UrlSnapshot]],
+    signals_by_index: dict[int, list[IssueSignal]],
+) -> None:
+    definitions = (
+        (
+            "title",
+            "duplicate_title",
+            "Dezelfde title op meerdere pagina's",
+            "medium",
+            "Schrijf voor iedere indexeerbare pagina een unieke title die het eigen onderwerp "
+            "en de zoekintentie beschrijft.",
+        ),
+        (
+            "meta_description",
+            "duplicate_meta_description",
+            "Dezelfde meta description op meerdere pagina's",
+            "low",
+            "Schrijf een unieke meta description die de inhoud en propositie van deze pagina "
+            "onderscheidt.",
+        ),
+    )
+    for field_name, issue_type, title, severity, action in definitions:
+        groups: dict[str, list[int]] = defaultdict(list)
+        for index, (_, snapshot) in enumerate(rows):
+            if not _is_indexable_page(snapshot):
+                continue
+            value = _normalize_metadata(getattr(snapshot, field_name))
+            if value:
+                groups[value].append(index)
+        for indices in groups.values():
+            if len(indices) < 2:
+                continue
+            urls = [rows[index][0].normalized_url for index in indices]
+            for index in indices:
+                related = [url for url in urls if url != rows[index][0].normalized_url]
+                signals_by_index[index].append(
+                    IssueSignal(
+                        issue_type=issue_type,
+                        category="onpage",
+                        severity=severity,
+                        confidence="high",
+                        title=title,
+                        description=(
+                            f"Deze waarde wordt ook gebruikt op {len(related)} andere "
+                            "indexeerbare URL(s)."
+                        ),
+                        recommended_action=action,
+                        evidence={
+                            "field": field_name,
+                            "value": getattr(rows[index][1], field_name),
+                            "related_urls": related,
+                            "group_size": len(indices),
+                        },
+                    )
+                )
+
+
 def _near_duplicate_groups(
     rows: list[tuple[Url, UrlSnapshot]], *, excluded_indices: set[int]
 ) -> list[tuple[list[int], list[float]]]:
@@ -150,12 +214,22 @@ def _near_duplicate_groups(
 
 def _is_comparable(snapshot: UrlSnapshot) -> bool:
     return bool(
-        snapshot.status_code == 200
-        and snapshot.is_indexable is True
-        and not snapshot.redirect_chain
+        _is_indexable_page(snapshot)
         and (snapshot.word_count or 0) >= MINIMUM_WORDS
         and snapshot.main_content
     )
+
+
+def _is_indexable_page(snapshot: UrlSnapshot) -> bool:
+    return bool(
+        snapshot.status_code == 200
+        and snapshot.is_indexable is True
+        and not snapshot.redirect_chain
+    )
+
+
+def _normalize_metadata(value: str | None) -> str:
+    return " ".join((value or "").casefold().split())
 
 
 def _connected_groups(

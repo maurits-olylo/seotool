@@ -35,8 +35,22 @@ def test_detects_exact_and_near_duplicate_content_and_resolves_it() -> None:
         run = _run(db, website.id)
         exact = _content("identiek")
         snapshots = [
-            _snapshot(urls[0], run, exact, "same-hash"),
-            _snapshot(urls[1], run, exact, "same-hash"),
+            _snapshot(
+                urls[0],
+                run,
+                exact,
+                "same-hash",
+                title="Gedeelde title",
+                meta_description="Gedeelde beschrijving",
+            ),
+            _snapshot(
+                urls[1],
+                run,
+                exact,
+                "same-hash",
+                title=" gedeelde   TITLE ",
+                meta_description=" gedeelde  BESCHRIJVING ",
+            ),
             _snapshot(urls[2], run, _content("variant alpha"), "hash-alpha"),
             _snapshot(urls[3], run, _content("variant beta"), "hash-beta"),
         ]
@@ -46,11 +60,15 @@ def test_detects_exact_and_near_duplicate_content_and_resolves_it() -> None:
         found = detect_duplicate_content(db, website_id=website.id, crawl_run_id=run.id)
         db.flush()
 
-        assert len(found) == 4
+        assert len(found) == 8
         issues = list(db.scalars(select(Issue).order_by(Issue.issue_type, Issue.url_id)))
         assert [issue.issue_type for issue in issues] == [
             "duplicate_content",
             "duplicate_content",
+            "duplicate_meta_description",
+            "duplicate_meta_description",
+            "duplicate_title",
+            "duplicate_title",
             "near_duplicate_content",
             "near_duplicate_content",
         ]
@@ -91,7 +109,15 @@ def _run(db, website_id):  # type: ignore[no-untyped-def]
     return run
 
 
-def _snapshot(url, run, content: str, content_hash: str):  # type: ignore[no-untyped-def]
+def _snapshot(  # type: ignore[no-untyped-def]
+    url,
+    run,
+    content: str,
+    content_hash: str,
+    *,
+    title: str | None = None,
+    meta_description: str | None = None,
+):
     return UrlSnapshot(
         url_id=url.id,
         crawl_run_id=run.id,
@@ -100,6 +126,8 @@ def _snapshot(url, run, content: str, content_hash: str):  # type: ignore[no-unt
         status_code=200,
         content_type="text/html",
         redirect_chain=[],
+        title=title,
+        meta_description=meta_description,
         word_count=len(content.split()),
         main_content=content,
         main_content_hash=content_hash,
