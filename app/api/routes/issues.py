@@ -11,7 +11,8 @@ from app.db.session import get_db
 from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
 from app.models.discovery import Url
 from app.models.integrations import GoogleAnalyticsMetric, SearchConsoleMetric
-from app.models.issues import Change, Issue, IssueComment, IssueOccurrence
+from app.models.issues import ActivityLog, Change, Issue, IssueComment, IssueOccurrence
+from app.models.user import User
 from app.schemas.issues import (
     ChangeDetailRead,
     ChangeRead,
@@ -343,8 +344,20 @@ def update_issue(
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
     require_website_access(db, principal, issue.website_id)
+    previous_status = issue.status
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(issue, key, value)
+    if payload.status and payload.status != previous_status:
+        actor = db.get(User, principal.user_id) if principal.user_id else None
+        db.add(
+            ActivityLog(
+                website_id=issue.website_id,
+                actor=actor.email if actor else "API",
+                activity_type="issue_status_changed",
+                summary=f"{issue.title}: {previous_status} → {payload.status}",
+                details={"issue_id": str(issue.id), "from": previous_status, "to": payload.status},
+            )
+        )
     db.commit()
     db.refresh(issue)
     return issue

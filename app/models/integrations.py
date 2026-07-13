@@ -87,3 +87,15 @@ class GoogleAnalyticsMetric(UUIDTimestampMixin, Base):
     sessions: Mapped[int] = mapped_column(Integer, default=0)
     active_users: Mapped[int] = mapped_column(Integer, default=0)
     key_events: Mapped[float] = mapped_column(Float, default=0)
+
+
+class GoogleAnalyticsEventMetric(UUIDTimestampMixin, Base):
+    __tablename__ = "google_analytics_event_metrics"
+    __table_args__ = (UniqueConstraint("website_id", "date", "event_name"),)
+
+    website_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("websites.id", ondelete="CASCADE"), index=True
+    )
+    date: Mapped[date] = mapped_column(Date, index=True)
+    event_name: Mapped[str] = mapped_column(String(255), index=True)
+    key_events: Mapped[float] = mapped_column(Float, default=0)

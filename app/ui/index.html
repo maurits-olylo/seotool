@@ -18,6 +18,7 @@
   <link rel="stylesheet" href="/ui/assets/report.css">
   <link rel="stylesheet" href="/ui/assets/member-management.css">
   <link rel="stylesheet" href="/ui/assets/report-performance.css">
+  <link rel="stylesheet" href="/ui/assets/key-events.css">
 </head>
 <body>
   <div id="app" class="app-shell hidden">
@@ -44,6 +45,7 @@
           <div class="report-period"><span>Meetperiode</span><strong id="report-date"></strong><small id="report-coverage"></small></div>
         </section>
         <section id="report-metrics" class="report-metrics"></section>
+        <section id="report-conversions" class="panel report-conversions"></section>
         <section class="panel report-trend"><div class="panel-head"><div><span class="eyebrow">ONTWIKKELING</span><h2>Organische prestaties per maand</h2></div><span id="report-trend-label" class="result-count"></span></div><div id="report-chart" class="report-chart"></div></section>
         <div class="report-columns report-work">
           <section class="panel report-section"><div class="panel-head"><div><span class="eyebrow">TERUGBLIK</span><h2>Wat is er gedaan?</h2></div></div><div id="report-completed" class="report-list"></div></section>
@@ -114,7 +116,8 @@
           <article class="integration-card"><div class="provider-icon bing">B</div><div><h2>Bing Webmaster Tools</h2><p>Zoekverkeer, backlinks, crawl- en indexatiegegevens.</p><span id="bing-status" class="connection-status">Niet gekoppeld</span></div><a id="bing-connect" class="connect-link" aria-disabled="true">Bing koppelen</a></article>
         </div>
         <p id="integration-message" class="integration-message hidden"></p>
-        <section id="property-mapping" class="panel property-mapping hidden"><span class="eyebrow">PROPERTYKOPPELINGEN</span><h2>Properties voor <span id="mapping-website"></span></h2><div class="property-grid"><label>Search Console-property<select id="search-console-property"></select><button id="save-search-console" class="save-property">Opslaan</button><span id="search-console-message" class="property-message"></span><button id="sync-search-console" class="save-property secondary-property">GSC-data synchroniseren</button></label><label>GA4-property<select id="ga4-property"></select><button id="save-ga4" class="save-property">Opslaan</button><span id="ga4-message" class="property-message"></span><button id="sync-ga4" class="save-property secondary-property">GA4-data synchroniseren</button></label></div></section>
+        <section id="property-mapping" class="panel property-mapping hidden"><span class="eyebrow">PROPERTYKOPPELINGEN</span><h2>Properties voor <span id="mapping-website"></span></h2><div class="property-grid"><label>Search Console-property<select id="search-console-property"></select><button id="save-search-console" class="save-property">Opslaan</button><span id="search-console-message" class="property-message"></span><button id="sync-search-console" class="save-property secondary-property">GSC-data synchroniseren</button></label><label>GA4-property<select id="ga4-property"></select><button id="save-ga4" class="save-property">Opslaan</button><span id="ga4-message" class="property-message"></span><button id="sync-ga4" class="save-property secondary-property">GA4-data synchroniseren</button></label></div><button id="sync-integration-history" class="save-property secondary-property">Historie tot 16 maanden synchroniseren</button><span id="integration-history-message" class="property-message"></span></section>
+        <section id="ga4-key-events-panel" class="panel property-mapping hidden"><span class="eyebrow">ORGANISCHE CONVERSIES</span><h2>Welke GA4-events zijn gekwalificeerde leads?</h2><p class="intro">Alleen aangevinkte events tellen mee in de hoofd-KPI van de klantreportage. De data wordt gefilterd op Organic Search.</p><div id="ga4-key-events" class="key-event-list"></div><button id="save-ga4-key-events" class="save-property">Conversiekeuze opslaan</button><span id="ga4-key-events-message" class="property-message"></span></section>
         <section id="bing-property-mapping" class="panel property-mapping hidden"><span class="eyebrow">BING PROPERTY</span><h2>Bing-site voor <span id="bing-mapping-website"></span></h2><div class="property-grid single"><label>Bing Webmaster Tools-site<select id="bing-property"></select><button id="save-bing" class="save-property">Opslaan</button><span id="bing-property-message" class="property-message"></span></label></div></section>
       </section>
     </main>

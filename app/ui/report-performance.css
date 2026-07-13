@@ -38,12 +38,17 @@
 
 .report-metric small.positive { color: #087a43; }
 .report-metric small.negative { color: var(--red); }
+.report-conversions { margin: 16px 0; }
+.conversion-breakdown { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #edf0ee; }
+.conversion-breakdown article { padding: 18px 22px; background: #fff; }
+.conversion-breakdown strong { display: block; font-size: 24px; }
+.conversion-breakdown span { display: block; margin-top: 4px; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 .report-trend { margin: 16px 0; }
 .report-chart {
   display: flex;
   align-items: flex-end;
   gap: 10px;
-  height: 250px;
+  height: 180px;
   padding: 42px 24px 20px;
 }
 
@@ -82,4 +87,5 @@
   .report-chart { gap: 5px; padding-inline: 12px; }
   .report-bar-value { display: none; }
   .report-list-grid { grid-template-columns: 1fr; }
+  .conversion-breakdown { grid-template-columns: 1fr 1fr; }
 }

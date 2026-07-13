@@ -1,21 +1,29 @@
+import uuid
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.queue import get_queue
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.client import Client
-from app.models.integrations import IntegrationConnection, WebsiteIntegration
+from app.models.integrations import (
+    GoogleAnalyticsEventMetric,
+    IntegrationConnection,
+    WebsiteIntegration,
+)
 from app.models.website import Website
 from app.schemas.integrations import (
     BingPropertiesRead,
+    GoogleAnalyticsKeyEventRead,
+    GoogleAnalyticsKeyEventSelection,
     GooglePropertiesRead,
     IntegrationConnectionCreate,
     IntegrationConnectionRead,
@@ -384,6 +392,82 @@ def upsert_website_integration(
     db.commit()
     db.refresh(mapping)
     return mapping
+
+
+@router.get(
+    "/websites/{website_id}/integrations/ga4/key-events",
+    response_model=list[GoogleAnalyticsKeyEventRead],
+)
+def list_google_analytics_key_events(
+    website_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> list[dict[str, object]]:
+    require_website_access(db, principal, website_id, admin=True)
+    mapping = db.scalar(
+        select(WebsiteIntegration).where(
+            WebsiteIntegration.website_id == website_id,
+            WebsiteIntegration.service == "ga4",
+        )
+    )
+    selected = set(mapping.settings.get("qualified_key_events", [])) if mapping else set()
+    rows = db.execute(
+        select(
+            GoogleAnalyticsEventMetric.event_name,
+            func.sum(GoogleAnalyticsEventMetric.key_events),
+        )
+        .where(GoogleAnalyticsEventMetric.website_id == website_id)
+        .group_by(GoogleAnalyticsEventMetric.event_name)
+        .order_by(func.sum(GoogleAnalyticsEventMetric.key_events).desc())
+    )
+    return [
+        {"event_name": name, "key_events": float(total or 0), "selected": name in selected}
+        for name, total in rows
+    ]
+
+
+@router.put(
+    "/websites/{website_id}/integrations/ga4/key-events",
+    response_model=list[GoogleAnalyticsKeyEventRead],
+)
+def update_google_analytics_key_events(
+    website_id: UUID,
+    payload: GoogleAnalyticsKeyEventSelection,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> list[dict[str, object]]:
+    require_website_access(db, principal, website_id, admin=True)
+    mapping = db.scalar(
+        select(WebsiteIntegration).where(
+            WebsiteIntegration.website_id == website_id,
+            WebsiteIntegration.service == "ga4",
+        )
+    )
+    if not mapping:
+        raise HTTPException(status_code=404, detail="GA4 property is not mapped")
+    selected = sorted({name.strip() for name in payload.event_names if name.strip()})
+    mapping.settings = {**mapping.settings, "qualified_key_events": selected}
+    db.commit()
+    return list_google_analytics_key_events(website_id, db, principal)
+
+
+@router.post(
+    "/websites/{website_id}/integrations/history-sync",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def synchronize_integration_history(
+    website_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, str | int]:
+    require_website_access(db, principal, website_id, admin=True)
+    get_queue().enqueue(
+        "app.services.integration_sync.synchronize_website_integrations",
+        str(website_id),
+        480,
+        job_id=f"integration-history-{website_id}-{uuid.uuid4()}",
+    )
+    return {"status": "queued", "days": 480}
 
 
 @router.post("/websites/{website_id}/integrations/search_console/sync")

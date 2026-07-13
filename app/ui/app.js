@@ -49,8 +49,9 @@ function renderClientReport() {
   if (!report) { $("#report-conclusion").textContent = "Rapportage wordt geladen…"; return; }
   const current = report.current || {};
   const comparisons = report.comparisons || {};
-  const signal = current.key_events ? "key_events" : current.sessions ? "sessions" : "clicks";
-  const signalLabels = {key_events:"belangrijke gebeurtenissen",sessions:"organische sessies",clicks:"organische klikken"};
+  const qualifiedEvents = report.qualified_key_events || {};
+  const signal = qualifiedEvents.configured && current.key_events ? "key_events" : current.sessions ? "sessions" : "clicks";
+  const signalLabels = {key_events:"gekwalificeerde organische leads",sessions:"organische sessies",clicks:"organische klikken"};
   const change = comparisons[signal];
   $("#report-conclusion").textContent = change === null || change === undefined
     ? `${Number(current[signal] || 0).toLocaleString("nl-NL")} ${signalLabels[signal]} in deze periode`
@@ -58,12 +59,16 @@ function renderClientReport() {
   $("#report-explanation").textContent = "Rendement wordt benaderd met organisch bereik, websitebezoek en belangrijke gebeurtenissen. Voor financieel rendement is aanvullende omzetdata nodig.";
   $("#report-date").textContent = `${new Date(report.start_date).toLocaleDateString("nl-NL")} – ${new Date(report.end_date).toLocaleDateString("nl-NL")}`;
   $("#report-coverage").textContent = report.coverage?.from ? `Data beschikbaar vanaf ${new Date(report.coverage.from).toLocaleDateString("nl-NL")}` : "Nog geen GSC/GA4-data beschikbaar";
-  const metricDefinitions = [["clicks","Organische klikken"],["impressions","Vertoningen in Google"],["sessions","Organische sessies"],["key_events","Belangrijke gebeurtenissen"]];
+  const metricDefinitions = [["clicks","Organische klikken"],["impressions","Vertoningen in Google"],["sessions","Organische sessies"],["key_events","Gekwalificeerde leads"]];
   $("#report-metrics").innerHTML = metricDefinitions.map(([key, label]) => {
     const delta = comparisons[key];
-    const deltaLabel = delta === null || delta === undefined ? "Geen vergelijkingsdata" : `${delta >= 0 ? "+" : ""}${delta}% t.o.v. vorige periode`;
-    return `<article class="report-metric"><strong>${Number(current[key] || 0).toLocaleString("nl-NL")}</strong><span>${label}</span><small class="${delta > 0 ? "positive" : delta < 0 ? "negative" : ""}">${deltaLabel}</small></article>`;
+    const deltaLabel = key === "key_events" && !qualifiedEvents.configured ? "Kies conversies in Integraties" : delta === null || delta === undefined ? "Geen vergelijkingsdata" : `${delta >= 0 ? "+" : ""}${delta}% t.o.v. vorige periode`;
+    return `<article class="report-metric"><strong>${key === "key_events" && !qualifiedEvents.configured ? "—" : Number(current[key] || 0).toLocaleString("nl-NL")}</strong><span>${label}</span><small class="${delta > 0 ? "positive" : delta < 0 ? "negative" : ""}">${deltaLabel}</small></article>`;
   }).join("");
+  const conversionEvents = qualifiedEvents.events || [];
+  $("#report-conversions").innerHTML = qualifiedEvents.configured
+    ? `<div class="panel-head"><div><span class="eyebrow">CONVERSIES</span><h2>Gekwalificeerde leads uit organic</h2></div></div><div class="conversion-breakdown">${conversionEvents.map((event) => `<article><strong>${Number(event.key_events).toLocaleString("nl-NL")}</strong><span>${escapeHtml(event.event_name)}</span></article>`).join("") || `<p class="report-empty">Geen gekwalificeerde leads in deze periode.</p>`}</div>`
+    : `<div class="panel-head"><div><span class="eyebrow">CONVERSIES</span><h2>Gekwalificeerde leads nog niet ingesteld</h2><p>Selecteer als admin de relevante GA4-events bij Integraties.</p></div></div>`;
 
   const months = (report.monthly || []).slice(-12);
   const chartMetric = months.some((month) => month.sessions) ? "sessions" : "clicks";
@@ -71,8 +76,10 @@ function renderClientReport() {
   $("#report-trend-label").textContent = chartMetric === "sessions" ? "Organische sessies" : "Organische klikken";
   $("#report-chart").innerHTML = months.map((month) => `<div class="report-bar"><span class="report-bar-value">${Number(month[chartMetric] || 0).toLocaleString("nl-NL")}</span><div style="height:${Math.max(3, Number(month[chartMetric] || 0) / maxValue * 100)}%"></div><small>${month.month.slice(5)}/${month.month.slice(2,4)}</small></div>`).join("") || `<p class="report-empty">Nog onvoldoende historische data voor een maandtrend.</p>`;
 
-  const changes = Object.entries(report.work_completed?.changes || {}).slice(0, 6);
-  $("#report-completed").innerHTML = `<article class="report-work-summary"><strong>${report.work_completed?.resolved_issues || 0}</strong><span>issues opgelost of geverifieerd</span></article>${changes.map(([type, count]) => `<article class="report-list-item"><strong>${count}× ${escapeHtml(changeLabel({change_type:type}))}</strong><p>Gedetecteerd in de gekozen periode.</p></article>`).join("")}`;
+  const activities = report.work_completed?.activities || [];
+  $("#report-completed").innerHTML = activities.length
+    ? `${activities.map((activity) => `<article class="report-list-item"><strong>${escapeHtml(activity.summary)}</strong><p>${escapeHtml(activity.actor || "Systeem")} · ${new Date(activity.occurred_at).toLocaleDateString("nl-NL")}</p></article>`).join("")}<article class="report-work-summary"><strong>${report.work_completed?.technically_verified || 0}</strong><span>technische issues geverifieerd of opgelost</span></article>`
+    : `<p class="report-empty">Nog geen handmatig werk gelogd in deze periode.</p><article class="report-work-summary"><strong>${report.work_completed?.technically_verified || 0}</strong><span>technische issues geverifieerd of opgelost</span></article>`;
   $("#report-planned").innerHTML = renderReportIssues(report.planned, "Er staan nog geen acties met status gepland of bezig.");
   $("#report-new-issues").innerHTML = renderReportIssues(report.new_issues, "Geen nieuwe aandachtspunten in deze periode.");
 }
@@ -272,6 +279,28 @@ async function loadGoogleProperties() {
   showMappingStatus(ga4Mapping, "#ga4-message", "GA4");
   $("#mapping-website").textContent = $("#website-select").selectedOptions[0]?.textContent || "website";
   $("#property-mapping").classList.remove("hidden");
+  if (ga4Mapping) await loadGa4KeyEvents();
+  else $("#ga4-key-events-panel").classList.add("hidden");
+}
+
+async function loadGa4KeyEvents() {
+  const websiteId = $("#website-select").value;
+  if (!websiteId) return;
+  const events = await api(`/api/v1/websites/${websiteId}/integrations/ga4/key-events`);
+  $("#ga4-key-events").innerHTML = events.map((event) => `<article class="key-event"><label><input type="checkbox" value="${escapeHtml(event.event_name)}" ${event.selected ? "checked" : ""}>${escapeHtml(event.event_name)}</label><span>${Number(event.key_events).toLocaleString("nl-NL")} organische gebeurtenissen</span></article>`).join("") || `<p class="key-event-empty">Nog geen organische key-eventdata. Synchroniseer GA4 opnieuw.</p>`;
+  $("#ga4-key-events-panel").classList.remove("hidden");
+}
+
+async function saveGa4KeyEvents() {
+  const websiteId = $("#website-select").value;
+  const button = $("#save-ga4-key-events"); const message = $("#ga4-key-events-message");
+  const eventNames = [...document.querySelectorAll("#ga4-key-events input:checked")].map((input) => input.value);
+  button.disabled = true; message.textContent = "";
+  try {
+    await api(`/api/v1/websites/${websiteId}/integrations/ga4/key-events`, {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify({event_names:eventNames})});
+    message.textContent = `${eventNames.length} conversie-events opgeslagen.`;
+  } catch (error) { message.textContent = error.message; }
+  finally { button.disabled = false; }
 }
 
 async function loadBingProperties() {
@@ -317,6 +346,7 @@ async function saveProperty(service, selector, buttonSelector, messageSelector, 
     });
     const serviceLabel = service === "ga4" ? "GA4" : service === "bing_webmaster" ? "Bing" : "Search Console";
     button.textContent = "Opgeslagen ✓"; message.textContent = `${serviceLabel}-property opgeslagen.`;
+    if (service === "ga4") await loadGa4KeyEvents();
   } catch (error) { button.textContent = "Opnieuw proberen"; message.textContent = "Opslaan is mislukt."; }
   finally { button.disabled = false; }
 }
@@ -346,6 +376,18 @@ async function syncGa4() {
     button.textContent = "Opnieuw synchroniseren";
     await loadIssues();
   } catch (error) { message.textContent = "GA4-import is mislukt."; button.textContent = "Opnieuw proberen"; }
+  finally { button.disabled = false; }
+}
+
+async function syncIntegrationHistory() {
+  const websiteId = $("#website-select").value;
+  const button = $("#sync-integration-history"); const message = $("#integration-history-message");
+  if (!websiteId) return;
+  button.disabled = true; message.textContent = "Historische import wordt ingepland…";
+  try {
+    await api(`/api/v1/websites/${websiteId}/integrations/history-sync`, {method: "POST"});
+    message.textContent = "Historische GSC- en GA4-import staat in de wachtrij. Dit kan enkele minuten duren.";
+  } catch (error) { message.textContent = error.message; }
   finally { button.disabled = false; }
 }
 
@@ -764,9 +806,11 @@ $("#refresh-operations").addEventListener("click", loadOperations);
 $("#current-export-download").addEventListener("click", () => window.setTimeout(loadOperations, 2000));
 $("#save-search-console").addEventListener("click", () => saveProperty("search_console", "#search-console-property", "#save-search-console", "#search-console-message", state.googleConnectionId));
 $("#save-ga4").addEventListener("click", () => saveProperty("ga4", "#ga4-property", "#save-ga4", "#ga4-message", state.googleConnectionId));
+$("#save-ga4-key-events").addEventListener("click", saveGa4KeyEvents);
 $("#save-bing").addEventListener("click", () => saveProperty("bing_webmaster", "#bing-property", "#save-bing", "#bing-property-message", state.bingConnectionId));
 $("#sync-search-console").addEventListener("click", syncSearchConsole);
 $("#sync-ga4").addEventListener("click", syncGa4);
+$("#sync-integration-history").addEventListener("click", syncIntegrationHistory);
 
 api("/api/v1/me").then((user) => {
   state.currentUser = user;

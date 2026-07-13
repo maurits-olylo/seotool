@@ -69,3 +69,13 @@ class BingProperty(BaseModel):
 
 class BingPropertiesRead(BaseModel):
     sites: list[BingProperty]
+
+
+class GoogleAnalyticsKeyEventRead(BaseModel):
+    event_name: str
+    key_events: float
+    selected: bool
+
+
+class GoogleAnalyticsKeyEventSelection(BaseModel):
+    event_names: list[str] = Field(default_factory=list, max_length=40)

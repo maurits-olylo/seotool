@@ -11,7 +11,13 @@ from app.core.security import create_session_token, hash_password
 from app.db.session import SessionLocal
 from app.models.crawl import CrawlRun
 from app.models.discovery import CrawlJob
-from app.models.integrations import GoogleAnalyticsMetric, SearchConsoleMetric
+from app.models.integrations import (
+    GoogleAnalyticsEventMetric,
+    GoogleAnalyticsMetric,
+    IntegrationConnection,
+    SearchConsoleMetric,
+    WebsiteIntegration,
+)
 from app.models.issues import Issue, IssueOccurrence
 from app.models.user import ClientMembership, User
 
@@ -302,6 +308,18 @@ def test_client_report_contains_performance_and_work(client: TestClient) -> None
     website_id = UUID(website["id"])
     yesterday = date.today() - timedelta(days=1)
     with SessionLocal() as db:
+        connection = IntegrationConnection(client_id=UUID(customer["id"]), provider="google")
+        db.add(connection)
+        db.flush()
+        db.add(
+            WebsiteIntegration(
+                website_id=website_id,
+                connection_id=connection.id,
+                service="ga4",
+                external_property_id="properties/1",
+                settings={"qualified_key_events": ["offer_request"]},
+            )
+        )
         db.add_all(
             [
                 SearchConsoleMetric(
@@ -319,6 +337,12 @@ def test_client_report_contains_performance_and_work(client: TestClient) -> None
                     landing_page="/",
                     sessions=40,
                     active_users=30,
+                    key_events=3,
+                ),
+                GoogleAnalyticsEventMetric(
+                    website_id=website_id,
+                    date=yesterday,
+                    event_name="offer_request",
                     key_events=3,
                 ),
                 SearchConsoleMetric(
@@ -346,6 +370,9 @@ def test_client_report_contains_performance_and_work(client: TestClient) -> None
     assert report.status_code == 200
     assert report.json()["current"]["clicks"] == 25
     assert report.json()["current"]["key_events"] == 3
+    assert report.json()["qualified_key_events"]["events"] == [
+        {"event_name": "offer_request", "key_events": 3}
+    ]
     assert report.json()["comparisons"]["clicks"] == 150
     assert report.json()["monthly"]
 

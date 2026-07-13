@@ -9,8 +9,13 @@ from sqlalchemy.orm import Session
 
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
-from app.models.integrations import GoogleAnalyticsMetric, SearchConsoleMetric
-from app.models.issues import Change, Issue
+from app.models.integrations import (
+    GoogleAnalyticsEventMetric,
+    GoogleAnalyticsMetric,
+    SearchConsoleMetric,
+    WebsiteIntegration,
+)
+from app.models.issues import ActivityLog, Change, Issue
 from app.services.authorization import require_website_access
 
 router = APIRouter(tags=["reports"])
@@ -76,6 +81,7 @@ def client_report(
     daily: dict[date, dict[str, float]] = defaultdict(dict)
     gsc_dates: list[date] = []
     ga_dates: list[date] = []
+    key_event_dates: list[date] = []
 
     for metric_date, clicks, impressions, position_weight in db.execute(
         select(
@@ -93,12 +99,11 @@ def client_report(
             impressions=float(impressions or 0),
             position_weight=float(position_weight or 0),
         )
-    for metric_date, sessions, users, events in db.execute(
+    for metric_date, sessions, users in db.execute(
         select(
             GoogleAnalyticsMetric.date,
             func.sum(GoogleAnalyticsMetric.sessions),
             func.sum(GoogleAnalyticsMetric.active_users),
-            func.sum(GoogleAnalyticsMetric.key_events),
         )
         .where(GoogleAnalyticsMetric.website_id == website_id)
         .group_by(GoogleAnalyticsMetric.date)
@@ -107,14 +112,48 @@ def client_report(
         daily[metric_date].update(
             sessions=float(sessions or 0),
             active_users=float(users or 0),
-            key_events=float(events or 0),
         )
+
+    ga4_mapping = db.scalar(
+        select(WebsiteIntegration).where(
+            WebsiteIntegration.website_id == website_id,
+            WebsiteIntegration.service == "ga4",
+        )
+    )
+    qualified_events = (
+        set(ga4_mapping.settings.get("qualified_key_events", [])) if ga4_mapping else set()
+    )
+    event_breakdown: dict[str, float] = defaultdict(float)
+    if qualified_events:
+        for metric_date, event_name, events in db.execute(
+            select(
+                GoogleAnalyticsEventMetric.date,
+                GoogleAnalyticsEventMetric.event_name,
+                func.sum(GoogleAnalyticsEventMetric.key_events),
+            )
+            .where(
+                GoogleAnalyticsEventMetric.website_id == website_id,
+                GoogleAnalyticsEventMetric.event_name.in_(qualified_events),
+            )
+            .group_by(GoogleAnalyticsEventMetric.date, GoogleAnalyticsEventMetric.event_name)
+        ):
+            value = float(events or 0)
+            key_event_dates.append(metric_date)
+            daily[metric_date]["key_events"] = daily[metric_date].get("key_events", 0) + value
+            if start <= metric_date <= end:
+                event_breakdown[event_name] += value
 
     current = _totals(daily, start, end)
     previous = _totals(daily, previous_start, previous_end)
     comparisons: dict[str, float | None] = {}
     for key in {"clicks", "impressions", "sessions", "active_users", "key_events"}:
-        source_dates = gsc_dates if key in {"clicks", "impressions"} else ga_dates
+        source_dates = (
+            gsc_dates
+            if key in {"clicks", "impressions"}
+            else key_event_dates
+            if key == "key_events"
+            else ga_dates
+        )
         comparisons[key] = (
             _delta(float(current.get(key, 0)), float(previous.get(key, 0)))
             if source_dates and min(source_dates) <= previous_start
@@ -144,6 +183,14 @@ def client_report(
             (Issue.resolved_at >= start_at) | (Issue.verified_at >= start_at),
         )
     ) or 0
+    activities = list(
+        db.scalars(
+            select(ActivityLog)
+            .where(ActivityLog.website_id == website_id, ActivityLog.occurred_at >= start_at)
+            .order_by(ActivityLog.occurred_at.desc())
+            .limit(20)
+        )
+    )
     planned = list(
         db.scalars(
             select(Issue)
@@ -201,8 +248,29 @@ def client_report(
             "through": max(daily) if daily else None,
             "gsc_from": min(gsc_dates) if gsc_dates else None,
             "ga4_from": min(ga_dates) if ga_dates else None,
+            "key_events_from": min(key_event_dates) if key_event_dates else None,
         },
-        "work_completed": {"resolved_issues": completed, "changes": change_counts},
+        "qualified_key_events": {
+            "configured": bool(qualified_events),
+            "events": [
+                {"event_name": name, "key_events": round(total, 1)}
+                for name, total in sorted(
+                    event_breakdown.items(), key=lambda item: item[1], reverse=True
+                )
+            ],
+        },
+        "work_completed": {
+            "technically_verified": completed,
+            "activities": [
+                {
+                    "summary": activity.summary,
+                    "actor": activity.actor,
+                    "occurred_at": activity.occurred_at,
+                }
+                for activity in activities
+            ],
+            "changes": change_counts,
+        },
         "planned": [_issue_summary(issue) for issue in planned],
         "new_issues": [_issue_summary(issue) for issue in new_issues],
     }
