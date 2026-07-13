@@ -95,8 +95,8 @@ function renderTrendChart(months, metric) {
   const y = (value) => padding.top + ((max - value) / range * plotHeight);
   const points = values.map((value, index) => `${x(index)},${y(value)}`).join(" ");
   const grid = [0, 0.5, 1].map((ratio) => { const lineY = padding.top + plotHeight * ratio; const label = Math.round(max - range * ratio).toLocaleString("nl-NL"); return `<line x1="${padding.left}" y1="${lineY}" x2="${width - padding.right}" y2="${lineY}"/><text x="0" y="${lineY + 4}">${label}</text>`; }).join("");
-  const dots = values.map((value, index) => `<g><title>${months[index].month}: ${value.toLocaleString("nl-NL")}</title><circle cx="${x(index)}" cy="${y(value)}" r="4"/><text x="${x(index)}" y="${height - 12}" text-anchor="middle">${months[index].month.slice(5)}/${months[index].month.slice(2,4)}</text></g>`).join("");
-  return `<svg class="report-line-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Maandelijkse organische prestaties"><g class="report-chart-grid">${grid}</g><polyline class="report-chart-line" points="${points}"/>${dots}</svg>`;
+  const dots = values.map((value, index) => `<g><title>${months[index].month}: ${value.toLocaleString("nl-NL")}</title><circle cx="${x(index)}" cy="${y(value)}" r="4" fill="#fff" stroke="#124b3b" stroke-width="3"/><text x="${x(index)}" y="${height - 12}" text-anchor="middle">${months[index].month.slice(5)}/${months[index].month.slice(2,4)}</text></g>`).join("");
+  return `<svg class="report-line-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Maandelijkse organische prestaties"><g class="report-chart-grid">${grid}</g><polyline class="report-chart-line" points="${points}" fill="none" stroke="#124b3b" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>${dots}</svg>`;
 }
 
 function renderReportIssues(issues = [], emptyText) {
