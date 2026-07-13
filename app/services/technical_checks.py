@@ -20,6 +20,12 @@ SNAPSHOT_ISSUE_TYPES = {
     "expired_job_posting_linked",
     "expired_job_posting_404",
     "job_posting_missing_fields",
+    "job_posting_invalid_dates",
+    "job_posting_missing_application",
+    "job_posting_remote_location_missing",
+    "job_posting_location_incomplete",
+    "job_posting_not_detail_page",
+    "job_posting_missing_recommended_fields",
     "robots_txt_blocked",
 }
 

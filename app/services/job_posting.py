@@ -74,22 +74,17 @@ def inspect_job_posting(
 
     expiration_evidence: dict[str, object] = {}
     for job in jobs:
+        signals.extend(
+            _google_for_jobs_signals(
+                job,
+                page_url=page_url,
+                main_content=main_content or "",
+                has_application_cta=has_application_cta,
+            )
+        )
         valid_through = _parse_date(job.get("validThrough"))
         if valid_through and valid_through < today and status_code == 200:
             expiration_evidence["validThrough"] = valid_through.isoformat()
-        missing = [field for field in ("title", "description", "datePosted") if not job.get(field)]
-        if missing:
-            signals.append(
-                IssueSignal(
-                    "job_posting_missing_fields",
-                    "structured_data",
-                    "medium",
-                    "JobPosting mist verplichte velden",
-                    f"Ontbrekende velden: {', '.join(missing)}.",
-                    "Vul de ontbrekende JobPosting-velden aan.",
-                    {"missing_fields": missing},
-                )
-            )
 
     visible_deadline = _visible_expired_deadline(main_content or "", today)
     if visible_deadline and has_application_cta:
@@ -120,6 +115,155 @@ def inspect_job_posting(
                 )
             )
     return signals
+
+
+def _google_for_jobs_signals(
+    job: dict[str, object],
+    *,
+    page_url: str | None,
+    main_content: str,
+    has_application_cta: bool,
+) -> list[IssueSignal]:
+    """Validate the JobPosting properties that Google needs for job listings."""
+    signals: list[IssueSignal] = []
+    missing = _missing_required_job_fields(job)
+    if missing:
+        signals.append(
+            IssueSignal(
+                "job_posting_missing_fields",
+                "structured_data",
+                "high",
+                "JobPosting mist verplichte velden",
+                f"Ontbrekende of ongeldige velden: {', '.join(missing)}.",
+                "Vul de ontbrekende JobPosting-velden aan op deze individuele vacaturepagina.",
+                {"missing_fields": missing, "source": "google_for_jobs"},
+            )
+        )
+
+    invalid_dates = _invalid_job_dates(job)
+    if invalid_dates:
+        signals.append(
+            IssueSignal(
+                "job_posting_invalid_dates",
+                "structured_data",
+                "high",
+                "JobPosting bevat ongeldige datums",
+                f"Controleer: {', '.join(invalid_dates)}.",
+                "Gebruik geldige ISO-datums en zorg dat validThrough niet vóór datePosted ligt.",
+                {"invalid_dates": invalid_dates, "source": "google_for_jobs"},
+            )
+        )
+
+    if not has_application_cta and not APPLICATION_CTA_RE.search(main_content):
+        signals.append(
+            IssueSignal(
+                "job_posting_missing_application",
+                "content",
+                "high",
+                "Vacature heeft geen herkenbare sollicitatiemogelijkheid",
+                "Op de vacaturepagina is geen herkenbare sollicitatie-CTA of sollicitatielink gevonden.",
+                "Voeg een direct bereikbare sollicitatiemogelijkheid toe aan de vacaturepagina.",
+                {"source": "google_for_jobs"},
+                confidence="medium",
+            )
+        )
+
+    if _is_remote_job(job) and not job.get("applicantLocationRequirements"):
+        signals.append(
+            IssueSignal(
+                "job_posting_remote_location_missing",
+                "structured_data",
+                "high",
+                "Remote vacature mist toegestane werklocatie",
+                "jobLocationType is TELECOMMUTE, maar applicantLocationRequirements ontbreekt.",
+                "Vermeld voor remote werk waar kandidaten zich moeten bevinden.",
+                {"source": "google_for_jobs"},
+            )
+        )
+    elif job.get("jobLocation") and _job_location_missing_country(job.get("jobLocation")):
+        signals.append(
+            IssueSignal(
+                "job_posting_location_incomplete",
+                "structured_data",
+                "medium",
+                "Vacaturelocatie mist land",
+                "Een JobPosting met jobLocation bevat geen addressCountry.",
+                "Vul addressCountry aan bij iedere fysieke vacaturelocatie.",
+                {"source": "google_for_jobs"},
+            )
+        )
+
+    if page_url and JOB_URL_RE.search(urlsplit(page_url).path) and not JOB_DETAIL_URL_RE.search(
+        urlsplit(page_url).path
+    ):
+        signals.append(
+            IssueSignal(
+                "job_posting_not_detail_page",
+                "structured_data",
+                "medium",
+                "JobPosting-schema staat niet op een individuele vacaturepagina",
+                "Google verwacht JobPosting-schema op een afzonderlijke detailpagina, niet op een vacature-overzicht.",
+                "Verplaats of beperk het JobPosting-schema tot individuele, actuele vacatures.",
+                {"source": "google_for_jobs", "page_url": page_url},
+            )
+        )
+
+    recommended = [field for field in ("employmentType", "identifier") if not job.get(field)]
+    if recommended:
+        signals.append(
+            IssueSignal(
+                "job_posting_missing_recommended_fields",
+                "structured_data",
+                "low",
+                "JobPosting mist aanbevolen velden",
+                f"Aanbevolen velden ontbreken: {', '.join(recommended)}.",
+                "Vul employmentType en een stabiele identifier aan voor vollediger vacature-schema.",
+                {"missing_fields": recommended, "source": "google_for_jobs"},
+            )
+        )
+    return signals
+
+
+def _missing_required_job_fields(job: dict[str, object]) -> list[str]:
+    missing: list[str] = []
+    if not _string(job.get("title")):
+        missing.append("title")
+    if not _string(job.get("description")):
+        missing.append("description")
+    if not _parse_date(job.get("datePosted")):
+        missing.append("datePosted")
+    if not _organization_name(job.get("hiringOrganization")):
+        missing.append("hiringOrganization")
+    return missing
+
+
+def _invalid_job_dates(job: dict[str, object]) -> list[str]:
+    invalid: list[str] = []
+    date_posted = _parse_date(job.get("datePosted"))
+    valid_through = _parse_date(job.get("validThrough"))
+    if job.get("datePosted") and date_posted is None:
+        invalid.append("datePosted is geen geldige datum")
+    if job.get("validThrough") and valid_through is None:
+        invalid.append("validThrough is geen geldige datum")
+    if date_posted and valid_through and valid_through < date_posted:
+        invalid.append("validThrough ligt vóór datePosted")
+    return invalid
+
+
+def _is_remote_job(job: dict[str, object]) -> bool:
+    value = _string(job.get("jobLocationType"))
+    return value is not None and value.upper() == "TELECOMMUTE"
+
+
+def _job_location_missing_country(value: object) -> bool:
+    locations = value if isinstance(value, list) else [value]
+    for location in locations:
+        if not isinstance(location, dict):
+            return True
+        address = location.get("address")
+        if not isinstance(address, dict) or not _string(address.get("addressCountry")):
+            return True
+    return False
 
 
 def recognize_job_listing(

@@ -11,16 +11,69 @@ def test_expired_job_posting() -> None:
             "description": "Vacature",
             "datePosted": "2025-01-01",
             "validThrough": "2025-02-01",
+            "hiringOrganization": {"name": "Thact"},
+            "employmentType": "FULL_TIME",
+            "identifier": {"value": "developer-1"},
         }
     ]
-    signals = inspect_job_posting(data, today=date(2026, 1, 1))
+    signals = inspect_job_posting(data, today=date(2026, 1, 1), main_content="Solliciteer direct.")
     assert [signal.issue_type for signal in signals] == ["expired_job_posting"]
 
 
 def test_job_posting_missing_required_fields() -> None:
     signals = inspect_job_posting([{"@type": "JobPosting", "title": "Developer"}])
     assert signals[0].issue_type == "job_posting_missing_fields"
-    assert signals[0].evidence["missing_fields"] == ["description", "datePosted"]
+    assert signals[0].evidence["missing_fields"] == [
+        "description",
+        "datePosted",
+        "hiringOrganization",
+    ]
+
+
+def test_google_for_jobs_validation_detects_remote_and_application_problems() -> None:
+    signals = inspect_job_posting(
+        [
+            {
+                "@type": "JobPosting",
+                "title": "Remote developer",
+                "description": "Bouw onze applicatie.",
+                "datePosted": "2026-01-10",
+                "hiringOrganization": {"name": "Thact"},
+                "jobLocationType": "TELECOMMUTE",
+            }
+        ],
+        page_url="https://example.com/vacatures/remote-developer",
+        main_content="Een vacature voor een remote developer.",
+    )
+    assert {signal.issue_type for signal in signals} == {
+        "job_posting_missing_application",
+        "job_posting_remote_location_missing",
+        "job_posting_missing_recommended_fields",
+    }
+
+
+def test_google_for_jobs_validation_detects_bad_dates_and_overview_schema() -> None:
+    signals = inspect_job_posting(
+        [
+            {
+                "@type": "JobPosting",
+                "title": "Developer",
+                "description": "Bouw onze applicatie.",
+                "datePosted": "2026-02-10",
+                "validThrough": "2026-01-10",
+                "hiringOrganization": {"name": "Thact"},
+                "employmentType": "FULL_TIME",
+                "identifier": {"value": "dev-1"},
+            }
+        ],
+        page_url="https://example.com/vacatures",
+        main_content="Solliciteer direct.",
+        today=date(2025, 1, 1),
+    )
+    assert {signal.issue_type for signal in signals} == {
+        "job_posting_invalid_dates",
+        "job_posting_not_detail_page",
+    }
 
 
 def test_visible_expired_deadline_requires_an_active_application_cta() -> None:
