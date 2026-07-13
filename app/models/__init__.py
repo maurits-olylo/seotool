@@ -7,6 +7,7 @@ from app.models.integrations import (
     GoogleAnalyticsMetric,
     IntegrationConnection,
     SearchConsoleMetric,
+    SearchConsoleQueryMetric,
     WebsiteIntegration,
 )
 from app.models.issues import ActivityLog, Change, Issue, IssueComment, IssueOccurrence
@@ -30,6 +31,7 @@ __all__ = [
     "GoogleAnalyticsMetric",
     "GoogleAnalyticsEventMetric",
     "SearchConsoleMetric",
+    "SearchConsoleQueryMetric",
     "Url",
     "UrlLink",
     "UrlSnapshot",

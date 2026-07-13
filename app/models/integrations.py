@@ -72,6 +72,27 @@ class SearchConsoleMetric(UUIDTimestampMixin, Base):
     position: Mapped[float] = mapped_column(Float, default=0)
 
 
+class SearchConsoleQueryMetric(UUIDTimestampMixin, Base):
+    """Daily Google Search Console performance by query and landing page."""
+
+    __tablename__ = "search_console_query_metrics"
+    __table_args__ = (UniqueConstraint("website_id", "date", "query", "page_url"),)
+
+    website_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("websites.id", ondelete="CASCADE"), index=True
+    )
+    url_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("urls.id", ondelete="SET NULL"), index=True
+    )
+    date: Mapped[date] = mapped_column(Date, index=True)
+    query: Mapped[str] = mapped_column(String(2048), index=True)
+    page_url: Mapped[str] = mapped_column(String(2048))
+    clicks: Mapped[float] = mapped_column(Float, default=0)
+    impressions: Mapped[int] = mapped_column(Integer, default=0)
+    ctr: Mapped[float] = mapped_column(Float, default=0)
+    position: Mapped[float] = mapped_column(Float, default=0)
+
+
 class GoogleAnalyticsMetric(UUIDTimestampMixin, Base):
     __tablename__ = "google_analytics_metrics"
     __table_args__ = (UniqueConstraint("website_id", "date", "landing_page"),)

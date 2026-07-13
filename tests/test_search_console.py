@@ -8,6 +8,7 @@ from app.models.discovery import Url
 from app.models.integrations import (
     IntegrationConnection,
     SearchConsoleMetric,
+    SearchConsoleQueryMetric,
     WebsiteIntegration,
 )
 from app.models.website import Website
@@ -18,21 +19,22 @@ async def test_search_console_sync_maps_and_upserts_page_metrics(monkeypatch) ->
     class FakeResponse:
         status_code = 200
 
+        def __init__(self, rows: list[dict[str, object]] | None = None) -> None:
+            self.rows = rows or [
+                {
+                    "keys": [
+                        (date.today() - timedelta(days=1)).isoformat(),
+                        "https://example.com/page/",
+                    ],
+                    "clicks": 12,
+                    "impressions": 1200,
+                    "ctr": 0.01,
+                    "position": 8.4,
+                }
+            ]
+
         def json(self) -> dict[str, object]:
-            return {
-                "rows": [
-                    {
-                        "keys": [
-                            (date.today() - timedelta(days=1)).isoformat(),
-                            "https://example.com/page/",
-                        ],
-                        "clicks": 12,
-                        "impressions": 1200,
-                        "ctr": 0.01,
-                        "position": 8.4,
-                    }
-                ]
-            }
+            return {"rows": self.rows}
 
     class FakeGoogleClient:
         async def __aenter__(self):  # type: ignore[no-untyped-def]
@@ -42,6 +44,23 @@ async def test_search_console_sync_maps_and_upserts_page_metrics(monkeypatch) ->
             return None
 
         async def post(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            dimensions = kwargs["json"]["dimensions"]
+            if dimensions == ["date", "query", "page"]:
+                return FakeResponse(
+                    [
+                        {
+                            "keys": [
+                                (date.today() - timedelta(days=1)).isoformat(),
+                                "example query",
+                                "https://example.com/page/",
+                            ],
+                            "clicks": 9,
+                            "impressions": 900,
+                            "ctr": 0.01,
+                            "position": 7.1,
+                        }
+                    ]
+                )
             return FakeResponse()
 
     async def fake_token(*args, **kwargs):  # type: ignore[no-untyped-def]
@@ -80,6 +99,9 @@ async def test_search_console_sync_maps_and_upserts_page_metrics(monkeypatch) ->
         assert first["matched_urls"] == 1
         assert second["rows"] == 1
         assert db.scalar(select(func.count()).select_from(SearchConsoleMetric)) == 1
+        assert db.scalar(select(func.count()).select_from(SearchConsoleQueryMetric)) == 1
         metric = db.scalar(select(SearchConsoleMetric))
         assert metric and metric.url_id == url.id and metric.clicks == 12
+        query_metric = db.scalar(select(SearchConsoleQueryMetric))
+        assert query_metric and query_metric.query == "example query" and query_metric.url_id == url.id
         assert mapping.last_synced_at is not None

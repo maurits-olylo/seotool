@@ -7,7 +7,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.models.integrations import GoogleAnalyticsMetric, SearchConsoleMetric, WebsiteIntegration
+from app.models.integrations import (
+    GoogleAnalyticsMetric,
+    SearchConsoleMetric,
+    SearchConsoleQueryMetric,
+    WebsiteIntegration,
+)
 from app.services.google_analytics import sync_google_analytics
 from app.services.search_console import sync_search_console
 
@@ -73,6 +78,11 @@ def _set_history_sync_status(
         "gsc_from": db.scalar(
             select(func.min(SearchConsoleMetric.date)).where(
                 SearchConsoleMetric.website_id == website_id
+            )
+        ),
+        "gsc_query_from": db.scalar(
+            select(func.min(SearchConsoleQueryMetric.date)).where(
+                SearchConsoleQueryMetric.website_id == website_id
             )
         ),
         "ga4_from": db.scalar(

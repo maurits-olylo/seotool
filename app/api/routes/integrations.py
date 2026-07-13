@@ -19,6 +19,7 @@ from app.models.integrations import (
     GoogleAnalyticsMetric,
     IntegrationConnection,
     SearchConsoleMetric,
+    SearchConsoleQueryMetric,
     WebsiteIntegration,
 )
 from app.models.website import Website
@@ -533,6 +534,16 @@ def integration_history_status(
             "gsc_through": db.scalar(
                 select(func.max(SearchConsoleMetric.date)).where(
                     SearchConsoleMetric.website_id == website_id
+                )
+            ),
+            "gsc_query_from": db.scalar(
+                select(func.min(SearchConsoleQueryMetric.date)).where(
+                    SearchConsoleQueryMetric.website_id == website_id
+                )
+            ),
+            "gsc_query_through": db.scalar(
+                select(func.max(SearchConsoleQueryMetric.date)).where(
+                    SearchConsoleQueryMetric.website_id == website_id
                 )
             ),
             "ga4_from": db.scalar(

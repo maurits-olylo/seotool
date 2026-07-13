@@ -473,7 +473,7 @@ async function syncIntegrationHistory() {
 }
 
 function historyCoverageText(coverage = {}) {
-  const ranges = [["GSC", coverage.gsc_from, coverage.gsc_through], ["GA4", coverage.ga4_from, coverage.ga4_through]]
+  const ranges = [["GSC", coverage.gsc_from, coverage.gsc_through], ["GSC-zoekopdrachten", coverage.gsc_query_from, coverage.gsc_query_through], ["GA4", coverage.ga4_from, coverage.ga4_through]]
     .filter(([, from]) => from)
     .map(([source, from, through]) => `${source}: ${new Date(from).toLocaleDateString("nl-NL")} – ${new Date(through).toLocaleDateString("nl-NL")}`);
   return ranges.join(" · ");
