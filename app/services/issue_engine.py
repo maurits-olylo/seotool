@@ -47,6 +47,7 @@ def reconcile_issues(
             issue.last_detected_at = now
             issue.severity = signal.severity
             issue.confidence = signal.confidence
+            issue.title = signal.title
             issue.description = signal.description
             issue.recommended_action = signal.recommended_action
             if issue.status in REOPENABLE_STATUSES:
@@ -68,6 +69,8 @@ def reconcile_issues(
                     evidence=signal.evidence,
                 )
             )
+        else:
+            occurrence.evidence = signal.evidence
         touched.append(issue)
 
     for issue in existing:

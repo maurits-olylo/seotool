@@ -149,9 +149,10 @@ def inspect_snapshot(snapshot: UrlSnapshot) -> list[IssueSignal]:
             _signal(
                 "unexpected_noindex",
                 "indexation",
-                "high",
-                "Pagina is niet indexeerbaar",
-                "Controleer robots-instructies en verwijder een onbedoelde noindex.",
+                "medium",
+                "Pagina heeft een noindex-instructie",
+                "Controleer of de noindex bewust is en verwijder hem wanneer de pagina "
+                "organisch vindbaar moet zijn.",
             )
         )
     if (
