@@ -61,9 +61,10 @@ function renderClientReport() {
     : `${label[0].toUpperCase()}${label.slice(1)} ${change >= 0 ? "stegen" : "daalden"} ${Math.abs(change)}%`;
   $("#report-explanation").textContent = change === null || change === undefined
     ? `Er is nog geen volledige voorafgaande periode om deze ${label} eerlijk te vergelijken.`
-    : `Van ${previousValue} naar ${currentValue} ${label} ten opzichte van de vorige vergelijkbare periode.`;
+    : `Van ${previousValue} naar ${currentValue} ${label}, vergeleken met ${report.comparison_context || "de vergelijkbare periode"}.`;
   $("#report-date").textContent = `${new Date(report.start_date).toLocaleDateString("nl-NL")} – ${new Date(report.end_date).toLocaleDateString("nl-NL")}`;
   $("#report-coverage").textContent = report.coverage?.from ? `Data beschikbaar vanaf ${new Date(report.coverage.from).toLocaleDateString("nl-NL")}` : "Nog geen GSC/GA4-data beschikbaar";
+  $("#report-comparison").textContent = report.comparison_context ? `Vergelijking: ${report.comparison_context}` : "";
   const metricDefinitions = [["clicks","Organische klikken"],["impressions","Vertoningen in Google"],["sessions","Organische sessies"],["key_events","Gekwalificeerde leads"]];
   $("#report-metrics").innerHTML = metricDefinitions.map(([key, label]) => {
     const delta = comparisons[key];
@@ -72,9 +73,8 @@ function renderClientReport() {
   }).join("");
   const availablePeriods = new Set(report.available_periods || []);
   $("#report-periods").querySelectorAll("button").forEach((button) => {
-    const available = availablePeriods.has(button.dataset.reportPeriod);
+    const available = availablePeriods.has(button.dataset.reportPeriod) || (!availablePeriods.size && button.dataset.reportPeriod === "month");
     button.classList.toggle("hidden", !available);
-    if (!available && button.dataset.reportPeriod === state.reportPeriod) state.reportPeriod = "month";
   });
   const conversionEvents = qualifiedEvents.events || [];
   $("#report-conversions").innerHTML = qualifiedEvents.configured
@@ -145,6 +145,13 @@ async function loadClientReport() {
   state.clientReport = state.selectedReportSnapshotId
     ? await api(`/api/v1/websites/${websiteId}/monthly-reports/${state.selectedReportSnapshotId}`)
     : await api(`/api/v1/websites/${websiteId}/client-report?period=${state.reportPeriod}`);
+  if (!state.selectedReportSnapshotId) {
+    const availablePeriods = state.clientReport.available_periods || [];
+    if (availablePeriods.length && !availablePeriods.includes(state.reportPeriod)) {
+      state.reportPeriod = availablePeriods.includes("month") ? "month" : availablePeriods[0] || "month";
+      return loadClientReport();
+    }
+  }
   renderClientReport();
 }
 

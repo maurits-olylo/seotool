@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from app.api.routes.reports import _period_dates
 from app.core.config import get_settings
 from app.core.security import create_session_token, hash_password
 from app.db.session import SessionLocal
@@ -377,7 +378,16 @@ def test_client_report_contains_performance_and_work(client: TestClient) -> None
     assert report.json()["comparisons"]["clicks"] == 150
     assert report.json()["monthly"]
     assert report.json()["primary_metric"] == "key_events"
-    assert "month" in report.json()["available_periods"]
+    assert report.json()["comparison_context"] == "dezelfde dagen in de vorige maand"
+
+
+def test_report_ytd_and_half_year_use_year_over_year_windows() -> None:
+    end = date(2026, 7, 12)
+    half_year = _period_dates("half_year", end)
+    ytd = _period_dates("ytd", end)
+
+    assert half_year == (date(2026, 1, 12), end, date(2025, 1, 12), date(2025, 7, 12))
+    assert ytd == (date(2026, 1, 1), end, date(2025, 1, 1), date(2025, 7, 12))
 
 
 def test_monthly_report_snapshots_are_listed_and_readable(client: TestClient) -> None:

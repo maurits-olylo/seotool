@@ -1,3 +1,4 @@
+from calendar import monthrange
 from collections import defaultdict
 from datetime import UTC, date, datetime, timedelta
 from typing import Literal
@@ -25,13 +26,44 @@ ACTIVE_STATUSES = {"new", "review", "accepted", "planned", "in_progress", "waiti
 REPORT_PERIODS: tuple[Period, ...] = ("month", "quarter", "half_year", "ytd", "year")
 
 
+def _shift_months(value: date, months: int) -> date:
+    raw_month = value.month - 1 + months
+    year = value.year + raw_month // 12
+    month = raw_month % 12 + 1
+    return date(year, month, min(value.day, monthrange(year, month)[1]))
+
+
 def _period_dates(period: Period, end: date) -> tuple[date, date, date, date]:
-    days = {"month": 30, "quarter": 90, "half_year": 182, "year": 365}
-    start = date(end.year, 1, 1) if period == "ytd" else end - timedelta(days=days[period] - 1)
-    length = (end - start).days + 1
-    previous_end = start - timedelta(days=1)
-    previous_start = previous_end - timedelta(days=length - 1)
+    """Return a current window and the explicitly comparable reference window."""
+    if period == "month":
+        start = end - timedelta(days=29)
+        previous_start, previous_end = _shift_months(start, -1), _shift_months(end, -1)
+    elif period == "quarter":
+        start = end - timedelta(days=89)
+        previous_start, previous_end = _shift_months(start, -3), _shift_months(end, -3)
+    elif period == "half_year":
+        start = end - timedelta(days=181)
+        previous_start, previous_end = _shift_months(start, -12), _shift_months(end, -12)
+    elif period == "year":
+        start = _shift_months(end, -12) + timedelta(days=1)
+        previous_start, previous_end = _shift_months(start, -12), _shift_months(end, -12)
+    else:  # YTD
+        start = date(end.year, 1, 1)
+        previous_start = date(end.year - 1, 1, 1)
+        previous_end = _shift_months(end, -12)
     return start, end, previous_start, previous_end
+
+
+def _comparison_context(period: str) -> str:
+    labels = {
+        "month": "dezelfde dagen in de vorige maand",
+        "quarter": "dezelfde dagen in het vorige kwartaal",
+        "half_year": "dezelfde zes maanden vorig jaar",
+        "year": "de voorgaande twaalf maanden",
+        "ytd": "dezelfde dagen vorig jaar",
+        "monthly_snapshot": "de voorgaande kalendermaand",
+    }
+    return labels.get(period, "de voorafgaande vergelijkbare periode")
 
 
 def _delta(current: float, previous: float) -> float | None:
@@ -273,6 +305,7 @@ def build_client_report(
         "end_date": end,
         "previous_start_date": previous_start,
         "previous_end_date": previous_end,
+        "comparison_context": _comparison_context(period),
         "current": current,
         "previous": previous,
         "comparisons": comparisons,
@@ -324,7 +357,7 @@ def client_report(
 ) -> dict[str, object]:
     require_website_access(db, principal, website_id)
     end = date.today() - timedelta(days=1)
-    start, _,previous_start, previous_end = _period_dates(period, end)
+    start, _, previous_start, previous_end = _period_dates(period, end)
     return build_client_report(
         website_id,
         period,
