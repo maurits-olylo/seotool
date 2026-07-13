@@ -12,6 +12,7 @@ from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url
 from app.models.website import Website
 from app.services.asset_checks import ASSET_ISSUE_TYPES, HTML_ONLY_ISSUE_TYPES, inspect_asset
+from app.services.content_similarity import detect_duplicate_content
 from app.services.contextual_404 import classify_404_issues
 from app.services.http_crawler import CrawlError, fetch_metadata, fetch_url
 from app.services.internal_link_analysis import detect_orphan_pages
@@ -200,6 +201,11 @@ def _crawl_full_site(db, job: CrawlJob, run: CrawlRun) -> bool:  # type: ignore[
     complete = not pending
     if complete:
         detect_orphan_pages(
+            db,
+            website_id=website.id,
+            crawl_run_id=run.id,
+        )
+        detect_duplicate_content(
             db,
             website_id=website.id,
             crawl_run_id=run.id,

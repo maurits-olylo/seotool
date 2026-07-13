@@ -78,6 +78,13 @@ hoofdcontent. Nagenoeg lege pagina's krijgen meer urgentie. Niet-indexeerbare pa
 zoek-/filtervarianten en duidelijke bevestigings-, login- en checkoutpagina's worden uitgesloten om
 functionele pagina's niet als contentfout te behandelen.
 
+Na een volledig afgeronde sitecrawl vergelijkt de sitebrede contentanalyse indexeerbare pagina's
+met minimaal 100 woorden. Gelijke hoofdcontenthashes leveren een hard duplicaatsignaal op. Sterk
+gelijkende pagina's worden met vijfwoord-shingles en een hoge overlapdrempel als controlepunt
+gemarkeerd. Veelvoorkomende template-shingles worden buiten de vergelijking gehouden. De GSC-analyse
+blijft daarnaast apart signaleren wanneer één zoekopdracht over meerdere landingspagina's is verdeeld;
+dat is een zoekintentiesignaal en geen bewijs van dubbele tekst.
+
 ## Vacaturemonitor
 
 `job_listings` bewaart de actuele, genormaliseerde toestand van herkende vacaturepagina’s per
