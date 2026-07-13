@@ -15,7 +15,7 @@ from app.services.asset_checks import ASSET_ISSUE_TYPES, HTML_ONLY_ISSUE_TYPES, 
 from app.services.content_similarity import detect_duplicate_content
 from app.services.contextual_404 import classify_404_issues
 from app.services.http_crawler import CrawlError, fetch_metadata, fetch_url
-from app.services.internal_link_analysis import detect_orphan_pages
+from app.services.internal_link_analysis import analyze_internal_link_quality, detect_orphan_pages
 from app.services.issue_engine import reconcile_issues
 from app.services.robots import RobotsRules
 from app.services.sitemap import parse_sitemap
@@ -201,6 +201,11 @@ def _crawl_full_site(db, job: CrawlJob, run: CrawlRun) -> bool:  # type: ignore[
     complete = not pending
     if complete:
         detect_orphan_pages(
+            db,
+            website_id=website.id,
+            crawl_run_id=run.id,
+        )
+        analyze_internal_link_quality(
             db,
             website_id=website.id,
             crawl_run_id=run.id,
