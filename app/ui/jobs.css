@@ -7,17 +7,24 @@
 .vacancy-table th:nth-child(3) { width: 10%; }
 .vacancy-table th:nth-child(4) { width: 28%; }
 .vacancy-table th, .vacancy-table td { min-width: 0; overflow-wrap: anywhere; }
-.vacancy-table .url { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.vacancy-table .url { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vacancy-table small { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; }
 .vacancy-badge { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #edf1ee; color: #45564d; font-size: 12px; font-weight: 800; white-space: nowrap; }
 .vacancy-badge + .vacancy-badge { margin-top: 6px; }
 .lifecycle-active, .validation-valid { background: #e7f6ec; color: #087a43; }
 .lifecycle-expiring_soon, .validation-warning { background: #fff4df; color: #9a6200; }
 .lifecycle-expired, .lifecycle-removed, .validation-error { background: #fff0ed; color: #b42318; }
-.vacancy-issue { display: block; width: 100%; margin: 3px 0; padding: 5px 0; border: 0; background: transparent; color: var(--green); text-align: left; font: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; }
-.vacancy-issue.high { color: var(--red); }
-.vacancy-issue.medium { color: var(--amber); }
+.vacancy-finding { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 3px 0; }
+.vacancy-finding .severity { font-size: 12px; }
 .vacancy-ok { color: var(--muted); font-size: 13px; }
+.vacancy-dashboard { margin: 0 0 30px; }
+.vacancy-dashboard-stats { display: grid; grid-template-columns: repeat(6, 1fr); }
+.vacancy-dashboard-stats button { min-width: 0; padding: 18px 20px; border: 0; border-right: 1px solid var(--line); background: #fff; color: var(--ink); text-align: left; cursor: pointer; }
+.vacancy-dashboard-stats button:last-child { border-right: 0; }
+.vacancy-dashboard-stats button:hover { background: #f6f9f7; }
+.vacancy-dashboard-stats strong { display: block; font-size: 26px; letter-spacing: -.04em; }
+.vacancy-dashboard-stats span { color: var(--muted); font-size: 12px; }
 dialog { max-height: calc(100vh - 32px); overflow: auto; }
 dialog .dialog-close { position: sticky; top: -18px; z-index: 2; float: right; margin: -18px -18px 0 16px; border-radius: 8px; background: #fff; line-height: 1.2; }
+@media(max-width:1100px) { .vacancy-dashboard-stats { grid-template-columns: repeat(3, 1fr); } .vacancy-dashboard-stats button:nth-child(3) { border-right: 0; } .vacancy-dashboard-stats button:nth-child(-n+3) { border-bottom: 1px solid var(--line); } }
 @media(max-width:850px) { .vacancy-filters { grid-template-columns: 1fr; padding: 14px; } .vacancy-table { min-width: 720px; } }

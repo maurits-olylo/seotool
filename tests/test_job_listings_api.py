@@ -63,6 +63,9 @@ def test_job_listing_endpoint_returns_validation_issues(client: TestClient) -> N
         "expired": 0,
         "removed": 0,
         "needs_attention": 1,
+        "technical_errors": 1,
+        "missing_schema": 1,
+        "new_issues": 1,
     }
     assert payload["job_listings"][0]["validation_status"] == "error"
     assert payload["job_listings"][0]["issues"][0]["title"] == "Vacature mist JobPosting-schema"

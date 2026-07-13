@@ -206,6 +206,7 @@ function applyRolePermissions() {
   $("#client-report").classList.toggle("hidden", !isClient);
   $("#report-archive").classList.toggle("hidden", !isClient);
   $("#summary").classList.toggle("hidden", isClient);
+  $("#vacancy-dashboard").classList.toggle("hidden", isClient);
   $("#internal-action-panel").classList.toggle("hidden", isClient);
   $("#detail-status").classList.toggle("hidden", isClient);
   $("#save-status").classList.toggle("hidden", isClient);
@@ -566,7 +567,11 @@ async function loadIssues() {
   $("#type-filter").innerHTML = `<option value="">Alle issue-types</option>${types.map((type) => `<option value="${escapeHtml(type)}">${escapeHtml(type)}</option>`).join("")}`;
   state.page = 1;
   render();
-  await Promise.all([loadClientReport(), loadReportSnapshots()]);
+  await Promise.all([
+    loadClientReport(),
+    loadReportSnapshots(),
+    state.currentUser?.role === "client" ? Promise.resolve() : loadJobListings(),
+  ]);
 }
 
 async function loadAllUrls(websiteId) {
@@ -597,7 +602,9 @@ function renderJobListings() {
   const validation = $("#vacancy-validation-filter").value;
   state.vacancyFiltered = state.jobListings.filter((listing) => {
     const searchable = `${listing.title || ""} ${listing.url || ""} ${listing.employer || ""}`.toLowerCase();
-    return (!query || searchable.includes(query)) && (!lifecycle || listing.lifecycle_status === lifecycle) && (!validation || listing.validation_status === validation);
+    const validationMatch = !validation || (validation === "missing_schema" ? !listing.has_job_posting_schema : listing.validation_status === validation);
+    const quickMatch = state.vacancyQuickFilter !== "new_issues" || listing.issues.some((issue) => issue.status === "new");
+    return (!query || searchable.includes(query)) && (!lifecycle || listing.lifecycle_status === lifecycle) && validationMatch && quickMatch;
   });
   const summary = state.jobSummary || {};
   $("#vacancy-summary").innerHTML = [["total", "Herkend"], ["active", "Actief"], ["expiring_soon", "Loopt bijna af"], ["needs_attention", "Met aandachtspunt"]]
@@ -606,11 +613,29 @@ function renderJobListings() {
   $("#vacancy-rows").innerHTML = state.vacancyFiltered.map((listing) => {
     const date = listing.valid_through ? `Geldig t/m ${new Date(`${listing.valid_through}T12:00:00`).toLocaleDateString("nl-NL")}` : listing.date_posted ? `Geplaatst ${new Date(`${listing.date_posted}T12:00:00`).toLocaleDateString("nl-NL")}` : "Geen datum in schema";
     const issueMarkup = listing.issues.length
-      ? listing.issues.map((issue) => `<button class="vacancy-issue ${issue.severity}" data-issue-id="${issue.id}">${escapeHtml(issue.title)}</button>`).join("")
+      ? listing.issues.map((issue) => `<div class="vacancy-finding"><span class="severity ${escapeHtml(issue.severity)}">${issue.severity === "high" || issue.severity === "critical" ? "Fout" : "Waarschuwing"}</span><button class="detail-button" data-issue-id="${issue.id}" aria-label="Bekijk ${escapeHtml(issue.title)}">Bekijk</button></div>`).join("")
       : `<span class="vacancy-ok">Geen actieve vacature-issues</span>`;
-    return `<tr><td><strong>${escapeHtml(listing.title || "Naam ontbreekt")}</strong><a class="url" href="${escapeHtml(listing.url)}" target="_blank" rel="noopener">${escapeHtml(listing.url)}</a><small>${date}</small></td><td><span class="vacancy-badge lifecycle-${escapeHtml(listing.lifecycle_status)}">${escapeHtml(vacancyLifecycleLabels[listing.lifecycle_status] || listing.lifecycle_status)}</span><span class="vacancy-badge validation-${escapeHtml(listing.validation_status)}">${escapeHtml(vacancyValidationLabels[listing.validation_status] || listing.validation_status)}</span><small>${listing.has_job_posting_schema ? "JobPosting gevonden" : "Herkenning via URL en inhoud"}</small></td><td>${listing.inbound_internal_links || 0}</td><td class="vacancy-issues">${issueMarkup}</td></tr>`;
+    return `<tr><td><strong>${escapeHtml(listing.title || "Naam ontbreekt")}</strong><a class="url" title="${escapeHtml(listing.url)}" href="${escapeHtml(listing.url)}" target="_blank" rel="noopener">${escapeHtml(listing.url)}</a><small>${date}</small></td><td><span class="vacancy-badge lifecycle-${escapeHtml(listing.lifecycle_status)}">${escapeHtml(vacancyLifecycleLabels[listing.lifecycle_status] || listing.lifecycle_status)}</span><span class="vacancy-badge validation-${escapeHtml(listing.validation_status)}">${escapeHtml(vacancyValidationLabels[listing.validation_status] || listing.validation_status)}</span><small>${listing.has_job_posting_schema ? "JobPosting gevonden" : "Herkenning via URL en inhoud"}</small></td><td>${listing.inbound_internal_links || 0}</td><td class="vacancy-issues">${issueMarkup}</td></tr>`;
   }).join("");
   $("#vacancy-empty").classList.toggle("hidden", state.vacancyFiltered.length !== 0);
+  renderVacancyDashboard();
+}
+
+function renderVacancyDashboard() {
+  const summary = state.jobSummary || {};
+  const metrics = [
+    ["active", "Actief"], ["expiring_soon", "Loopt bijna af"], ["expired", "Verlopen"],
+    ["technical_errors", "Technische fouten"], ["missing_schema", "Zonder JobPosting"], ["new_issues", "Nieuwe issues"],
+  ];
+  $("#vacancy-dashboard-stats").innerHTML = metrics.map(([key, label]) => `<button type="button" data-vacancy-filter="${key}"><strong>${Number(summary[key] || 0).toLocaleString("nl-NL")}</strong><span>${label}</span></button>`).join("");
+}
+
+function openVacanciesWithFilter(filter = "") {
+  state.vacancyQuickFilter = filter === "new_issues" ? "new_issues" : null;
+  $("#vacancy-search").value = "";
+  $("#vacancy-status-filter").value = ["active", "expiring_soon", "expired"].includes(filter) ? filter : "";
+  $("#vacancy-validation-filter").value = filter === "technical_errors" ? "error" : filter === "missing_schema" ? "missing_schema" : "";
+  showView("vacancies");
 }
 
 function urlIndexState(url) {
@@ -973,9 +998,11 @@ $("#change-search").addEventListener("input", () => { state.changePage = 1; rend
 $("#change-previous-page").addEventListener("click", () => { state.changePage -= 1; renderChanges(); });
 $("#change-next-page").addEventListener("click", () => { state.changePage += 1; renderChanges(); });
 $("#change-rows").addEventListener("click", (event) => { const button = event.target.closest("[data-change-group-id]"); if (button) showChangeGroup(button.dataset.changeGroupId); });
-for (const selector of ["#vacancy-status-filter", "#vacancy-validation-filter"]) $(selector).addEventListener("change", renderJobListings);
-$("#vacancy-search").addEventListener("input", renderJobListings);
+for (const selector of ["#vacancy-status-filter", "#vacancy-validation-filter"]) $(selector).addEventListener("change", () => { state.vacancyQuickFilter = null; renderJobListings(); });
+$("#vacancy-search").addEventListener("input", () => { state.vacancyQuickFilter = null; renderJobListings(); });
 $("#vacancy-rows").addEventListener("click", (event) => { const button = event.target.closest("[data-issue-id]"); if (button) showIssue(button.dataset.issueId); });
+$("#vacancy-dashboard-stats").addEventListener("click", (event) => { const button = event.target.closest("[data-vacancy-filter]"); if (button) openVacanciesWithFilter(button.dataset.vacancyFilter); });
+$("#open-vacancies").addEventListener("click", () => openVacanciesWithFilter());
 $("#close-change-dialog").addEventListener("click", () => $("#change-dialog").close());
 $("#start-light-check").addEventListener("click", () => startCrawl("light_check"));
 $("#start-full-crawl").addEventListener("click", () => startCrawl("full_site_crawl"));

@@ -72,6 +72,7 @@ def list_job_listings(
         _listing_payload(listing, url, issues_by_url.get(listing.url_id, []))
         for listing, url in listings
     ]
+    active_issues = [issue for row in rows for issue in row["issues"]]
     return {
         "summary": {
             "total": len(rows),
@@ -80,6 +81,9 @@ def list_job_listings(
             "expired": sum(row["lifecycle_status"] == "expired" for row in rows),
             "removed": sum(row["lifecycle_status"] == "removed" for row in rows),
             "needs_attention": sum(bool(row["issues"]) for row in rows),
+            "technical_errors": sum(row["validation_status"] == "error" for row in rows),
+            "missing_schema": sum(not row["has_job_posting_schema"] for row in rows),
+            "new_issues": sum(issue["status"] == "new" for issue in active_issues),
         },
         "job_listings": rows,
     }
