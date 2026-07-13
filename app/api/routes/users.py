@@ -3,11 +3,12 @@ import secrets
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.security import Principal, hash_password, require_api_key
+from app.core.config import get_settings
+from app.core.security import Principal, create_session_token, hash_password, require_api_key
 from app.db.session import get_db
 from app.models.user import ClientMembership, User, UserInvitation
 from app.schemas.users import (
@@ -15,6 +16,7 @@ from app.schemas.users import (
     CurrentUserRead,
     InvitationAccept,
     InvitationCreate,
+    InvitationPreview,
     InvitationRead,
 )
 from app.services.authorization import require_client_access
@@ -110,8 +112,7 @@ def list_client_members(
     ]
 
 
-@public_router.post("/invitations/{token}/accept", status_code=status.HTTP_204_NO_CONTENT)
-def accept_invitation(token: str, payload: InvitationAccept, db: Session = Depends(get_db)) -> None:
+def _valid_invitation(token: str, db: Session) -> UserInvitation:
     token_hash = hashlib.sha256(token.encode()).hexdigest()
     invitation = db.scalar(select(UserInvitation).where(UserInvitation.token_hash == token_hash))
     now = datetime.now(UTC)
@@ -120,9 +121,26 @@ def accept_invitation(token: str, payload: InvitationAccept, db: Session = Depen
         expires_at = expires_at.replace(tzinfo=UTC)
     if not invitation or invitation.accepted_at or not expires_at or expires_at <= now:
         raise HTTPException(status_code=410, detail="Invitation is invalid or expired")
+    return invitation
+
+
+@public_router.get("/invitations/{token}", response_model=InvitationPreview)
+def preview_invitation(token: str, db: Session = Depends(get_db)) -> UserInvitation:
+    return _valid_invitation(token, db)
+
+
+@public_router.post("/invitations/{token}/accept", status_code=status.HTTP_204_NO_CONTENT)
+def accept_invitation(
+    token: str,
+    payload: InvitationAccept,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> Response:
+    invitation = _valid_invitation(token, db)
+    now = datetime.now(UTC)
     user = User(
         email=invitation.email,
-        display_name=payload.display_name,
+        display_name=None,
         role=invitation.role,
         password_hash=hash_password(payload.password),
     )
@@ -131,3 +149,13 @@ def accept_invitation(token: str, payload: InvitationAccept, db: Session = Depen
     db.add(ClientMembership(user_id=user.id, client_id=invitation.client_id, role=invitation.role))
     invitation.accepted_at = now
     db.commit()
+    response.set_cookie(
+        "seo_session",
+        create_session_token(user.id),
+        max_age=60 * 60 * 12,
+        httponly=True,
+        secure=get_settings().app_env == "production",
+        samesite="lax",
+    )
+    response.status_code = status.HTTP_204_NO_CONTENT
+    return response

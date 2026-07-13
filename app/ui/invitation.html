@@ -1,1 +1,33 @@
-<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Uitnodiging — SEO Monitor</title><link rel="stylesheet" href="/ui/assets/public.css"></head><body><nav class="public-nav"><a class="brand" href="/"><span>THACT</span>SEO Monitor</a></nav><main class="auth-shell"><form id="invitation-form" class="auth-card"><span class="eyebrow">TEAMUITNODIGING</span><h1>Account activeren</h1><p>Kies je naam en een uniek wachtwoord van minimaal 12 tekens.</p><label>Naam<input id="display-name" required minlength="2" maxlength="255"></label><label>Wachtwoord<input id="new-password" type="password" autocomplete="new-password" required minlength="12"></label><button class="button" type="submit">Account aanmaken</button><p id="invitation-message" class="error" role="alert"></p></form></main><script src="/ui/assets/invitation.js" defer></script></body></html>
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Uitnodiging — SEO Monitor</title>
+  <link rel="stylesheet" href="/ui/assets/public.css">
+  <link rel="stylesheet" href="/ui/assets/invitation.css">
+</head>
+<body>
+  <nav class="public-nav"><a class="brand" href="/"><span>THACT</span>SEO Monitor</a></nav>
+  <main class="auth-shell">
+    <form id="invitation-form" class="auth-card">
+      <span class="eyebrow">TEAMUITNODIGING</span>
+      <h1>Account activeren</h1>
+      <p>Je account is aangemaakt voor <strong id="invitation-email">het uitgenodigde e-mailadres</strong>. Hiermee log je voortaan in.</p>
+      <label>Maak een wachtwoord aan
+        <input id="new-password" type="password" autocomplete="new-password" required minlength="12" aria-describedby="password-rules">
+      </label>
+      <ul id="password-rules" class="password-rules">
+        <li>Minimaal 12 tekens</li>
+        <li>Minimaal één hoofdletter en één kleine letter</li>
+        <li>Minimaal één cijfer</li>
+        <li>Minimaal één speciaal teken, bijvoorbeeld ! @ # $ %</li>
+      </ul>
+      <button class="button" type="submit">Account activeren en inloggen</button>
+      <p id="invitation-message" class="error" role="alert"></p>
+    </form>
+  </main>
+  <script src="/ui/assets/invitation.js" defer></script>
+</body>
+</html>

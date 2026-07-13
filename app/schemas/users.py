@@ -1,6 +1,8 @@
+import re
+from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class MembershipRead(BaseModel):
@@ -31,8 +33,27 @@ class InvitationRead(BaseModel):
 
 
 class InvitationAccept(BaseModel):
-    display_name: str = Field(min_length=2, max_length=255)
     password: str = Field(min_length=12, max_length=256)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        requirements = (
+            (r"[a-z]", "een kleine letter"),
+            (r"[A-Z]", "een hoofdletter"),
+            (r"[0-9]", "een cijfer"),
+            (r"[^A-Za-z0-9]", "een speciaal teken"),
+        )
+        missing = [label for pattern, label in requirements if not re.search(pattern, value)]
+        if missing:
+            raise ValueError(f"Wachtwoord mist: {', '.join(missing)}")
+        return value
+
+
+class InvitationPreview(BaseModel):
+    email: EmailStr
+    role: str
+    expires_at: datetime
 
 
 class ClientMemberRead(BaseModel):

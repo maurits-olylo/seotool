@@ -239,11 +239,17 @@ def test_superuser_invites_user_for_client(client: TestClient) -> None:
     )
     assert invitation.status_code == 201
     token = invitation.json()["accept_path"].split("token=", maxsplit=1)[1]
-    accepted = TestClient(app).post(
+    invited_browser = TestClient(app)
+    preview = invited_browser.get(f"/api/v1/invitations/{token}")
+    assert preview.status_code == 200
+    assert preview.json()["email"] == "member@example.com"
+    accepted = invited_browser.post(
         f"/api/v1/invitations/{token}/accept",
-        json={"display_name": "Member", "password": "member-secure-password"},
+        json={"password": "Member-secure-password-1!"},
     )
     assert accepted.status_code == 204
+    assert "HttpOnly" in accepted.headers["set-cookie"]
+    assert invited_browser.get("/app").status_code == 200
     with SessionLocal() as db:
         member = db.scalar(select(User).where(User.email == "member@example.com"))
         assert member and member.role == "user"

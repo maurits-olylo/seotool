@@ -1,0 +1,22 @@
+.error,
+.success {
+  min-height: 22px;
+  font-weight: 700;
+}
+
+.success {
+  color: #087a43;
+}
+
+.password-rules {
+  margin: 12px 0 0;
+  padding-left: 20px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.auth-card button:disabled {
+  cursor: wait;
+  opacity: .65;
+}

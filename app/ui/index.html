@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="/ui/assets/changes.css">
   <link rel="stylesheet" href="/ui/assets/operations.css">
   <link rel="stylesheet" href="/ui/assets/organization.css">
+  <link rel="stylesheet" href="/ui/assets/report.css">
 </head>
 <body>
   <div id="app" class="app-shell hidden">
@@ -32,8 +33,19 @@
           <select id="website-select" aria-label="Website"></select>
         </div>
       </header>
+      <section id="client-report" class="client-report hidden">
+        <section class="report-hero">
+          <div><span class="eyebrow">SAMENVATTING</span><h2 id="report-conclusion"></h2><p id="report-explanation"></p></div>
+          <div class="report-period"><span>Rapportagedatum</span><strong id="report-date"></strong></div>
+        </section>
+        <section id="report-metrics" class="report-metrics"></section>
+        <div class="report-columns">
+          <section class="panel report-section"><div class="panel-head"><div><span class="eyebrow">PER ONDERDEEL</span><h2>Waar aandacht nodig is</h2></div></div><div id="report-categories" class="report-categories"></div></section>
+          <section class="panel report-section"><div class="panel-head"><div><span class="eyebrow">ADVIES</span><h2>Belangrijkste vervolgstappen</h2></div></div><div id="report-priorities" class="report-priorities"></div></section>
+        </div>
+      </section>
       <section id="summary" class="cards"></section>
-      <section class="panel">
+      <section id="internal-action-panel" class="panel">
         <div class="panel-head">
           <div><span class="eyebrow">ACTIELIJST</span><h2>Openstaande issues</h2></div>
           <span id="result-count" class="result-count"></span>

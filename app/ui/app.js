@@ -42,6 +42,57 @@ function impactMarkup(issue) {
   const secondary = impact.key_events ? ` · ${impact.key_events} gebeurtenissen` : "";
   return `<span class="impact-badge ${impact.level}">${label}</span><span class="impact-metrics">${primary}${secondary}</span>`;
 }
+
+function renderClientReport() {
+  if (state.currentUser?.role !== "client") return;
+  const active = state.issues.filter((issue) => ACTIVE_STATUSES.has(issue.status));
+  const high = active.filter((issue) => issue.severity === "high");
+  const impacted = active.filter((issue) => issue.organic_impact && impactLevel(issue) !== "none");
+  const completed = state.issues.filter((issue) => ["resolved", "verified"].includes(issue.status));
+  const conclusion = high.length === 0
+    ? "De technische basis is momenteel stabiel"
+    : high.length <= 5
+      ? "Een beperkt aantal prioriteiten vraagt aandacht"
+      : "Meerdere technische prioriteiten vragen aandacht";
+  $("#report-conclusion").textContent = conclusion;
+  $("#report-explanation").textContent = high.length
+    ? `${high.length} punten hebben hoge prioriteit. Hieronder staat wat dit betekent en welke vervolgstappen het meeste effect hebben.`
+    : "Er zijn geen actieve punten met hoge prioriteit. Blijf de middelgrote aandachtspunten planmatig verbeteren.";
+  $("#report-date").textContent = new Date().toLocaleDateString("nl-NL", {day:"numeric", month:"long", year:"numeric"});
+  const metrics = [
+    [active.length, "Actieve aandachtspunten"],
+    [high.length, "Hoge prioriteit"],
+    [impacted.length, "Met gemeten bereik"],
+    [completed.length, "Opgelost of geverifieerd"],
+  ];
+  $("#report-metrics").innerHTML = metrics.map(([value, label]) => `<article class="report-metric"><strong>${value}</strong><span>${label}</span></article>`).join("");
+
+  const categoryContent = {
+    reachability: ["Bereikbaarheid", "Pagina's en links die bezoekers mogelijk niet goed kunnen bereiken."],
+    indexation: ["Vindbaarheid", "Signalen die invloed hebben op opname en weergave in zoekmachines."],
+    onpage: ["Pagina-inhoud", "Technische paginavelden die zoekmachines helpen de inhoud te begrijpen."],
+    internal_links: ["Interne navigatie", "De manier waarop pagina's binnen de website met elkaar verbonden zijn."],
+    structured_data: ["Gestructureerde data", "Aanvullende informatie waarmee zoekmachines pagina's interpreteren."],
+    performance: ["Bestandsgrootte", "Afbeeldingen en documenten die onnodig zwaar zijn voor bezoekers."],
+  };
+  const categoryCounts = new Map();
+  active.forEach((issue) => categoryCounts.set(issue.category, (categoryCounts.get(issue.category) || 0) + 1));
+  $("#report-categories").innerHTML = [...categoryCounts.entries()].sort((a, b) => b[1] - a[1]).map(([category, count]) => {
+    const [title, description] = categoryContent[category] || [category.replaceAll("_", " "), "Technische aandachtspunten binnen dit onderdeel."];
+    return `<article class="report-category"><strong>${escapeHtml(title)}</strong><span>${count}</span><p>${escapeHtml(description)}</p></article>`;
+  }).join("") || `<p class="report-empty">Geen actieve technische aandachtspunten.</p>`;
+
+  const priorities = [...active].sort((a, b) => {
+    const severityOrder = {high: 0, medium: 1, low: 2};
+    return severityOrder[a.severity] - severityOrder[b.severity]
+      || impactRank(a) - impactRank(b)
+      || impactVolume(b) - impactVolume(a);
+  }).slice(0, 5);
+  $("#report-priorities").innerHTML = priorities.map((issue) => {
+    const url = issueUrl(issue);
+    return `<article class="report-priority"><div class="report-priority-head"><span class="severity ${issue.severity}">${labels[issue.severity] || issue.severity}</span><h3>${escapeHtml(issue.title)}</h3></div><p>${escapeHtml(issue.recommended_action)}</p>${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a>` : ""}</article>`;
+  }).join("") || `<p class="report-empty">Er zijn momenteel geen vervolgstappen nodig.</p>`;
+}
 function issueUrlMarkup(issue) {
   const url = issueUrl(issue);
   return url ? `<a class="url" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a>` : `<span class="url">Websitebreed issue</span>`;
@@ -58,6 +109,9 @@ function applyRolePermissions() {
   $("#overview-eyebrow").textContent = isClient ? "KLANTRAPPORTAGE" : "PRODUCTIE";
   $("#overview-title").textContent = isClient ? "SEO-status" : "Technische SEO-acties";
   $("#client-report-intro").classList.toggle("hidden", !isClient);
+  $("#client-report").classList.toggle("hidden", !isClient);
+  $("#summary").classList.toggle("hidden", isClient);
+  $("#internal-action-panel").classList.toggle("hidden", isClient);
   $("#detail-status").classList.toggle("hidden", isClient);
   $("#save-status").classList.toggle("hidden", isClient);
   $("#client-status-label").classList.toggle("hidden", !isClient);
@@ -577,6 +631,7 @@ function renderGroups() {
 }
 
 function render() {
+  renderClientReport();
   applyFilters();
   renderGroups();
   const counts = { high: 0, medium: 0, low: 0, total: state.filtered.length };
