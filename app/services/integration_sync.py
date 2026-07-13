@@ -1,5 +1,5 @@
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from uuid import UUID
 
 import structlog
@@ -17,6 +17,10 @@ from app.services.google_analytics import sync_google_analytics
 from app.services.search_console import sync_search_console
 
 logger = structlog.get_logger()
+
+
+def _date_as_iso(value: date | None) -> str | None:
+    return value.isoformat() if value else None
 
 
 def synchronize_website_integrations(website_id: str, days: int | None = None) -> None:
@@ -75,19 +79,25 @@ def _set_history_sync_status(
     )
     now = datetime.now(UTC).isoformat()
     coverage = {
-        "gsc_from": db.scalar(
-            select(func.min(SearchConsoleMetric.date)).where(
-                SearchConsoleMetric.website_id == website_id
+        "gsc_from": _date_as_iso(
+            db.scalar(
+                select(func.min(SearchConsoleMetric.date)).where(
+                    SearchConsoleMetric.website_id == website_id
+                )
             )
         ),
-        "gsc_query_from": db.scalar(
-            select(func.min(SearchConsoleQueryMetric.date)).where(
-                SearchConsoleQueryMetric.website_id == website_id
+        "gsc_query_from": _date_as_iso(
+            db.scalar(
+                select(func.min(SearchConsoleQueryMetric.date)).where(
+                    SearchConsoleQueryMetric.website_id == website_id
+                )
             )
         ),
-        "ga4_from": db.scalar(
-            select(func.min(GoogleAnalyticsMetric.date)).where(
-                GoogleAnalyticsMetric.website_id == website_id
+        "ga4_from": _date_as_iso(
+            db.scalar(
+                select(func.min(GoogleAnalyticsMetric.date)).where(
+                    GoogleAnalyticsMetric.website_id == website_id
+                )
             )
         ),
     }
