@@ -16,7 +16,9 @@ from app.db.session import get_db
 from app.models.client import Client
 from app.models.integrations import (
     GoogleAnalyticsEventMetric,
+    GoogleAnalyticsMetric,
     IntegrationConnection,
+    SearchConsoleMetric,
     WebsiteIntegration,
 )
 from app.models.website import Website
@@ -461,6 +463,27 @@ def synchronize_integration_history(
     principal: Principal = Depends(require_api_key),
 ) -> dict[str, str | int]:
     require_website_access(db, principal, website_id, admin=True)
+    now = datetime.now(UTC).isoformat()
+    mappings = list(
+        db.scalars(
+            select(WebsiteIntegration).where(
+                WebsiteIntegration.website_id == website_id,
+                WebsiteIntegration.service.in_(["search_console", "ga4"]),
+            )
+        )
+    )
+    for mapping in mappings:
+        mapping.settings = {
+            **mapping.settings,
+            "history_sync": {
+                "status": "queued",
+                "days": 480,
+                "queued_at": now,
+                "updated_at": now,
+                "error": None,
+            },
+        }
+    db.commit()
     get_queue().enqueue(
         "app.services.integration_sync.synchronize_website_integrations",
         str(website_id),
@@ -468,6 +491,62 @@ def synchronize_integration_history(
         job_id=f"integration-history-{website_id}-{uuid.uuid4()}",
     )
     return {"status": "queued", "days": 480}
+
+
+@router.get("/websites/{website_id}/integrations/history-sync")
+def integration_history_status(
+    website_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, object]:
+    """Return durable import state plus the imported GSC and GA4 date ranges."""
+    require_website_access(db, principal, website_id, admin=True)
+    mappings = list(
+        db.scalars(
+            select(WebsiteIntegration).where(
+                WebsiteIntegration.website_id == website_id,
+                WebsiteIntegration.service.in_(["search_console", "ga4"]),
+            )
+        )
+    )
+    sync = next(
+        (
+            mapping.settings.get("history_sync", {})
+            for mapping in mappings
+            if mapping.settings.get("history_sync")
+        ),
+        {},
+    )
+    return {
+        "status": sync.get("status", "not_started"),
+        "days": sync.get("days"),
+        "queued_at": sync.get("queued_at"),
+        "updated_at": sync.get("updated_at"),
+        "completed_at": sync.get("completed_at"),
+        "error": sync.get("error"),
+        "coverage": {
+            "gsc_from": db.scalar(
+                select(func.min(SearchConsoleMetric.date)).where(
+                    SearchConsoleMetric.website_id == website_id
+                )
+            ),
+            "gsc_through": db.scalar(
+                select(func.max(SearchConsoleMetric.date)).where(
+                    SearchConsoleMetric.website_id == website_id
+                )
+            ),
+            "ga4_from": db.scalar(
+                select(func.min(GoogleAnalyticsMetric.date)).where(
+                    GoogleAnalyticsMetric.website_id == website_id
+                )
+            ),
+            "ga4_through": db.scalar(
+                select(func.max(GoogleAnalyticsMetric.date)).where(
+                    GoogleAnalyticsMetric.website_id == website_id
+                )
+            ),
+        },
+    }
 
 
 @router.post("/websites/{website_id}/integrations/search_console/sync")

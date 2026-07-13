@@ -70,11 +70,12 @@ function renderClientReport() {
     ? `<div class="panel-head"><div><span class="eyebrow">CONVERSIES</span><h2>Gekwalificeerde leads uit organic</h2></div></div><div class="conversion-breakdown">${conversionEvents.map((event) => `<article><strong>${Number(event.key_events).toLocaleString("nl-NL")}</strong><span>${escapeHtml(event.event_name)}</span></article>`).join("") || `<p class="report-empty">Geen gekwalificeerde leads in deze periode.</p>`}</div>`
     : `<div class="panel-head"><div><span class="eyebrow">CONVERSIES</span><h2>Gekwalificeerde leads nog niet ingesteld</h2><p>Selecteer als admin de relevante GA4-events bij Integraties.</p></div></div>`;
 
-  const months = (report.monthly || []).slice(-12);
+  const months = (report.monthly || [])
+    .filter((month) => month.month !== String(report.end_date || "").slice(0, 7))
+    .slice(-12);
   const chartMetric = months.some((month) => month.sessions) ? "sessions" : "clicks";
-  const maxValue = Math.max(1, ...months.map((month) => Number(month[chartMetric] || 0)));
-  $("#report-trend-label").textContent = chartMetric === "sessions" ? "Organische sessies" : "Organische klikken";
-  $("#report-chart").innerHTML = months.map((month) => `<div class="report-bar"><span class="report-bar-value">${Number(month[chartMetric] || 0).toLocaleString("nl-NL")}</span><div style="height:${Math.max(3, Number(month[chartMetric] || 0) / maxValue * 100)}%"></div><small>${month.month.slice(5)}/${month.month.slice(2,4)}</small></div>`).join("") || `<p class="report-empty">Nog onvoldoende historische data voor een maandtrend.</p>`;
+  $("#report-trend-label").textContent = `${chartMetric === "sessions" ? "Organische sessies" : "Organische klikken"} · volledige maanden`;
+  $("#report-chart").innerHTML = renderTrendChart(months, chartMetric);
 
   const activities = report.work_completed?.activities || [];
   $("#report-completed").innerHTML = activities.length
@@ -82,6 +83,20 @@ function renderClientReport() {
     : `<p class="report-empty">Nog geen handmatig werk gelogd in deze periode.</p><article class="report-work-summary"><strong>${report.work_completed?.technically_verified || 0}</strong><span>technische issues geverifieerd of opgelost</span></article>`;
   $("#report-planned").innerHTML = renderReportIssues(report.planned, "Er staan nog geen acties met status gepland of bezig.");
   $("#report-new-issues").innerHTML = renderReportIssues(report.new_issues, "Geen nieuwe aandachtspunten in deze periode.");
+}
+
+function renderTrendChart(months, metric) {
+  if (months.length < 2) return `<p class="report-empty">Nog onvoldoende volledige maanden voor een betrouwbare maandtrend.</p>`;
+  const width = 1000; const height = 245; const padding = {left: 46, right: 24, top: 28, bottom: 42};
+  const values = months.map((month) => Number(month[metric] || 0));
+  const max = Math.max(...values); const min = Math.min(...values);
+  const range = Math.max(1, max - min); const plotWidth = width - padding.left - padding.right; const plotHeight = height - padding.top - padding.bottom;
+  const x = (index) => padding.left + (plotWidth * index / (months.length - 1));
+  const y = (value) => padding.top + ((max - value) / range * plotHeight);
+  const points = values.map((value, index) => `${x(index)},${y(value)}`).join(" ");
+  const grid = [0, 0.5, 1].map((ratio) => { const lineY = padding.top + plotHeight * ratio; const label = Math.round(max - range * ratio).toLocaleString("nl-NL"); return `<line x1="${padding.left}" y1="${lineY}" x2="${width - padding.right}" y2="${lineY}"/><text x="0" y="${lineY + 4}">${label}</text>`; }).join("");
+  const dots = values.map((value, index) => `<g><title>${months[index].month}: ${value.toLocaleString("nl-NL")}</title><circle cx="${x(index)}" cy="${y(value)}" r="4"/><text x="${x(index)}" y="${height - 12}" text-anchor="middle">${months[index].month.slice(5)}/${months[index].month.slice(2,4)}</text></g>`).join("");
+  return `<svg class="report-line-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Maandelijkse organische prestaties"><g class="report-chart-grid">${grid}</g><polyline class="report-chart-line" points="${points}"/>${dots}</svg>`;
 }
 
 function renderReportIssues(issues = [], emptyText) {
@@ -281,6 +296,7 @@ async function loadGoogleProperties() {
   $("#property-mapping").classList.remove("hidden");
   if (ga4Mapping) await loadGa4KeyEvents();
   else $("#ga4-key-events-panel").classList.add("hidden");
+  pollIntegrationHistory(websiteId).catch(() => {});
 }
 
 async function loadGa4KeyEvents() {
@@ -386,9 +402,39 @@ async function syncIntegrationHistory() {
   button.disabled = true; message.textContent = "Historische import wordt ingepland…";
   try {
     await api(`/api/v1/websites/${websiteId}/integrations/history-sync`, {method: "POST"});
-    message.textContent = "Historische GSC- en GA4-import staat in de wachtrij. Dit kan enkele minuten duren.";
-  } catch (error) { message.textContent = error.message; }
-  finally { button.disabled = false; }
+    message.textContent = "Historische GSC- en GA4-import staat in de wachtrij. Voortgang wordt automatisch bijgewerkt.";
+    await pollIntegrationHistory(websiteId);
+  } catch (error) { message.textContent = error.message; button.disabled = false; }
+}
+
+function historyCoverageText(coverage = {}) {
+  const ranges = [["GSC", coverage.gsc_from, coverage.gsc_through], ["GA4", coverage.ga4_from, coverage.ga4_through]]
+    .filter(([, from]) => from)
+    .map(([source, from, through]) => `${source}: ${new Date(from).toLocaleDateString("nl-NL")} – ${new Date(through).toLocaleDateString("nl-NL")}`);
+  return ranges.join(" · ");
+}
+
+async function pollIntegrationHistory(websiteId) {
+  const button = $("#sync-integration-history"); const message = $("#integration-history-message");
+  const result = await api(`/api/v1/websites/${websiteId}/integrations/history-sync`);
+  const coverage = historyCoverageText(result.coverage);
+  if (result.status === "queued" || result.status === "running") {
+    button.disabled = true;
+    button.textContent = result.status === "queued" ? "Import wacht op worker…" : "Historie wordt geïmporteerd…";
+    message.textContent = `${result.status === "queued" ? "In wachtrij" : "Bezig met importeren"}. Deze pagina controleert automatisch opnieuw.`;
+    window.setTimeout(() => pollIntegrationHistory(websiteId).catch(() => {}), 5000);
+    return;
+  }
+  button.disabled = false;
+  button.textContent = "Historie tot 16 maanden synchroniseren";
+  if (result.status === "succeeded") {
+    message.textContent = `Historische import voltooid. ${coverage || "Datumbereik wordt nog verwerkt."}`;
+    await loadGa4KeyEvents().catch(() => {});
+  } else if (result.status === "failed") {
+    message.textContent = `Historische import mislukt${result.error ? `: ${result.error}` : "."}`;
+  } else if (coverage) {
+    message.textContent = `Beschikbare historische data: ${coverage}`;
+  }
 }
 
 function showView(view, updateHash = true) {
