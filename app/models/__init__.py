@@ -11,6 +11,7 @@ from app.models.integrations import (
     WebsiteIntegration,
 )
 from app.models.issues import ActivityLog, Change, Issue, IssueComment, IssueOccurrence
+from app.models.jobs import JobListing
 from app.models.reporting import MonthlyReportSnapshot
 from app.models.user import ClientMembership, User, UserInvitation
 from app.models.website import Website, WebsiteSettings
@@ -26,6 +27,7 @@ __all__ = [
     "Issue",
     "IssueComment",
     "IssueOccurrence",
+    "JobListing",
     "MonthlyReportSnapshot",
     "IntegrationConnection",
     "GoogleAnalyticsMetric",

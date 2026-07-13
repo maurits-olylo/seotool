@@ -8,6 +8,7 @@ from app.models.discovery import Url
 from app.models.issues import Change
 from app.services.change_detection import DetectedChange, compare_snapshots
 from app.services.issue_engine import reconcile_issues
+from app.services.job_listings import update_job_listing
 from app.services.job_posting import inspect_job_posting
 from app.services.technical_checks import SNAPSHOT_ISSUE_TYPES, inspect_snapshot
 
@@ -49,31 +50,38 @@ def analyze_snapshot(db: Session, snapshot: UrlSnapshot) -> None:
             )
         )
     signals = inspect_snapshot(snapshot)
+    inbound_internal_links = db.scalar(
+        select(func.count(UrlLink.id)).where(
+            UrlLink.crawl_run_id == snapshot.crawl_run_id,
+            UrlLink.target_url_id == url.id,
+            UrlLink.is_internal.is_(True),
+        )
+    ) or 0
+    application_url = db.scalar(
+        select(UrlLink.target_url).where(
+            UrlLink.crawl_run_id == snapshot.crawl_run_id,
+            UrlLink.source_url_id == url.id,
+            UrlLink.is_internal.is_(True),
+            UrlLink.anchor_text.ilike("%solliciteer%")
+            | UrlLink.anchor_text.ilike("%reageer%")
+            | UrlLink.anchor_text.ilike("%aanmelden%"),
+        )
+    )
+    update_job_listing(
+        db,
+        url=url,
+        snapshot=snapshot,
+        inbound_internal_links=inbound_internal_links,
+        application_url=application_url,
+    )
     if not snapshot.redirect_chain:
-        inbound_internal_links = db.scalar(
-            select(func.count(UrlLink.id)).where(
-                UrlLink.crawl_run_id == snapshot.crawl_run_id,
-                UrlLink.target_url_id == url.id,
-                UrlLink.is_internal.is_(True),
-            )
-        ) or 0
-        application_cta = db.scalar(
-            select(UrlLink.id).where(
-                UrlLink.crawl_run_id == snapshot.crawl_run_id,
-                UrlLink.source_url_id == url.id,
-                UrlLink.is_internal.is_(True),
-                UrlLink.anchor_text.ilike("%solliciteer%")
-                | UrlLink.anchor_text.ilike("%reageer%")
-                | UrlLink.anchor_text.ilike("%aanmelden%"),
-            )
-        ) is not None
         signals.extend(
             inspect_job_posting(
                 snapshot.schema_data or [],
                 status_code=snapshot.status_code,
                 page_url=url.normalized_url,
                 main_content=snapshot.main_content,
-                has_application_cta=application_cta,
+                has_application_cta=application_url is not None,
                 inbound_internal_links=inbound_internal_links,
                 was_job_posting=bool(previous and "JobPosting" in (previous.schema_types or [])),
             )

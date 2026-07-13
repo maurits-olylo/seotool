@@ -1,6 +1,6 @@
 from datetime import date
 
-from app.services.job_posting import inspect_job_posting
+from app.services.job_posting import inspect_job_posting, recognize_job_listing
 
 
 def test_expired_job_posting() -> None:
@@ -60,3 +60,51 @@ def test_missing_job_url_is_reported_when_previously_a_job_posting() -> None:
     )
 
     assert [signal.issue_type for signal in signals] == ["expired_job_posting_404"]
+
+
+def test_job_listing_recognition_extracts_schema_fields_and_lifecycle() -> None:
+    listing = recognize_job_listing(
+        [
+            {
+                "@type": "JobPosting",
+                "title": "SEO specialist",
+                "datePosted": "2026-01-01",
+                "validThrough": "2026-01-10",
+                "hiringOrganization": {"name": "Thact"},
+                "jobLocation": {"address": {"addressLocality": "Amsterdam"}},
+                "employmentType": ["FULL_TIME"],
+                "identifier": {"value": "seo-123"},
+            }
+        ],
+        page_url="https://example.com/vacatures/seo-specialist",
+        title="SEO specialist vacature",
+        headings={"h1": ["SEO specialist"]},
+        main_content="Solliciteer op deze vacature.",
+        status_code=200,
+        redirect_chain=[],
+        application_url="https://example.com/solliciteren",
+        today=date(2026, 1, 1),
+    )
+
+    assert listing is not None
+    assert listing.lifecycle_status == "expiring_soon"
+    assert listing.title == "SEO specialist"
+    assert listing.employer == "Thact"
+    assert listing.locations == ["Amsterdam"]
+    assert listing.external_identifier == "seo-123"
+    assert listing.application_url == "https://example.com/solliciteren"
+
+
+def test_job_listing_fallback_requires_a_detail_vacancy_url() -> None:
+    listing = recognize_job_listing(
+        [],
+        page_url="https://example.com/vacatures",
+        title="Vacatures",
+        headings={"h1": ["Vacatures"]},
+        main_content="Bekijk alle vacatures.",
+        status_code=200,
+        redirect_chain=[],
+        application_url=None,
+    )
+
+    assert listing is None

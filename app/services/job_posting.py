@@ -1,4 +1,5 @@
-from datetime import UTC, date, datetime
+from dataclasses import dataclass
+from datetime import UTC, date, datetime, timedelta
 import re
 from typing import Any
 from urllib.parse import urlsplit
@@ -7,6 +8,12 @@ from app.services.technical_checks import IssueSignal
 
 APPLICATION_CTA_RE = re.compile(r"\b(solliciteer|reageer|aanmelden|apply)\b", re.IGNORECASE)
 JOB_URL_RE = re.compile(r"/(vacature|vacatures|werken-bij|jobs?|carriere)(/|$)", re.IGNORECASE)
+JOB_DETAIL_URL_RE = re.compile(
+    r"/(?:vacatures?|werken-bij|jobs?|carriere)/.+", re.IGNORECASE
+)
+JOB_TERMS_RE = re.compile(
+    r"\b(vacature|functie|solliciteer|werken bij|job opening|jobomschrijving)\b", re.IGNORECASE
+)
 CLOSING_DATE_RE = re.compile(
     r"(?:solliciteren\s+tot|reageer\s+(?:voor|v[oó]or)|sluitingsdatum|deadline)\s*(?:is|:)?\s*"
     r"(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{1,2}\s+"
@@ -18,6 +25,23 @@ MONTHS_NL = {
     "juli": 7, "augustus": 8, "september": 9, "oktober": 10, "november": 11,
     "december": 12,
 }
+
+
+@dataclass(frozen=True)
+class RecognizedJobListing:
+    detection_sources: list[str]
+    title: str | None
+    employer: str | None
+    locations: list[str]
+    date_posted: date | None
+    valid_through: date | None
+    salary_data: dict[str, object]
+    hours: str | None
+    employment_types: list[str]
+    external_identifier: str | None
+    application_url: str | None
+    job_posting_data: dict[str, object]
+    lifecycle_status: str
 
 
 def inspect_job_posting(
@@ -98,6 +122,64 @@ def inspect_job_posting(
     return signals
 
 
+def recognize_job_listing(
+    schema_data: list[object],
+    *,
+    page_url: str,
+    title: str | None,
+    headings: dict[str, list[str]] | None,
+    main_content: str | None,
+    status_code: int | None,
+    redirect_chain: list[dict[str, object]] | None,
+    application_url: str | None,
+    today: date | None = None,
+) -> RecognizedJobListing | None:
+    """Identify one vacancy and normalize the useful JobPosting fields."""
+    today = today or datetime.now(UTC).date()
+    jobs = list(_find_job_postings(schema_data))
+    path = urlsplit(page_url).path
+    sources: list[str] = []
+    job: dict[str, object] = {}
+    if jobs:
+        job = jobs[0]
+        sources.append("job_posting_schema")
+    if JOB_DETAIL_URL_RE.search(path):
+        sources.append("url_pattern")
+    visible_text = " ".join(
+        [title or "", *(headings or {}).get("h1", []), main_content or ""]
+    )
+    if JOB_TERMS_RE.search(visible_text):
+        sources.append("page_text")
+    if not sources or (not jobs and "url_pattern" not in sources):
+        return None
+
+    valid_through = _parse_date(job.get("validThrough"))
+    visible_closing_date = _visible_closing_date(main_content or "")
+    lifecycle_status = _job_lifecycle_status(
+        status_code=status_code,
+        redirect_chain=redirect_chain,
+        valid_through=valid_through,
+        visible_closing_date=visible_closing_date,
+        today=today,
+    )
+    schema_title = _string(job.get("title"))
+    return RecognizedJobListing(
+        detection_sources=sources,
+        title=schema_title or _first_headline(headings) or title,
+        employer=_organization_name(job.get("hiringOrganization")),
+        locations=_job_locations(job.get("jobLocation")),
+        date_posted=_parse_date(job.get("datePosted")),
+        valid_through=valid_through or visible_closing_date,
+        salary_data=_salary_data(job.get("baseSalary")),
+        hours=_string(job.get("workHours")),
+        employment_types=_strings(job.get("employmentType")),
+        external_identifier=_identifier(job.get("identifier")),
+        application_url=application_url,
+        job_posting_data=job,
+        lifecycle_status=lifecycle_status,
+    )
+
+
 def _find_job_postings(value: object):  # type: ignore[no-untyped-def]
     if isinstance(value, dict):
         schema_type = value.get("@type")
@@ -120,7 +202,7 @@ def _parse_date(value: Any) -> date | None:
         return None
 
 
-def _visible_expired_deadline(content: str, today: date) -> date | None:
+def _visible_closing_date(content: str) -> date | None:
     match = CLOSING_DATE_RE.search(content)
     if not match:
         return None
@@ -135,7 +217,89 @@ def _visible_expired_deadline(content: str, today: date) -> date | None:
             parsed = date(int(year), MONTHS_NL[month_name], int(day))
     except (KeyError, ValueError):
         return None
-    return parsed if parsed < today else None
+    return parsed
+
+
+def _visible_expired_deadline(content: str, today: date) -> date | None:
+    parsed = _visible_closing_date(content)
+    return parsed if parsed and parsed < today else None
+
+
+def _job_lifecycle_status(
+    *,
+    status_code: int | None,
+    redirect_chain: list[dict[str, object]] | None,
+    valid_through: date | None,
+    visible_closing_date: date | None,
+    today: date,
+) -> str:
+    if redirect_chain:
+        return "redirected"
+    if status_code in {404, 410}:
+        return "removed"
+    deadline = valid_through or visible_closing_date
+    if deadline and deadline < today:
+        return "expired"
+    if deadline and deadline <= today + timedelta(days=14):
+        return "expiring_soon"
+    return "active"
+
+
+def _string(value: object) -> str | None:
+    if isinstance(value, str):
+        value = value.strip()
+        return value or None
+    if isinstance(value, (int, float)):
+        return str(value)
+    return None
+
+
+def _strings(value: object) -> list[str]:
+    values = value if isinstance(value, list) else [value]
+    return [item for item in (_string(value) for value in values) if item]
+
+
+def _first_headline(headings: dict[str, list[str]] | None) -> str | None:
+    if not headings:
+        return None
+    return next((value for value in headings.get("h1", []) if value), None)
+
+
+def _organization_name(value: object) -> str | None:
+    return _string(value.get("name")) if isinstance(value, dict) else _string(value)
+
+
+def _job_locations(value: object) -> list[str]:
+    locations = value if isinstance(value, list) else [value]
+    values: list[str] = []
+    for location in locations:
+        if not isinstance(location, dict):
+            text = _string(location)
+            if text:
+                values.append(text)
+            continue
+        address = location.get("address")
+        if isinstance(address, dict):
+            parts = [
+                _string(address.get(field))
+                for field in ("streetAddress", "addressLocality", "addressRegion", "addressCountry")
+            ]
+            text = ", ".join(part for part in parts if part)
+        else:
+            text = _string(address)
+        if text:
+            values.append(text)
+    return list(dict.fromkeys(values))
+
+
+def _salary_data(value: object) -> dict[str, object]:
+    return value if isinstance(value, dict) else {}
+
+
+def _identifier(value: object) -> str | None:
+    if isinstance(value, dict):
+        return _string(value.get("value")) or _string(value.get("name"))
+    return _string(value)
 
 
 def _expiration_description(evidence: dict[str, object]) -> str:
