@@ -1,4 +1,5 @@
 import csv
+import json
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -13,7 +14,9 @@ from app.models.crawl import CrawlRun, UrlLink
 from app.models.discovery import Url
 from app.models.exports import Export
 from app.models.issues import Change, Issue
+from app.models.jobs import JobListing
 from app.models.website import Website
+from app.services.job_posting import ACTIVE_JOB_ISSUE_STATUSES, JOB_ISSUE_TYPES
 
 EXPORT_ROOT = Path("/app/exports")
 
@@ -54,6 +57,23 @@ def _datasets(db: Session, website_id: object) -> dict[str, tuple[list[str], lis
     url_by_id = {url.id: url.normalized_url for url in urls}
     issues = list(db.scalars(select(Issue).where(Issue.website_id == website_id)))
     changes = list(db.scalars(select(Change).where(Change.website_id == website_id)))
+    job_listings = list(
+        db.scalars(
+            select(JobListing)
+            .where(JobListing.website_id == website_id)
+            .order_by(JobListing.valid_through.asc().nullslast(), JobListing.title)
+        )
+    )
+    job_issues_by_url = {
+        listing.url_id: [
+            issue
+            for issue in issues
+            if issue.url_id == listing.url_id
+            and issue.issue_type in JOB_ISSUE_TYPES
+            and issue.status in ACTIVE_JOB_ISSUE_STATUSES
+        ]
+        for listing in job_listings
+    }
     latest_full_run_id = db.scalar(
         select(CrawlRun.id)
         .where(
@@ -168,7 +188,69 @@ def _datasets(db: Session, website_id: object) -> dict[str, tuple[list[str], lis
                 for link in links
             ],
         ),
+        "vacancies": (
+            [
+                "url",
+                "title",
+                "employer",
+                "locations",
+                "lifecycle_status",
+                "google_for_jobs_status",
+                "date_posted",
+                "valid_through",
+                "employment_types",
+                "hours",
+                "salary",
+                "application_url",
+                "status_code",
+                "is_indexable",
+                "inbound_internal_links",
+                "active_findings",
+                "first_detected_at",
+                "last_detected_at",
+            ],
+            [
+                [
+                    url_by_id.get(listing.url_id),
+                    listing.title,
+                    listing.employer,
+                    " | ".join(listing.locations or []),
+                    listing.lifecycle_status,
+                    _job_validation_status(
+                        listing,
+                        job_issues_by_url.get(listing.url_id, []),
+                    ),
+                    listing.date_posted,
+                    listing.valid_through,
+                    " | ".join(listing.employment_types or []),
+                    listing.hours,
+                    json.dumps(listing.salary_data, ensure_ascii=False)
+                    if listing.salary_data
+                    else "",
+                    listing.application_url,
+                    listing.current_status_code,
+                    listing.is_indexable,
+                    listing.inbound_internal_links,
+                    " | ".join(
+                        issue.title for issue in job_issues_by_url.get(listing.url_id, [])
+                    ),
+                    listing.first_detected_at,
+                    listing.last_detected_at,
+                ]
+                for listing in job_listings
+            ],
+        ),
     }
+
+
+def _job_validation_status(listing: JobListing, issues: list[Issue]) -> str:
+    if any(issue.severity in {"critical", "high"} for issue in issues):
+        return "error"
+    if issues:
+        return "warning"
+    if "job_posting_schema" in (listing.detection_sources or []):
+        return "valid"
+    return "missing_schema"
 
 
 def _write_csv(db: Session, website_id: object, export_type: str, path: Path) -> None:

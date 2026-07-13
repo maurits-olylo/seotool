@@ -9,7 +9,7 @@ from app.schemas.common import ORMModel
 
 class ExportCreate(BaseModel):
     website_id: UUID
-    export_type: Literal["urls", "technical", "changes", "issues", "links", "excel"]
+    export_type: Literal["urls", "technical", "changes", "issues", "links", "vacancies", "excel"]
 
 
 class ExportRead(ORMModel):

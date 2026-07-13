@@ -2,6 +2,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
+from openpyxl import load_workbook
 
 from app.db.session import SessionLocal
 from app.models.client import Client
@@ -10,11 +11,15 @@ from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url
 from app.models.exports import Export
 from app.models.issues import Change, Issue
+from app.models.jobs import JobListing
 from app.models.website import Website, WebsiteSettings
 from app.services import exports as export_service
 
 
-@pytest.mark.parametrize("export_type,suffix", [("urls", "csv"), ("excel", "xlsx")])
+@pytest.mark.parametrize(
+    "export_type,suffix",
+    [("urls", "csv"), ("vacancies", "csv"), ("excel", "xlsx")],
+)
 def test_generates_export(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -42,6 +47,8 @@ def test_generates_export(
         path = Path(completed.file_path or "")
         assert path.suffix == f".{suffix}"
         assert path.stat().st_size > 0
+        if export_type == "excel":
+            assert "Vacancies" in load_workbook(path, read_only=True).sheetnames
 
 
 def test_datasets_include_human_readable_urls() -> None:
@@ -98,6 +105,30 @@ def test_datasets_include_human_readable_urls() -> None:
                     description="Test",
                     recommended_action="Herstel",
                 ),
+                Issue(
+                    website_id=website.id,
+                    url_id=target.id,
+                    issue_type="job_posting_schema_missing",
+                    category="structured_data",
+                    severity="high",
+                    title="Vacature mist JobPosting-schema",
+                    description="Test",
+                    recommended_action="Voeg schema toe",
+                ),
+                JobListing(
+                    website_id=website.id,
+                    url_id=target.id,
+                    latest_snapshot_id=snapshot.id,
+                    detection_sources=["url_pattern", "page_text"],
+                    title="SEO specialist",
+                    employer="Example",
+                    locations=["Amsterdam"],
+                    employment_types=["FULL_TIME"],
+                    lifecycle_status="active",
+                    current_status_code=200,
+                    is_indexable=True,
+                    inbound_internal_links=2,
+                ),
                 Change(
                     website_id=website.id,
                     url_id=target.id,
@@ -141,6 +172,11 @@ def test_datasets_include_human_readable_urls() -> None:
         assert datasets["changes"][1][0][0] == target.normalized_url
         assert datasets["links"][0][:2] == ["source_url", "target_url"]
         assert datasets["links"][1][0][0] == source.normalized_url
+        assert datasets["vacancies"][0][0] == "url"
+        assert datasets["vacancies"][1][0][0] == target.normalized_url
+        assert datasets["vacancies"][1][0][1] == "SEO specialist"
+        assert datasets["vacancies"][1][0][5] == "error"
+        assert datasets["vacancies"][1][0][15] == "Vacature mist JobPosting-schema"
         assert all(
             not header.endswith("_id")
             for headers, _ in datasets.values()

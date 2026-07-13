@@ -1,6 +1,6 @@
+import re
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
-import re
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -24,6 +24,28 @@ MONTHS_NL = {
     "januari": 1, "februari": 2, "maart": 3, "april": 4, "mei": 5, "juni": 6,
     "juli": 7, "augustus": 8, "september": 9, "oktober": 10, "november": 11,
     "december": 12,
+}
+
+ACTIVE_JOB_ISSUE_STATUSES = {
+    "new",
+    "review",
+    "accepted",
+    "planned",
+    "in_progress",
+    "waiting_for_client",
+}
+JOB_ISSUE_TYPES = {
+    "expired_job_posting",
+    "expired_job_posting_linked",
+    "expired_job_posting_404",
+    "job_posting_schema_missing",
+    "job_posting_missing_fields",
+    "job_posting_invalid_dates",
+    "job_posting_missing_application",
+    "job_posting_remote_location_missing",
+    "job_posting_location_incomplete",
+    "job_posting_not_detail_page",
+    "job_posting_missing_recommended_fields",
 }
 
 

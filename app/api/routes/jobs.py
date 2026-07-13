@@ -11,30 +11,10 @@ from app.models.discovery import Url
 from app.models.issues import Issue
 from app.models.jobs import JobListing
 from app.services.authorization import require_website_access
+from app.services.job_posting import ACTIVE_JOB_ISSUE_STATUSES, JOB_ISSUE_TYPES
 
 router = APIRouter(tags=["job listings"])
 
-ACTIVE_ISSUE_STATUSES = {
-    "new",
-    "review",
-    "accepted",
-    "planned",
-    "in_progress",
-    "waiting_for_client",
-}
-JOB_ISSUE_TYPES = {
-    "expired_job_posting",
-    "expired_job_posting_linked",
-    "expired_job_posting_404",
-    "job_posting_schema_missing",
-    "job_posting_missing_fields",
-    "job_posting_invalid_dates",
-    "job_posting_missing_application",
-    "job_posting_remote_location_missing",
-    "job_posting_location_incomplete",
-    "job_posting_not_detail_page",
-    "job_posting_missing_recommended_fields",
-}
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 
 
@@ -62,7 +42,7 @@ def list_job_listings(
                 Issue.website_id == website_id,
                 Issue.url_id.in_(url_ids),
                 Issue.issue_type.in_(JOB_ISSUE_TYPES),
-                Issue.status.in_(ACTIVE_ISSUE_STATUSES),
+                Issue.status.in_(ACTIVE_JOB_ISSUE_STATUSES),
             )
         ):
             if issue.url_id:

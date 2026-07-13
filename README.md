@@ -1,8 +1,9 @@
 # SEO Monitor
 
-Backend voor het beheren van klanten en websites, periodieke crawls, wijzigingsdetectie,
-technische SEO-issues en CSV-/Excel-export. De applicatie gebruikt FastAPI, PostgreSQL en Redis/RQ
-en draait als zes losse Docker Compose-services.
+Platform voor het beheren van klanten en websites, periodieke crawls, wijzigingsdetectie,
+technische SEO-issues, vacaturemonitoring en CSV-/Excel-export. Excel-exporten bevatten een
+afzonderlijk vacaturetabblad met lifecycle en Google for Jobs-bevindingen. De applicatie gebruikt
+FastAPI, PostgreSQL en Redis/RQ en draait als zes losse Docker Compose-services.
 
 ## Architectuur
 

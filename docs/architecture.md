@@ -51,7 +51,9 @@ terugkerend signaal opent hetzelfde issue opnieuw. `issue_occurrences` bewaart b
 De API en scheduler schrijven eerst een persistent `crawl_job` en plaatsen daarna alleen het ID op
 de RQ-queue. De worker voorkomt gelijktijdige crawls per website en bewaart deelresultaten per URL.
 RQ verzorgt retries met oplopende wachttijd. CSV-exporten leveren één dataset; Excel bevat metadata
-en aparte tabbladen voor URL's, issues, wijzigingen en links. Bestanden staan in een gedeeld volume.
+en aparte tabbladen voor URL's, issues, wijzigingen, interne links en vacatures. Het vacaturetabblad
+bevat lifecycle, Google for Jobs-status, datums, sollicitatiegegevens, interne links en actieve
+bevindingen, maar geen technische database-ID's. Bestanden staan in een gedeeld volume.
 
 ## Crawl-diepte
 
@@ -78,4 +80,5 @@ website en URL. Herkenning gebruikt JobPosting-schema, vacature-URL-patronen en 
 vacaturetekst. Google for Jobs-signalen blijven gewone, dedupliceerbare issues zodat hun bewijs,
 status en lifecycle overeenkomen met andere technische bevindingen. De interne vacatureweergave
 combineert deze blijvende vacaturegegevens met alleen actieve vacature-issues; geldige vacatures
-verschijnen daardoor ook wanneer zij geen issue veroorzaken.
+verschijnen daardoor ook wanneer zij geen issue veroorzaken. Het interne hoofdoverzicht toont
+klikbare vacature-indicatoren; klanten zien deze operationele monitor niet.
