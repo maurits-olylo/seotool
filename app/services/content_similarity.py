@@ -10,6 +10,7 @@ from app.models.discovery import Url
 from app.models.issues import Issue
 from app.services.issue_engine import reconcile_issues
 from app.services.technical_checks import IssueSignal
+from app.services.url_normalization import InvalidUrlError, normalize_url
 
 CONTENT_SIMILARITY_ISSUE_TYPES = {
     "duplicate_content",
@@ -221,11 +222,19 @@ def _is_comparable(snapshot: UrlSnapshot) -> bool:
 
 
 def _is_indexable_page(snapshot: UrlSnapshot) -> bool:
-    return bool(
-        snapshot.status_code == 200
-        and snapshot.is_indexable is True
-        and not snapshot.redirect_chain
-    )
+    if (
+        snapshot.status_code != 200
+        or snapshot.is_indexable is not True
+        or snapshot.redirect_chain
+    ):
+        return False
+    if not snapshot.canonical:
+        return True
+    page_url = snapshot.final_url or snapshot.requested_url
+    try:
+        return normalize_url(snapshot.canonical) == normalize_url(page_url)
+    except InvalidUrlError:
+        return True
 
 
 def _normalize_metadata(value: str | None) -> str:

@@ -95,6 +95,57 @@ def test_detects_exact_and_near_duplicate_content_and_resolves_it() -> None:
         assert {issue.status for issue in issues} == {"resolved"}
 
 
+def test_ignores_duplicate_content_consolidated_by_canonical() -> None:
+    with SessionLocal() as db:
+        client = Client(name="Canonical client")
+        website = Website(client=client, name="Canonical site", base_url="https://example.com/")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        primary = Url(
+            website_id=website.id,
+            normalized_url="https://example.com/articles",
+            current_status_code=200,
+            is_indexable=True,
+        )
+        variant = Url(
+            website_id=website.id,
+            normalized_url="https://example.com/articles?category=seo",
+            current_status_code=200,
+            is_indexable=True,
+        )
+        db.add_all([primary, variant])
+        db.flush()
+        run = _run(db, website.id)
+        content = _content("canonical cluster")
+        db.add_all(
+            [
+                _snapshot(
+                    primary,
+                    run,
+                    content,
+                    "shared-hash",
+                    title="Articles",
+                    meta_description="All articles",
+                    canonical=primary.normalized_url,
+                ),
+                _snapshot(
+                    variant,
+                    run,
+                    content,
+                    "shared-hash",
+                    title="Articles",
+                    meta_description="All articles",
+                    canonical=primary.normalized_url,
+                ),
+            ]
+        )
+        db.flush()
+
+        assert detect_duplicate_content(db, website_id=website.id, crawl_run_id=run.id) == []
+        assert db.scalar(select(Issue)) is None
+
+
 def _run(db, website_id):  # type: ignore[no-untyped-def]
     job = CrawlJob(website_id=website_id, job_type="full_site_crawl")
     db.add(job)
@@ -117,6 +168,7 @@ def _snapshot(  # type: ignore[no-untyped-def]
     *,
     title: str | None = None,
     meta_description: str | None = None,
+    canonical: str | None = None,
 ):
     return UrlSnapshot(
         url_id=url.id,
@@ -128,6 +180,7 @@ def _snapshot(  # type: ignore[no-untyped-def]
         redirect_chain=[],
         title=title,
         meta_description=meta_description,
+        canonical=canonical,
         word_count=len(content.split()),
         main_content=content,
         main_content_hash=content_hash,
