@@ -50,13 +50,18 @@ function renderClientReport() {
   const current = report.current || {};
   const comparisons = report.comparisons || {};
   const qualifiedEvents = report.qualified_key_events || {};
-  const signal = qualifiedEvents.configured && current.key_events ? "key_events" : current.sessions ? "sessions" : "clicks";
+  const signal = report.primary_metric || (qualifiedEvents.configured && current.key_events ? "key_events" : current.sessions ? "sessions" : "clicks");
   const signalLabels = {key_events:"gekwalificeerde organische leads",sessions:"organische sessies",clicks:"organische klikken"};
   const change = comparisons[signal];
+  const currentValue = Number(current[signal] || 0).toLocaleString("nl-NL");
+  const previousValue = Number(report.previous?.[signal] || 0).toLocaleString("nl-NL");
+  const label = signalLabels[signal];
   $("#report-conclusion").textContent = change === null || change === undefined
-    ? `${Number(current[signal] || 0).toLocaleString("nl-NL")} ${signalLabels[signal]} in deze periode`
-    : change >= 0 ? `Organische prestaties zijn ${Math.abs(change)}% gestegen` : `Organische prestaties zijn ${Math.abs(change)}% gedaald`;
-  $("#report-explanation").textContent = "Deze rapportage combineert organische zichtbaarheid, bezoek, gekwalificeerde leads en technische voortgang.";
+    ? `${currentValue} ${label} gemeten`
+    : `${label[0].toUpperCase()}${label.slice(1)} ${change >= 0 ? "stegen" : "daalden"} ${Math.abs(change)}%`;
+  $("#report-explanation").textContent = change === null || change === undefined
+    ? `Er is nog geen volledige voorafgaande periode om deze ${label} eerlijk te vergelijken.`
+    : `Van ${previousValue} naar ${currentValue} ${label} ten opzichte van de vorige vergelijkbare periode.`;
   $("#report-date").textContent = `${new Date(report.start_date).toLocaleDateString("nl-NL")} – ${new Date(report.end_date).toLocaleDateString("nl-NL")}`;
   $("#report-coverage").textContent = report.coverage?.from ? `Data beschikbaar vanaf ${new Date(report.coverage.from).toLocaleDateString("nl-NL")}` : "Nog geen GSC/GA4-data beschikbaar";
   const metricDefinitions = [["clicks","Organische klikken"],["impressions","Vertoningen in Google"],["sessions","Organische sessies"],["key_events","Gekwalificeerde leads"]];
@@ -65,6 +70,12 @@ function renderClientReport() {
     const deltaLabel = key === "key_events" && !qualifiedEvents.configured ? "Kies conversies in Integraties" : delta === null || delta === undefined ? "Geen vergelijkingsdata" : `${delta >= 0 ? "+" : ""}${delta}% t.o.v. vorige periode`;
     return `<article class="report-metric"><strong>${key === "key_events" && !qualifiedEvents.configured ? "—" : Number(current[key] || 0).toLocaleString("nl-NL")}</strong><span>${label}</span><small class="${delta > 0 ? "positive" : delta < 0 ? "negative" : ""}">${deltaLabel}</small></article>`;
   }).join("");
+  const availablePeriods = new Set(report.available_periods || []);
+  $("#report-periods").querySelectorAll("button").forEach((button) => {
+    const available = availablePeriods.has(button.dataset.reportPeriod);
+    button.classList.toggle("hidden", !available);
+    if (!available && button.dataset.reportPeriod === state.reportPeriod) state.reportPeriod = "month";
+  });
   const conversionEvents = qualifiedEvents.events || [];
   $("#report-conversions").innerHTML = qualifiedEvents.configured
     ? `<div class="panel-head"><div><span class="eyebrow">CONVERSIES</span><h2>Gekwalificeerde leads uit organic</h2></div></div><div class="conversion-breakdown">${conversionEvents.map((event) => `<article><strong>${Number(event.key_events).toLocaleString("nl-NL")}</strong><span>${escapeHtml(event.event_name)}</span></article>`).join("") || `<p class="report-empty">Geen gekwalificeerde leads in deze periode.</p>`}</div>`
@@ -76,8 +87,8 @@ function renderClientReport() {
     .slice(-12);
   const chartMetric = months.some((month) => month.sessions) ? "sessions" : "clicks";
   const trendValues = months.map((month) => Number(month[chartMetric] || 0));
-  const trendRange = trendValues.length ? `${Math.min(...trendValues).toLocaleString("nl-NL")}–${Math.max(...trendValues).toLocaleString("nl-NL")}` : "—";
-  $("#report-trend-label").textContent = `${chartMetric === "sessions" ? "Organische sessies" : "Organische klikken"} · schaal ${trendRange} · volledige maanden`;
+  const trendMax = trendValues.length ? Math.ceil(Math.max(...trendValues) / 1000) * 1000 : 0;
+  $("#report-trend-label").textContent = `${chartMetric === "sessions" ? "Organische sessies" : "Organische klikken"} · 0–${trendMax.toLocaleString("nl-NL")} · volledige maanden`;
   $("#report-chart").innerHTML = renderTrendChart(months, chartMetric);
 
   const activities = report.work_completed?.activities || [];
@@ -93,15 +104,16 @@ function renderReportInsights(report, signal) {
   const signalName = {key_events:"gekwalificeerde leads", sessions:"organische sessies", clicks:"organische klikken"}[signal];
   const delta = comparisons[signal];
   const performance = delta === null || delta === undefined
-    ? `${Number(current[signal] || 0).toLocaleString("nl-NL")} ${signalName} gemeten.`
-    : `${signalName[0].toUpperCase()}${signalName.slice(1)} ${delta >= 0 ? "stegen" : "daalden"} ${Math.abs(delta)}% t.o.v. de vorige periode.`;
+    ? `${Number(current[signal] || 0).toLocaleString("nl-NL")} ${signalName}; een eerlijke vergelijking is nog niet beschikbaar.`
+    : `${Number(report.previous?.[signal] || 0).toLocaleString("nl-NL")} → ${Number(current[signal] || 0).toLocaleString("nl-NL")} ${signalName} (${delta >= 0 ? "+" : ""}${delta}%).`;
   const clickDelta = comparisons.clicks;
   const visibility = clickDelta === null || clickDelta === undefined
     ? `${Number(current.impressions || 0).toLocaleString("nl-NL")} vertoningen in Google.`
-    : `Organische klikken ${clickDelta >= 0 ? "+" : ""}${clickDelta}% t.o.v. de vorige periode.`;
+    : `${Number(report.previous?.clicks || 0).toLocaleString("nl-NL")} → ${Number(current.clicks || 0).toLocaleString("nl-NL")} organische klikken (${clickDelta >= 0 ? "+" : ""}${clickDelta}%).`;
   const newIssues = (report.new_issues || []).length;
   const planned = (report.planned || []).length;
-  const action = newIssues ? `${newIssues} nieuwe aandachtspunten vragen opvolging.` : planned ? `${planned} acties staan gepland of zijn in uitvoering.` : "Geen nieuwe technische aandachtspunten in deze periode.";
+  const resolved = report.work_completed?.technically_verified || 0;
+  const action = newIssues ? `${newIssues} nieuwe aandachtspunten; ${resolved} issues opgelost of geverifieerd.` : planned ? `${planned} acties gepland of in uitvoering; ${resolved} issues opgelost of geverifieerd.` : `${resolved} issues opgelost of geverifieerd; geen nieuwe technische aandachtspunten.`;
   $("#report-insights").innerHTML = [["PRESTATIE", performance], ["ZICHTBAARHEID", visibility], ["ACTIE", action]]
     .map(([label, text]) => `<article><span>${label}</span><p>${text}</p></article>`).join("");
 }
@@ -110,12 +122,13 @@ function renderTrendChart(months, metric) {
   if (months.length < 2) return `<p class="report-empty">Nog onvoldoende volledige maanden voor een betrouwbare maandtrend.</p>`;
   const width = 1000; const height = 245; const padding = {left: 46, right: 24, top: 28, bottom: 42};
   const values = months.map((month) => Number(month[metric] || 0));
-  const max = Math.max(...values); const min = Math.min(...values);
-  const range = Math.max(1, max - min); const plotWidth = width - padding.left - padding.right; const plotHeight = height - padding.top - padding.bottom;
+  const max = Math.max(...values);
+  const axisMax = Math.max(1, Math.ceil(max / 1000) * 1000);
+  const plotWidth = width - padding.left - padding.right; const plotHeight = height - padding.top - padding.bottom;
   const x = (index) => padding.left + (plotWidth * index / (months.length - 1));
-  const y = (value) => padding.top + ((max - value) / range * plotHeight);
+  const y = (value) => padding.top + ((axisMax - value) / axisMax * plotHeight);
   const points = values.map((value, index) => `${x(index)},${y(value)}`).join(" ");
-  const grid = [0, 0.5, 1].map((ratio) => { const lineY = padding.top + plotHeight * ratio; const label = Math.round(max - range * ratio).toLocaleString("nl-NL"); return `<line x1="${padding.left}" y1="${lineY}" x2="${width - padding.right}" y2="${lineY}"/><text x="0" y="${lineY + 4}">${label}</text>`; }).join("");
+  const grid = [0, 0.5, 1].map((ratio) => { const lineY = padding.top + plotHeight * ratio; const label = Math.round(axisMax * (1 - ratio)).toLocaleString("nl-NL"); return `<line x1="${padding.left}" y1="${lineY}" x2="${width - padding.right}" y2="${lineY}"/><text x="0" y="${lineY + 4}">${label}</text>`; }).join("");
   const dots = values.map((value, index) => `<g><title>${months[index].month}: ${value.toLocaleString("nl-NL")}</title><circle cx="${x(index)}" cy="${y(value)}" r="4" fill="#fff" stroke="#124b3b" stroke-width="3"/><text x="${x(index)}" y="${height - 12}" text-anchor="middle">${months[index].month.slice(5)}/${months[index].month.slice(2,4)}</text></g>`).join("");
   return `<svg class="report-line-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Maandelijkse organische prestaties"><g class="report-chart-grid">${grid}</g><polyline class="report-chart-line" points="${points}" fill="none" stroke="#124b3b" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>${dots}</svg>`;
 }

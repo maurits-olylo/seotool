@@ -22,6 +22,7 @@ from app.services.authorization import require_website_access
 router = APIRouter(tags=["reports"])
 Period = Literal["month", "quarter", "half_year", "year", "ytd"]
 ACTIVE_STATUSES = {"new", "review", "accepted", "planned", "in_progress", "waiting_for_client"}
+REPORT_PERIODS: tuple[Period, ...] = ("month", "quarter", "half_year", "ytd", "year")
 
 
 def _period_dates(period: Period, end: date) -> tuple[date, date, date, date]:
@@ -37,6 +38,21 @@ def _delta(current: float, previous: float) -> float | None:
     if previous == 0:
         return None
     return round((current - previous) / previous * 100, 1)
+
+
+def _available_periods(
+    end: date, source_dates: list[date]
+) -> list[Period]:
+    """Only offer periods that have a complete preceding comparison window."""
+    if not source_dates:
+        return []
+    first_date = min(source_dates)
+    available: list[Period] = []
+    for period in REPORT_PERIODS:
+        _, _, previous_start, _ = _period_dates(period, end)
+        if first_date <= previous_start:
+            available.append(period)
+    return available
 
 
 def _totals(
@@ -160,6 +176,27 @@ def build_client_report(
             else None
         )
 
+    primary_metric = (
+        "key_events"
+        if qualified_events and key_event_dates
+        else "sessions"
+        if ga_dates
+        else "clicks"
+    )
+    primary_source_dates = (
+        key_event_dates
+        if primary_metric == "key_events"
+        else ga_dates
+        if primary_metric == "sessions"
+        else gsc_dates
+    )
+    comparison_source_dates = ga_dates or gsc_dates
+    available_periods = _available_periods(end, comparison_source_dates)
+    # A yearly headline must also be supportable by its primary KPI. Otherwise it
+    # would fall back to an unrelated total (for example conversions only).
+    if "year" in available_periods and "year" not in _available_periods(end, primary_source_dates):
+        available_periods.remove("year")
+
     monthly: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
     for metric_date, values in daily.items():
         if metric_date >= end - timedelta(days=395):
@@ -239,6 +276,8 @@ def build_client_report(
         "current": current,
         "previous": previous,
         "comparisons": comparisons,
+        "primary_metric": primary_metric,
+        "available_periods": available_periods,
         "monthly": [
             {"month": month, **{key: round(value, 1) for key, value in values.items()}}
             for month, values in sorted(monthly.items())

@@ -376,6 +376,8 @@ def test_client_report_contains_performance_and_work(client: TestClient) -> None
     ]
     assert report.json()["comparisons"]["clicks"] == 150
     assert report.json()["monthly"]
+    assert report.json()["primary_metric"] == "key_events"
+    assert "month" in report.json()["available_periods"]
 
 
 def test_monthly_report_snapshots_are_listed_and_readable(client: TestClient) -> None:
