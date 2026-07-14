@@ -3,9 +3,83 @@ from sqlalchemy import select
 from app.db.session import SessionLocal
 from app.jobs import execute_crawl_job
 from app.models.client import Client
+from app.models.crawl import CrawlRun, UrlSnapshot
 from app.models.discovery import CrawlJob, Url
 from app.models.website import Website, WebsiteSettings
 from app.services.http_crawler import FetchMetadata, FetchResult
+
+
+def test_resumed_full_crawl_continues_after_saved_snapshot(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    fetched: list[str] = []
+
+    def fake_fetch(url: str, **_: object) -> FetchResult:
+        fetched.append(url)
+        return FetchResult(
+            requested_url=url,
+            final_url=url,
+            status_code=200,
+            redirect_chain=[],
+            headers={"content-type": "text/html"},
+            content=b"<main>Remaining page</main>",
+            response_time_ms=1,
+        )
+
+    monkeypatch.setattr("app.jobs.fetch_url", fake_fetch)
+    with SessionLocal() as db:
+        client = Client(name="Resume client")
+        website = Website(client=client, name="Resume site", base_url="https://example.com/")
+        website.settings = WebsiteSettings(respect_robots_txt=False)
+        db.add(website)
+        db.flush()
+        root = Url(
+            website_id=website.id,
+            normalized_url="https://example.com/",
+            crawl_depth=0,
+        )
+        child = Url(
+            website_id=website.id,
+            normalized_url="https://example.com/remaining",
+            crawl_depth=1,
+        )
+        job = CrawlJob(
+            website_id=website.id,
+            job_type="full_site_crawl",
+            status="pending",
+            settings_snapshot={"max_urls": 10, "respect_robots_txt": False},
+        )
+        db.add_all([root, child, job])
+        db.flush()
+        run = CrawlRun(
+            crawl_job_id=job.id,
+            website_id=website.id,
+            crawl_type=job.job_type,
+            status="paused",
+            crawled_urls=1,
+        )
+        db.add(run)
+        db.flush()
+        db.add(
+            UrlSnapshot(
+                url_id=root.id,
+                crawl_run_id=run.id,
+                requested_url=root.normalized_url,
+                final_url=root.normalized_url,
+                status_code=200,
+                redirect_chain=[],
+                is_indexable=True,
+            )
+        )
+        db.commit()
+        job_id = job.id
+
+    execute_crawl_job(str(job_id))
+
+    assert fetched == ["https://example.com/remaining"]
+    with SessionLocal() as db:
+        job = db.get(CrawlJob, job_id)
+        run = db.scalar(select(CrawlRun).where(CrawlRun.crawl_job_id == job_id))
+        assert job and job.status == "succeeded"
+        assert run and run.crawled_urls == 2
 
 
 def test_full_site_crawl_assigns_breadth_first_depths(monkeypatch) -> None:  # type: ignore[no-untyped-def]

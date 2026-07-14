@@ -10,8 +10,10 @@ const labels = {
   ignored: "Genegeerd", accepted_risk: "Risico geaccepteerd",
   pending: "In wachtrij", running: "Bezig", succeeded: "Geslaagd",
   partially_succeeded: "Deels geslaagd", failed: "Mislukt", cancelled: "Geannuleerd",
+  pause_requested: "Pauze wordt voorbereid", paused: "Gepauzeerd",
+  cancel_requested: "Stop wordt voorbereid",
 };
-const state = { currentUser: null, clients: [], websites: [], organizationWebsites: [], issues: [], changes: [], changeGroups: [], jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], exports: [], systemStatus: null, operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
+const state = { currentUser: null, clients: [], websites: [], organizationWebsites: [], issues: [], changes: [], changeGroups: [], jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
 const VIEW_HASHES = {overview: "overzicht", reports: "rapportage", insights: "inzichten", urls: "urls", changes: "wijzigingen", vacancies: "vacatures", operations: "beheer", organization: "organisatie", integrations: "integraties"};
 const CLIENT_STORAGE_KEY = "seo-monitor-client-id";
 const WEBSITE_STORAGE_KEY = "seo-monitor-website-id";
@@ -835,6 +837,8 @@ async function loadOperations() {
       api(`/api/v1/websites/${websiteId}/crawl-runs?limit=20`),
       api(`/api/v1/exports?website_id=${websiteId}&limit=20`),
     ]);
+    const activeRun = state.crawlRuns.find((run) => ["running", "paused"].includes(run.status));
+    state.activeCrawlJob = activeRun ? await api(`/api/v1/crawl-jobs/${activeRun.crawl_job_id}`) : null;
     state.systemStatus = await api("/api/v1/system/status").catch(() => null);
     $("#operations-website-name").textContent = $("#website-select").selectedOptions[0]?.textContent || "de website";
     $("#operations-load-message").textContent = state.systemStatus ? "" : "De systeemstatus kon niet worden opgehaald; crawl- en exportgegevens zijn wel bijgewerkt.";
@@ -873,11 +877,16 @@ function renderOperations() {
   const runLabels = {light_check: "Light check", full_site_crawl: "Volledige crawl", fetch_sitemap: "Sitemap", full_page_analysis: "Pagina-analyse"};
   $("#crawl-run-rows").innerHTML = state.crawlRuns.map((run) => `<tr><td>${new Date(run.started_at).toLocaleString("nl-NL")}</td><td>${runLabels[run.crawl_type] || escapeHtml(run.crawl_type)}</td><td><span class="run-status ${run.status}">${labels[run.status] || run.status}</span></td><td>${run.discovered_urls}</td><td>${run.crawled_urls}</td><td>${run.failed_urls}</td><td>${durationLabel(run)}</td></tr>`).join("");
   $("#crawl-runs-empty").classList.toggle("hidden", state.crawlRuns.length !== 0);
-  const runningCrawl = state.crawlRuns.find((run) => run.status === "running");
+  const runningCrawl = state.crawlRuns.find((run) => ["running", "paused"].includes(run.status));
+  const crawlStatus = state.activeCrawlJob?.status || runningCrawl?.status;
   $("#crawl-live-status").classList.toggle("hidden", !runningCrawl);
   $("#start-light-check").disabled = Boolean(runningCrawl);
   $("#start-full-crawl").disabled = Boolean(runningCrawl);
-  if (runningCrawl) $("#crawl-live-label").textContent = `${runLabels[runningCrawl.crawl_type] || runningCrawl.crawl_type} bezig · ${runningCrawl.crawled_urls} gecrawld · ${runningCrawl.failed_urls} mislukt`;
+  if (runningCrawl) $("#crawl-live-label").textContent = `${runLabels[runningCrawl.crawl_type] || runningCrawl.crawl_type} · ${labels[crawlStatus] || crawlStatus} · ${runningCrawl.crawled_urls} gecrawld · ${runningCrawl.failed_urls} mislukt`;
+  $("#crawl-progress-track").classList.toggle("hidden", crawlStatus === "paused");
+  $("#pause-crawl").classList.toggle("hidden", crawlStatus !== "running");
+  $("#resume-crawl").classList.toggle("hidden", crawlStatus !== "paused");
+  $("#cancel-crawl").disabled = ["cancel_requested", "cancelled"].includes(crawlStatus);
   const currentExport = state.exports.find((item) => !item.downloaded_at && ["pending", "running", "succeeded"].includes(item.status));
   const exportPanel = $("#current-export"); const exportButton = $("#generate-excel"); const download = $("#current-export-download");
   exportPanel.classList.toggle("hidden", !currentExport);
@@ -906,6 +915,21 @@ async function startCrawl(jobType) {
     message.textContent = `${jobType === "light_check" ? "Light check" : "Volledige crawl"} is gestart (${job.id.slice(0, 8)}).`;
     setTimeout(loadOperations, 2000);
   } catch (error) { message.classList.add("error"); message.textContent = error.message; button.disabled = false; }
+}
+
+async function controlCrawl(action) {
+  const job = state.activeCrawlJob;
+  if (!job) return;
+  if (action === "cancel" && !window.confirm("Crawl stoppen? Reeds opgeslagen resultaten blijven behouden.")) return;
+  const message = $("#crawl-action-message");
+  message.classList.remove("error");
+  message.textContent = action === "pause" ? "Crawl wordt na de huidige URL gepauzeerd…" : action === "resume" ? "Crawl wordt hervat…" : "Crawl wordt na de huidige URL gestopt…";
+  try {
+    state.activeCrawlJob = await api(`/api/v1/crawl-jobs/${job.id}/${action}`, {method: "POST"});
+    await loadOperations();
+  } catch (error) {
+    message.classList.add("error"); message.textContent = error.message;
+  }
 }
 
 async function generateExcel() {
@@ -1174,6 +1198,9 @@ $("#open-vacancies").addEventListener("click", () => openVacanciesWithFilter());
 $("#close-change-dialog").addEventListener("click", () => $("#change-dialog").close());
 $("#start-light-check").addEventListener("click", () => startCrawl("light_check"));
 $("#start-full-crawl").addEventListener("click", () => startCrawl("full_site_crawl"));
+$("#pause-crawl").addEventListener("click", () => controlCrawl("pause"));
+$("#resume-crawl").addEventListener("click", () => controlCrawl("resume"));
+$("#cancel-crawl").addEventListener("click", () => controlCrawl("cancel"));
 $("#generate-excel").addEventListener("click", generateExcel);
 $("#refresh-operations").addEventListener("click", loadOperations);
 $("#current-export-download").addEventListener("click", () => window.setTimeout(loadOperations, 2000));

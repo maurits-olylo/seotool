@@ -1,14 +1,15 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from rq import Retry
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.queue import get_queue
+from app.core.queue import enqueue_crawl_job
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
+from app.models.common import utc_now
+from app.models.crawl import CrawlRun
 from app.models.discovery import CrawlJob, Url
 from app.schemas.discovery import CrawlJobCreate, CrawlJobRead, UrlRead, UrlRegister
 from app.services.authorization import require_website_access
@@ -76,7 +77,7 @@ def create_crawl_job(
     running = db.scalar(
         select(CrawlJob.id).where(
             CrawlJob.website_id == payload.website_id,
-            CrawlJob.status.in_(["pending", "running"]),
+            CrawlJob.status.in_(["pending", "running", "pause_requested", "paused"]),
         )
     )
     if running:
@@ -96,12 +97,73 @@ def create_crawl_job(
     db.commit()
     db.refresh(job)
     if get_settings().app_env != "test":
-        get_queue().enqueue(
-            "app.jobs.execute_crawl_job",
-            str(job.id),
-            retry=Retry(max=3, interval=[10, 30, 90]),
-            job_id=str(job.id),
-        )
+        enqueue_crawl_job(str(job.id))
+    return job
+
+
+def _crawl_job_or_404(job_id: UUID, db: Session, principal: Principal) -> CrawlJob:
+    job = db.get(CrawlJob, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Crawl job not found")
+    require_website_access(db, principal, job.website_id, admin=True)
+    return job
+
+
+@router.post("/crawl-jobs/{job_id}/pause", response_model=CrawlJobRead)
+def pause_crawl_job(
+    job_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> CrawlJob:
+    job = _crawl_job_or_404(job_id, db, principal)
+    if job.status != "running":
+        raise HTTPException(status_code=409, detail="Deze crawl kan niet worden gepauzeerd")
+    job.status = "pause_requested"
+    db.commit()
+    db.refresh(job)
+    return job
+
+
+@router.post("/crawl-jobs/{job_id}/resume", response_model=CrawlJobRead)
+def resume_crawl_job(
+    job_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> CrawlJob:
+    job = _crawl_job_or_404(job_id, db, principal)
+    if job.status != "paused":
+        raise HTTPException(status_code=409, detail="Alleen een gepauzeerde crawl kan hervatten")
+    job.status = "pending"
+    job.finished_at = None
+    job.error_message = None
+    db.commit()
+    if get_settings().app_env != "test":
+        enqueue_crawl_job(str(job.id), attempt=job.attempt_count + 1)
+    db.refresh(job)
+    return job
+
+
+@router.post("/crawl-jobs/{job_id}/cancel", response_model=CrawlJobRead)
+def cancel_crawl_job(
+    job_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> CrawlJob:
+    job = _crawl_job_or_404(job_id, db, principal)
+    if job.status not in {"pending", "running", "pause_requested", "paused"}:
+        raise HTTPException(status_code=409, detail="Deze crawl kan niet worden gestopt")
+    run = db.scalar(select(CrawlRun).where(CrawlRun.crawl_job_id == job.id))
+    if job.status in {"pending", "paused"}:
+        finished = utc_now()
+        job.status = "cancelled"
+        job.finished_at = finished
+        if run:
+            run.status = "cancelled"
+            run.finished_at = finished
+    else:
+        job.status = "cancel_requested"
+    db.commit()
+    db.refresh(job)
     return job
 
 

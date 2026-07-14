@@ -1,13 +1,12 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from rq import Retry
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.queue import get_queue
+from app.core.queue import enqueue_crawl_job
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.client import Client
@@ -116,12 +115,7 @@ def onboard_client(
     db.refresh(website)
     db.refresh(crawl_job)
     if get_settings().app_env != "test":
-        get_queue().enqueue(
-            "app.jobs.execute_crawl_job",
-            str(crawl_job.id),
-            retry=Retry(max=3, interval=[10, 30, 90]),
-            job_id=str(crawl_job.id),
-        )
+        enqueue_crawl_job(str(crawl_job.id))
     return {"client": client, "website": website, "crawl_job": crawl_job}
 
 

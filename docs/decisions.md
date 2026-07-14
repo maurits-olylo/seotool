@@ -125,3 +125,16 @@ opgelost.
 
 Gevolg: kritieke bereikbaarheidsproblemen zijn direct uitvoerbaar zonder iedere tijdelijke
 verbindingstoring als nieuw SEO-issue te presenteren.
+
+## 2026-07-14 — Crawlbesturing is coöperatief en hervatbaar
+
+Context: een worker-restart of maximale RQ-taakduur kon een crawl afbreken terwijl de database op
+`running` bleef staan. Gebruikers konden een lange crawl bovendien niet pauzeren of stoppen.
+
+Besluit: pauze en stop worden tussen URL-verzoeken verwerkt, zodat de huidige fetch gecontroleerd
+kan afronden. Een gepauzeerde crawl bewaart dezelfde job en crawlrun; hervatten reconstrueert de
+resterende wachtrij uit snapshots en crawl-dieptes. Bij een worker-restart worden actieve crawls
+automatisch gepauzeerd en expliciete stopverzoeken afgerond. De RQ-limiet voor crawls is zes uur.
+
+Gevolg: deelresultaten blijven behouden, een crawl kan veilig hervatten en een containerupdate laat
+geen onzichtbare `running`-status meer achter.

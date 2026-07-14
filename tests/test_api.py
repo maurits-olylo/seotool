@@ -688,6 +688,57 @@ def test_url_registry_deduplicates_and_creates_job(client: TestClient) -> None:
     assert [item["id"] for item in exports.json()] == [export.json()["id"]]
 
 
+def test_running_crawl_can_pause_resume_and_cancel(client: TestClient) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Controlled crawl"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": customer["id"],
+            "name": "Controlled site",
+            "base_url": "https://control.example.com",
+        },
+    ).json()
+    created = client.post(
+        "/api/v1/crawl-jobs",
+        json={"website_id": website["id"], "job_type": "full_site_crawl"},
+    ).json()
+    job_id = created["id"]
+    with SessionLocal() as db:
+        job = db.get(CrawlJob, UUID(job_id))
+        assert job
+        job.status = "running"
+        run = CrawlRun(
+            crawl_job_id=job.id,
+            website_id=job.website_id,
+            crawl_type=job.job_type,
+        )
+        db.add(run)
+        db.commit()
+
+    pause = client.post(f"/api/v1/crawl-jobs/{job_id}/pause")
+    assert pause.status_code == 200
+    assert pause.json()["status"] == "pause_requested"
+
+    with SessionLocal() as db:
+        job = db.get(CrawlJob, UUID(job_id))
+        run = db.scalar(select(CrawlRun).where(CrawlRun.crawl_job_id == UUID(job_id)))
+        assert job and run
+        job.status = "paused"
+        run.status = "paused"
+        db.commit()
+
+    resume = client.post(f"/api/v1/crawl-jobs/{job_id}/resume")
+    assert resume.status_code == 200
+    assert resume.json()["status"] == "pending"
+
+    cancel = client.post(f"/api/v1/crawl-jobs/{job_id}/cancel")
+    assert cancel.status_code == 200
+    assert cancel.json()["status"] == "cancelled"
+    with SessionLocal() as db:
+        run = db.scalar(select(CrawlRun).where(CrawlRun.crawl_job_id == UUID(job_id)))
+        assert run and run.status == "cancelled" and run.finished_at is not None
+
+
 def test_url_overview_hides_inactive_out_of_scope_records_by_default(
     client: TestClient,
 ) -> None:

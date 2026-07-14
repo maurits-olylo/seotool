@@ -74,6 +74,7 @@ Status: gepland.
 
 - Volledige acceptatiecontrole met minimaal twee klanten.
 - Scheduler, workers, exports, back-up, restore, updates en rollback valideren.
+- Pauzeren, hervatten, stoppen en herstel na worker-restart operationeel valideren.
 - Logging, operationele status en documentatie afronden.
 - Reproduceerbare NAS-installatie en alle relevante MVP-acceptatiecriteria controleren.
 

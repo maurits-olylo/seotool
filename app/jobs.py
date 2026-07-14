@@ -34,10 +34,18 @@ from app.services.url_scope import is_url_in_website_scope
 logger = structlog.get_logger()
 
 
+class CrawlPaused(RuntimeError):
+    pass
+
+
+class CrawlCancelled(RuntimeError):
+    pass
+
+
 def execute_crawl_job(job_id: str) -> None:
     with SessionLocal() as db:
         job = db.get(CrawlJob, uuid.UUID(job_id))
-        if job is None or job.status == "cancelled":
+        if job is None or job.status in {"cancelled", "paused", "pause_requested"}:
             return
         running = db.scalar(
             select(CrawlJob.id).where(
@@ -48,14 +56,15 @@ def execute_crawl_job(job_id: str) -> None:
         )
         if running:
             raise RuntimeError("Another crawl is already running for this website")
+        existing_run = db.scalar(select(CrawlRun).where(CrawlRun.crawl_job_id == job.id))
+        resumed = existing_run is not None
         job.status = "running"
-        job.started_at = utc_now()
+        job.started_at = job.started_at or utc_now()
         job.attempt_count += 1
-        run = CrawlRun(
-            crawl_job_id=job.id,
-            website_id=job.website_id,
-            crawl_type=job.job_type,
+        run = existing_run or CrawlRun(
+            crawl_job_id=job.id, website_id=job.website_id, crawl_type=job.job_type
         )
+        run.status = "running"
         db.add(run)
         db.commit()
         try:
@@ -65,13 +74,15 @@ def execute_crawl_job(job_id: str) -> None:
             _deactivate_out_of_scope_urls(db, website)
             db.commit()
             if job.job_type in {"fetch_sitemap", "full_site_crawl"}:
-                _import_sitemaps(db, job, run)
+                if not resumed:
+                    _import_sitemaps(db, job, run)
             if job.job_type == "fetch_sitemap":
                 run.status = "succeeded"
                 job.status = "succeeded"
                 return
             if job.job_type == "full_site_crawl":
-                site_crawl_complete = _crawl_full_site(db, job, run)
+                site_crawl_complete = _crawl_full_site(db, job, run, resumed=resumed)
+                _check_crawl_control(db, job, run)
                 classify_404_issues(db, website_id=job.website_id, crawl_run_id=run.id)
                 run.status = (
                     "succeeded"
@@ -90,7 +101,13 @@ def execute_crawl_job(job_id: str) -> None:
                 )
             )
             run.discovered_urls = len(urls)
+            completed_url_ids = set(
+                db.scalars(select(UrlSnapshot.url_id).where(UrlSnapshot.crawl_run_id == run.id))
+            )
             for url in urls:
+                if url.id in completed_url_ids:
+                    continue
+                _check_crawl_control(db, job, run)
                 if is_probable_html_page(url.normalized_url):
                     _crawl_one(db, job, run, url, robots=robots)
                 else:
@@ -99,6 +116,10 @@ def execute_crawl_job(job_id: str) -> None:
             classify_404_issues(db, website_id=job.website_id, crawl_run_id=run.id)
             run.status = "succeeded" if run.failed_urls == 0 else "partially_succeeded"
             job.status = run.status
+        except CrawlPaused:
+            logger.info("crawl_job_paused", job_id=job_id)
+        except CrawlCancelled:
+            logger.info("crawl_job_cancelled", job_id=job_id)
         except Exception as exc:
             db.rollback()
             job = db.get(CrawlJob, uuid.UUID(job_id))
@@ -114,9 +135,9 @@ def execute_crawl_job(job_id: str) -> None:
             raise
         finally:
             finished = datetime.now(UTC)
-            if job:
+            if job and job.status != "paused":
                 job.finished_at = finished
-            if run:
+            if run and run.status != "paused":
                 run.finished_at = finished
             db.commit()
 
@@ -172,11 +193,14 @@ def _import_sitemaps(db, job: CrawlJob, run: CrawlRun) -> None:  # type: ignore[
         db.commit()
 
 
-def _crawl_full_site(db, job: CrawlJob, run: CrawlRun) -> bool:  # type: ignore[no-untyped-def]
+def _crawl_full_site(  # type: ignore[no-untyped-def]
+    db, job: CrawlJob, run: CrawlRun, *, resumed: bool = False
+) -> bool:
     website = db.get(Website, job.website_id)
     if website is None:
         raise RuntimeError("Website does not exist")
-    db.execute(update(Url).where(Url.website_id == website.id).values(crawl_depth=None))
+    if not resumed:
+        db.execute(update(Url).where(Url.website_id == website.id).values(crawl_depth=None))
     root = register_url(
         db,
         website_id=website.id,
@@ -185,15 +209,42 @@ def _crawl_full_site(db, job: CrawlJob, run: CrawlRun) -> bool:  # type: ignore[
         source_url="",
         ignored_query_parameters=frozenset(website.settings.ignored_query_parameters),
     )
-    root.crawl_depth = 0
+    if not resumed:
+        root.crawl_depth = 0
     db.commit()
     robots = _load_robots_rules(db, job)
 
-    pending: list[tuple[uuid.UUID, int]] = [(root.id, 0)]
-    visited: set[uuid.UUID] = set()
-    audited_assets: set[uuid.UUID] = set()
+    snapshot_url_ids = set(
+        db.scalars(select(UrlSnapshot.url_id).where(UrlSnapshot.crawl_run_id == run.id))
+    )
+    visited = {
+        item.id
+        for item in db.scalars(select(Url).where(Url.id.in_(snapshot_url_ids)))
+        if is_probable_html_page(item.normalized_url)
+    }
+    pending = [
+        (item.id, item.crawl_depth or 0)
+        for item in db.scalars(
+            select(Url)
+            .where(
+                Url.website_id == website.id,
+                Url.is_active.is_(True),
+                Url.crawl_depth.is_not(None),
+            )
+            .order_by(Url.crawl_depth, Url.normalized_url)
+        )
+        if item.id not in visited and is_probable_html_page(item.normalized_url)
+    ]
+    if not pending and root.id not in visited:
+        pending = [(root.id, 0)]
+    audited_assets = {
+        item.id
+        for item in db.scalars(select(Url).where(Url.id.in_(snapshot_url_ids)))
+        if not is_probable_html_page(item.normalized_url)
+    }
     maximum = int(job.settings_snapshot.get("max_urls", website.settings.max_urls))
     while pending and len(visited) < maximum:
+        _check_crawl_control(db, job, run)
         url_id, depth = pending.pop(0)
         if url_id in visited:
             continue
@@ -232,26 +283,31 @@ def _crawl_full_site(db, job: CrawlJob, run: CrawlRun) -> bool:  # type: ignore[
     run.discovered_urls = len(visited)
     complete = not pending
     if complete:
+        _check_crawl_control(db, job, run)
         detect_orphan_pages(
             db,
             website_id=website.id,
             crawl_run_id=run.id,
         )
+        _check_crawl_control(db, job, run)
         analyze_internal_link_quality(
             db,
             website_id=website.id,
             crawl_run_id=run.id,
         )
+        _check_crawl_control(db, job, run)
         analyze_indexation_consistency(
             db,
             website_id=website.id,
             crawl_run_id=run.id,
         )
+        _check_crawl_control(db, job, run)
         analyze_breadcrumb_consistency(
             db,
             website_id=website.id,
             crawl_run_id=run.id,
         )
+        _check_crawl_control(db, job, run)
         detect_duplicate_content(
             db,
             website_id=website.id,
@@ -259,6 +315,23 @@ def _crawl_full_site(db, job: CrawlJob, run: CrawlRun) -> bool:  # type: ignore[
         )
     db.commit()
     return complete
+
+
+def _check_crawl_control(db, job: CrawlJob, run: CrawlRun) -> None:  # type: ignore[no-untyped-def]
+    db.refresh(job)
+    if job.status == "pause_requested":
+        job.status = "paused"
+        run.status = "paused"
+        db.commit()
+        raise CrawlPaused
+    if job.status in {"cancel_requested", "cancelled"}:
+        finished = utc_now()
+        job.status = "cancelled"
+        job.finished_at = finished
+        run.status = "cancelled"
+        run.finished_at = finished
+        db.commit()
+        raise CrawlCancelled
 
 
 def _deactivate_out_of_scope_urls(db, website: Website) -> None:  # type: ignore[no-untyped-def]
