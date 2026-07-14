@@ -45,6 +45,7 @@ def reconcile_issues(
             db.flush()
         else:
             issue.last_detected_at = now
+            issue.category = signal.category
             issue.severity = signal.severity
             issue.confidence = signal.confidence
             issue.title = signal.title

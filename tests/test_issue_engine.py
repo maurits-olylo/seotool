@@ -122,6 +122,55 @@ def test_second_clean_check_verifies_resolved_issue() -> None:
         assert issue.verified_at is not None
 
 
+def test_recurring_signal_updates_issue_category() -> None:
+    with SessionLocal() as db:
+        client = Client(name="Reclassified client")
+        website = Website(client=client, name="Reclassified site", base_url="https://example.com")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        url = Url(website_id=website.id, normalized_url="https://example.com/vacature")
+        db.add(url)
+        db.flush()
+        issue = Issue(
+            website_id=website.id,
+            url_id=url.id,
+            issue_type="job_posting_missing_recommended_fields",
+            category="structured_data",
+            severity="low",
+            title="Oude classificatie",
+            description="Test",
+            recommended_action="Test",
+        )
+        db.add(issue)
+        db.flush()
+        run, snapshot = _run(db, website.id, url.id)
+
+        reconcile_issues(
+            db,
+            website_id=website.id,
+            url_id=url.id,
+            crawl_run_id=run.id,
+            snapshot_id=snapshot.id,
+            signals=[
+                IssueSignal(
+                    "job_posting_missing_recommended_fields",
+                    "optimization",
+                    "low",
+                    "JobPosting kan worden aangevuld",
+                    "Optioneel veld ontbreekt.",
+                    "Overweeg aanvulling.",
+                    {},
+                    confidence="low",
+                )
+            ],
+            checked_issue_types={"job_posting_missing_recommended_fields"},
+        )
+
+        assert issue.category == "optimization"
+        assert issue.confidence == "low"
+
+
 def _run(db, website_id, url_id):  # type: ignore[no-untyped-def]
     job = CrawlJob(website_id=website_id, job_type="light_check")
     db.add(job)

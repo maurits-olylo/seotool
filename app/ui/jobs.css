@@ -16,6 +16,7 @@
 .lifecycle-expired, .lifecycle-removed, .validation-error { background: #fff0ed; color: #b42318; }
 .vacancy-finding { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 3px 0; }
 .vacancy-finding .severity { font-size: 12px; }
+.severity.optimization { color: #45624f; }
 .vacancy-ok { color: var(--muted); font-size: 13px; }
 .vacancy-dashboard { margin: 0 0 30px; }
 .vacancy-dashboard-stats { display: grid; grid-template-columns: repeat(6, 1fr); }

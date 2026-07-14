@@ -138,3 +138,15 @@ automatisch gepauzeerd en expliciete stopverzoeken afgerond. De RQ-limiet voor c
 
 Gevolg: deelresultaten blijven behouden, een crawl kan veilig hervatten en een containerupdate laat
 geen onzichtbare `running`-status meer achter.
+
+## 2026-07-14 — Optionele JobPosting-velden zijn optimalisaties
+
+Context: `employmentType` en `identifier` zijn nuttige aanvullende JobPosting-velden, maar hun
+afwezigheid maakt het schema niet ongeldig en heeft naar verwachting minimale SEO-impact.
+
+Besluit: ontbrekende aanbevolen JobPosting-velden worden als `optimization` met lage prioriteit en
+lage zekerheid opgeslagen. Ze tellen niet mee als Google for Jobs-waarschuwing, technisch probleem
+of nieuw vacature-issue. De interface noemt ze expliciet “Optimalisatie”.
+
+Gevolg: verplichte en ongeldige structured data blijft duidelijk als fout of waarschuwing zichtbaar,
+terwijl vrijblijvende verrijking de actielijst niet onnodig alarmeert.
