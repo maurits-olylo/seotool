@@ -8,6 +8,8 @@ from bs4 import BeautifulSoup
 from app.services.hashing import stable_hash
 from app.services.url_normalization import InvalidUrlError, normalize_url
 
+INVALID_JSON_LD_MARKER = "_seo_monitor_invalid_json_ld"
+
 
 @dataclass(frozen=True)
 class ExtractedLink:
@@ -128,6 +130,7 @@ def _extract_json_ld(soup: BeautifulSoup) -> tuple[list[object], list[str]]:
         try:
             value = json.loads(script.string or script.get_text())
         except (json.JSONDecodeError, TypeError):
+            data.append({INVALID_JSON_LD_MARKER: True})
             continue
         data.append(value)
         _collect_schema_types(value, types)

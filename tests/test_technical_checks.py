@@ -163,3 +163,24 @@ def test_reports_paginated_canonical_to_first_page() -> None:
     )
     types = {signal.issue_type for signal in inspect_snapshot(snapshot)}
     assert "canonical_other_url" in types
+
+
+def test_reports_invalid_json_ld_blocks() -> None:
+    snapshot = UrlSnapshot(
+        requested_url="https://example.com/page",
+        final_url="https://example.com/page",
+        status_code=200,
+        title="Page",
+        headings={"h1": ["Page"]},
+        word_count=200,
+        is_indexable=True,
+        redirect_chain=[],
+        schema_data=[{"_seo_monitor_invalid_json_ld": True}],
+    )
+
+    signal = next(
+        item for item in inspect_snapshot(snapshot) if item.issue_type == "invalid_json_ld"
+    )
+
+    assert signal.severity == "medium"
+    assert signal.evidence["invalid_blocks"] == 1

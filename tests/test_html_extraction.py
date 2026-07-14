@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from app.services.html_extraction import extract_page
+from app.services.html_extraction import INVALID_JSON_LD_MARKER, extract_page
 
 
 def test_extracts_page_data_and_hashes() -> None:
@@ -65,3 +65,13 @@ def test_link_and_schema_hashes_ignore_order_and_external_links() -> None:
 
     assert first.links_hash == second.links_hash
     assert first.schema_hash == second.schema_hash
+
+
+def test_preserves_invalid_json_ld_as_a_validation_marker() -> None:
+    page = extract_page(
+        '<html><body><script type="application/ld+json">{"@type":}</script></body></html>',
+        "https://example.com/page",
+    )
+
+    assert page.schema_data == [{INVALID_JSON_LD_MARKER: True}]
+    assert page.schema_types == []

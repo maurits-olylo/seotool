@@ -21,6 +21,7 @@ from app.services.issue_engine import reconcile_issues
 from app.services.robots import RobotsRules
 from app.services.sitemap import parse_sitemap
 from app.services.snapshot import store_fetch_result
+from app.services.structured_data_analysis import analyze_breadcrumb_consistency
 from app.services.technical_checks import IssueSignal
 from app.services.url_filtering import is_probable_html_page
 from app.services.url_registry import register_url
@@ -212,6 +213,11 @@ def _crawl_full_site(db, job: CrawlJob, run: CrawlRun) -> bool:  # type: ignore[
             crawl_run_id=run.id,
         )
         analyze_indexation_consistency(
+            db,
+            website_id=website.id,
+            crawl_run_id=run.id,
+        )
+        analyze_breadcrumb_consistency(
             db,
             website_id=website.id,
             crawl_run_id=run.id,

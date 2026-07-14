@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from urllib.parse import parse_qs, urlsplit
 
 from app.models.crawl import UrlSnapshot
+from app.services.html_extraction import INVALID_JSON_LD_MARKER
 
 THIN_CONTENT_WORD_LIMIT = 150
 FUNCTIONAL_PATH_RE = re.compile(
@@ -25,6 +26,7 @@ SNAPSHOT_ISSUE_TYPES = {
     "unexpected_noindex",
     "canonical_other_url",
     "conflicting_robots",
+    "invalid_json_ld",
     "expired_job_posting",
     "expired_job_posting_linked",
     "expired_job_posting_404",
@@ -180,6 +182,22 @@ def inspect_snapshot(snapshot: UrlSnapshot) -> list[IssueSignal]:
                 "Conflicterende robots-instructies",
                 "Maak meta robots en X-Robots-Tag consistent.",
                 directives=sorted(robots),
+            )
+        )
+    invalid_json_ld_blocks = sum(
+        1
+        for value in snapshot.schema_data or []
+        if isinstance(value, dict) and value.get(INVALID_JSON_LD_MARKER) is True
+    )
+    if status == 200 and invalid_json_ld_blocks:
+        signals.append(
+            _signal(
+                "invalid_json_ld",
+                "structured_data",
+                "medium",
+                "JSON-LD kan niet worden gelezen",
+                "Herstel de JSON-syntax en valideer de structured data opnieuw.",
+                invalid_blocks=invalid_json_ld_blocks,
             )
         )
     return signals
