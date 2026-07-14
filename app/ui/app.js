@@ -11,7 +11,7 @@ const labels = {
   pending: "In wachtrij", running: "Bezig", succeeded: "Geslaagd",
   partially_succeeded: "Deels geslaagd", failed: "Mislukt", cancelled: "Geannuleerd",
 };
-const state = { currentUser: null, clients: [], websites: [], issues: [], changes: [], changeGroups: [], jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], exports: [], operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
+const state = { currentUser: null, clients: [], websites: [], issues: [], changes: [], changeGroups: [], jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], exports: [], systemStatus: null, operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
 const VIEW_HASHES = {overview: "overzicht", reports: "rapportage", insights: "inzichten", urls: "urls", changes: "wijzigingen", vacancies: "vacatures", operations: "beheer", organization: "organisatie", integrations: "integraties"};
 let operationsPollTimer = null;
 
@@ -582,7 +582,11 @@ function showView(view, updateHash = true) {
     loadReportSnapshots().catch(() => { $("#report-archive-list").innerHTML = "<p>Rapportagehistorie kon niet worden geladen.</p>"; });
   }
   if (view === "integrations") loadIntegrations();
-  if (view === "insights") loadConsultantInsights().catch(() => { $("#search-insight-list").innerHTML = `<p class="insight-empty">Inzichten konden niet worden geladen.</p>`; });
+  if (view === "insights") loadConsultantInsights().catch(() => {
+    for (const selector of ["#search-insight-list", "#content-insight-list", "#conversion-insight-list"]) {
+      $(selector).innerHTML = `<p class="insight-empty">Inzichten konden niet worden geladen. Probeer het later opnieuw.</p>`;
+    }
+  });
   if (view === "organization") loadOrganization();
   if (view === "urls") renderUrls();
   if (view === "changes") loadChanges();
@@ -764,9 +768,31 @@ async function loadOperations() {
       api(`/api/v1/websites/${websiteId}/crawl-runs?limit=20`),
       api(`/api/v1/exports?website_id=${websiteId}&limit=20`),
     ]);
+    state.systemStatus = await api("/api/v1/system/status").catch(() => null);
     $("#operations-website-name").textContent = $("#website-select").selectedOptions[0]?.textContent || "de website";
+    $("#operations-load-message").textContent = state.systemStatus ? "" : "De systeemstatus kon niet worden opgehaald; crawl- en exportgegevens zijn wel bijgewerkt.";
+    $("#operations-load-message").classList.toggle("error", !state.systemStatus);
     renderOperations();
+  } catch (error) {
+    $("#operations-load-message").textContent = `Status kon niet worden bijgewerkt: ${error.message}`;
+    $("#operations-load-message").classList.add("error");
   } finally { state.operationsLoading = false; }
+}
+
+function renderSystemStatus() {
+  const status = state.systemStatus;
+  const unavailable = {status: "unavailable", workers: 0, queued_jobs: 0};
+  const crawl = status?.queues?.default || unavailable;
+  const exports = status?.queues?.exports || unavailable;
+  const healthy = status?.status === "ok";
+  $("#system-status-summary").textContent = healthy ? "Alles operationeel" : "Aandacht nodig";
+  $("#system-status-summary").className = `system-summary ${healthy ? "ok" : "degraded"}`;
+  const entries = [
+    ["API & database", status?.api === "ok" && status?.database === "ok", status?.database === "ok" ? "Bereikbaar" : "Database niet bereikbaar"],
+    ["Crawl-worker", crawl.status === "ok", `${crawl.workers} actief · ${crawl.queued_jobs} in wachtrij`],
+    ["Export-worker", exports.status === "ok", `${exports.workers} actief · ${exports.queued_jobs} in wachtrij`],
+  ];
+  $("#system-status-grid").innerHTML = entries.map(([label, ok, detail]) => `<article><span>${label}</span><strong class="${ok ? "ok" : "degraded"}">${ok ? "Operationeel" : "Niet beschikbaar"}</strong><small>${detail}</small></article>`).join("");
 }
 
 function durationLabel(run) {
@@ -776,6 +802,7 @@ function durationLabel(run) {
 }
 
 function renderOperations() {
+  renderSystemStatus();
   const runLabels = {light_check: "Light check", full_site_crawl: "Volledige crawl", fetch_sitemap: "Sitemap", full_page_analysis: "Pagina-analyse"};
   $("#crawl-run-rows").innerHTML = state.crawlRuns.map((run) => `<tr><td>${new Date(run.started_at).toLocaleString("nl-NL")}</td><td>${runLabels[run.crawl_type] || escapeHtml(run.crawl_type)}</td><td><span class="run-status ${run.status}">${labels[run.status] || run.status}</span></td><td>${run.discovered_urls}</td><td>${run.crawled_urls}</td><td>${run.failed_urls}</td><td>${durationLabel(run)}</td></tr>`).join("");
   $("#crawl-runs-empty").classList.toggle("hidden", state.crawlRuns.length !== 0);

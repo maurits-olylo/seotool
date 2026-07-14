@@ -113,3 +113,10 @@ status en lifecycle overeenkomen met andere technische bevindingen. De interne v
 combineert deze blijvende vacaturegegevens met alleen actieve vacature-issues; geldige vacatures
 verschijnen daardoor ook wanneer zij geen issue veroorzaken. Het interne hoofdoverzicht toont
 klikbare vacature-indicatoren; klanten zien deze operationele monitor niet.
+
+## Operationele status
+
+De interne beheerweergave controleert via `/api/v1/system/status` de database, Redis en de actieve
+crawl- en exportworkers. Deze status is alleen beschikbaar voor interne rollen en staat los van het
+publieke health-endpoint. Een storing in deze aanvullende controle blokkeert het tonen van bestaande
+crawl- en exportgegevens niet.

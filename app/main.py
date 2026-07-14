@@ -18,6 +18,7 @@ from app.api.routes import (
     issues,
     jobs,
     reports,
+    system,
     ui,
     users,
     websites,
@@ -73,6 +74,7 @@ app.include_router(reports.router, prefix="/api/v1", dependencies=[Depends(requi
 app.include_router(exports.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(integrations.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(insights.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
+app.include_router(system.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(users.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(users.public_router, prefix="/api/v1")
 app.include_router(integrations.oauth_router, prefix="/api/v1")
