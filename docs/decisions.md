@@ -111,3 +111,17 @@ lage zekerheid; vacatures behouden hun eigen strengere verloopcontrole.
 
 Gevolg: consultants krijgen een onderbouwde aanleiding voor inhoudelijke beoordeling zonder dat
 ouderdom automatisch als SEO-fout wordt gepresenteerd.
+
+## 2026-07-14 — Alleen typeerbare crawlerfouten worden issues
+
+Context: mislukte verzoeken werden wel als snapshotfout opgeslagen, maar time-outs en
+redirectloops ontbraken als bruikbare actiepunten. Tegelijk zijn generieke netwerkfouten vaak
+tijdelijk en onvoldoende specifiek.
+
+Besluit: crawlerfouten krijgen een intern fouttype. Alleen een bevestigde time-out en redirectloop
+maken automatisch een reachability-issue aan. Andere verzoekfouten blijven beschikbaar in de
+crawlhistorie. Een volgende succesvolle controle zet het eerdere issue via de normale lifecycle op
+opgelost.
+
+Gevolg: kritieke bereikbaarheidsproblemen zijn direct uitvoerbaar zonder iedere tijdelijke
+verbindingstoring als nieuw SEO-issue te presenteren.

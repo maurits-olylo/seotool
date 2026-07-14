@@ -26,8 +26,19 @@ def test_detects_redirect_loop() -> None:
         target = "/b" if request.url.path == "/a" else "/a"
         return httpx.Response(302, headers={"location": target})
 
-    with pytest.raises(CrawlError, match="loop"):
+    with pytest.raises(CrawlError, match="loop") as exc_info:
         fetch_url("https://example.com/a", transport=httpx.MockTransport(handler))
+    assert exc_info.value.error_type == "redirect_loop"
+
+
+def test_classifies_timeout() -> None:
+    def handler(_: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("Timed out")
+
+    with pytest.raises(CrawlError, match="Timed out") as exc_info:
+        fetch_url("https://example.com", transport=httpx.MockTransport(handler))
+
+    assert exc_info.value.error_type == "timeout"
 
 
 def test_limits_response_size() -> None:

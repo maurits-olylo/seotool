@@ -7,7 +7,7 @@ from app.models.crawl import CrawlRun, UrlSnapshot
 from app.models.discovery import CrawlJob, Url
 from app.models.issues import Issue
 from app.models.website import Website, WebsiteSettings
-from app.services.http_crawler import FetchResult
+from app.services.http_crawler import CrawlError, FetchResult
 
 
 def test_light_check_respects_url_limit_and_request_delay(monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -140,3 +140,58 @@ def test_job_skips_url_blocked_by_robots_and_creates_issue(monkeypatch) -> None:
         run = db.scalar(select(CrawlRun))
         assert issue and issue.issue_type == "robots_txt_blocked"
         assert run and run.crawled_urls == 1 and run.failed_urls == 1
+
+
+def test_timeout_creates_issue_and_successful_retry_resolves_it(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    def timeout_fetch(_: str, **__: object) -> FetchResult:
+        raise CrawlError("Timed out", error_type="timeout")
+
+    monkeypatch.setattr("app.jobs.fetch_url", timeout_fetch)
+    with SessionLocal() as db:
+        client = Client(name="Timeout client")
+        website = Website(client=client, name="Timeout site", base_url="https://example.com/")
+        website.settings = WebsiteSettings(respect_robots_txt=False)
+        db.add(website)
+        db.flush()
+        db.add(Url(website_id=website.id, normalized_url="https://example.com/slow"))
+        failed_job = CrawlJob(
+            website_id=website.id,
+            job_type="light_check",
+            settings_snapshot={"respect_robots_txt": False},
+        )
+        db.add(failed_job)
+        db.commit()
+        website_id = website.id
+        failed_job_id = failed_job.id
+
+    execute_crawl_job(str(failed_job_id))
+
+    with SessionLocal() as db:
+        issue = db.scalar(select(Issue).where(Issue.issue_type == "crawl_timeout"))
+        assert issue and issue.status == "new"
+        retry_job = CrawlJob(
+            website_id=website_id,
+            job_type="light_check",
+            settings_snapshot={"respect_robots_txt": False},
+        )
+        db.add(retry_job)
+        db.commit()
+        retry_job_id = retry_job.id
+
+    def successful_fetch(url: str, **_: object) -> FetchResult:
+        return FetchResult(
+            requested_url=url,
+            final_url=url,
+            status_code=200,
+            redirect_chain=[],
+            headers={"content-type": "text/html"},
+            content=b"<main>Page is available again.</main>",
+            response_time_ms=1,
+        )
+
+    monkeypatch.setattr("app.jobs.fetch_url", successful_fetch)
+    execute_crawl_job(str(retry_job_id))
+
+    with SessionLocal() as db:
+        issue = db.scalar(select(Issue).where(Issue.issue_type == "crawl_timeout"))
+        assert issue and issue.status == "resolved"

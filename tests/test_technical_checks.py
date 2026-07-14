@@ -2,7 +2,8 @@ import uuid
 from datetime import date
 
 from app.models.crawl import UrlSnapshot
-from app.services.technical_checks import inspect_snapshot
+from app.services.http_crawler import CrawlError
+from app.services.technical_checks import inspect_crawl_error, inspect_snapshot
 
 
 def test_detects_404() -> None:
@@ -15,6 +16,18 @@ def test_detects_404() -> None:
         redirect_chain=[],
     )
     assert [signal.issue_type for signal in inspect_snapshot(snapshot)] == ["http_404"]
+
+
+def test_maps_only_actionable_crawl_errors_to_issues() -> None:
+    timeout = inspect_crawl_error(CrawlError("Timed out", error_type="timeout"))
+    redirect_loop = inspect_crawl_error(
+        CrawlError("Redirect loop detected", error_type="redirect_loop")
+    )
+    generic = inspect_crawl_error(CrawlError("Connection reset"))
+
+    assert [signal.issue_type for signal in timeout] == ["crawl_timeout"]
+    assert [signal.issue_type for signal in redirect_loop] == ["redirect_loop"]
+    assert generic == []
 
 
 def test_detects_onpage_and_indexation_signals() -> None:

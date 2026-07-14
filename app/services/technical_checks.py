@@ -5,6 +5,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from app.models.crawl import UrlSnapshot
 from app.services.html_extraction import INVALID_JSON_LD_MARKER
+from app.services.http_crawler import CrawlError
 
 THIN_CONTENT_WORD_LIMIT = 150
 OUTDATED_CONTENT_AGE_DAYS = 3 * 365
@@ -20,6 +21,8 @@ SNAPSHOT_ISSUE_TYPES = {
     "http_404",
     "http_410",
     "http_5xx",
+    "crawl_timeout",
+    "redirect_loop",
     "long_redirect_chain",
     "missing_title",
     "missing_meta_description",
@@ -55,6 +58,39 @@ class IssueSignal:
     recommended_action: str
     evidence: dict[str, object]
     confidence: str = "high"
+
+
+CRAWL_ERROR_ISSUE_TYPES = {"crawl_timeout", "redirect_loop"}
+
+
+def inspect_crawl_error(error: CrawlError) -> list[IssueSignal]:
+    if error.error_type == "timeout":
+        return [
+            _signal(
+                "crawl_timeout",
+                "reachability",
+                "high",
+                "Pagina reageert niet binnen de ingestelde tijd",
+                "Controleer de serverbelasting, bereikbaarheid en ingestelde time-out. "
+                "Probeer de URL daarna opnieuw.",
+                error_type=error.error_type,
+                error_message=str(error),
+            )
+        ]
+    if error.error_type == "redirect_loop":
+        return [
+            _signal(
+                "redirect_loop",
+                "reachability",
+                "high",
+                "Redirectloop gedetecteerd",
+                "Corrigeer de redirectregels zodat de URL in één doorlopende keten op een "
+                "bereikbare eind-URL uitkomt.",
+                error_type=error.error_type,
+                error_message=str(error),
+            )
+        ]
+    return []
 
 
 def inspect_snapshot(snapshot: UrlSnapshot, *, today: date | None = None) -> list[IssueSignal]:

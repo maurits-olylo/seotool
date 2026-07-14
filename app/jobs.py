@@ -22,7 +22,11 @@ from app.services.robots import RobotsRules
 from app.services.sitemap import parse_sitemap
 from app.services.snapshot import store_fetch_result
 from app.services.structured_data_analysis import analyze_breadcrumb_consistency
-from app.services.technical_checks import IssueSignal
+from app.services.technical_checks import (
+    CRAWL_ERROR_ISSUE_TYPES,
+    IssueSignal,
+    inspect_crawl_error,
+)
 from app.services.url_filtering import is_probable_html_page
 from app.services.url_registry import register_url
 from app.services.url_scope import is_url_in_website_scope
@@ -373,14 +377,23 @@ def _crawl_one(  # type: ignore[no-untyped-def]
         run.crawled_urls += 1
         db.commit()
     except CrawlError as exc:
-        db.add(
-            UrlSnapshot(
-                url_id=url.id,
-                crawl_run_id=run.id,
-                requested_url=url.normalized_url,
-                error_message=str(exc),
-                is_indexable=False,
-            )
+        snapshot = UrlSnapshot(
+            url_id=url.id,
+            crawl_run_id=run.id,
+            requested_url=url.normalized_url,
+            error_message=str(exc),
+            is_indexable=False,
+        )
+        db.add(snapshot)
+        db.flush()
+        reconcile_issues(
+            db,
+            website_id=url.website_id,
+            url_id=url.id,
+            crawl_run_id=run.id,
+            snapshot_id=snapshot.id,
+            signals=inspect_crawl_error(exc),
+            checked_issue_types=CRAWL_ERROR_ISSUE_TYPES,
         )
         run.failed_urls += 1
         db.commit()

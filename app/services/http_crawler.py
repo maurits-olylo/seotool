@@ -7,7 +7,9 @@ from app.services.security import validate_public_http_url
 
 
 class CrawlError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, error_type: str = "request_failed") -> None:
+        super().__init__(message)
+        self.error_type = error_type
 
 
 @dataclass(frozen=True)
@@ -57,7 +59,10 @@ def fetch_url(
                     if response.is_redirect:
                         location = response.headers.get("location")
                         if not location:
-                            raise CrawlError("Redirect without Location header")
+                            raise CrawlError(
+                                "Redirect without Location header",
+                                error_type="redirect_invalid",
+                            )
                         next_url = str(response.url.join(location))
                         chain.append(
                             {
@@ -67,7 +72,7 @@ def fetch_url(
                             }
                         )
                         if next_url in {item["url"] for item in chain}:
-                            raise CrawlError("Redirect loop detected")
+                            raise CrawlError("Redirect loop detected", error_type="redirect_loop")
                         current_url = next_url
                         continue
                     content = _read_limited(response, max_response_size)
@@ -80,9 +85,11 @@ def fetch_url(
                         content=content,
                         response_time_ms=round((time.monotonic() - started) * 1000),
                     )
+            except httpx.TimeoutException as exc:
+                raise CrawlError(str(exc), error_type="timeout") from exc
             except httpx.HTTPError as exc:
                 raise CrawlError(str(exc)) from exc
-    raise CrawlError("Redirect chain exceeds maximum length")
+    raise CrawlError("Redirect chain exceeds maximum length", error_type="redirect_limit")
 
 
 def fetch_metadata(
@@ -107,12 +114,17 @@ def fetch_metadata(
             validate_public_http_url(current_url)
             try:
                 response = client.head(current_url)
+            except httpx.TimeoutException as exc:
+                raise CrawlError(str(exc), error_type="timeout") from exc
             except httpx.HTTPError as exc:
                 raise CrawlError(str(exc)) from exc
             if response.is_redirect:
                 location = response.headers.get("location")
                 if not location:
-                    raise CrawlError("Redirect without Location header")
+                    raise CrawlError(
+                        "Redirect without Location header",
+                        error_type="redirect_invalid",
+                    )
                 next_url = str(response.url.join(location))
                 chain.append(
                     {
@@ -122,7 +134,7 @@ def fetch_metadata(
                     }
                 )
                 if next_url in {item["url"] for item in chain}:
-                    raise CrawlError("Redirect loop detected")
+                    raise CrawlError("Redirect loop detected", error_type="redirect_loop")
                 current_url = next_url
                 continue
             return FetchMetadata(
@@ -133,7 +145,7 @@ def fetch_metadata(
                 headers={key.lower(): value for key, value in response.headers.items()},
                 response_time_ms=round((time.monotonic() - started) * 1000),
             )
-    raise CrawlError("Redirect chain exceeds maximum length")
+    raise CrawlError("Redirect chain exceeds maximum length", error_type="redirect_limit")
 
 
 def _read_limited(response: httpx.Response, maximum: int) -> bytes:
