@@ -107,3 +107,120 @@ def test_search_insights_identify_ctr_cannibalization_and_decline() -> None:
         "ctr_opportunity",
         "declining_query",
     }
+
+
+def test_search_insights_identify_dominant_ranking_url_change() -> None:
+    with SessionLocal() as db:
+        customer = Client(name="Ranking URL change")
+        db.add(customer)
+        db.flush()
+        website = Website(
+            client_id=customer.id,
+            name="Example",
+            base_url="https://example.com",
+        )
+        db.add(website)
+        db.flush()
+        db.add_all(
+            [
+                _metric(
+                    website.id,
+                    date(2026, 1, 10),
+                    "kunststof kozijnen",
+                    "https://example.com/oud",
+                    30,
+                    180,
+                    4,
+                ),
+                _metric(
+                    website.id,
+                    date(2026, 1, 10),
+                    "kunststof kozijnen",
+                    "https://example.com/nieuw",
+                    2,
+                    20,
+                    9,
+                ),
+                _metric(
+                    website.id,
+                    date(2026, 2, 10),
+                    "kunststof kozijnen",
+                    "https://example.com/oud",
+                    3,
+                    30,
+                    8,
+                ),
+                _metric(
+                    website.id,
+                    date(2026, 2, 10),
+                    "kunststof kozijnen",
+                    "https://example.com/nieuw",
+                    25,
+                    170,
+                    5,
+                ),
+            ]
+        )
+        db.commit()
+
+        insights = build_search_insights(
+            db,
+            website.id,
+            date(2026, 2, 1),
+            date(2026, 2, 28),
+            date(2026, 1, 1),
+            date(2026, 1, 31),
+        )
+
+    switches = [item for item in insights if item["type"] == "ranking_url_changed"]
+    assert len(switches) == 1
+    assert switches[0]["previous_url"] == "https://example.com/oud"
+    assert switches[0]["url"] == "https://example.com/nieuw"
+
+
+def test_search_insights_ignore_minor_secondary_page_visibility() -> None:
+    with SessionLocal() as db:
+        customer = Client(name="Minor secondary page")
+        db.add(customer)
+        db.flush()
+        website = Website(
+            client_id=customer.id,
+            name="Example",
+            base_url="https://example.com",
+        )
+        db.add(website)
+        db.flush()
+        db.add_all(
+            [
+                _metric(
+                    website.id,
+                    date(2026, 2, 10),
+                    "kozijnen",
+                    "https://example.com/primair",
+                    40,
+                    900,
+                    3,
+                ),
+                _metric(
+                    website.id,
+                    date(2026, 2, 10),
+                    "kozijnen",
+                    "https://example.com/secundair",
+                    1,
+                    20,
+                    15,
+                ),
+            ]
+        )
+        db.commit()
+
+        insights = build_search_insights(
+            db,
+            website.id,
+            date(2026, 2, 1),
+            date(2026, 2, 28),
+            date(2026, 1, 1),
+            date(2026, 1, 31),
+        )
+
+    assert not any(item["type"] == "cannibalization" for item in insights)

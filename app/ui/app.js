@@ -503,7 +503,7 @@ function renderConsultantInsight(insight) {
   const query = insight.query ? `<p class="insight-query">Zoekopdracht: “${escapeHtml(insight.query)}”</p>` : "";
   const url = insight.url ? `<p>${insightLink(insight.url)}</p>` : "";
   const pages = (insight.pages || []).length
-    ? `<ul class="insight-pages">${insight.pages.map((page) => `<li>${insightLink(page.url)} · ${Number(page.impressions || 0).toLocaleString("nl-NL")} vertoningen · positie ${page.position}</li>`).join("")}</ul>`
+    ? `<ul class="insight-pages">${insight.pages.map((page) => `<li>${page.label ? `<strong>${escapeHtml(page.label)}:</strong> ` : ""}${insightLink(page.url)} · ${Number(page.impressions || 0).toLocaleString("nl-NL")} vertoningen · positie ${page.position}</li>`).join("")}</ul>`
     : "";
   return `<article class="insight-item"><h3>${escapeHtml(insight.title)}</h3><p>${escapeHtml(insight.description)}</p>${query}${url}${pages}</article>`;
 }
