@@ -49,6 +49,13 @@ def test_ignores_whitespace_only_metadata_changes() -> None:
     assert compare_snapshots(previous, current) == []
 
 
+def test_ignores_whitespace_only_h1_changes() -> None:
+    previous = snapshot(headings={"h1": ["SEO monitoring platform"]})
+    current = snapshot(headings={"h1": ["  SEO   monitoring\nplatform "]})
+
+    assert compare_snapshots(previous, current) == []
+
+
 def test_schema_comparison_ignores_script_order_but_detects_values() -> None:
     previous = snapshot(schema_data=[{"@type": "Article", "@id": "/old"}, {"@type": "Person"}])
     reordered = snapshot(schema_data=[{"@type": "Person"}, {"@id": "/old", "@type": "Article"}])
@@ -56,5 +63,41 @@ def test_schema_comparison_ignores_script_order_but_detects_values() -> None:
 
     assert compare_snapshots(previous, reordered) == []
     assert [item.change_type for item in compare_snapshots(previous, changed)] == [
+        "structured_data_changed"
+    ]
+
+
+def test_schema_comparison_ignores_graph_and_type_order() -> None:
+    previous = snapshot(
+        schema_data=[
+            {
+                "@context": "https://schema.org",
+                "@graph": [
+                    {"@id": "/website", "@type": ["WebSite", "Thing"]},
+                    {"@id": "/page", "@type": "WebPage"},
+                ],
+            }
+        ]
+    )
+    reordered = snapshot(
+        schema_data=[
+            {
+                "@context": "https://schema.org",
+                "@graph": [
+                    {"@type": "WebPage", "@id": "/page"},
+                    {"@type": ["Thing", "WebSite"], "@id": "/website"},
+                ],
+            }
+        ]
+    )
+
+    assert compare_snapshots(previous, reordered) == []
+
+
+def test_schema_comparison_keeps_meaningful_list_order() -> None:
+    previous = snapshot(schema_data=[{"@type": "ItemList", "itemListElement": ["one", "two"]}])
+    reordered = snapshot(schema_data=[{"@type": "ItemList", "itemListElement": ["two", "one"]}])
+
+    assert [item.change_type for item in compare_snapshots(previous, reordered)] == [
         "structured_data_changed"
     ]

@@ -35,8 +35,8 @@ def compare_snapshots(previous: UrlSnapshot | None, current: UrlSnapshot) -> lis
         new = getattr(current, field)
         if not _values_equal(field, old, new):
             changes.append(DetectedChange(change_type, field, _serialize(old), _serialize(new)))
-    old_h1 = (previous.headings or {}).get("h1", [])
-    new_h1 = (current.headings or {}).get("h1", [])
+    old_h1 = _normalized_text_list((previous.headings or {}).get("h1", []))
+    new_h1 = _normalized_text_list((current.headings or {}).get("h1", []))
     if old_h1 != new_h1:
         changes.append(
             DetectedChange("h1_changed", "headings.h1", _serialize(old_h1), _serialize(new_h1))
@@ -62,10 +62,35 @@ def _values_equal(field: str, old: object, new: object) -> bool:
 
 
 def _canonical_schema(value: list[object]) -> list[object]:
+    canonical = [_canonical_schema_value(item) for item in value]
     return sorted(
-        value,
+        canonical,
         key=lambda item: json.dumps(item, sort_keys=True, ensure_ascii=False),
     )
+
+
+def _canonical_schema_value(value: object, *, unordered: bool = False) -> object:
+    if isinstance(value, dict):
+        return {
+            key: _canonical_schema_value(
+                child,
+                unordered=key in {"@graph", "@type"},
+            )
+            for key, child in value.items()
+        }
+    if isinstance(value, list):
+        children = [_canonical_schema_value(child) for child in value]
+        if unordered:
+            return sorted(
+                children,
+                key=lambda item: json.dumps(item, sort_keys=True, ensure_ascii=False),
+            )
+        return children
+    return value
+
+
+def _normalized_text_list(values: list[object]) -> list[object]:
+    return [" ".join(value.split()) if isinstance(value, str) else value for value in values]
 
 
 def _serialize(value: object) -> str | None:

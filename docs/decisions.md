@@ -87,3 +87,15 @@ sitemap staat of aantoonbare recente organische waarde heeft.
 
 Gevolg: de actielijst bevat minder ruis, terwijl belangrijke pagina's met een onbedoelde noindex
 met hoge urgentie gemeld blijven worden.
+
+## 2026-07-14 — Semantische vergelijking voor wijzigingsdetectie
+
+Context: CMS'en kunnen witruimte in koppen en de volgorde van JSON-LD `@graph`-onderdelen wijzigen
+zonder dat de inhoud of betekenis verandert.
+
+Besluit: H1-waarden worden voor vergelijking op witruimte genormaliseerd. JSON-LD-scriptblokken,
+`@graph`-onderdelen en meervoudige `@type`-waarden worden als ongeordend vergeleken. De volgorde van
+betekenisvolle lijsten, zoals `itemListElement`, blijft wel relevant.
+
+Gevolg: technische herschikking veroorzaakt geen wijzigingsmelding, maar inhoudelijke structured
+data-veranderingen blijven aantoonbaar zichtbaar.
