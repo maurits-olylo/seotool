@@ -11,8 +11,8 @@ const labels = {
   pending: "In wachtrij", running: "Bezig", succeeded: "Geslaagd",
   partially_succeeded: "Deels geslaagd", failed: "Mislukt", cancelled: "Geannuleerd",
 };
-const state = { currentUser: null, clients: [], websites: [], issues: [], changes: [], changeGroups: [], jobListings: [], jobSummary: {}, crawlRuns: [], exports: [], operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
-const VIEW_HASHES = {overview: "overzicht", reports: "rapportage", urls: "urls", changes: "wijzigingen", vacancies: "vacatures", operations: "beheer", organization: "organisatie", integrations: "integraties"};
+const state = { currentUser: null, clients: [], websites: [], issues: [], changes: [], changeGroups: [], jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], exports: [], operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
+const VIEW_HASHES = {overview: "overzicht", reports: "rapportage", insights: "inzichten", urls: "urls", changes: "wijzigingen", vacancies: "vacatures", operations: "beheer", organization: "organisatie", integrations: "integraties"};
 let operationsPollTimer = null;
 
 async function api(path, options = {}) {
@@ -196,6 +196,7 @@ function applyRolePermissions() {
   $("#organization-nav").classList.toggle("hidden", !canAdmin);
   $("#crawl-operation-card").classList.toggle("hidden", !canAdmin);
   $("#overview-nav").classList.toggle("hidden", isClient);
+  $("#insights-nav").classList.toggle("hidden", isClient);
   for (const selector of ["#urls-nav", "#changes-nav", "#vacancies-nav", "#operations-nav"]) $(selector).classList.toggle("hidden", isClient);
   $("#detail-status").classList.toggle("hidden", isClient);
   $("#save-status").classList.toggle("hidden", isClient);
@@ -490,6 +491,47 @@ function historyCoverageText(coverage = {}) {
   return ranges.join(" · ");
 }
 
+function insightLink(url) {
+  if (!url) return "";
+  const safe = escapeHtml(url);
+  return /^https?:\/\//.test(url)
+    ? `<a href="${safe}" target="_blank" rel="noopener">${safe}</a>`
+    : `<span>${safe}</span>`;
+}
+
+function renderConsultantInsight(insight) {
+  const query = insight.query ? `<p class="insight-query">Zoekopdracht: “${escapeHtml(insight.query)}”</p>` : "";
+  const url = insight.url ? `<p>${insightLink(insight.url)}</p>` : "";
+  const pages = (insight.pages || []).length
+    ? `<ul class="insight-pages">${insight.pages.map((page) => `<li>${insightLink(page.url)} · ${Number(page.impressions || 0).toLocaleString("nl-NL")} vertoningen · positie ${page.position}</li>`).join("")}</ul>`
+    : "";
+  return `<article class="insight-item"><h3>${escapeHtml(insight.title)}</h3><p>${escapeHtml(insight.description)}</p>${query}${url}${pages}</article>`;
+}
+
+function renderConsultantInsights() {
+  const data = state.consultantInsights;
+  if (!data) return;
+  const search = data.search || [];
+  const conversion = data.conversion || [];
+  $("#insights-website-name").textContent = state.websites.find((item) => item.id === $("#website-select").value)?.name || "";
+  $("#insight-summary").innerHTML = [
+    [search.length, "Zoekkansen"],
+    [search.filter((item) => item.type === "declining_query" || item.type === "declining_page").length, "Dalingen"],
+    [conversion.length, "Conversiekansen"],
+  ].map(([count, label]) => `<article class="card"><strong>${count}</strong><span>${label}</span></article>`).join("");
+  $("#search-insight-list").innerHTML = search.map(renderConsultantInsight).join("") || `<p class="insight-empty">Geen duidelijke GSC-kansen in deze periode.</p>`;
+  $("#conversion-insight-list").innerHTML = conversion.map(renderConsultantInsight).join("") || `<p class="insight-empty">Geen landingspagina’s met voldoende verkeer en een opvallend laag conversiesignaal.</p>`;
+}
+
+async function loadConsultantInsights() {
+  const websiteId = $("#website-select").value;
+  if (!websiteId) return;
+  $("#search-insight-list").innerHTML = `<p class="insight-empty">Inzichten worden geladen…</p>`;
+  $("#conversion-insight-list").innerHTML = `<p class="insight-empty">Inzichten worden geladen…</p>`;
+  state.consultantInsights = await api(`/api/v1/websites/${websiteId}/consultant-insights?days=${state.insightDays}`);
+  renderConsultantInsights();
+}
+
 async function pollIntegrationHistory(websiteId) {
   const button = $("#sync-integration-history"); const message = $("#integration-history-message");
   const result = await api(`/api/v1/websites/${websiteId}/integrations/history-sync`);
@@ -516,7 +558,7 @@ async function pollIntegrationHistory(websiteId) {
 function showView(view, updateHash = true) {
   if (state.currentUser?.role === "client") view = "reports";
   const visibleView = view === "reports" ? "overview" : view;
-  for (const name of ["overview", "urls", "changes", "vacancies", "operations", "organization", "integrations"]) {
+  for (const name of ["overview", "insights", "urls", "changes", "vacancies", "operations", "organization", "integrations"]) {
     $(`#${name}-view`).classList.toggle("hidden", name !== visibleView);
   }
   for (const name of Object.keys(VIEW_HASHES)) {
@@ -528,6 +570,7 @@ function showView(view, updateHash = true) {
     loadReportSnapshots().catch(() => { $("#report-archive-list").innerHTML = "<p>Rapportagehistorie kon niet worden geladen.</p>"; });
   }
   if (view === "integrations") loadIntegrations();
+  if (view === "insights") loadConsultantInsights().catch(() => { $("#search-insight-list").innerHTML = `<p class="insight-empty">Inzichten konden niet worden geladen.</p>`; });
   if (view === "organization") loadOrganization();
   if (view === "urls") renderUrls();
   if (view === "changes") loadChanges();
@@ -967,7 +1010,7 @@ async function saveIssueStatus() {
 
 $("#logout").addEventListener("click", async () => { await fetch("/ui/logout", { method: "POST" }); window.location.assign("/"); });
 $("#client-select").addEventListener("change", async () => { await loadWebsites(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); });
-$("#website-select").addEventListener("change", async () => { state.selectedReportSnapshotId = null; await loadIssues(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); if (!$("#urls-view").classList.contains("hidden")) renderUrls(); if (!$("#changes-view").classList.contains("hidden")) await loadChanges(); if (!$("#vacancies-view").classList.contains("hidden")) await loadJobListings(); if (!$("#operations-view").classList.contains("hidden")) await loadOperations(); });
+$("#website-select").addEventListener("change", async () => { state.selectedReportSnapshotId = null; state.consultantInsights = null; await loadIssues(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); if (!$("#insights-view").classList.contains("hidden")) await loadConsultantInsights(); if (!$("#urls-view").classList.contains("hidden")) renderUrls(); if (!$("#changes-view").classList.contains("hidden")) await loadChanges(); if (!$("#vacancies-view").classList.contains("hidden")) await loadJobListings(); if (!$("#operations-view").classList.contains("hidden")) await loadOperations(); });
 for (const selector of ["#severity-filter", "#type-filter", "#impact-filter", "#status-filter"]) $(selector).addEventListener("change", () => { state.page = 1; render(); });
 $("#search-filter").addEventListener("input", () => { state.page = 1; render(); });
 $("#previous-page").addEventListener("click", () => { state.page -= 1; render(); });
@@ -985,12 +1028,14 @@ for (const dialog of document.querySelectorAll("dialog")) dialog.addEventListene
 $("#save-status").addEventListener("click", saveIssueStatus);
 $("#overview-nav").addEventListener("click", () => showView("overview"));
 $("#reports-nav").addEventListener("click", () => showView("reports"));
+$("#insights-nav").addEventListener("click", () => showView("insights"));
 $("#urls-nav").addEventListener("click", () => showView("urls"));
 $("#changes-nav").addEventListener("click", () => showView("changes"));
 $("#vacancies-nav").addEventListener("click", () => showView("vacancies"));
 $("#operations-nav").addEventListener("click", () => showView("operations"));
 $("#organization-nav").addEventListener("click", () => showView("organization"));
 $("#integrations-nav").addEventListener("click", () => showView("integrations"));
+$("#insight-period").addEventListener("change", async (event) => { state.insightDays = Number(event.target.value); await loadConsultantInsights(); });
 $("#client-form").addEventListener("submit", createClient);
 $("#website-form").addEventListener("submit", createWebsite);
 $("#invitation-form").addEventListener("submit", createInvitation);

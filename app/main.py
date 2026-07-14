@@ -13,6 +13,7 @@ from app.api.routes import (
     crawls,
     discovery,
     exports,
+    insights,
     integrations,
     issues,
     jobs,
@@ -71,6 +72,7 @@ app.include_router(jobs.router, prefix="/api/v1", dependencies=[Depends(require_
 app.include_router(reports.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(exports.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(integrations.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
+app.include_router(insights.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(users.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(users.public_router, prefix="/api/v1")
 app.include_router(integrations.oauth_router, prefix="/api/v1")

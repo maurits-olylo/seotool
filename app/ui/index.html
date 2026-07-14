@@ -20,12 +20,13 @@
   <link rel="stylesheet" href="/ui/assets/report-performance.css?v=20260713-6">
   <link rel="stylesheet" href="/ui/assets/key-events.css">
   <link rel="stylesheet" href="/ui/assets/jobs.css">
+  <link rel="stylesheet" href="/ui/assets/insights.css">
 </head>
 <body>
   <div id="app" class="app-shell hidden">
     <aside>
       <div><span class="eyebrow">THACT</span><h2>SEO Monitor</h2><small id="current-user"></small></div>
-      <nav><button id="overview-nav" class="nav-active"><span id="overview-nav-label">Overzicht</span></button><button id="reports-nav">Rapportage</button><button id="urls-nav">URLs</button><button id="changes-nav">Wijzigingen</button><button id="vacancies-nav">Vacatures</button><button id="operations-nav">Beheer</button><button id="organization-nav">Organisatie</button><button id="integrations-nav">Integraties</button></nav>
+      <nav><button id="overview-nav" class="nav-active"><span id="overview-nav-label">Overzicht</span></button><button id="reports-nav">Rapportage</button><button id="insights-nav">Inzichten</button><button id="urls-nav">URLs</button><button id="changes-nav">Wijzigingen</button><button id="vacancies-nav">Vacatures</button><button id="operations-nav">Beheer</button><button id="organization-nav">Organisatie</button><button id="integrations-nav">Integraties</button></nav>
       <section id="report-archive" class="report-archive hidden"><span class="eyebrow">RAPPORTAGES</span><button type="button" data-report-live>Live status</button><div id="report-archive-list"></div></section>
       <button id="logout" class="quiet">Uitloggen</button>
     </aside>
@@ -78,6 +79,14 @@
         <p id="empty" class="empty hidden">Geen issues gevonden.</p>
         <footer class="pager"><button id="previous-page" class="page-button">Vorige</button><span id="page-label"></span><button id="next-page" class="page-button">Volgende</button></footer>
       </section>
+      </section>
+      <section id="insights-view" class="hidden">
+        <header><div><span class="eyebrow">CONSULTANT</span><h1>Inzichten</h1><p class="intro">Kansen en afwijkingen uit Search Console en GA4 voor <strong id="insights-website-name"></strong>.</p></div><label class="insight-period">Periode<select id="insight-period"><option value="28">28 dagen</option><option value="90">90 dagen</option></select></label></header>
+        <section id="insight-summary" class="cards"></section>
+        <div class="insight-columns">
+          <section class="panel insight-panel"><div class="panel-head"><div><span class="eyebrow">ZOEKZICHTBAARHEID</span><h2>GSC-kansen</h2></div><span class="source-label">Google Search Console</span></div><div id="search-insight-list" class="insight-list"></div></section>
+          <section class="panel insight-panel"><div class="panel-head"><div><span class="eyebrow">CONVERSIE</span><h2>Landingspagina’s</h2></div><span class="source-label">Google Analytics 4</span></div><div id="conversion-insight-list" class="insight-list"></div></section>
+        </div>
       </section>
       <section id="urls-view" class="hidden">
         <header><div><span class="eyebrow">URL-REGISTER</span><h1>URLs</h1><p class="intro">Actuele crawlstatus voor <strong id="urls-website-name"></strong>.</p></div></header>

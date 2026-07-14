@@ -1,0 +1,15 @@
+.insight-period { display: grid; gap: .45rem; color: #66736e; font-weight: 700; }
+.insight-period select { min-width: 10rem; }
+.insight-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-top: 1.25rem; }
+.insight-panel { min-width: 0; }
+.source-label { color: #66736e; font-size: .85rem; font-weight: 700; }
+.insight-list { display: grid; }
+.insight-item { padding: 1.25rem 1.5rem; border-top: 1px solid #e1e7e3; }
+.insight-item:first-child { border-top: 0; }
+.insight-item h3 { margin: 0 0 .45rem; font-size: 1.05rem; }
+.insight-item p { margin: 0 0 .65rem; color: #56645f; line-height: 1.5; }
+.insight-item a, .insight-query { color: #12634d; overflow-wrap: anywhere; }
+.insight-pages { margin: .5rem 0 0; padding-left: 1.15rem; }
+.insight-pages li { margin-top: .35rem; }
+.insight-empty { margin: 0; padding: 1.5rem; color: #66736e; }
+@media (max-width: 1050px) { .insight-columns { grid-template-columns: 1fr; } }
