@@ -98,6 +98,12 @@ signalen gebruiken alleen materiële vraagvolumes, een verklaarbare woorden- en 
 beschikbare volledige snapshot. De interface toont daarom bewijs, betrouwbaarheid en een handmatige
 controleactie. Dit voorkomt dat een semantische aanname als technische fout wordt gepresenteerd.
 
+GA4-conversie-inzichten gebruiken uitsluitend de per website geselecteerde gekwalificeerde events.
+De import bewaart deze events zowel als websitebrede dagtotalen als per organische landingspagina.
+Hierdoor kan de consultant veel verkeer zonder leads, een relatief lage leadratio en een dalende
+leadratio onderscheiden. Na introductie of wijziging van de eventselectie is een historische
+GA4-synchronisatie nodig om de landingspaginaverdeling opnieuw op te bouwen.
+
 ## Vacaturemonitor
 
 `job_listings` bewaart de actuele, genormaliseerde toestand van herkende vacaturepagina’s per

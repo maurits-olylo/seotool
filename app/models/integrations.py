@@ -120,3 +120,21 @@ class GoogleAnalyticsEventMetric(UUIDTimestampMixin, Base):
     date: Mapped[date] = mapped_column(Date, index=True)
     event_name: Mapped[str] = mapped_column(String(255), index=True)
     key_events: Mapped[float] = mapped_column(Float, default=0)
+
+
+class GoogleAnalyticsLandingPageEventMetric(UUIDTimestampMixin, Base):
+    """Daily organic GA4 key events by landing page and event name."""
+
+    __tablename__ = "google_analytics_landing_page_event_metrics"
+    __table_args__ = (UniqueConstraint("website_id", "date", "landing_page", "event_name"),)
+
+    website_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("websites.id", ondelete="CASCADE"), index=True
+    )
+    url_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("urls.id", ondelete="SET NULL"), index=True
+    )
+    date: Mapped[date] = mapped_column(Date, index=True)
+    landing_page: Mapped[str] = mapped_column(String(2048))
+    event_name: Mapped[str] = mapped_column(String(255), index=True)
+    key_events: Mapped[float] = mapped_column(Float, default=0)

@@ -516,6 +516,7 @@ function renderConsultantInsights() {
   const search = data.search || [];
   const content = data.content || [];
   const conversion = data.conversion || [];
+  const conversionContext = data.conversion_context || {};
   $("#insights-website-name").textContent = state.websites.find((item) => item.id === $("#website-select").value)?.name || "";
   $("#insight-summary").innerHTML = [
     [search.length, "Zoekkansen"],
@@ -525,7 +526,12 @@ function renderConsultantInsights() {
   ].map(([count, label]) => `<article class="card"><strong>${count}</strong><span>${label}</span></article>`).join("");
   $("#content-insight-list").innerHTML = content.map(renderConsultantInsight).join("") || `<p class="insight-empty">Geen materiële onbeantwoorde zoekvragen gevonden.</p>`;
   $("#search-insight-list").innerHTML = search.map(renderConsultantInsight).join("") || `<p class="insight-empty">Geen duidelijke GSC-kansen in deze periode.</p>`;
-  $("#conversion-insight-list").innerHTML = conversion.map(renderConsultantInsight).join("") || `<p class="insight-empty">Geen landingspagina’s met voldoende verkeer en een opvallend laag conversiesignaal.</p>`;
+  const conversionEmpty = !conversionContext.configured
+    ? "Selecteer eerst de gekwalificeerde GA4-events bij Integraties."
+    : conversionContext.needs_sync
+      ? "Synchroniseer GA4 opnieuw om gekwalificeerde leads per landingspagina te laden."
+      : "Geen landingspagina’s met voldoende verkeer en een opvallend laag gekwalificeerd leadsignaal.";
+  $("#conversion-insight-list").innerHTML = conversion.map(renderConsultantInsight).join("") || `<p class="insight-empty">${conversionEmpty}</p>`;
 }
 
 async function loadConsultantInsights() {

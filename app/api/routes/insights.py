@@ -46,4 +46,5 @@ def consultant_insights(
         "search": insights["search"],
         "content": insights["content"],
         "conversion": insights["conversion"],
+        "conversion_context": insights["conversion_context"],
     }

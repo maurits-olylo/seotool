@@ -4,6 +4,7 @@ from app.models.discovery import CrawlJob, Url, UrlSource
 from app.models.exports import Export
 from app.models.integrations import (
     GoogleAnalyticsEventMetric,
+    GoogleAnalyticsLandingPageEventMetric,
     GoogleAnalyticsMetric,
     IntegrationConnection,
     SearchConsoleMetric,
@@ -32,6 +33,7 @@ __all__ = [
     "IntegrationConnection",
     "GoogleAnalyticsMetric",
     "GoogleAnalyticsEventMetric",
+    "GoogleAnalyticsLandingPageEventMetric",
     "SearchConsoleMetric",
     "SearchConsoleQueryMetric",
     "Url",

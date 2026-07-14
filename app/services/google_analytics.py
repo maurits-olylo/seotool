@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.models.discovery import Url
 from app.models.integrations import (
     GoogleAnalyticsEventMetric,
+    GoogleAnalyticsLandingPageEventMetric,
     GoogleAnalyticsMetric,
     IntegrationConnection,
     WebsiteIntegration,
@@ -112,6 +113,15 @@ async def sync_google_analytics(
                 ["date", "eventName"],
                 ["keyEvents"],
             )
+            landing_event_rows = await _run_ga_report(
+                http,
+                endpoint,
+                token,
+                start_date,
+                end_date,
+                ["date", "landingPagePlusQueryString", "eventName"],
+                ["keyEvents"],
+            )
         except ValueError:
             mapping.status = "error"
             mapping.settings = {**mapping.settings, "last_error": "GA4 import failed"}
@@ -130,6 +140,13 @@ async def sync_google_analytics(
             GoogleAnalyticsEventMetric.website_id == website_id,
             GoogleAnalyticsEventMetric.date >= start_date,
             GoogleAnalyticsEventMetric.date <= end_date,
+        )
+    )
+    db.execute(
+        delete(GoogleAnalyticsLandingPageEventMetric).where(
+            GoogleAnalyticsLandingPageEventMetric.website_id == website_id,
+            GoogleAnalyticsLandingPageEventMetric.date >= start_date,
+            GoogleAnalyticsLandingPageEventMetric.date <= end_date,
         )
     )
 
@@ -187,6 +204,36 @@ async def sync_google_analytics(
         )
         imported_events += 1
 
+    imported_landing_events = 0
+    matched_landing_events = 0
+    for row in landing_event_rows:
+        dimensions = row.get("dimensionValues", [])
+        metrics = row.get("metricValues", [])
+        if len(dimensions) < 3 or not metrics:
+            continue
+        key_events = float(metrics[0].get("value", 0))
+        landing_page = str(dimensions[1]["value"])
+        if key_events <= 0 or landing_page in {"(not set)", ""}:
+            continue
+        page_url = urljoin(website.base_url, landing_page)
+        try:
+            normalized = normalize_url(page_url)
+        except InvalidUrlError:
+            normalized = page_url
+        url_id = url_map.get(normalized)
+        matched_landing_events += int(url_id is not None)
+        db.add(
+            GoogleAnalyticsLandingPageEventMetric(
+                website_id=website_id,
+                url_id=url_id,
+                date=datetime.strptime(dimensions[0]["value"], "%Y%m%d").date(),
+                landing_page=landing_page,
+                event_name=str(dimensions[2]["value"]),
+                key_events=key_events,
+            )
+        )
+        imported_landing_events += 1
+
     now = datetime.now(UTC)
     mapping.status = "active"
     mapping.last_synced_at = now
@@ -196,6 +243,8 @@ async def sync_google_analytics(
         "last_import_end": end_date.isoformat(),
         "last_import_rows": imported,
         "last_import_event_rows": imported_events,
+        "last_import_landing_event_rows": imported_landing_events,
+        "last_import_landing_event_matched": matched_landing_events,
         "last_import_matched": matched,
     }
     connection.last_synced_at = now
@@ -208,4 +257,6 @@ async def sync_google_analytics(
         "matched_urls": matched,
         "unmatched_urls": imported - matched,
         "event_rows": imported_events,
+        "landing_event_rows": imported_landing_events,
+        "landing_event_matched_urls": matched_landing_events,
     }
