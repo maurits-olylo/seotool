@@ -349,7 +349,7 @@ def test_client_report_contains_performance_and_work(client: TestClient) -> None
                 ),
                 SearchConsoleMetric(
                     website_id=website_id,
-                    date=yesterday - timedelta(days=30),
+                    date=_period_dates("month", yesterday)[2],
                     page_url="https://reporting.example.com/",
                     clicks=10,
                     impressions=200,

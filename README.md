@@ -50,13 +50,17 @@ mag worden.
 ## Development en tests
 
 ```bash
-python3.12 -m venv .venv
-source .venv/bin/activate
+mkdir -p "$HOME/.virtualenvs"
+python3.12 -m venv "$HOME/.virtualenvs/seo-tool"
+source "$HOME/.virtualenvs/seo-tool/bin/activate"
 pip install -e '.[dev]'
 ruff check .
 ruff format --check .
 python -m pytest
 ```
+
+Bewaar de virtuele omgeving buiten een door iCloud gesynchroniseerde projectmap. Dataless
+iCloud-bestanden maken iedere nieuwe Python- en pytest-run onnodig traag.
 
 Tests gebruiken SQLite en lokale fixtures en hebben geen internetverbinding nodig.
 

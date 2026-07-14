@@ -1,3 +1,4 @@
+import asyncio
 from datetime import date, timedelta
 
 from sqlalchemy import func, select
@@ -15,7 +16,7 @@ from app.models.website import Website
 from app.services.search_console import sync_search_console
 
 
-async def test_search_console_sync_maps_and_upserts_page_metrics(monkeypatch) -> None:
+def test_search_console_sync_maps_and_upserts_page_metrics(monkeypatch) -> None:
     class FakeResponse:
         status_code = 200
 
@@ -93,8 +94,8 @@ async def test_search_console_sync_maps_and_upserts_page_metrics(monkeypatch) ->
         db.add(mapping)
         db.commit()
 
-        first = await sync_search_console(db, website.id)
-        second = await sync_search_console(db, website.id)
+        first = asyncio.run(sync_search_console(db, website.id))
+        second = asyncio.run(sync_search_console(db, website.id))
 
         assert first["matched_urls"] == 1
         assert second["rows"] == 1
@@ -103,5 +104,7 @@ async def test_search_console_sync_maps_and_upserts_page_metrics(monkeypatch) ->
         metric = db.scalar(select(SearchConsoleMetric))
         assert metric and metric.url_id == url.id and metric.clicks == 12
         query_metric = db.scalar(select(SearchConsoleQueryMetric))
-        assert query_metric and query_metric.query == "example query" and query_metric.url_id == url.id
+        assert query_metric
+        assert query_metric.query == "example query"
+        assert query_metric.url_id == url.id
         assert mapping.last_synced_at is not None

@@ -1,4 +1,5 @@
 from datetime import date
+from uuid import UUID
 
 from fastapi.testclient import TestClient
 
@@ -14,9 +15,10 @@ def test_job_listing_endpoint_returns_validation_issues(client: TestClient) -> N
         "/api/v1/websites",
         json={"client_id": customer["id"], "name": "Site", "base_url": "https://example.com"},
     ).json()
+    website_id = UUID(website["id"])
     with SessionLocal() as db:
         url = Url(
-            website_id=website["id"],
+            website_id=website_id,
             normalized_url="https://example.com/vacatures/seo-specialist",
             current_status_code=200,
             is_active=True,
@@ -26,7 +28,7 @@ def test_job_listing_endpoint_returns_validation_issues(client: TestClient) -> N
         db.flush()
         db.add(
             JobListing(
-                website_id=website["id"],
+                website_id=website_id,
                 url_id=url.id,
                 title="SEO specialist",
                 valid_through=date(2026, 12, 31),
@@ -39,7 +41,7 @@ def test_job_listing_endpoint_returns_validation_issues(client: TestClient) -> N
         )
         db.add(
             Issue(
-                website_id=website["id"],
+                website_id=website_id,
                 url_id=url.id,
                 issue_type="job_posting_schema_missing",
                 category="structured_data",
