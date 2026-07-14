@@ -13,6 +13,7 @@ from app.models.discovery import CrawlJob, Url
 from app.schemas.discovery import CrawlJobCreate, CrawlJobRead, UrlRead, UrlRegister
 from app.services.authorization import require_website_access
 from app.services.url_registry import register_url
+from app.services.url_scope import is_url_in_website_scope
 
 router = APIRouter(tags=["discovery"])
 
@@ -43,6 +44,12 @@ def add_url(
     principal: Principal = Depends(require_api_key),
 ) -> Url:
     website = require_website_access(db, principal, website_id, admin=True)
+    if not is_url_in_website_scope(
+        str(payload.url),
+        base_url=website.base_url,
+        allowed_subdomains=website.settings.allowed_subdomains,
+    ):
+        raise HTTPException(status_code=422, detail="URL valt buiten het ingestelde websitedomein")
     try:
         url = register_url(
             db,

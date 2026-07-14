@@ -8,6 +8,8 @@ from app.core.queue import get_redis
 
 def _worker_queue_names(worker: Worker) -> set[str]:
     names = getattr(worker, "queue_names", [])
+    if callable(names):
+        names = names()
     return {str(name) for name in names}
 
 

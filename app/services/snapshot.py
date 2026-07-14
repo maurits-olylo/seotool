@@ -2,10 +2,12 @@ from sqlalchemy.orm import Session
 
 from app.models.crawl import UrlLink, UrlSnapshot
 from app.models.discovery import Url
+from app.models.website import Website
 from app.services.html_extraction import extract_page
 from app.services.http_crawler import FetchResult
 from app.services.url_normalization import normalize_url
 from app.services.url_registry import register_url
+from app.services.url_scope import is_url_in_website_scope
 
 
 def store_fetch_result(
@@ -56,9 +58,21 @@ def store_fetch_result(
     url.current_final_url = normalize_url(result.final_url)
     url.is_indexable = is_indexable
     if page:
+        website = db.get(Website, url.website_id)
+        allowed_subdomains = (
+            website.settings.allowed_subdomains if website and website.settings else []
+        )
         for link in page.links:
             target = None
-            if link.is_internal:
+            is_internal = bool(
+                website
+                and is_url_in_website_scope(
+                    link.target_url,
+                    base_url=website.base_url,
+                    allowed_subdomains=allowed_subdomains,
+                )
+            )
+            if is_internal:
                 target = register_url(
                     db,
                     website_id=url.website_id,
@@ -73,7 +87,7 @@ def store_fetch_result(
                     target_url=normalize_url(link.target_url),
                     target_url_id=target.id if target else None,
                     anchor_text=link.anchor_text,
-                    is_internal=link.is_internal,
+                    is_internal=is_internal,
                     is_nofollow=link.is_nofollow,
                 )
             )

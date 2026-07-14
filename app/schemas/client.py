@@ -1,6 +1,7 @@
-from pydantic import EmailStr, Field
+from pydantic import AnyHttpUrl, BaseModel, EmailStr, Field
 
 from app.schemas.common import ORMModel, Timestamped
+from app.schemas.website import WebsiteRead
 
 
 class ClientCreate(ORMModel):
@@ -18,3 +19,15 @@ class ClientUpdate(ClientCreate):
 
 class ClientRead(ClientCreate, Timestamped):
     pass
+
+
+class ClientOnboardingCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    internal_reference: str | None = Field(default=None, max_length=100)
+    website_name: str = Field(min_length=1, max_length=255)
+    base_url: AnyHttpUrl
+
+
+class ClientOnboardingRead(BaseModel):
+    client: ClientRead
+    website: WebsiteRead

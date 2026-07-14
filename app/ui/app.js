@@ -11,8 +11,10 @@ const labels = {
   pending: "In wachtrij", running: "Bezig", succeeded: "Geslaagd",
   partially_succeeded: "Deels geslaagd", failed: "Mislukt", cancelled: "Geannuleerd",
 };
-const state = { currentUser: null, clients: [], websites: [], issues: [], changes: [], changeGroups: [], jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], exports: [], systemStatus: null, operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
+const state = { currentUser: null, clients: [], websites: [], organizationWebsites: [], issues: [], changes: [], changeGroups: [], jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], exports: [], systemStatus: null, operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
 const VIEW_HASHES = {overview: "overzicht", reports: "rapportage", insights: "inzichten", urls: "urls", changes: "wijzigingen", vacancies: "vacatures", operations: "beheer", organization: "organisatie", integrations: "integraties"};
+const CLIENT_STORAGE_KEY = "seo-monitor-client-id";
+const WEBSITE_STORAGE_KEY = "seo-monitor-website-id";
 let operationsPollTimer = null;
 
 async function api(path, options = {}) {
@@ -223,7 +225,29 @@ async function loadOrganization() {
     $("#new-website-client").value = $("#client-select").value;
     $("#invitation-client").value = $("#client-select").value;
   }
+  state.organizationWebsites = await api("/api/v1/websites");
+  renderClientDirectory();
   await loadMembers();
+}
+
+function renderClientDirectory() {
+  const query = $("#client-directory-search").value.trim().toLowerCase();
+  const websitesByClient = state.organizationWebsites.reduce((groups, website) => {
+    (groups[website.client_id] ||= []).push(website); return groups;
+  }, {});
+  const clients = state.clients.filter((client) => {
+    const websites = websitesByClient[client.id] || [];
+    const searchable = `${client.name} ${client.internal_reference || ""} ${websites.map((website) => `${website.name} ${website.base_url}`).join(" ")}`.toLowerCase();
+    return !query || searchable.includes(query);
+  });
+  $("#client-rows").innerHTML = clients.map((client) => {
+    const websites = websitesByClient[client.id] || [];
+    const websiteMarkup = websites.length
+      ? websites.map((website) => `<span><strong>${escapeHtml(website.name)}</strong><small>${escapeHtml(website.base_url)}</small></span>`).join("")
+      : `<span class="client-no-website">Nog geen website</span>`;
+    return `<tr><td><input class="client-name-input" data-client-id="${client.id}" value="${escapeHtml(client.name)}" maxlength="255"></td><td><div class="client-websites">${websiteMarkup}</div></td><td>${escapeHtml(client.internal_reference || "—")}</td><td><div class="client-actions"><button type="button" class="detail-button client-open" data-client-id="${client.id}">Open</button><button type="button" class="detail-button client-save" data-client-id="${client.id}">Opslaan</button><button type="button" class="detail-button danger client-delete" data-client-id="${client.id}" data-client-name="${escapeHtml(client.name)}">Verwijder</button></div></td></tr>`;
+  }).join("");
+  $("#clients-empty").classList.toggle("hidden", clients.length !== 0);
 }
 
 async function loadMembers() {
@@ -260,20 +284,31 @@ async function removeMember(memberId, email) {
   } catch (error) { message.textContent = error.message; }
 }
 
-async function createClient(event) {
-  event.preventDefault(); const message = $("#client-form-message");
+async function onboardClient(event) {
+  event.preventDefault();
+  const form = event.currentTarget; const button = form.querySelector('button[type="submit"]'); const message = $("#client-form-message");
+  button.disabled = true; message.classList.remove("error"); message.textContent = "Klant en website worden aangemaakt…";
   try {
-    await api("/api/v1/clients", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({name:$("#new-client-name").value, internal_reference:$("#new-client-reference").value || null})});
-    event.currentTarget.reset(); message.textContent = "Klant toegevoegd."; await loadClients(); await loadOrganization();
-  } catch (error) { message.textContent = error.message; }
+    const result = await api("/api/v1/clients/onboard", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({name:$("#new-client-name").value.trim(), internal_reference:$("#new-client-reference").value.trim() || null, website_name:$("#onboarding-website-name").value.trim(), base_url:$("#onboarding-website-url").value.trim()})});
+    form.reset();
+    localStorage.setItem(CLIENT_STORAGE_KEY, result.client.id); localStorage.setItem(WEBSITE_STORAGE_KEY, result.website.id);
+    await loadClients(result.client.id, result.website.id); await loadOrganization();
+    message.textContent = "Klant en website zijn aangemaakt. De eerste geplande controles kunnen automatisch starten.";
+  } catch (error) { message.classList.add("error"); message.textContent = error.message; }
+  finally { button.disabled = false; }
 }
 
 async function createWebsite(event) {
-  event.preventDefault(); const message = $("#website-form-message");
+  event.preventDefault();
+  const form = event.currentTarget; const button = form.querySelector('button[type="submit"]'); const message = $("#website-form-message");
+  button.disabled = true; message.classList.remove("error");
   try {
-    await api("/api/v1/websites", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({client_id:$("#new-website-client").value, name:$("#new-website-name").value, base_url:$("#new-website-url").value})});
-    event.currentTarget.reset(); message.textContent = "Website toegevoegd."; await loadClients(); await loadOrganization();
-  } catch (error) { message.textContent = error.message; }
+    const website = await api("/api/v1/websites", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({client_id:$("#new-website-client").value, name:$("#new-website-name").value, base_url:$("#new-website-url").value})});
+    const clientId = $("#new-website-client").value; form.reset();
+    localStorage.setItem(CLIENT_STORAGE_KEY, clientId); localStorage.setItem(WEBSITE_STORAGE_KEY, website.id);
+    await loadClients(clientId, website.id); await loadOrganization(); message.textContent = "Website toegevoegd.";
+  } catch (error) { message.classList.add("error"); message.textContent = error.message; }
+  finally { button.disabled = false; }
 }
 
 async function createInvitation(event) {
@@ -285,19 +320,50 @@ async function createInvitation(event) {
   } catch (error) { message.textContent = error.message; }
 }
 
-async function loadClients() {
+async function loadClients(preferredClientId = null, preferredWebsiteId = null) {
   state.clients = await api("/api/v1/clients");
   $("#client-select").innerHTML = state.clients.map(option).join("");
-  await loadWebsites();
+  const selectedClientId = preferredClientId || localStorage.getItem(CLIENT_STORAGE_KEY);
+  if (selectedClientId && state.clients.some((client) => client.id === selectedClientId)) $("#client-select").value = selectedClientId;
+  if ($("#client-select").value) localStorage.setItem(CLIENT_STORAGE_KEY, $("#client-select").value);
+  await loadWebsites(preferredWebsiteId);
 }
 
-async function loadWebsites() {
+async function loadWebsites(preferredWebsiteId = null) {
   const clientId = $("#client-select").value;
-  if (!clientId) { state.websites = []; state.issues = []; render(); return; }
+  if (!clientId) { state.websites = []; state.issues = []; $("#website-select").innerHTML = ""; render(); return; }
   state.websites = await api(`/api/v1/websites?client_id=${clientId}`);
   $("#website-select").innerHTML = state.websites.map(option).join("");
+  const selectedWebsiteId = preferredWebsiteId || localStorage.getItem(WEBSITE_STORAGE_KEY);
+  if (selectedWebsiteId && state.websites.some((website) => website.id === selectedWebsiteId)) $("#website-select").value = selectedWebsiteId;
+  if ($("#website-select").value) localStorage.setItem(WEBSITE_STORAGE_KEY, $("#website-select").value);
+  else localStorage.removeItem(WEBSITE_STORAGE_KEY);
   updateReportSelectors();
-  await loadIssues();
+  if ($("#website-select").value) await loadIssues();
+  else { state.issues = []; state.urlRecords = []; state.urls = new Map(); render(); }
+}
+
+async function openClient(clientId) {
+  localStorage.setItem(CLIENT_STORAGE_KEY, clientId); localStorage.removeItem(WEBSITE_STORAGE_KEY);
+  $("#client-select").value = clientId; await loadWebsites(); showView("overview");
+}
+
+async function saveClient(clientId) {
+  const input = $(`.client-name-input[data-client-id="${clientId}"]`); const message = $("#clients-message");
+  try {
+    await api(`/api/v1/clients/${clientId}`, {method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({name:input.value.trim()})});
+    message.classList.remove("error"); message.textContent = "Klantnaam bijgewerkt."; await loadClients(clientId); await loadOrganization();
+  } catch (error) { message.classList.add("error"); message.textContent = error.message; }
+}
+
+async function deleteClient(clientId, clientName) {
+  if (!window.confirm(`Klant “${clientName}” definitief verwijderen? Websites, crawldata, issues, integraties en rapportages worden ook verwijderd.`)) return;
+  const message = $("#clients-message");
+  try {
+    await api(`/api/v1/clients/${clientId}`, {method:"DELETE"});
+    if (localStorage.getItem(CLIENT_STORAGE_KEY) === clientId) { localStorage.removeItem(CLIENT_STORAGE_KEY); localStorage.removeItem(WEBSITE_STORAGE_KEY); }
+    message.classList.remove("error"); message.textContent = "Klant verwijderd."; await loadClients(); await loadOrganization();
+  } catch (error) { message.classList.add("error"); message.textContent = error.message; }
 }
 
 async function loadIntegrations() {
@@ -1048,8 +1114,8 @@ async function saveIssueStatus() {
 }
 
 $("#logout").addEventListener("click", async () => { await fetch("/ui/logout", { method: "POST" }); window.location.assign("/"); });
-$("#client-select").addEventListener("change", async () => { await loadWebsites(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); });
-$("#website-select").addEventListener("change", async () => { state.selectedReportSnapshotId = null; state.consultantInsights = null; await loadIssues(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); if (!$("#insights-view").classList.contains("hidden")) await loadConsultantInsights(); if (!$("#urls-view").classList.contains("hidden")) renderUrls(); if (!$("#changes-view").classList.contains("hidden")) await loadChanges(); if (!$("#vacancies-view").classList.contains("hidden")) await loadJobListings(); if (!$("#operations-view").classList.contains("hidden")) await loadOperations(); });
+$("#client-select").addEventListener("change", async () => { localStorage.setItem(CLIENT_STORAGE_KEY, $("#client-select").value); localStorage.removeItem(WEBSITE_STORAGE_KEY); await loadWebsites(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); });
+$("#website-select").addEventListener("change", async () => { localStorage.setItem(WEBSITE_STORAGE_KEY, $("#website-select").value); state.selectedReportSnapshotId = null; state.consultantInsights = null; await loadIssues(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); if (!$("#insights-view").classList.contains("hidden")) await loadConsultantInsights(); if (!$("#urls-view").classList.contains("hidden")) renderUrls(); if (!$("#changes-view").classList.contains("hidden")) await loadChanges(); if (!$("#vacancies-view").classList.contains("hidden")) await loadJobListings(); if (!$("#operations-view").classList.contains("hidden")) await loadOperations(); });
 for (const selector of ["#severity-filter", "#type-filter", "#impact-filter", "#status-filter"]) $(selector).addEventListener("change", () => { state.page = 1; render(); });
 $("#search-filter").addEventListener("input", () => { state.page = 1; render(); });
 $("#previous-page").addEventListener("click", () => { state.page -= 1; render(); });
@@ -1075,12 +1141,18 @@ $("#operations-nav").addEventListener("click", () => showView("operations"));
 $("#organization-nav").addEventListener("click", () => showView("organization"));
 $("#integrations-nav").addEventListener("click", () => showView("integrations"));
 $("#insight-period").addEventListener("change", async (event) => { state.insightDays = Number(event.target.value); await loadConsultantInsights(); });
-$("#client-form").addEventListener("submit", createClient);
+$("#onboarding-form").addEventListener("submit", onboardClient);
 $("#website-form").addEventListener("submit", createWebsite);
 $("#invitation-form").addEventListener("submit", createInvitation);
 $("#invitation-client").addEventListener("change", loadMembers);
 $("#member-rows").addEventListener("change", (event) => { const select = event.target.closest(".member-role"); if (select) updateMemberRole(select.dataset.memberId, select.value); });
 $("#member-rows").addEventListener("click", (event) => { const button = event.target.closest(".member-remove"); if (button) removeMember(button.dataset.memberId, button.dataset.memberEmail); });
+$("#client-directory-search").addEventListener("input", renderClientDirectory);
+$("#client-rows").addEventListener("click", (event) => {
+  const open = event.target.closest(".client-open"); if (open) { openClient(open.dataset.clientId); return; }
+  const save = event.target.closest(".client-save"); if (save) { saveClient(save.dataset.clientId); return; }
+  const remove = event.target.closest(".client-delete"); if (remove) deleteClient(remove.dataset.clientId, remove.dataset.clientName);
+});
 $("#copy-invitation").addEventListener("click", async () => { await navigator.clipboard.writeText($("#invitation-link").value); $("#invitation-form-message").textContent = "Link gekopieerd."; });
 for (const selector of ["#url-status-filter", "#url-index-filter", "#url-depth-filter"]) $(selector).addEventListener("change", () => { state.urlPage = 1; renderUrls(); });
 $("#url-search").addEventListener("input", () => { state.urlPage = 1; renderUrls(); });

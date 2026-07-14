@@ -120,3 +120,15 @@ De interne beheerweergave controleert via `/api/v1/system/status` de database, R
 crawl- en exportworkers. Deze status is alleen beschikbaar voor interne rollen en staat los van het
 publieke health-endpoint. Een storing in deze aanvullende controle blokkeert het tonen van bestaande
 crawl- en exportgegevens niet.
+
+## Klantonboarding en domeinafbakening
+
+Een nieuwe klant en de eerste website worden in één databasetransactie aangemaakt. Hierdoor kan de
+interface geen half voltooide klant achterlaten wanneer het opslaan van de website mislukt. Klantnamen
+en interne referenties worden vooraf gecontroleerd op duplicaten. De laatst geselecteerde klant en
+website worden lokaal in de browser bewaard, zodat een refresh dezelfde werkcontext herstelt.
+
+Discovery en interne-linkregistratie accepteren uitsluitend de host van de ingestelde basis-URL, de
+www-variant daarvan en expliciet geconfigureerde `allowed_subdomains`. URL's van andere domeinen in
+een gedeelde sitemap of CMS worden niet geregistreerd; eerder geregistreerde externe URL's worden
+bij de volgende sitemapimport gedeactiveerd en niet opnieuw gecrawld.

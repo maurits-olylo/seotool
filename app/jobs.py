@@ -25,6 +25,7 @@ from app.services.structured_data_analysis import analyze_breadcrumb_consistency
 from app.services.technical_checks import IssueSignal
 from app.services.url_filtering import is_probable_html_page
 from app.services.url_registry import register_url
+from app.services.url_scope import is_url_in_website_scope
 
 logger = structlog.get_logger()
 
@@ -115,6 +116,7 @@ def _import_sitemaps(db, job: CrawlJob, run: CrawlRun) -> None:  # type: ignore[
     website = db.get(Website, job.website_id)
     if website is None:
         raise RuntimeError("Website does not exist")
+    _deactivate_out_of_scope_urls(db, website)
     pending = list(website.settings.sitemap_urls)
     visited: set[str] = set()
     while pending and len(visited) < 100:
@@ -128,8 +130,28 @@ def _import_sitemaps(db, job: CrawlJob, run: CrawlRun) -> None:  # type: ignore[
             max_response_size=website.settings.max_response_size,
         )
         document = parse_sitemap(result.content)
-        pending.extend(document.child_sitemaps)
+        pending.extend(
+            child
+            for child in document.child_sitemaps
+            if is_url_in_website_scope(
+                child,
+                base_url=website.base_url,
+                allowed_subdomains=website.settings.allowed_subdomains,
+            )
+        )
         for item in document.urls[: website.settings.max_urls]:
+            if not is_url_in_website_scope(
+                item.location,
+                base_url=website.base_url,
+                allowed_subdomains=website.settings.allowed_subdomains,
+            ):
+                logger.info(
+                    "sitemap_url_outside_website_scope",
+                    website_id=str(website.id),
+                    sitemap_url=sitemap_url,
+                    url=item.location,
+                )
+                continue
             register_url(
                 db,
                 website_id=website.id,
@@ -229,6 +251,17 @@ def _crawl_full_site(db, job: CrawlJob, run: CrawlRun) -> bool:  # type: ignore[
         )
     db.commit()
     return complete
+
+
+def _deactivate_out_of_scope_urls(db, website: Website) -> None:  # type: ignore[no-untyped-def]
+    known_urls = list(db.scalars(select(Url).where(Url.website_id == website.id)))
+    for known_url in known_urls:
+        if not is_url_in_website_scope(
+            known_url.normalized_url,
+            base_url=website.base_url,
+            allowed_subdomains=website.settings.allowed_subdomains,
+        ):
+            known_url.is_active = False
 
 
 def _audit_asset(db, job: CrawlJob, run: CrawlRun, url: Url) -> None:  # type: ignore[no-untyped-def]

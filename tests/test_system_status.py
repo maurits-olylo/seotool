@@ -10,6 +10,14 @@ class FakeWorker:
         self.queue_names = list(queue_names)
 
 
+class FakeMethodWorker:
+    def __init__(self, *queue_names: str) -> None:
+        self._queue_names = list(queue_names)
+
+    def queue_names(self) -> list[str]:
+        return self._queue_names
+
+
 def test_build_queue_status_reports_workers_and_backlog(monkeypatch) -> None:
     redis = Mock()
     monkeypatch.setattr(
@@ -54,3 +62,22 @@ def test_system_status_endpoint_payload(monkeypatch) -> None:
     )
     assert result["status"] == "ok"
     assert result["database"] == "ok"
+
+
+def test_build_queue_status_supports_rq_queue_names_method(monkeypatch) -> None:
+    redis = Mock()
+    monkeypatch.setattr(
+        "app.services.system_status.Worker.all",
+        lambda connection: [FakeMethodWorker("default"), FakeMethodWorker("exports")],
+    )
+
+    class EmptyQueue:
+        count = 0
+
+        def __init__(self, name: str, connection: object) -> None:
+            pass
+
+    monkeypatch.setattr("app.services.system_status.Queue", EmptyQueue)
+    result = build_queue_status(redis)
+    assert result["queues"]["default"]["workers"] == 1
+    assert result["queues"]["exports"]["workers"] == 1
