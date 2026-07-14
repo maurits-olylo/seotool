@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 
 from app.models.crawl import UrlSnapshot
 from app.services.technical_checks import inspect_snapshot
@@ -213,3 +214,69 @@ def test_reports_invalid_json_ld_blocks() -> None:
 
     assert signal.severity == "medium"
     assert signal.evidence["invalid_blocks"] == 1
+
+
+def test_flags_explicitly_dated_old_editorial_content_for_review() -> None:
+    snapshot = UrlSnapshot(
+        requested_url="https://example.com/kennisbank/seo",
+        final_url="https://example.com/kennisbank/seo",
+        status_code=200,
+        title="SEO handleiding",
+        headings={"h1": ["SEO handleiding"]},
+        word_count=900,
+        is_indexable=True,
+        redirect_chain=[],
+        schema_data=[
+            {
+                "@type": "Article",
+                "datePublished": "2019-02-01",
+                "dateModified": "2022-06-15T10:00:00+02:00",
+            }
+        ],
+    )
+
+    signal = next(
+        item
+        for item in inspect_snapshot(snapshot, today=date(2026, 7, 14))
+        if item.issue_type == "possibly_outdated_content"
+    )
+
+    assert signal.severity == "low"
+    assert signal.confidence == "low"
+    assert signal.evidence["content_date"] == "2022-06-15"
+    assert signal.evidence["date_source"] == "dateModified"
+
+
+def test_does_not_flag_recent_or_non_editorial_content_as_outdated() -> None:
+    snapshots = [
+        UrlSnapshot(
+            requested_url="https://example.com/recent",
+            final_url="https://example.com/recent",
+            status_code=200,
+            word_count=500,
+            is_indexable=True,
+            redirect_chain=[],
+            schema_data=[
+                {
+                    "@type": "BlogPosting",
+                    "datePublished": "2018-01-01",
+                    "dateModified": "2026-06-01",
+                }
+            ],
+        ),
+        UrlSnapshot(
+            requested_url="https://example.com/organisatie",
+            final_url="https://example.com/organisatie",
+            status_code=200,
+            word_count=500,
+            is_indexable=True,
+            redirect_chain=[],
+            schema_data=[{"@type": "Organization", "dateModified": "2018-01-01"}],
+        ),
+    ]
+
+    for snapshot in snapshots:
+        types = {
+            signal.issue_type for signal in inspect_snapshot(snapshot, today=date(2026, 7, 14))
+        }
+        assert "possibly_outdated_content" not in types

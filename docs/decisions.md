@@ -99,3 +99,15 @@ betekenisvolle lijsten, zoals `itemListElement`, blijft wel relevant.
 
 Gevolg: technische herschikking veroorzaakt geen wijzigingsmelding, maar inhoudelijke structured
 data-veranderingen blijven aantoonbaar zichtbaar.
+
+## 2026-07-14 — Verouderde content alleen signaleren met expliciete datum
+
+Context: ouderdom afleiden uit losse jaartallen of tekst levert te veel fout-positieve meldingen op.
+
+Besluit: algemene contentouderdom wordt alleen als controlesignaal aangemaakt voor indexeerbare
+redactionele schema's (`Article`, `BlogPosting`, `NewsArticle` en `TechArticle`) met een expliciete
+`dateModified` of `datePublished` van minimaal drie jaar oud. Het signaal krijgt lage urgentie en
+lage zekerheid; vacatures behouden hun eigen strengere verloopcontrole.
+
+Gevolg: consultants krijgen een onderbouwde aanleiding voor inhoudelijke beoordeling zonder dat
+ouderdom automatisch als SEO-fout wordt gepresenteerd.

@@ -1,11 +1,14 @@
 import re
 from dataclasses import dataclass
+from datetime import UTC, date, datetime
 from urllib.parse import parse_qs, urlsplit
 
 from app.models.crawl import UrlSnapshot
 from app.services.html_extraction import INVALID_JSON_LD_MARKER
 
 THIN_CONTENT_WORD_LIMIT = 150
+OUTDATED_CONTENT_AGE_DAYS = 3 * 365
+EDITORIAL_SCHEMA_TYPES = {"Article", "BlogPosting", "NewsArticle", "TechArticle"}
 FUNCTIONAL_PATH_RE = re.compile(
     r"/(?:(?:bedankt|bevestiging|confirmation|thank-you|success|succes)(?:-[^/]*)?|"
     r"inloggen|login|uitloggen|logout|winkelwagen|cart|checkout|afrekenen)(?:/|$)",
@@ -23,6 +26,7 @@ SNAPSHOT_ISSUE_TYPES = {
     "missing_h1",
     "multiple_h1",
     "thin_content",
+    "possibly_outdated_content",
     "canonical_other_url",
     "conflicting_robots",
     "invalid_json_ld",
@@ -53,7 +57,7 @@ class IssueSignal:
     confidence: str = "high"
 
 
-def inspect_snapshot(snapshot: UrlSnapshot) -> list[IssueSignal]:
+def inspect_snapshot(snapshot: UrlSnapshot, *, today: date | None = None) -> list[IssueSignal]:
     signals: list[IssueSignal] = []
     status = snapshot.status_code
     if status in {404, 410}:
@@ -189,7 +193,81 @@ def inspect_snapshot(snapshot: UrlSnapshot) -> list[IssueSignal]:
                 invalid_blocks=invalid_json_ld_blocks,
             )
         )
+    outdated_signal = _possibly_outdated_content_signal(
+        snapshot,
+        today=today or datetime.now(UTC).date(),
+    )
+    if outdated_signal:
+        signals.append(outdated_signal)
     return signals
+
+
+def _possibly_outdated_content_signal(
+    snapshot: UrlSnapshot,
+    *,
+    today: date,
+) -> IssueSignal | None:
+    if snapshot.status_code != 200 or snapshot.redirect_chain or snapshot.is_indexable is False:
+        return None
+    dated_nodes = _editorial_schema_dates(snapshot.schema_data or [])
+    if not dated_nodes:
+        return None
+    source, content_date = max(dated_nodes, key=lambda item: item[1])
+    age_days = (today - content_date).days
+    if age_days < OUTDATED_CONTENT_AGE_DAYS or content_date > today:
+        return None
+    return _signal(
+        "possibly_outdated_content",
+        "content",
+        "low",
+        "Redactionele content mogelijk verouderd",
+        "Controleer of de inhoud nog actueel en nuttig is. Werk de pagina inhoudelijk bij, "
+        "behoud hem bewust of voeg een passende redirect toe; wijzig de datum niet zonder "
+        "inhoudelijke update.",
+        confidence="low",
+        content_date=content_date.isoformat(),
+        date_source=source,
+        age_days=age_days,
+        threshold_days=OUTDATED_CONTENT_AGE_DAYS,
+    )
+
+
+def _editorial_schema_dates(values: list[object]) -> list[tuple[str, date]]:
+    found: list[tuple[str, date]] = []
+
+    def visit(value: object) -> None:
+        if isinstance(value, dict):
+            schema_type = value.get("@type")
+            types = (
+                {schema_type}
+                if isinstance(schema_type, str)
+                else {item for item in schema_type if isinstance(item, str)}
+                if isinstance(schema_type, list)
+                else set()
+            )
+            if types & EDITORIAL_SCHEMA_TYPES:
+                for field in ("dateModified", "datePublished"):
+                    parsed = _parse_schema_date(value.get(field))
+                    if parsed:
+                        found.append((field, parsed))
+                        break
+            for child in value.values():
+                visit(child)
+        elif isinstance(value, list):
+            for child in value:
+                visit(child)
+
+    visit(values)
+    return found
+
+
+def _parse_schema_date(value: object) -> date | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        return date.fromisoformat(value.strip()[:10])
+    except ValueError:
+        return None
 
 
 def _should_report_thin_content(snapshot: UrlSnapshot) -> bool:
