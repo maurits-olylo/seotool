@@ -131,4 +131,5 @@ website worden lokaal in de browser bewaard, zodat een refresh dezelfde werkcont
 Discovery en interne-linkregistratie accepteren uitsluitend de host van de ingestelde basis-URL, de
 www-variant daarvan en expliciet geconfigureerde `allowed_subdomains`. URL's van andere domeinen in
 een gedeelde sitemap of CMS worden niet geregistreerd; eerder geregistreerde externe URL's worden
-bij de volgende sitemapimport gedeactiveerd en niet opnieuw gecrawld.
+vóór ieder crawltype gedeactiveerd en niet opnieuw gecrawld. Het standaard URL-overzicht toont alleen
+actieve URL's; historische records blijven expliciet opvraagbaar voor audit en exports.
