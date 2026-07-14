@@ -11,7 +11,7 @@ from app.core.config import get_settings
 from app.core.security import create_session_token, hash_password
 from app.db.session import SessionLocal
 from app.models.crawl import CrawlRun
-from app.models.discovery import CrawlJob
+from app.models.discovery import CrawlJob, Url
 from app.models.integrations import (
     GoogleAnalyticsEventMetric,
     GoogleAnalyticsMetric,
@@ -617,3 +617,29 @@ def test_url_registry_deduplicates_and_creates_job(client: TestClient) -> None:
     exports = client.get(f"/api/v1/exports?website_id={website['id']}")
     assert exports.status_code == 200
     assert [item["id"] for item in exports.json()] == [export.json()["id"]]
+
+
+def test_url_overview_hides_inactive_out_of_scope_records_by_default(
+    client: TestClient,
+) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Scoped URLs"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": customer["id"],
+            "name": "Pearle",
+            "base_url": "https://www.pearle.nl",
+        },
+    ).json()
+    endpoint = f"/api/v1/websites/{website['id']}/urls"
+    created = client.post(endpoint, json={"url": "https://www.pearle.nl/winkels"}).json()
+
+    with SessionLocal() as db:
+        url = db.get(Url, UUID(created["id"]))
+        assert url is not None
+        url.is_active = False
+        db.commit()
+
+    assert client.get(endpoint).json() == []
+    inactive = client.get(f"{endpoint}?active=false").json()
+    assert [item["normalized_url"] for item in inactive] == ["https://www.pearle.nl/winkels"]

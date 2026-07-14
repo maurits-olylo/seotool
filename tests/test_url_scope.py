@@ -27,3 +27,16 @@ def test_website_scope_supports_explicit_hosts_and_wildcards() -> None:
         base_url="https://www.example.nl/",
         allowed_subdomains=["*.example.nl"],
     )
+
+
+def test_wildcard_does_not_allow_the_parent_or_lookalike_domains() -> None:
+    assert not is_url_in_website_scope(
+        "https://example.nl/",
+        base_url="https://primary.example/",
+        allowed_subdomains=["*.example.nl"],
+    )
+    assert not is_url_in_website_scope(
+        "https://notexample.nl/",
+        base_url="https://primary.example/",
+        allowed_subdomains=["*.example.nl"],
+    )

@@ -56,6 +56,40 @@ def test_light_check_respects_url_limit_and_request_delay(monkeypatch) -> None: 
     assert delays == [0.75, 0.75]
 
 
+def test_every_crawl_deactivates_urls_outside_the_website_scope(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    fetched: list[str] = []
+    monkeypatch.setattr("app.jobs.fetch_url", lambda url, **_: fetched.append(url))
+
+    with SessionLocal() as db:
+        client = Client(name="Pearle")
+        website = Website(client=client, name="Pearle NL", base_url="https://www.pearle.nl/")
+        website.settings = WebsiteSettings(respect_robots_txt=False)
+        db.add(website)
+        db.flush()
+        polluted = Url(
+            website_id=website.id,
+            normalized_url="https://jobsatpearle.be/vacatures",
+        )
+        job = CrawlJob(
+            website_id=website.id,
+            job_type="light_check",
+            settings_snapshot={"respect_robots_txt": False},
+        )
+        db.add_all([polluted, job])
+        db.commit()
+        polluted_id = polluted.id
+        job_id = job.id
+
+    execute_crawl_job(str(job_id))
+
+    with SessionLocal() as db:
+        polluted = db.get(Url, polluted_id)
+        completed = db.get(CrawlJob, job_id)
+        assert polluted and polluted.is_active is False
+        assert completed and completed.status == "succeeded"
+    assert fetched == []
+
+
 def test_job_skips_url_blocked_by_robots_and_creates_issue(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     fetched: list[str] = []
 

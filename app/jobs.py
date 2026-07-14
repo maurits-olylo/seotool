@@ -55,6 +55,11 @@ def execute_crawl_job(job_id: str) -> None:
         db.add(run)
         db.commit()
         try:
+            website = db.get(Website, job.website_id)
+            if website is None:
+                raise RuntimeError("Website does not exist")
+            _deactivate_out_of_scope_urls(db, website)
+            db.commit()
             if job.job_type in {"fetch_sitemap", "full_site_crawl"}:
                 _import_sitemaps(db, job, run)
             if job.job_type == "fetch_sitemap":
@@ -116,7 +121,6 @@ def _import_sitemaps(db, job: CrawlJob, run: CrawlRun) -> None:  # type: ignore[
     website = db.get(Website, job.website_id)
     if website is None:
         raise RuntimeError("Website does not exist")
-    _deactivate_out_of_scope_urls(db, website)
     pending = list(website.settings.sitemap_urls)
     visited: set[str] = set()
     while pending and len(visited) < 100:

@@ -21,7 +21,7 @@ router = APIRouter(tags=["discovery"])
 @router.get("/websites/{website_id}/urls", response_model=list[UrlRead])
 def list_urls(
     website_id: UUID,
-    active: bool | None = None,
+    active: bool | None = True,
     limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
