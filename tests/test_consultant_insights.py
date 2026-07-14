@@ -72,6 +72,7 @@ def test_consultant_insights_find_page_decline_and_conversion_gap() -> None:
 
     assert insights["search"][0]["type"] == "declining_page"
     assert insights["search"][0]["click_change_percent"] == -80.0
+    assert insights["content"] == []
     assert insights["conversion"][0]["type"] == "conversion_opportunity"
     assert insights["conversion"][0]["url"] == "https://example.com/landing"
 
@@ -87,11 +88,10 @@ def test_consultant_insights_endpoint(client) -> None:
         },
     ).json()
 
-    response = client.get(
-        f"/api/v1/websites/{website['id']}/consultant-insights?days=28"
-    )
+    response = client.get(f"/api/v1/websites/{website['id']}/consultant-insights?days=28")
 
     assert response.status_code == 200
     assert response.json()["days"] == 28
     assert response.json()["search"] == []
+    assert response.json()["content"] == []
     assert response.json()["conversion"] == []

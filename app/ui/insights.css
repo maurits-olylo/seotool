@@ -1,6 +1,7 @@
 .insight-period { display: grid; gap: .45rem; color: #66736e; font-weight: 700; }
 .insight-period select { min-width: 10rem; }
 .insight-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-top: 1.25rem; }
+.content-insight-panel { margin-top: 1.25rem; }
 .insight-panel { min-width: 0; }
 .source-label { color: #66736e; font-size: .85rem; font-weight: 700; }
 .insight-list { display: grid; }
@@ -11,5 +12,8 @@
 .insight-item a, .insight-query { color: #12634d; overflow-wrap: anywhere; }
 .insight-pages { margin: .5rem 0 0; padding-left: 1.15rem; }
 .insight-pages li { margin-top: .35rem; }
+.insight-confidence { display: inline-block; margin: 0 0 .65rem; padding: .25rem .55rem; border-radius: 999px; background: #eef2ef; color: #56645f; font-size: .75rem; font-weight: 800; text-transform: uppercase; }
+.insight-confidence.hoog { background: #fff0ec; color: #b3261e; }
+.insight-action { padding: .75rem; border-radius: .5rem; background: #f5f8f6; }
 .insight-empty { margin: 0; padding: 1.5rem; color: #66736e; }
 @media (max-width: 1050px) { .insight-columns { grid-template-columns: 1fr; } }

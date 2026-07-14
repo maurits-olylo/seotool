@@ -90,6 +90,14 @@ dat is een zoekintentiesignaal en geen bewijs van dubbele tekst.
 Dezelfde sitebrede stap groepeert genormaliseerde titles en meta descriptions om identieke metadata
 over meerdere indexeerbare pagina's als afzonderlijke, dedupliceerbare issues te volgen.
 
+## Consultantinzichten
+
+Consultantinzichten blijven gescheiden van de issue-engine: ze combineren historische GSC- en
+GA4-prestaties met de laatste crawl, maar maken niet automatisch een actiepunt aan. Zoekintentie-
+signalen gebruiken alleen materiële vraagvolumes, een verklaarbare woorden- en intentiematch en een
+beschikbare volledige snapshot. De interface toont daarom bewijs, betrouwbaarheid en een handmatige
+controleactie. Dit voorkomt dat een semantische aanname als technische fout wordt gepresenteerd.
+
 ## Vacaturemonitor
 
 `job_listings` bewaart de actuele, genormaliseerde toestand van herkende vacaturepagina’s per

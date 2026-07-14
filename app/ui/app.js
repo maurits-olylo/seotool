@@ -505,20 +505,25 @@ function renderConsultantInsight(insight) {
   const pages = (insight.pages || []).length
     ? `<ul class="insight-pages">${insight.pages.map((page) => `<li>${page.label ? `<strong>${escapeHtml(page.label)}:</strong> ` : ""}${insightLink(page.url)} · ${Number(page.impressions || 0).toLocaleString("nl-NL")} vertoningen · positie ${page.position}</li>`).join("")}</ul>`
     : "";
-  return `<article class="insight-item"><h3>${escapeHtml(insight.title)}</h3><p>${escapeHtml(insight.description)}</p>${query}${url}${pages}</article>`;
+  const confidence = insight.confidence ? `<span class="insight-confidence ${escapeHtml(insight.confidence)}">Betrouwbaarheid: ${escapeHtml(insight.confidence)}</span>` : "";
+  const action = insight.recommended_action ? `<p class="insight-action"><strong>Controle:</strong> ${escapeHtml(insight.recommended_action)}</p>` : "";
+  return `<article class="insight-item"><h3>${escapeHtml(insight.title)}</h3>${confidence}<p>${escapeHtml(insight.description)}</p>${query}${url}${pages}${action}</article>`;
 }
 
 function renderConsultantInsights() {
   const data = state.consultantInsights;
   if (!data) return;
   const search = data.search || [];
+  const content = data.content || [];
   const conversion = data.conversion || [];
   $("#insights-website-name").textContent = state.websites.find((item) => item.id === $("#website-select").value)?.name || "";
   $("#insight-summary").innerHTML = [
     [search.length, "Zoekkansen"],
+    [content.length, "Contentvragen"],
     [search.filter((item) => item.type === "declining_query" || item.type === "declining_page").length, "Dalingen"],
     [conversion.length, "Conversiekansen"],
   ].map(([count, label]) => `<article class="card"><strong>${count}</strong><span>${label}</span></article>`).join("");
+  $("#content-insight-list").innerHTML = content.map(renderConsultantInsight).join("") || `<p class="insight-empty">Geen materiële onbeantwoorde zoekvragen gevonden.</p>`;
   $("#search-insight-list").innerHTML = search.map(renderConsultantInsight).join("") || `<p class="insight-empty">Geen duidelijke GSC-kansen in deze periode.</p>`;
   $("#conversion-insight-list").innerHTML = conversion.map(renderConsultantInsight).join("") || `<p class="insight-empty">Geen landingspagina’s met voldoende verkeer en een opvallend laag conversiesignaal.</p>`;
 }
@@ -527,6 +532,7 @@ async function loadConsultantInsights() {
   const websiteId = $("#website-select").value;
   if (!websiteId) return;
   $("#search-insight-list").innerHTML = `<p class="insight-empty">Inzichten worden geladen…</p>`;
+  $("#content-insight-list").innerHTML = `<p class="insight-empty">Contentvragen worden geladen…</p>`;
   $("#conversion-insight-list").innerHTML = `<p class="insight-empty">Inzichten worden geladen…</p>`;
   state.consultantInsights = await api(`/api/v1/websites/${websiteId}/consultant-insights?days=${state.insightDays}`);
   renderConsultantInsights();

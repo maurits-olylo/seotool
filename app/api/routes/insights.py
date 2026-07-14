@@ -44,5 +44,6 @@ def consultant_insights(
         "previous_start_date": previous_start,
         "previous_end_date": previous_end,
         "search": insights["search"],
+        "content": insights["content"],
         "conversion": insights["conversion"],
     }

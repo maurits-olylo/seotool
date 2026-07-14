@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.discovery import Url
 from app.models.integrations import GoogleAnalyticsMetric, SearchConsoleMetric
+from app.services.content_intent_insights import build_content_intent_insights
 from app.services.search_insights import build_search_insights
 
 
@@ -188,10 +189,9 @@ def build_consultant_insights(
             previous_end,
         )
     ]
-    search_insights.extend(
-        _page_declines(db, website_id, start, end, previous_start, previous_end)
-    )
+    search_insights.extend(_page_declines(db, website_id, start, end, previous_start, previous_end))
     return {
         "search": search_insights,
+        "content": build_content_intent_insights(db, website_id, start, end),
         "conversion": _conversion_opportunities(db, website_id, start, end),
     }
