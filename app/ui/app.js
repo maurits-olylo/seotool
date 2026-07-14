@@ -289,11 +289,12 @@ async function onboardClient(event) {
   const form = event.currentTarget; const button = form.querySelector('button[type="submit"]'); const message = $("#client-form-message");
   button.disabled = true; message.classList.remove("error"); message.textContent = "Klant en website worden aangemaakt…";
   try {
-    const result = await api("/api/v1/clients/onboard", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({name:$("#new-client-name").value.trim(), internal_reference:$("#new-client-reference").value.trim() || null, website_name:$("#onboarding-website-name").value.trim(), base_url:$("#onboarding-website-url").value.trim()})});
+    const sitemapUrl = $("#onboarding-sitemap-url").value.trim();
+    const result = await api("/api/v1/clients/onboard", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({name:$("#new-client-name").value.trim(), internal_reference:$("#new-client-reference").value.trim() || null, website_name:$("#onboarding-website-name").value.trim(), base_url:$("#onboarding-website-url").value.trim(), settings:{sitemap_urls:sitemapUrl ? [sitemapUrl] : [], max_urls:Number($("#onboarding-max-urls").value), request_delay_ms:Number($("#onboarding-request-delay").value), respect_robots_txt:$("#onboarding-respect-robots").checked}})});
     form.reset();
     localStorage.setItem(CLIENT_STORAGE_KEY, result.client.id); localStorage.setItem(WEBSITE_STORAGE_KEY, result.website.id);
     await loadClients(result.client.id, result.website.id); await loadOrganization();
-    message.textContent = "Klant en website zijn aangemaakt. De eerste geplande controles kunnen automatisch starten.";
+    message.textContent = `Klant en website zijn aangemaakt. De eerste volledige crawl staat klaar (${result.crawl_job.status}).`;
   } catch (error) { message.classList.add("error"); message.textContent = error.message; }
   finally { button.disabled = false; }
 }

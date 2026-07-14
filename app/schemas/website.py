@@ -33,10 +33,10 @@ class WebsiteRead(Timestamped):
 
 class WebsiteSettingsData(ORMModel):
     website_id: UUID | None = None
-    sitemap_urls: list[str] = []
-    allowed_subdomains: list[str] = []
-    excluded_url_patterns: list[str] = []
-    ignored_query_parameters: list[str] = []
+    sitemap_urls: list[str] = Field(default_factory=list)
+    allowed_subdomains: list[str] = Field(default_factory=list)
+    excluded_url_patterns: list[str] = Field(default_factory=list)
+    ignored_query_parameters: list[str] = Field(default_factory=list)
     max_urls: int = Field(default=10_000, ge=1)
     request_delay_ms: int = Field(default=200, ge=0)
     concurrency: int = Field(default=5, ge=1, le=50)

@@ -1,7 +1,8 @@
 from pydantic import AnyHttpUrl, BaseModel, EmailStr, Field, field_validator
 
 from app.schemas.common import ORMModel, Timestamped
-from app.schemas.website import WebsiteRead
+from app.schemas.discovery import CrawlJobRead
+from app.schemas.website import WebsiteRead, WebsiteSettingsData
 
 
 class ClientCreate(ORMModel):
@@ -38,6 +39,7 @@ class ClientOnboardingCreate(BaseModel):
     internal_reference: str | None = Field(default=None, max_length=100)
     website_name: str = Field(min_length=1, max_length=255)
     base_url: AnyHttpUrl
+    settings: WebsiteSettingsData = Field(default_factory=WebsiteSettingsData)
 
     @field_validator("name", "website_name")
     @classmethod
@@ -56,3 +58,4 @@ class ClientOnboardingCreate(BaseModel):
 class ClientOnboardingRead(BaseModel):
     client: ClientRead
     website: WebsiteRead
+    crawl_job: CrawlJobRead
