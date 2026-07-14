@@ -68,8 +68,10 @@ def analyze_indexation_consistency(
                     },
                 )
             )
-        if snapshot.status_code == 200 and snapshot.is_indexable is False and (
-            in_sitemap or is_important
+        if (
+            snapshot.status_code == 200
+            and snapshot.is_indexable is False
+            and (in_sitemap or is_important)
         ):
             context = "de actuele sitemap" if in_sitemap else "historische GSC/GA4-prestaties"
             signals.append(

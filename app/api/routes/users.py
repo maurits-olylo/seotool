@@ -168,9 +168,7 @@ def update_client_member(
     }
 
 
-@router.delete(
-    "/clients/{client_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete("/clients/{client_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_client_member(
     client_id: UUID,
     user_id: UUID,

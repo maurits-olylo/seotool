@@ -1,5 +1,4 @@
 from datetime import UTC, date, datetime
-from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session

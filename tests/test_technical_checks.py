@@ -105,9 +105,7 @@ def test_ignores_thin_confirmation_and_filter_pages() -> None:
     ]
 
     for snapshot in snapshots:
-        assert "thin_content" not in {
-            signal.issue_type for signal in inspect_snapshot(snapshot)
-        }
+        assert "thin_content" not in {signal.issue_type for signal in inspect_snapshot(snapshot)}
 
 
 def test_does_not_report_final_page_onpage_issues_on_redirect_source() -> None:

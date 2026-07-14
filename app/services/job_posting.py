@@ -8,9 +8,7 @@ from app.services.technical_checks import IssueSignal
 
 APPLICATION_CTA_RE = re.compile(r"\b(solliciteer|reageer|aanmelden|apply)\b", re.IGNORECASE)
 JOB_URL_RE = re.compile(r"/(vacature|vacatures|werken-bij|jobs?|carriere)(/|$)", re.IGNORECASE)
-JOB_DETAIL_URL_RE = re.compile(
-    r"/(?:vacatures?|werken-bij|jobs?|carriere)/.+", re.IGNORECASE
-)
+JOB_DETAIL_URL_RE = re.compile(r"/(?:vacatures?|werken-bij|jobs?|carriere)/.+", re.IGNORECASE)
 JOB_TERMS_RE = re.compile(
     r"\b(vacature|functie|solliciteer|werken bij|job opening|jobomschrijving)\b", re.IGNORECASE
 )
@@ -21,8 +19,17 @@ CLOSING_DATE_RE = re.compile(
     re.IGNORECASE,
 )
 MONTHS_NL = {
-    "januari": 1, "februari": 2, "maart": 3, "april": 4, "mei": 5, "juni": 6,
-    "juli": 7, "augustus": 8, "september": 9, "oktober": 10, "november": 11,
+    "januari": 1,
+    "februari": 2,
+    "maart": 3,
+    "april": 4,
+    "mei": 5,
+    "juni": 6,
+    "juli": 7,
+    "augustus": 8,
+    "september": 9,
+    "oktober": 10,
+    "november": 11,
     "december": 12,
 }
 
@@ -89,7 +96,10 @@ def inspect_job_posting(
                 "high",
                 "Vacature is niet meer bereikbaar",
                 "De vacature-URL geeft een fout zonder actuele vacaturepagina.",
-                "Stel een relevante redirect in of verwijder resterende verwijzingen naar de vacature.",
+                (
+                    "Stel een relevante redirect in of verwijder resterende verwijzingen "
+                    "naar de vacature."
+                ),
                 {"status_code": status_code, "was_job_posting": was_job_posting},
             )
         ]
@@ -101,8 +111,14 @@ def inspect_job_posting(
                 "structured_data",
                 "high",
                 "Vacature mist JobPosting-schema",
-                "Deze individuele vacaturepagina is herkend aan URL en inhoud, maar bevat geen JobPosting-schema.",
-                "Voeg volledig JobPosting-schema toe met onder meer titel, omschrijving, werkgever, datum en vacaturelocatie.",
+                (
+                    "Deze individuele vacaturepagina is herkend aan URL en inhoud, maar bevat "
+                    "geen JobPosting-schema."
+                ),
+                (
+                    "Voeg volledig JobPosting-schema toe met onder meer titel, omschrijving, "
+                    "werkgever, datum en vacaturelocatie."
+                ),
                 {"source": "url_and_page_text", "page_url": page_url},
                 confidence="medium",
             )
@@ -134,7 +150,10 @@ def inspect_job_posting(
                 "high",
                 "Vacature is verlopen maar nog online",
                 _expiration_description(expiration_evidence),
-                "Sluit of actualiseer de vacature, verwijder de sollicitatie-CTA en werk het JobPosting-schema bij.",
+                (
+                    "Sluit of actualiseer de vacature, verwijder de sollicitatie-CTA en werk "
+                    "het JobPosting-schema bij."
+                ),
                 expiration_evidence,
             )
         )
@@ -145,7 +164,10 @@ def inspect_job_posting(
                     "internal_links",
                     "medium",
                     "Verlopen vacature heeft interne links",
-                    f"De verlopen vacature heeft nog {inbound_internal_links} interne verwijzingen.",
+                    (
+                        f"De verlopen vacature heeft nog {inbound_internal_links} "
+                        "interne verwijzingen."
+                    ),
                     "Verwijder of vervang interne links naar deze verlopen vacature.",
                     {"inbound_internal_links": inbound_internal_links},
                 )
@@ -197,7 +219,10 @@ def _google_for_jobs_signals(
                 "content",
                 "high",
                 "Vacature heeft geen herkenbare sollicitatiemogelijkheid",
-                "Op de vacaturepagina is geen herkenbare sollicitatie-CTA of sollicitatielink gevonden.",
+                (
+                    "Op de vacaturepagina is geen herkenbare sollicitatie-CTA of "
+                    "sollicitatielink gevonden."
+                ),
                 "Voeg een direct bereikbare sollicitatiemogelijkheid toe aan de vacaturepagina.",
                 {"source": "google_for_jobs"},
                 confidence="medium",
@@ -229,8 +254,10 @@ def _google_for_jobs_signals(
             )
         )
 
-    if page_url and JOB_URL_RE.search(urlsplit(page_url).path) and not JOB_DETAIL_URL_RE.search(
-        urlsplit(page_url).path
+    if (
+        page_url
+        and JOB_URL_RE.search(urlsplit(page_url).path)
+        and not JOB_DETAIL_URL_RE.search(urlsplit(page_url).path)
     ):
         signals.append(
             IssueSignal(
@@ -238,7 +265,10 @@ def _google_for_jobs_signals(
                 "structured_data",
                 "medium",
                 "JobPosting-schema staat niet op een individuele vacaturepagina",
-                "Google verwacht JobPosting-schema op een afzonderlijke detailpagina, niet op een vacature-overzicht.",
+                (
+                    "Google verwacht JobPosting-schema op een afzonderlijke detailpagina, "
+                    "niet op een vacature-overzicht."
+                ),
                 "Verplaats of beperk het JobPosting-schema tot individuele, actuele vacatures.",
                 {"source": "google_for_jobs", "page_url": page_url},
             )
@@ -253,7 +283,10 @@ def _google_for_jobs_signals(
                 "low",
                 "JobPosting mist aanbevolen velden",
                 f"Aanbevolen velden ontbreken: {', '.join(recommended)}.",
-                "Vul employmentType en een stabiele identifier aan voor vollediger vacature-schema.",
+                (
+                    "Vul employmentType en een stabiele identifier aan voor vollediger "
+                    "vacature-schema."
+                ),
                 {"missing_fields": recommended, "source": "google_for_jobs"},
             )
         )
@@ -331,9 +364,7 @@ def recognize_job_listing(
         sources.append("job_posting_schema")
     if JOB_DETAIL_URL_RE.search(path):
         sources.append("url_pattern")
-    visible_text = " ".join(
-        [title or "", *(headings or {}).get("h1", []), main_content or ""]
-    )
+    visible_text = " ".join([title or "", *(headings or {}).get("h1", []), main_content or ""])
     if JOB_TERMS_RE.search(visible_text):
         sources.append("page_text")
     if not sources or (not jobs and "url_pattern" not in sources):
@@ -493,7 +524,9 @@ def _expiration_description(evidence: dict[str, object]) -> str:
     if "validThrough" in evidence:
         details.append(f"validThrough ({evidence['validThrough']}) ligt in het verleden")
     if "visible_closing_date" in evidence:
-        details.append(f"zichtbare sluitingsdatum ({evidence['visible_closing_date']}) ligt in het verleden")
+        details.append(
+            f"zichtbare sluitingsdatum ({evidence['visible_closing_date']}) ligt in het verleden"
+        )
     if evidence.get("application_cta_active"):
         details.append("de sollicitatie-CTA is nog actief")
     return "; ".join(details) + "."

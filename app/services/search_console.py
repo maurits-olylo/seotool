@@ -49,6 +49,7 @@ async def sync_search_console(
         "https://www.googleapis.com/webmasters/v3/sites/"
         f"{quote(mapping.external_property_id, safe='')}/searchAnalytics/query"
     )
+
     async def fetch_rows(dimensions: list[str]) -> list[dict[str, object]]:
         rows: list[dict[str, object]] = []
         start_row = 0

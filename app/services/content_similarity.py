@@ -222,11 +222,7 @@ def _is_comparable(snapshot: UrlSnapshot) -> bool:
 
 
 def _is_indexable_page(snapshot: UrlSnapshot) -> bool:
-    if (
-        snapshot.status_code != 200
-        or snapshot.is_indexable is not True
-        or snapshot.redirect_chain
-    ):
+    if snapshot.status_code != 200 or snapshot.is_indexable is not True or snapshot.redirect_chain:
         return False
     if not snapshot.canonical:
         return True

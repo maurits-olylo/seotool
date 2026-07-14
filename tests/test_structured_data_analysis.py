@@ -22,9 +22,7 @@ def test_reports_breadcrumb_gap_only_when_site_consistently_uses_schema() -> Non
             db.add(_snapshot(url, run, has_breadcrumb=index < 3))
         db.flush()
 
-        found = analyze_breadcrumb_consistency(
-            db, website_id=website.id, crawl_run_id=run.id
-        )
+        found = analyze_breadcrumb_consistency(db, website_id=website.id, crawl_run_id=run.id)
 
         assert len(found) == 3
         assert {issue.issue_type for issue in found} == {"missing_breadcrumb_schema"}
@@ -36,9 +34,7 @@ def test_reports_breadcrumb_gap_only_when_site_consistently_uses_schema() -> Non
         db.flush()
 
         assert (
-            analyze_breadcrumb_consistency(
-                db, website_id=website.id, crawl_run_id=second_run.id
-            )
+            analyze_breadcrumb_consistency(db, website_id=website.id, crawl_run_id=second_run.id)
             == []
         )
         assert set(db.scalars(select(Issue.status))) == {"resolved"}

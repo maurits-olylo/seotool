@@ -19,7 +19,11 @@ def test_completed_history_sync_serializes_date_coverage() -> None:
         db.add(customer)
         db.flush()
         website = Website(client_id=customer.id, name="Example", base_url="https://example.com")
-        connection = IntegrationConnection(client_id=customer.id, provider="google", status="connected")
+        connection = IntegrationConnection(
+            client_id=customer.id,
+            provider="google",
+            status="connected",
+        )
         db.add_all([website, connection])
         db.flush()
         db.add_all(
@@ -65,4 +69,6 @@ def test_completed_history_sync_serializes_date_coverage() -> None:
             "gsc_query_from": "2026-01-03",
             "ga4_from": "2026-01-04",
         }
-        assert all(mapping.settings["history_sync"]["status"] == "succeeded" for mapping in mappings)
+        assert all(
+            mapping.settings["history_sync"]["status"] == "succeeded" for mapping in mappings
+        )

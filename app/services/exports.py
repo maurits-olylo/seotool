@@ -231,9 +231,7 @@ def _datasets(db: Session, website_id: object) -> dict[str, tuple[list[str], lis
                     listing.current_status_code,
                     listing.is_indexable,
                     listing.inbound_internal_links,
-                    " | ".join(
-                        issue.title for issue in job_issues_by_url.get(listing.url_id, [])
-                    ),
+                    " | ".join(issue.title for issue in job_issues_by_url.get(listing.url_id, [])),
                     listing.first_detected_at,
                     listing.last_detected_at,
                 ]

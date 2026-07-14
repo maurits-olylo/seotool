@@ -9,9 +9,7 @@ from app.services.technical_checks import IssueSignal
 CONTEXTUAL_404_TYPES = {"http_404", "internally_linked_404", "sitemap_404"}
 
 
-def classify_404_issues(
-    db: Session, *, website_id: object, crawl_run_id: object
-) -> None:
+def classify_404_issues(db: Session, *, website_id: object, crawl_run_id: object) -> None:
     urls = list(
         db.scalars(
             select(Url).where(
@@ -22,13 +20,16 @@ def classify_404_issues(
         )
     )
     for url in urls:
-        incoming_links = db.scalar(
-            select(func.count(UrlLink.id)).where(
-                UrlLink.crawl_run_id == crawl_run_id,
-                UrlLink.target_url_id == url.id,
-                UrlLink.is_internal.is_(True),
+        incoming_links = (
+            db.scalar(
+                select(func.count(UrlLink.id)).where(
+                    UrlLink.crawl_run_id == crawl_run_id,
+                    UrlLink.target_url_id == url.id,
+                    UrlLink.is_internal.is_(True),
+                )
             )
-        ) or 0
+            or 0
+        )
         in_sitemap = db.scalar(
             select(UrlSource.id).where(
                 UrlSource.url_id == url.id,

@@ -40,9 +40,7 @@ def _ensure_unique_client(
     if duplicate:
         raise HTTPException(status_code=409, detail="Er bestaat al een klant met deze naam")
     if internal_reference:
-        reference_query = select(Client.id).where(
-            Client.internal_reference == internal_reference
-        )
+        reference_query = select(Client.id).where(Client.internal_reference == internal_reference)
         if exclude_client_id:
             reference_query = reference_query.where(Client.id != exclude_client_id)
         if db.scalar(reference_query):

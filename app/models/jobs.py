@@ -1,7 +1,17 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -17,9 +27,7 @@ class JobListing(UUIDTimestampMixin, Base):
     website_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("websites.id", ondelete="CASCADE"), index=True
     )
-    url_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("urls.id", ondelete="CASCADE"), index=True
-    )
+    url_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("urls.id", ondelete="CASCADE"), index=True)
     latest_snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("url_snapshots.id", ondelete="SET NULL"), index=True
     )

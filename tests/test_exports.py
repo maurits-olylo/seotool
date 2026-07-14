@@ -178,8 +178,6 @@ def test_datasets_include_human_readable_urls() -> None:
         assert datasets["vacancies"][1][0][5] == "error"
         assert datasets["vacancies"][1][0][15] == "Vacature mist JobPosting-schema"
         assert all(
-            not header.endswith("_id")
-            for headers, _ in datasets.values()
-            for header in headers
+            not header.endswith("_id") for headers, _ in datasets.values() for header in headers
         )
         assert len(datasets["links"][1]) == 1

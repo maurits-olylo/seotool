@@ -50,13 +50,16 @@ def analyze_snapshot(db: Session, snapshot: UrlSnapshot) -> None:
             )
         )
     signals = inspect_snapshot(snapshot)
-    inbound_internal_links = db.scalar(
-        select(func.count(UrlLink.id)).where(
-            UrlLink.crawl_run_id == snapshot.crawl_run_id,
-            UrlLink.target_url_id == url.id,
-            UrlLink.is_internal.is_(True),
+    inbound_internal_links = (
+        db.scalar(
+            select(func.count(UrlLink.id)).where(
+                UrlLink.crawl_run_id == snapshot.crawl_run_id,
+                UrlLink.target_url_id == url.id,
+                UrlLink.is_internal.is_(True),
+            )
         )
-    ) or 0
+        or 0
+    )
     application_url = db.scalar(
         select(UrlLink.target_url).where(
             UrlLink.crawl_run_id == snapshot.crawl_run_id,

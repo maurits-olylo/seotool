@@ -73,9 +73,7 @@ def _delta(current: float, previous: float) -> float | None:
     return round((current - previous) / previous * 100, 1)
 
 
-def _available_periods(
-    end: date, source_dates: list[date]
-) -> list[Period]:
+def _available_periods(end: date, source_dates: list[date]) -> list[Period]:
     """Only offer periods that have a complete preceding comparison window."""
     if not source_dates:
         return []
@@ -88,9 +86,7 @@ def _available_periods(
     return available
 
 
-def _totals(
-    daily: dict[date, dict[str, float]], start: date, end: date
-) -> dict[str, float]:
+def _totals(daily: dict[date, dict[str, float]], start: date, end: date) -> dict[str, float]:
     result: dict[str, float] = defaultdict(float)
     weighted_position = 0.0
     for metric_date, values in daily.items():
@@ -247,12 +243,15 @@ def build_client_report(
             .order_by(func.count(Change.id).desc())
         )
     }
-    completed = db.scalar(
-        select(func.count(Issue.id)).where(
-            Issue.website_id == website_id,
-            (Issue.resolved_at >= start_at) | (Issue.verified_at >= start_at),
+    completed = (
+        db.scalar(
+            select(func.count(Issue.id)).where(
+                Issue.website_id == website_id,
+                (Issue.resolved_at >= start_at) | (Issue.verified_at >= start_at),
+            )
         )
-    ) or 0
+        or 0
+    )
     activities = list(
         db.scalars(
             select(ActivityLog)

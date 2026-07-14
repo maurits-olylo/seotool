@@ -64,9 +64,7 @@ def test_detects_redirect_deep_page_and_weakly_linked_important_page() -> None:
         )
         db.flush()
 
-        found = analyze_internal_link_quality(
-            db, website_id=website.id, crawl_run_id=run.id
-        )
+        found = analyze_internal_link_quality(db, website_id=website.id, crawl_run_id=run.id)
 
         assert {issue.issue_type for issue in found} == {
             "deep_page",
@@ -113,9 +111,7 @@ def test_detects_redirect_deep_page_and_weakly_linked_important_page() -> None:
         db.flush()
 
         assert (
-            analyze_internal_link_quality(
-                db, website_id=website.id, crawl_run_id=second_run.id
-            )
+            analyze_internal_link_quality(db, website_id=website.id, crawl_run_id=second_run.id)
             == []
         )
         assert set(db.scalars(select(Issue.status))) == {"resolved"}

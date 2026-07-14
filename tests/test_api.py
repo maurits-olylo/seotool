@@ -207,18 +207,24 @@ def test_client_role_is_report_only(client: TestClient) -> None:
     from app.main import app
 
     browser = TestClient(app)
-    assert browser.post(
-        "/ui/login",
-        json={"email": "client@example.com", "password": "client-secure-password"},
-    ).status_code == 204
+    assert (
+        browser.post(
+            "/ui/login",
+            json={"email": "client@example.com", "password": "client-secure-password"},
+        ).status_code
+        == 204
+    )
     assert browser.get(f"/api/v1/websites/{website_id}/issues").status_code == 200
-    assert browser.patch(
-        f"/api/v1/issues/{issue_id}", json={"status": "planned"}
-    ).status_code == 403
-    assert browser.post(
-        "/api/v1/exports",
-        json={"website_id": str(website_id), "export_type": "excel"},
-    ).status_code == 403
+    assert (
+        browser.patch(f"/api/v1/issues/{issue_id}", json={"status": "planned"}).status_code == 403
+    )
+    assert (
+        browser.post(
+            "/api/v1/exports",
+            json={"website_id": str(website_id), "export_type": "excel"},
+        ).status_code
+        == 403
+    )
 
 
 def test_admin_can_manage_other_client_members(client: TestClient) -> None:
@@ -257,23 +263,29 @@ def test_admin_can_manage_other_client_members(client: TestClient) -> None:
     from app.main import app
 
     browser = TestClient(app)
-    assert browser.post(
-        "/ui/login",
-        json={"email": "admin@example.com", "password": "Admin-secure-password-1!"},
-    ).status_code == 204
+    assert (
+        browser.post(
+            "/ui/login",
+            json={"email": "admin@example.com", "password": "Admin-secure-password-1!"},
+        ).status_code
+        == 204
+    )
     upgraded = browser.patch(
         f"/api/v1/clients/{customer['id']}/members/{member_id}",
         json={"role": "user"},
     )
     assert upgraded.status_code == 200
     assert upgraded.json()["client_role"] == "user"
-    assert browser.patch(
-        f"/api/v1/clients/{customer['id']}/members/{admin_id}",
-        json={"role": "client"},
-    ).status_code == 409
-    assert browser.delete(
-        f"/api/v1/clients/{customer['id']}/members/{member_id}"
-    ).status_code == 204
+    assert (
+        browser.patch(
+            f"/api/v1/clients/{customer['id']}/members/{admin_id}",
+            json={"role": "client"},
+        ).status_code
+        == 409
+    )
+    assert (
+        browser.delete(f"/api/v1/clients/{customer['id']}/members/{member_id}").status_code == 204
+    )
     with SessionLocal() as db:
         removed = db.get(User, member_id)
         assert removed and removed.is_active is False

@@ -83,18 +83,14 @@ def test_adds_sitemap_and_performance_context_to_indexation_issues() -> None:
             checked_issue_types={"unexpected_noindex"},
         )
 
-        found = analyze_indexation_consistency(
-            db, website_id=website.id, crawl_run_id=run.id
-        )
+        found = analyze_indexation_consistency(db, website_id=website.id, crawl_run_id=run.id)
 
         assert {issue.issue_type for issue in found} == {
             "canonical_other_url",
             "sitemap_redirect",
             "unexpected_noindex",
         }
-        noindex_issue = db.scalar(
-            select(Issue).where(Issue.issue_type == "unexpected_noindex")
-        )
+        noindex_issue = db.scalar(select(Issue).where(Issue.issue_type == "unexpected_noindex"))
         assert noindex_issue is not None
         assert noindex_issue.severity == "high"
         assert noindex_issue.title == "Belangrijke pagina is niet indexeerbaar"
