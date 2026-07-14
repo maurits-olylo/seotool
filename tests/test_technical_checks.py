@@ -32,13 +32,44 @@ def test_detects_onpage_and_indexation_signals() -> None:
         redirect_chain=[],
     )
     types = {signal.issue_type for signal in inspect_snapshot(snapshot)}
-    assert types == {
-        "missing_title",
-        "missing_meta_description",
-        "missing_h1",
-        "unexpected_noindex",
-        "canonical_other_url",
-    }
+    assert types == {"canonical_other_url"}
+
+
+def test_ignores_onpage_signals_for_intentionally_non_indexable_page() -> None:
+    snapshot = UrlSnapshot(
+        requested_url="https://example.com/account/login",
+        final_url="https://example.com/account/login",
+        status_code=200,
+        title=None,
+        meta_description=None,
+        headings={"h1": ["Login", "Account"]},
+        word_count=20,
+        is_indexable=False,
+        meta_robots="noindex,follow",
+        redirect_chain=[],
+    )
+
+    types = {signal.issue_type for signal in inspect_snapshot(snapshot)}
+
+    assert types == set()
+
+
+def test_keeps_onpage_signals_for_indexable_page() -> None:
+    snapshot = UrlSnapshot(
+        requested_url="https://example.com/services/seo",
+        final_url="https://example.com/services/seo",
+        status_code=200,
+        title=None,
+        meta_description=None,
+        headings={"h1": []},
+        word_count=200,
+        is_indexable=True,
+        redirect_chain=[],
+    )
+
+    types = {signal.issue_type for signal in inspect_snapshot(snapshot)}
+
+    assert types == {"missing_title", "missing_meta_description", "missing_h1"}
 
 
 def test_reports_limited_content_only_for_indexable_content_pages() -> None:

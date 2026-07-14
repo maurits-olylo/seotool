@@ -75,3 +75,15 @@ Besluit: releases worden lokaal met `git archive` gemaakt, met SHA-256 gecontrol
 
 Gevolg: ieder deploymentadvies vermeldt volledig pakketpad, checksum, migrationstatus en alleen de
 geraakte containers.
+
+## 2026-07-14 — Onpage- en noindex-issues vereisen indexatiecontext
+
+Context: bewust niet-indexeerbare login-, filter- en hulppagina's veroorzaakten onnodige meldingen
+over ontbrekende metadata, koppen en noindex-instructies.
+
+Besluit: onpage-controles voor title, meta description en H1 gelden alleen voor indexeerbare
+200-pagina's. Een noindex wordt alleen als onverwacht issue gemeld wanneer de URL in de actuele
+sitemap staat of aantoonbare recente organische waarde heeft.
+
+Gevolg: de actielijst bevat minder ruis, terwijl belangrijke pagina's met een onbedoelde noindex
+met hoge urgentie gemeld blijven worden.

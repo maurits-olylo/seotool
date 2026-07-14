@@ -23,7 +23,6 @@ SNAPSHOT_ISSUE_TYPES = {
     "missing_h1",
     "multiple_h1",
     "thin_content",
-    "unexpected_noindex",
     "canonical_other_url",
     "conflicting_robots",
     "invalid_json_ld",
@@ -92,7 +91,8 @@ def inspect_snapshot(snapshot: UrlSnapshot) -> list[IssueSignal]:
         )
     if snapshot.redirect_chain:
         return signals
-    if status == 200 and not snapshot.title:
+    inspect_onpage = status == 200 and snapshot.is_indexable is not False
+    if inspect_onpage and not snapshot.title:
         signals.append(
             _signal(
                 "missing_title",
@@ -102,7 +102,7 @@ def inspect_snapshot(snapshot: UrlSnapshot) -> list[IssueSignal]:
                 "Voeg een unieke, beschrijvende title toe.",
             )
         )
-    if status == 200 and not snapshot.meta_description:
+    if inspect_onpage and not snapshot.meta_description:
         signals.append(
             _signal(
                 "missing_meta_description",
@@ -113,11 +113,11 @@ def inspect_snapshot(snapshot: UrlSnapshot) -> list[IssueSignal]:
             )
         )
     h1_values = (snapshot.headings or {}).get("h1", [])
-    if status == 200 and not h1_values:
+    if inspect_onpage and not h1_values:
         signals.append(
             _signal("missing_h1", "onpage", "medium", "H1 ontbreekt", "Voeg één duidelijke H1 toe.")
         )
-    elif len(h1_values) > 1:
+    elif inspect_onpage and len(h1_values) > 1:
         signals.append(
             _signal(
                 "multiple_h1",
@@ -144,17 +144,6 @@ def inspect_snapshot(snapshot: UrlSnapshot) -> list[IssueSignal]:
                 threshold=THIN_CONTENT_WORD_LIMIT,
                 content_level="nearly_empty" if nearly_empty else "limited",
                 confidence="medium",
-            )
-        )
-    if status == 200 and snapshot.is_indexable is False:
-        signals.append(
-            _signal(
-                "unexpected_noindex",
-                "indexation",
-                "medium",
-                "Pagina heeft een noindex-instructie",
-                "Controleer of de noindex bewust is en verwijder hem wanneer de pagina "
-                "organisch vindbaar moet zijn.",
             )
         )
     if (

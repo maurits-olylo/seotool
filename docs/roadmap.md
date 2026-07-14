@@ -6,7 +6,7 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 
 ## Huidige status
 
-- Actieve ontwikkellijn: fase 3 — tweede-klantvalidatie.
+- Actieve ontwikkellijn: fase 4 — resterende SEO-functionaliteit.
 - Productie: `https://seo.thact.nl` op Synology NAS `192.168.2.20`.
 - Laatste afgeronde kwaliteitscontrole: 124 tests, Ruff en JavaScript-syntax geslaagd.
 - Open productiecontrole fase 1: bevestigen dat `jobsatpearle.be` na de lopende crawl niet meer als
@@ -52,7 +52,7 @@ gebruiker geen websites, URL's, crawls, issues of rapportages van een andere kla
 
 ## Fase 4 — Resterende SEO-functionaliteit
 
-Status: deels aanwezig, verdere validatie gepland.
+Status: in uitvoering.
 
 - Thin-contentdetectie en ruisarme wijzigingsdetectie aanscherpen.
 - Verouderde content buiten vacatures toevoegen met voorzichtige signalering.
