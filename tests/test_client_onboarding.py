@@ -1,5 +1,6 @@
 import pytest
 from fastapi import HTTPException
+from pydantic import ValidationError
 from sqlalchemy import func, select
 
 from app.api.routes.clients import onboard_client
@@ -39,3 +40,37 @@ def test_onboarding_rejects_duplicate_client_name() -> None:
         with pytest.raises(HTTPException) as exc_info:
             onboard_client(payload, db, principal)
         assert exc_info.value.status_code == 409
+
+
+def test_onboarding_normalizes_names_references_and_duplicate_whitespace() -> None:
+    principal = Principal(user_id=None, role="superuser", is_api_key=True)
+    first = ClientOnboardingCreate(
+        name="  Acme  ",
+        internal_reference="  acme-1  ",
+        website_name="  Corporate site  ",
+        base_url="https://www.example.com/",
+    )
+    duplicate = ClientOnboardingCreate(
+        name="Acme ",
+        internal_reference="   ",
+        website_name="Another site",
+        base_url="https://example.org/",
+    )
+    assert first.name == "Acme"
+    assert first.internal_reference == "acme-1"
+    assert first.website_name == "Corporate site"
+    assert duplicate.internal_reference is None
+
+    with SessionLocal() as db:
+        onboard_client(first, db, principal)
+        with pytest.raises(HTTPException) as exc_info:
+            onboard_client(duplicate, db, principal)
+        assert exc_info.value.status_code == 409
+
+
+def test_client_update_rejects_null_or_whitespace_name() -> None:
+    from app.schemas.client import ClientUpdate
+
+    for invalid_name in (None, "   "):
+        with pytest.raises(ValidationError):
+            ClientUpdate(name=invalid_name)
