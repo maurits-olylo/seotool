@@ -165,6 +165,63 @@ def test_user_only_sees_assigned_client_and_cannot_start_crawl(client: TestClien
     assert denied.status_code == 403
 
 
+def test_user_cannot_access_another_clients_website_data(client: TestClient) -> None:
+    assigned = client.post("/api/v1/clients", json={"name": "Visible customer"}).json()
+    hidden = client.post("/api/v1/clients", json={"name": "Private customer"}).json()
+    visible_website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": assigned["id"],
+            "name": "Visible site",
+            "base_url": "https://visible.example.com",
+        },
+    ).json()
+    hidden_website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": hidden["id"],
+            "name": "Private site",
+            "base_url": "https://private.example.com",
+        },
+    ).json()
+    with SessionLocal() as db:
+        user = User(
+            email="isolated@example.com",
+            role="user",
+            password_hash=hash_password("isolated-secure-password"),
+        )
+        db.add(user)
+        db.flush()
+        db.add(ClientMembership(user_id=user.id, client_id=UUID(assigned["id"]), role="user"))
+        db.commit()
+
+    from app.main import app
+
+    browser = TestClient(app)
+    assert (
+        browser.post(
+            "/ui/login",
+            json={"email": "isolated@example.com", "password": "isolated-secure-password"},
+        ).status_code
+        == 204
+    )
+    websites = browser.get("/api/v1/websites")
+    assert websites.status_code == 200
+    assert [website["id"] for website in websites.json()] == [visible_website["id"]]
+
+    hidden_website_id = hidden_website["id"]
+    protected_paths = [
+        f"/api/v1/websites/{hidden_website_id}",
+        f"/api/v1/websites/{hidden_website_id}/settings",
+        f"/api/v1/websites/{hidden_website_id}/urls",
+        f"/api/v1/websites/{hidden_website_id}/crawl-runs",
+        f"/api/v1/websites/{hidden_website_id}/issues",
+        f"/api/v1/websites/{hidden_website_id}/client-report",
+    ]
+    for path in protected_paths:
+        assert browser.get(path).status_code == 403, path
+
+
 def test_client_role_is_report_only(client: TestClient) -> None:
     customer = client.post("/api/v1/clients", json={"name": "Report customer"}).json()
     website = client.post(

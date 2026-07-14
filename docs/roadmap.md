@@ -6,7 +6,7 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 
 ## Huidige status
 
-- Actieve ontwikkellijn: fase 2 — onboarding en Organisatie-UI.
+- Actieve ontwikkellijn: fase 3 — tweede-klantvalidatie.
 - Productie: `https://seo.thact.nl` op Synology NAS `192.168.2.20`.
 - Laatste afgeronde kwaliteitscontrole: 124 tests, Ruff en JavaScript-syntax geslaagd.
 - Open productiecontrole fase 1: bevestigen dat `jobsatpearle.be` na de lopende crawl niet meer als
@@ -30,7 +30,7 @@ Acceptatie:
 
 ## Fase 2 — Onboarding en Organisatie-UI
 
-Status: in uitvoering.
+Status: afgerond en gedeployed.
 
 - Klant en eerste website atomair aanmaken.
 - Website-instellingen onderdeel maken van onboarding.
@@ -42,10 +42,13 @@ Status: in uitvoering.
 
 ## Fase 3 — Tweede-klantvalidatie
 
-Status: gepland.
+Status: in uitvoering.
 
 Gebruik `werkenbijgrandvision.nl` als praktijktest voor onboarding, crawl, issues, vacatures,
 integraties, exports, rapportage en rollen. Los uitsluitend reproduceerbare multi-clientproblemen op.
+
+Validatie omvat zowel productiecontroles als geautomatiseerde regressietests die aantonen dat een
+gebruiker geen websites, URL's, crawls, issues of rapportages van een andere klant kan benaderen.
 
 ## Fase 4 — Resterende SEO-functionaliteit
 
