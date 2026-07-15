@@ -541,6 +541,19 @@ async function syncGa4() {
   finally { button.disabled = false; }
 }
 
+async function syncBing() {
+  const websiteId = $("#website-select").value;
+  const button = $("#sync-bing"); const message = $("#bing-property-message");
+  if (!websiteId) return;
+  button.disabled = true; button.textContent = "Importeren…"; message.textContent = "";
+  try {
+    const result = await api(`/api/v1/websites/${websiteId}/integrations/bing_webmaster/sync`, {method: "POST"});
+    message.textContent = `${result.page_rows} pagina-regels en ${result.query_rows} zoektermregels geïmporteerd; ${result.matched_urls} gekoppeld aan URL’s.`;
+    button.textContent = "Opnieuw synchroniseren";
+  } catch (error) { message.textContent = "Bing-import is mislukt."; button.textContent = "Opnieuw proberen"; }
+  finally { button.disabled = false; }
+}
+
 async function syncIntegrationHistory() {
   const websiteId = $("#website-select").value;
   const button = $("#sync-integration-history"); const message = $("#integration-history-message");
@@ -554,7 +567,7 @@ async function syncIntegrationHistory() {
 }
 
 function historyCoverageText(coverage = {}) {
-  const ranges = [["GSC", coverage.gsc_from, coverage.gsc_through], ["GSC-zoekopdrachten", coverage.gsc_query_from, coverage.gsc_query_through], ["GA4", coverage.ga4_from, coverage.ga4_through]]
+  const ranges = [["GSC", coverage.gsc_from, coverage.gsc_through], ["GSC-zoekopdrachten", coverage.gsc_query_from, coverage.gsc_query_through], ["GA4", coverage.ga4_from, coverage.ga4_through], ["Bing", coverage.bing_from, coverage.bing_through]]
     .filter(([, from]) => from)
     .map(([source, from, through]) => `${source}: ${new Date(from).toLocaleDateString("nl-NL")} – ${new Date(through).toLocaleDateString("nl-NL")}`);
   return ranges.join(" · ");
@@ -1294,6 +1307,7 @@ $("#save-ga4-key-events").addEventListener("click", saveGa4KeyEvents);
 $("#save-bing").addEventListener("click", () => saveProperty("bing_webmaster", "#bing-property", "#save-bing", "#bing-property-message", state.bingConnectionId));
 $("#sync-search-console").addEventListener("click", syncSearchConsole);
 $("#sync-ga4").addEventListener("click", syncGa4);
+$("#sync-bing").addEventListener("click", syncBing);
 $("#sync-integration-history").addEventListener("click", syncIntegrationHistory);
 
 api("/api/v1/me").then((user) => {

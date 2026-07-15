@@ -8,11 +8,13 @@ from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
 from app.models.integrations import (
+    BingPageMetric,
     GoogleAnalyticsMetric,
     SearchConsoleMetric,
     SearchConsoleQueryMetric,
     WebsiteIntegration,
 )
+from app.services.bing_integrations import sync_bing_webmaster
 from app.services.google_analytics import sync_google_analytics
 from app.services.search_console import sync_search_console
 
@@ -34,7 +36,7 @@ async def _synchronize_website_integrations(website_id: UUID, days: int | None =
             db.scalars(
                 select(WebsiteIntegration.service).where(
                     WebsiteIntegration.website_id == website_id,
-                    WebsiteIntegration.service.in_(["search_console", "ga4"]),
+                    WebsiteIntegration.service.in_(["search_console", "ga4", "bing_webmaster"]),
                 )
             )
         )
@@ -53,6 +55,13 @@ async def _synchronize_website_integrations(website_id: UUID, days: int | None =
             except Exception as exc:
                 logger.exception("ga4_sync_failed", website_id=str(website_id))
                 errors.append(f"GA4: {exc}")
+        if "bing_webmaster" in services:
+            try:
+                result = await sync_bing_webmaster(db, website_id, days)
+                logger.info("bing_sync_succeeded", website_id=str(website_id), **result)
+            except Exception as exc:
+                logger.exception("bing_sync_failed", website_id=str(website_id))
+                errors.append(f"Bing: {exc}")
         if errors:
             message = "; ".join(errors)
             _set_history_sync_status(db, website_id, "failed", days=days, error=message)
@@ -68,17 +77,17 @@ def _set_history_sync_status(
     days: int | None,
     error: str | None = None,
 ) -> None:
-    """Persist queue state on both Google mappings so it survives a browser refresh."""
+    """Persist queue state on all mapped data sources so it survives a browser refresh."""
     mappings = list(
         db.scalars(
             select(WebsiteIntegration).where(
                 WebsiteIntegration.website_id == website_id,
-                WebsiteIntegration.service.in_(["search_console", "ga4"]),
+                WebsiteIntegration.service.in_(["search_console", "ga4", "bing_webmaster"]),
             )
         )
     )
     now = datetime.now(UTC).isoformat()
-    coverage = {
+    coverage: dict[str, str | None] = {
         "gsc_from": _date_as_iso(
             db.scalar(
                 select(func.min(SearchConsoleMetric.date)).where(
@@ -101,6 +110,14 @@ def _set_history_sync_status(
             )
         ),
     }
+    if any(mapping.service == "bing_webmaster" for mapping in mappings):
+        coverage["bing_from"] = _date_as_iso(
+            db.scalar(
+                select(func.min(BingPageMetric.date)).where(
+                    BingPageMetric.website_id == website_id
+                )
+            )
+        )
     for mapping in mappings:
         previous = dict(mapping.settings.get("history_sync", {}))
         details = {

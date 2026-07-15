@@ -15,6 +15,7 @@ from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.client import Client
 from app.models.integrations import (
+    BingPageMetric,
     GoogleAnalyticsEventMetric,
     GoogleAnalyticsMetric,
     IntegrationConnection,
@@ -35,7 +36,7 @@ from app.schemas.integrations import (
     WebsiteIntegrationUpsert,
 )
 from app.services.authorization import require_client_access, require_website_access
-from app.services.bing_integrations import BING_TOKEN_URL, list_bing_sites
+from app.services.bing_integrations import BING_TOKEN_URL, list_bing_sites, sync_bing_webmaster
 from app.services.google_analytics import sync_google_analytics
 from app.services.google_integrations import list_google_properties
 from app.services.oauth import (
@@ -469,7 +470,7 @@ def synchronize_integration_history(
         db.scalars(
             select(WebsiteIntegration).where(
                 WebsiteIntegration.website_id == website_id,
-                WebsiteIntegration.service.in_(["search_console", "ga4"]),
+                WebsiteIntegration.service.in_(["search_console", "ga4", "bing_webmaster"]),
             )
         )
     )
@@ -500,13 +501,13 @@ def integration_history_status(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> dict[str, object]:
-    """Return durable import state plus the imported GSC and GA4 date ranges."""
+    """Return durable import state plus the imported data-source date ranges."""
     require_website_access(db, principal, website_id, admin=True)
     mappings = list(
         db.scalars(
             select(WebsiteIntegration).where(
                 WebsiteIntegration.website_id == website_id,
-                WebsiteIntegration.service.in_(["search_console", "ga4"]),
+                WebsiteIntegration.service.in_(["search_console", "ga4", "bing_webmaster"]),
             )
         )
     )
@@ -556,6 +557,16 @@ def integration_history_status(
                     GoogleAnalyticsMetric.website_id == website_id
                 )
             ),
+            "bing_from": db.scalar(
+                select(func.min(BingPageMetric.date)).where(
+                    BingPageMetric.website_id == website_id
+                )
+            ),
+            "bing_through": db.scalar(
+                select(func.max(BingPageMetric.date)).where(
+                    BingPageMetric.website_id == website_id
+                )
+            ),
         },
     }
 
@@ -584,5 +595,19 @@ async def synchronize_google_analytics(
     require_website_access(db, principal, website_id, admin=True)
     try:
         return await sync_google_analytics(db, website_id, days)
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.post("/websites/{website_id}/integrations/bing_webmaster/sync")
+async def synchronize_bing_webmaster(
+    website_id: UUID,
+    days: int = Query(default=480, ge=1, le=480),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, object]:
+    require_website_access(db, principal, website_id, admin=True)
+    try:
+        return await sync_bing_webmaster(db, website_id, days)
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc

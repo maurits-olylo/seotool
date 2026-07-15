@@ -3,6 +3,8 @@ from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url, UrlSource
 from app.models.exports import Export
 from app.models.integrations import (
+    BingPageMetric,
+    BingQueryMetric,
     GoogleAnalyticsEventMetric,
     GoogleAnalyticsLandingPageEventMetric,
     GoogleAnalyticsMetric,
@@ -33,6 +35,8 @@ __all__ = [
     "JobListing",
     "MonthlyReportSnapshot",
     "IntegrationConnection",
+    "BingPageMetric",
+    "BingQueryMetric",
     "GoogleAnalyticsMetric",
     "GoogleAnalyticsEventMetric",
     "GoogleAnalyticsLandingPageEventMetric",

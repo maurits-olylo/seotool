@@ -4,6 +4,7 @@ from app.db.session import SessionLocal
 from app.models.client import Client
 from app.models.discovery import Url
 from app.models.integrations import (
+    BingPageMetric,
     GoogleAnalyticsLandingPageEventMetric,
     GoogleAnalyticsMetric,
     IntegrationConnection,
@@ -106,6 +107,69 @@ def test_consultant_insights_find_page_decline_and_conversion_gap() -> None:
     assert insights["conversion"][0]["type"] == "traffic_without_leads"
     assert insights["conversion"][0]["url"] == "https://example.com/landing"
     assert insights["conversion_context"]["configured"] is True
+
+
+def test_consultant_insights_show_bing_decline_with_explicit_source() -> None:
+    with SessionLocal() as db:
+        customer = Client(name="Bing insights")
+        website = Website(
+            client=customer,
+            name="Example",
+            base_url="https://example.com",
+        )
+        db.add(website)
+        db.flush()
+        page_url = "https://example.com/bing-page"
+        db.add_all(
+            [
+                BingPageMetric(
+                    website_id=website.id,
+                    date=date(2026, 1, 10),
+                    page_url=page_url,
+                    clicks=12,
+                    impressions=300,
+                    average_click_position=4,
+                    average_impression_position=5,
+                ),
+                BingPageMetric(
+                    website_id=website.id,
+                    date=date(2026, 2, 10),
+                    page_url=page_url,
+                    clicks=3,
+                    impressions=80,
+                    average_click_position=9,
+                    average_impression_position=10,
+                ),
+            ]
+        )
+        db.commit()
+
+        insights = build_consultant_insights(
+            db,
+            website.id,
+            date(2026, 2, 1),
+            date(2026, 2, 28),
+            date(2026, 1, 1),
+            date(2026, 1, 31),
+        )
+
+    assert insights["search"] == [
+        {
+            "type": "declining_bing_page",
+            "source": "Bing Webmaster Tools",
+            "title": "Landingspagina verliest zichtbaarheid in Bing",
+            "description": "Klikken: 12 → 3; vertoningen: 300 → 80.",
+            "url": page_url,
+            "previous_clicks": 12.0,
+            "clicks": 3.0,
+            "previous_impressions": 300,
+            "impressions": 80,
+            "recommended_action": (
+                "Vergelijk indexatie, positie en paginawijzigingen in Bing met Google voordat "
+                "je een zoekmachine-specifieke oorzaak concludeert."
+            ),
+        }
+    ]
 
 
 def test_consultant_insights_find_declining_qualified_lead_rate() -> None:

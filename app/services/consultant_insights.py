@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.discovery import Url
 from app.models.integrations import (
+    BingPageMetric,
     GoogleAnalyticsLandingPageEventMetric,
     GoogleAnalyticsMetric,
     SearchConsoleMetric,
@@ -108,6 +109,72 @@ def _page_declines(
             }
         )
     return result
+
+
+def _bing_page_declines(
+    db: Session,
+    website_id: UUID,
+    start: date,
+    end: date,
+    previous_start: date,
+    previous_end: date,
+) -> list[dict[str, object]]:
+    current: dict[str, PagePerformance] = defaultdict(PagePerformance)
+    previous: dict[str, PagePerformance] = defaultdict(PagePerformance)
+    rows = db.execute(
+        select(
+            BingPageMetric.date,
+            BingPageMetric.page_url,
+            BingPageMetric.clicks,
+            BingPageMetric.impressions,
+        ).where(
+            BingPageMetric.website_id == website_id,
+            BingPageMetric.date >= previous_start,
+            BingPageMetric.date <= end,
+        )
+    )
+    for metric_date, page_url, clicks, impressions in rows:
+        target = current if start <= metric_date <= end else previous
+        totals = target[str(page_url)]
+        totals.clicks += float(clicks or 0)
+        totals.impressions += int(impressions or 0)
+
+    candidates: list[tuple[float, str, PagePerformance, PagePerformance]] = []
+    for page_url, old in previous.items():
+        new = current[page_url]
+        clicks_declined = old.clicks >= 5 and new.clicks <= old.clicks * 0.5
+        impressions_declined = old.impressions >= 100 and new.impressions <= old.impressions * 0.5
+        if clicks_declined or impressions_declined:
+            candidates.append(
+                (
+                    old.clicks - new.clicks + (old.impressions - new.impressions) / 1000,
+                    page_url,
+                    old,
+                    new,
+                )
+            )
+
+    return [
+        {
+            "type": "declining_bing_page",
+            "source": "Bing Webmaster Tools",
+            "title": "Landingspagina verliest zichtbaarheid in Bing",
+            "description": (
+                f"Klikken: {old.clicks:,.0f} → {new.clicks:,.0f}; "
+                f"vertoningen: {old.impressions:,} → {new.impressions:,}."
+            ),
+            "url": page_url,
+            "previous_clicks": round(old.clicks, 1),
+            "clicks": round(new.clicks, 1),
+            "previous_impressions": old.impressions,
+            "impressions": new.impressions,
+            "recommended_action": (
+                "Vergelijk indexatie, positie en paginawijzigingen in Bing met Google voordat "
+                "je een zoekmachine-specifieke oorzaak concludeert."
+            ),
+        }
+        for _, page_url, old, new in sorted(candidates, reverse=True)[:5]
+    ]
 
 
 def _conversion_opportunities(
@@ -283,6 +350,9 @@ def build_consultant_insights(
         )
     ]
     search_insights.extend(_page_declines(db, website_id, start, end, previous_start, previous_end))
+    search_insights.extend(
+        _bing_page_declines(db, website_id, start, end, previous_start, previous_end)
+    )
     conversion, conversion_context = _conversion_opportunities(
         db,
         website_id,

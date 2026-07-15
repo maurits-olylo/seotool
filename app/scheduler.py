@@ -75,7 +75,7 @@ def schedule_integration_syncs() -> int:
         website_ids = set(
             db.scalars(
                 select(WebsiteIntegration.website_id).where(
-                    WebsiteIntegration.service.in_(["search_console", "ga4"]),
+                    WebsiteIntegration.service.in_(["search_console", "ga4", "bing_webmaster"]),
                     WebsiteIntegration.status.in_(["active", "error"]),
                 )
             )
@@ -85,12 +85,16 @@ def schedule_integration_syncs() -> int:
                 db.scalars(
                     select(WebsiteIntegration).where(
                         WebsiteIntegration.website_id == website_id,
-                        WebsiteIntegration.service.in_(["search_console", "ga4"]),
+                        WebsiteIntegration.service.in_(["search_console", "ga4", "bing_webmaster"]),
                     )
                 )
             )
             last_synced = [item.last_synced_at for item in mappings if item.last_synced_at]
-            if last_synced and min(last_synced) > now - timedelta(days=1):
+            if (
+                len(last_synced) == len(mappings)
+                and last_synced
+                and min(last_synced) > now - timedelta(days=1)
+            ):
                 continue
             queued_at_values = [
                 item.settings.get("sync_queued_at") for item in mappings if item.settings

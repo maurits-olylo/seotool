@@ -175,16 +175,27 @@ Acceptatie:
 
 ## Fase 5 — Bing hervatten
 
-Status: in uitvoering; OAuth-koppeling is hersteld en HUMAN is gekoppeld. Data-import volgt.
+Status: pagina- en zoektermimport technisch geïmplementeerd; deployment en productievalidatie met
+HUMAN volgen.
 
-- Bing aanvullend vergelijken met Google en databron expliciet tonen.
+- Bing-pagina- en zoektermstatistieken versleuteld geauthenticeerd en idempotent importeren.
+- Bing-URL's aan het blijvende URL-register koppelen en importdekking tonen.
+- Handmatige import en dagelijkse synchronisatie ondersteunen met blijvende foutstatus.
+- Dalende Bing-zichtbaarheid naast Google-inzichten tonen en databron expliciet benoemen.
 - Backlinkdiscovery en veranderingen toevoegen wanneer de officiële API dit ondersteunt.
 - Geen scraping-workaround voor ontbrekende officiële functionaliteit.
 
+Acceptatie:
+
+- HUMAN importeert pagina- en zoektermregels zonder duplicaten bij herhaling.
+- Bekende HUMAN-URL's worden aan het URL-register gekoppeld; afwijkende URL's blijven als
+  controleerbare ongekoppelde regels bewaard.
+- Een Bing-daling wordt als Bing-signaal getoond en niet stilzwijgend met GSC-data vermengd.
+- Een ingetrokken token of API-fout verschijnt als herstelbare integratiefout zonder geheimen.
+
 ## Fase 6 — Intelligente diagnose en UX/UI-polish
 
-Status: gepland; direct na de eerste werkende Bing-data-import oppakken als kernfase van het
-product.
+Status: gepland; na productievalidatie van de Bing-data-import oppakken als kernfase van het product.
 
 ### Van signaal naar diagnose
 

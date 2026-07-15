@@ -318,3 +318,17 @@ op CTR gekozen, maar binnen vergelijkbare paginatypen en met positie en andere v
 Gevolg: de tool levert concretere teksten en acties zonder feitelijke analyse aan een taalmodel uit
 te besteden. Providerkeuze, kostenlimieten, privacy en menselijke controle blijven expliciete
 productvoorwaarden.
+
+## 2026-07-16 — Bing-data blijft een expliciete aanvullende zoekbron
+
+Context: de OAuth-koppeling en propertyselectie bestonden al, maar Bing-pagina- en zoektermdata
+werden nog niet geïmporteerd. Daardoor kon de tool Bing niet naast Google beoordelen.
+
+Besluit: Bing-statistieken krijgen eigen dagelijkse tabellen voor pagina's en zoektermen. Imports
+vervangen idempotent de gekozen periode, koppelen genormaliseerde pagina-URL's aan het URL-register
+en bewaren ongekoppelde regels. Handmatige en geplande synchronisatie gebruiken dezelfde service.
+Inzichten noemen Bing altijd als bron en trekken geen zoekmachinebrede conclusie uit alleen Bing.
+
+Gevolg: Bing-dalingen kunnen naast GSC worden beoordeeld zonder databronnen te vermengen. Omdat de
+officiële Bing-statistieken volgens Microsoft periodiek worden bijgewerkt, interpreteert de tool de
+data op periodebasis en niet als realtime signaal.
