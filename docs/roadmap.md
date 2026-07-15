@@ -214,6 +214,27 @@ product.
 - Adviezen uitsluitend baseren op opgeslagen bewijs; onzekerheid zichtbaar houden en geen
   onbewezen AI-conclusie als feit presenteren.
 
+### AI-ondersteunde verbetersuggesties
+
+- Een modulaire AI-provider koppelen als advieslaag boven op crawl-, diagnose- en prestatiedata.
+- Per paginatype vergelijkbare, goed presterende pagina's selecteren op basis van inhoud, zoekintentie
+  en beschikbare GSC-, Bing- en verkeersdata; positie, merkbekendheid en andere vertekenende factoren
+  expliciet meewegen.
+- Voor titles, meta descriptions, headings, interne ankerteksten en structured data concrete
+  conceptvoorstellen geven in plaats van alleen “verbeter dit” te tonen.
+- Bij een meta-descriptionvoorstel tonen welke pagina-inhoud, zoekintentie en vergelijkingsgroep als
+  basis zijn gebruikt, bijvoorbeeld: “op basis van deze drie vergelijkbare pagina's”.
+- Twee of drie varianten kunnen geven met verschil in invalshoek, lengte en call-to-action.
+- Bestaande merktaal en redactiestijl afleiden uit door de gebruiker goedgekeurde voorbeelden, niet
+  uit willekeurige sitebrede tekst.
+- Suggesties nooit automatisch publiceren; gebruiker laat kiezen, aanpassen, kopiëren, afwijzen of
+  als actie opslaan.
+- Afwijzingen en goedgekeurde varianten gebruiken als voorkeurssignaal zonder feitelijke crawlerdata
+  of historische issues te overschrijven.
+- Verzonden context minimaliseren, persoonsgegevens en secrets uitsluiten, kosten en gebruik per
+  klant begrenzen en de AI-provider vervangbaar houden.
+- Geen voorstel tonen wanneer broninhoud, zoekintentie of bewijs onvoldoende betrouwbaar is.
+
 ### UX/UI-polish
 
 - Issues presenteren als diagnosekaart met samenvatting, waarom, waarschijnlijk probleem,
@@ -249,6 +270,9 @@ Acceptatie:
 - Een overzicht met honderd URL's op crawldiepte 1 benoemt vooral de waarschijnlijke uitzonderingen.
 - Ieder belangrijk issue beantwoordt: wat gebeurt er, waarom is dat relevant, wat is waarschijnlijk
   de oorzaak, wat moet concreet worden aangepast en hoe wordt de oplossing gecontroleerd.
+- Een ontbrekende of zwakke meta description kan twee of drie direct bruikbare concepten opleveren,
+  gebaseerd op de actuele pagina en aantoonbaar vergelijkbare goed presterende pagina's; de gebruiker
+  ziet de onderbouwing en houdt altijd de eindbeslissing.
 - Een gebruiker kan altijd onderscheid maken tussen feitelijk bewijs, systeeminterpretatie en een
   onzekere hypothese.
 - De geselecteerde GrandVision-vacature- en favorieten-URL's kunnen voor één issuetype in bulk

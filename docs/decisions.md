@@ -302,3 +302,19 @@ maar worden niet als concurrerende hoofdissues in de actielijst gepresenteerd.
 
 Gevolg: een pagina met vier dode interne links levert één uitvoerbare taak op. Tegelijk kan een
 defect doel dat vanaf veel pagina's wordt gelinkt afzonderlijk als sitebreed patroon worden herkend.
+
+## 2026-07-16 — AI doet gegronde voorstellen en neemt geen beslissingen over
+
+Context: een generiek advies zoals “verbeter de meta description” laat het moeilijkste werk bij de
+gebruiker. Een taalmodel kan bruikbare concepten maken wanneer het beschikt over actuele
+pagina-inhoud, zoekintentie, merkstijl en zorgvuldig gekozen vergelijkingspagina's.
+
+Besluit: AI wordt een optionele, verwisselbare advieslaag boven op de deterministische diagnose.
+Prompts ontvangen alleen noodzakelijke, niet-gevoelige bewijscontext. Voorstellen benoemen hun
+bronnen en onzekerheid, bieden waar nuttig meerdere varianten en worden nooit automatisch
+gepubliceerd. De gebruiker keurt goed, past aan of wijst af. “Beste pagina's” worden niet uitsluitend
+op CTR gekozen, maar binnen vergelijkbare paginatypen en met positie en andere vertekening in beeld.
+
+Gevolg: de tool levert concretere teksten en acties zonder feitelijke analyse aan een taalmodel uit
+te besteden. Providerkeuze, kostenlimieten, privacy en menselijke controle blijven expliciete
+productvoorwaarden.
