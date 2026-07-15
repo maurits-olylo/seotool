@@ -213,3 +213,16 @@ doorlopen. Een mislukte job met bestaande snapshots mag vanuit dezelfde crawlrun
 
 Gevolg: een beperkt aantal onbereikbare links resulteert in `partially_succeeded` in plaats van een
 afgebroken sitecrawl; opgeslagen voortgang hoeft na een gerepareerde crawlerfout niet opnieuw.
+
+## 2026-07-15 — De publieke website vertelt het productverhaal tijdens scrollen
+
+Context: de publieke pagina vóór de login legde de kern kort uit, maar liet onvoldoende zien hoe
+SEO Monitor signalen omzet in bruikbare acties.
+
+Besluit: kleuren en typografie blijven behouden. De publieke landingspagina krijgt een ruime hero,
+productvisuals en een vierdelig scrollverhaal. Links verandert de uitleg; rechts worden prioriteiten,
+wijzigingen, sitestructuur en actiebeheer zichtbaar. Het ingelogde dashboard blijft operationeel en
+compact. Op kleinere schermen wordt de presentatie een gewone verticale stroom.
+
+Gevolg: bezoekers begrijpen vóór het inloggen zowel de waarde als de werkwijze van het product,
+zonder dat de interface voor bestaande gebruikers verandert.

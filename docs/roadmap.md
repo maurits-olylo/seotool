@@ -72,6 +72,16 @@ gebruiker geen websites, URL's, crawls, issues of rapportages van een andere kla
 
 Status: in uitvoering.
 
+### Visuele vernieuwing publieke website
+
+Status: technisch geïmplementeerd; frontenddeployment en visuele productievalidatie volgen.
+
+- Bestaande kleuren en typografie behouden.
+- Ruimere hero en productvisual toevoegen vóór de login.
+- Sticky uitleg links koppelen aan scrollende productbeelden rechts.
+- Prioriteiten, veranderingen, sitestructuur en actiebeheer uitleggen.
+- Het ingelogde dashboard functioneel en compact houden.
+
 - Thin-contentdetectie en ruisarme wijzigingsdetectie aanscherpen.
 - Verouderde content buiten vacatures toevoegen met voorzichtige signalering.
 - GSC/GA4-impact en consultantinzichten verder prioriteren.
