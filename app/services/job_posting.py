@@ -276,24 +276,18 @@ def _google_for_jobs_signals(
 
     recommended = [field for field in ("employmentType", "identifier") if not job.get(field)]
     if recommended:
-        field_labels = {
-            "employmentType": "het type dienstverband",
-            "identifier": "een stabiele vacature-identifier",
-        }
-        additions = " en ".join(field_labels[field] for field in recommended)
         signals.append(
             IssueSignal(
                 "job_posting_missing_recommended_fields",
-                "optimization",
+                "structured_data",
                 "low",
-                "JobPosting kan worden aangevuld",
-                f"Optionele velden ontbreken: {', '.join(recommended)}.",
+                "JobPosting mist aanbevolen velden",
+                f"Aanbevolen velden ontbreken: {', '.join(recommended)}.",
                 (
-                    f"Overweeg {additions} toe te voegen voor vollediger vacature-schema. "
-                    "Deze velden zijn niet verplicht en de verwachte SEO-impact is minimaal."
+                    "Vul employmentType en een stabiele identifier aan voor vollediger "
+                    "vacature-schema."
                 ),
                 {"missing_fields": recommended, "source": "google_for_jobs"},
-                confidence="low",
             )
         )
     return signals

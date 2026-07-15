@@ -751,7 +751,7 @@ function renderJobListings() {
   $("#vacancy-rows").innerHTML = state.vacancyFiltered.map((listing) => {
     const date = listing.valid_through ? `Geldig t/m ${new Date(`${listing.valid_through}T12:00:00`).toLocaleDateString("nl-NL")}` : listing.date_posted ? `Geplaatst ${new Date(`${listing.date_posted}T12:00:00`).toLocaleDateString("nl-NL")}` : "Geen datum in schema";
     const issueMarkup = listing.issues.length
-      ? listing.issues.map((issue) => `<div class="vacancy-finding"><span class="severity ${escapeHtml(issue.category === "optimization" ? "optimization" : issue.severity)}">${issue.category === "optimization" ? "Optimalisatie" : issue.severity === "high" || issue.severity === "critical" ? "Fout" : "Waarschuwing"}</span><button class="detail-button" data-issue-id="${issue.id}" aria-label="Bekijk ${escapeHtml(issue.title)}">Bekijk</button></div>`).join("")
+      ? listing.issues.map((issue) => `<div class="vacancy-finding"><span class="severity ${escapeHtml(issue.severity)}">${issue.severity === "high" || issue.severity === "critical" ? "Fout" : "Waarschuwing"}</span><button class="detail-button" data-issue-id="${issue.id}" aria-label="Bekijk ${escapeHtml(issue.title)}">Bekijk</button></div>`).join("")
       : `<span class="vacancy-ok">Geen actieve vacature-issues</span>`;
     return `<tr><td><strong>${escapeHtml(listing.title || "Naam ontbreekt")}</strong><a class="url" title="${escapeHtml(listing.url)}" href="${escapeHtml(listing.url)}" target="_blank" rel="noopener">${escapeHtml(listing.url)}</a><small>${date}</small></td><td><span class="vacancy-badge lifecycle-${escapeHtml(listing.lifecycle_status)}">${escapeHtml(vacancyLifecycleLabels[listing.lifecycle_status] || listing.lifecycle_status)}</span><span class="vacancy-badge validation-${escapeHtml(listing.validation_status)}">${escapeHtml(vacancyValidationLabels[listing.validation_status] || listing.validation_status)}</span><small>${listing.has_job_posting_schema ? "JobPosting gevonden" : "Herkenning via URL en inhoud"}</small></td><td>${listing.inbound_internal_links || 0}</td><td class="vacancy-issues">${issueMarkup}</td></tr>`;
   }).join("");
@@ -1084,7 +1084,7 @@ function render() {
   const start = (state.page - 1) * PAGE_SIZE;
   const rows = state.filtered.slice(start, start + PAGE_SIZE);
   $("#issues").innerHTML = rows.map((issue) => `<tr>
-    <td><span class="severity ${issue.category === "optimization" ? "optimization" : issue.severity}">${issue.category === "optimization" ? "Optimalisatie" : labels[issue.severity] || issue.severity}</span></td>
+    <td><span class="severity ${issue.severity}">${labels[issue.severity] || issue.severity}</span></td>
     <td><strong>${escapeHtml(issue.title)}</strong>${issueUrlMarkup(issue)}</td>
     <td>${impactMarkup(issue)}</td>
     <td><span class="badge">${labels[issue.status] || issue.status}</span></td>
@@ -1102,11 +1102,10 @@ async function showIssue(issueId) {
   const issue = await api(`/api/v1/issues/${issueId}`);
   if (!issue) return;
   state.selectedIssueId = issueId;
-  $("#detail-eyebrow").textContent = issue.category === "optimization" ? "OPTIMALISATIE" : "ISSUEDETAIL";
   $("#detail-title").textContent = issue.title;
   const url = issueUrl(issue); $("#detail-url").textContent = url || "Websitebreed issue";
   if (url) $("#detail-url").href = url; else $("#detail-url").removeAttribute("href");
-  $("#detail-severity").textContent = issue.category === "optimization" ? "Minimale verwachte impact" : labels[issue.severity] || issue.severity;
+  $("#detail-severity").textContent = labels[issue.severity] || issue.severity;
   $("#detail-status").value = issue.status;
   $("#client-status-label").textContent = labels[issue.status] || issue.status;
   $("#detail-description").textContent = issue.description;

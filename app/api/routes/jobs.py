@@ -60,15 +60,10 @@ def list_job_listings(
             "expiring_soon": sum(row["lifecycle_status"] == "expiring_soon" for row in rows),
             "expired": sum(row["lifecycle_status"] == "expired" for row in rows),
             "removed": sum(row["lifecycle_status"] == "removed" for row in rows),
-            "needs_attention": sum(
-                any(issue["category"] != "optimization" for issue in row["issues"]) for row in rows
-            ),
+            "needs_attention": sum(bool(row["issues"]) for row in rows),
             "technical_errors": sum(row["validation_status"] == "error" for row in rows),
             "missing_schema": sum(not row["has_job_posting_schema"] for row in rows),
-            "new_issues": sum(
-                issue["status"] == "new" and issue["category"] != "optimization"
-                for issue in active_issues
-            ),
+            "new_issues": sum(issue["status"] == "new" for issue in active_issues),
         },
         "job_listings": rows,
     }
@@ -76,11 +71,10 @@ def list_job_listings(
 
 def _listing_payload(listing: JobListing, url: str, issues: list[Issue]) -> dict[str, object]:
     ordered_issues = sorted(issues, key=lambda issue: SEVERITY_ORDER.get(issue.severity, 99))
-    validation_issues = [issue for issue in ordered_issues if issue.category != "optimization"]
     has_schema = "job_posting_schema" in (listing.detection_sources or [])
-    if any(issue.severity in {"critical", "high"} for issue in validation_issues):
+    if any(issue.severity in {"critical", "high"} for issue in ordered_issues):
         validation_status = "error"
-    elif validation_issues:
+    elif ordered_issues:
         validation_status = "warning"
     elif has_schema:
         validation_status = "valid"
@@ -108,9 +102,7 @@ def _listing_payload(listing: JobListing, url: str, issues: list[Issue]) -> dict
             {
                 "id": str(issue.id),
                 "title": issue.title,
-                "category": issue.category,
                 "severity": issue.severity,
-                "confidence": issue.confidence,
                 "status": issue.status,
                 "recommended_action": issue.recommended_action,
             }

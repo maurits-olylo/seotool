@@ -60,15 +60,6 @@ def test_google_for_jobs_validation_detects_remote_and_application_problems() ->
         "job_posting_remote_location_missing",
         "job_posting_missing_recommended_fields",
     }
-    optimization = next(
-        signal
-        for signal in signals
-        if signal.issue_type == "job_posting_missing_recommended_fields"
-    )
-    assert optimization.category == "optimization"
-    assert optimization.severity == "low"
-    assert optimization.confidence == "low"
-    assert "niet verplicht" in optimization.recommended_action
 
 
 def test_google_for_jobs_validation_detects_bad_dates_and_overview_schema() -> None:
