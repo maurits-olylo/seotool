@@ -19,6 +19,7 @@ from app.services.http_crawler import CrawlError, fetch_metadata, fetch_url
 from app.services.indexation_analysis import analyze_indexation_consistency
 from app.services.internal_link_analysis import analyze_internal_link_quality, detect_orphan_pages
 from app.services.issue_engine import reconcile_issues
+from app.services.job_identifier_analysis import analyze_job_identifier_risk
 from app.services.robots import RobotsRules
 from app.services.sitemap import parse_sitemap
 from app.services.snapshot import store_fetch_result
@@ -315,6 +316,12 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
         )
         _check_crawl_control(db, job, run)
         detect_duplicate_content(
+            db,
+            website_id=website.id,
+            crawl_run_id=run.id,
+        )
+        _check_crawl_control(db, job, run)
+        analyze_job_identifier_risk(
             db,
             website_id=website.id,
             crawl_run_id=run.id,

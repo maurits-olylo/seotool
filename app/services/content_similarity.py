@@ -46,7 +46,7 @@ def detect_duplicate_content(
 
     exact_groups = [indices for indices in by_hash.values() if len(indices) > 1]
     exact_members = {index for group in exact_groups for index in group}
-    near_groups = _near_duplicate_groups(rows, excluded_indices=exact_members)
+    near_groups = near_duplicate_groups(rows, excluded_indices=exact_members)
 
     signals_by_index: dict[int, list[IssueSignal]] = defaultdict(list)
     _add_duplicate_metadata_signals(rows, signals_by_index)
@@ -174,9 +174,10 @@ def _add_duplicate_metadata_signals(
                 )
 
 
-def _near_duplicate_groups(
+def near_duplicate_groups(
     rows: list[tuple[Url, UrlSnapshot]], *, excluded_indices: set[int]
 ) -> list[tuple[list[int], list[float]]]:
+    """Return groups whose main content has at least 85% shingle containment."""
     shingles: dict[int, set[tuple[str, ...]]] = {}
     postings: dict[tuple[str, ...], list[int]] = defaultdict(list)
     for index, (_, snapshot) in enumerate(rows):

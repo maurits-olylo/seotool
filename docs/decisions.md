@@ -226,3 +226,19 @@ compact. Op kleinere schermen wordt de presentatie een gewone verticale stroom.
 
 Gevolg: bezoekers begrijpen vóór het inloggen zowel de waarde als de werkwijze van het product,
 zonder dat de interface voor bestaande gebruikers verandert.
+
+## 2026-07-15 — Een ontbrekende vacature-identifier is alleen contextueel een issue
+
+Context: `identifier` en `employmentType` zijn aanbevolen JobPosting-velden. Het ontbreken ervan
+werd op iedere vacature als laag issue getoond, terwijl dit meestal slechts een optimalisatie is.
+Een identifier wordt pas operationeel belangrijk wanneer sterk gelijkende vacatures zonder stabiele
+identiteit moeilijk uit elkaar te houden zijn.
+
+Besluit: ontbrekende aanbevolen velden leveren niet langer zelfstandig een issue op. Na een volledige
+sitecrawl vergelijkt SEO Monitor alle indexeerbare JobPosting-pagina's zonder identifier. Alleen een
+groep met minimaal twee sterk gelijkende vacatures krijgt een contextueel signaal. Vanaf vijf
+vacatures is de ernst middel en het vertrouwen hoog; kleinere groepen blijven laag met gemiddeld
+vertrouwen.
+
+Gevolg: de generieke waarschuwing verdwijnt. Een nieuw signaal benoemt de omvang, inhoudelijke
+overlap en gerelateerde URL's, zodat de aanbevolen identifier een aantoonbaar probleem oplost.

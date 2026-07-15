@@ -53,6 +53,7 @@ JOB_ISSUE_TYPES = {
     "job_posting_location_incomplete",
     "job_posting_not_detail_page",
     "job_posting_missing_recommended_fields",
+    "job_posting_identifier_collision_risk",
 }
 
 
@@ -274,23 +275,13 @@ def _google_for_jobs_signals(
             )
         )
 
-    recommended = [field for field in ("employmentType", "identifier") if not job.get(field)]
-    if recommended:
-        signals.append(
-            IssueSignal(
-                "job_posting_missing_recommended_fields",
-                "structured_data",
-                "low",
-                "JobPosting mist aanbevolen velden",
-                f"Aanbevolen velden ontbreken: {', '.join(recommended)}.",
-                (
-                    "Vul employmentType en een stabiele identifier aan voor vollediger "
-                    "vacature-schema."
-                ),
-                {"missing_fields": recommended, "source": "google_for_jobs"},
-            )
-        )
     return signals
+
+
+def job_posting_identifier(value: object) -> str | None:
+    """Return the stable JobPosting identifier from arbitrary schema data."""
+    job = next(_find_job_postings(value), None)
+    return _identifier(job.get("identifier")) if job else None
 
 
 def _looks_like_job_detail_page(page_url: str | None, main_content: str) -> bool:

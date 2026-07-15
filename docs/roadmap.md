@@ -7,8 +7,7 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 ## Huidige status
 
 - Actieve ontwikkellijn: fase 4 — resterende SEO-functionaliteit.
-- Eerstvolgend ontwikkelitem: gerichte pagina-exports deployen en tegelijk de globale crawl-drain
-  met de actieve HUMAN-crawl valideren.
+- Eerstvolgend ontwikkelitem: ruisarme en verklaarbare wijzigingen verder normaliseren.
 - Productie: `https://seo.thact.nl` op Synology NAS `192.168.2.20`.
 - Laatste afgeronde kwaliteitscontrole: 154 tests en Ruff geslaagd.
 - Open productiecontrole fase 1: bevestigen dat `jobsatpearle.be` na de lopende crawl niet meer als
@@ -16,7 +15,7 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 
 ## Operationele veiligheid — globale deployment-drain
 
-Status: technisch geïmplementeerd; deployment en productievalidatie volgen.
+Status: geïmplementeerd, gedeployed en met een actieve crawl gevalideerd.
 
 - Nieuwe handmatige crawls, onboarding-crawls en scheduler-crawls worden centraal geblokkeerd.
 - Actieve crawls ronden de huidige URL af en gaan daarna naar `paused`.
@@ -74,13 +73,23 @@ Status: in uitvoering.
 
 ### Visuele vernieuwing publieke website
 
-Status: technisch geïmplementeerd; frontenddeployment en visuele productievalidatie volgen.
+Status: afgerond, gedeployed en geaccepteerd.
 
 - Bestaande kleuren en typografie behouden.
 - Ruimere hero en productvisual toevoegen vóór de login.
 - Sticky uitleg links koppelen aan scrollende productbeelden rechts.
 - Prioriteiten, veranderingen, sitestructuur en actiebeheer uitleggen.
 - Het ingelogde dashboard functioneel en compact houden.
+
+### Contextuele JobPosting-identifiers
+
+Status: technisch geïmplementeerd; deployment en productievalidatie volgen.
+
+- Ontbrekende aanbevolen velden niet zelfstandig als waarschuwing tonen.
+- Vacatures zonder identifier sitebreed op sterke inhoudelijke gelijkenis vergelijken.
+- Alleen bij aantoonbaar verwarringsrisico een contextueel issue maken.
+- Groepsgrootte, overlap en gerelateerde URL's als technisch bewijs tonen.
+- Vanaf vijf vergelijkbare vacatures de prioriteit van laag naar middel verhogen.
 
 - Thin-contentdetectie en ruisarme wijzigingsdetectie aanscherpen.
 - Verouderde content buiten vacatures toevoegen met voorzichtige signalering.
@@ -90,7 +99,7 @@ Status: technisch geïmplementeerd; frontenddeployment en visuele productievalid
 
 ### Gerichte pagina-exports
 
-Status: technisch geïmplementeerd; deployment en productievalidatie volgen.
+Status: geïmplementeerd en gedeployed; productievalidatie met een gefilterde export blijft open.
 
 - Voeg bovenaan `URL's`, `Wijzigingen` en `Vacatures` een eigen exportknop toe.
 - Exporteer per knop uitsluitend het datatype en de kolommen van de betreffende pagina.

@@ -58,8 +58,24 @@ def test_google_for_jobs_validation_detects_remote_and_application_problems() ->
     assert {signal.issue_type for signal in signals} == {
         "job_posting_missing_application",
         "job_posting_remote_location_missing",
-        "job_posting_missing_recommended_fields",
     }
+
+
+def test_missing_recommended_fields_are_not_a_standalone_issue() -> None:
+    signals = inspect_job_posting(
+        [
+            {
+                "@type": "JobPosting",
+                "title": "Developer",
+                "description": "Bouw onze applicatie.",
+                "datePosted": "2026-01-10",
+                "hiringOrganization": {"name": "Thact"},
+            }
+        ],
+        main_content="Solliciteer direct.",
+    )
+
+    assert signals == []
 
 
 def test_google_for_jobs_validation_detects_bad_dates_and_overview_schema() -> None:
