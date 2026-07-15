@@ -15,9 +15,7 @@ engine = create_engine(database_url, **engine_options)
 
 
 @event.listens_for(engine, "connect")
-def record_connection_process_id(
-    _connection: object, connection_record: Any
-) -> None:
+def record_connection_process_id(_connection: object, connection_record: Any) -> None:
     connection_record.info["pid"] = os.getpid()
 
 

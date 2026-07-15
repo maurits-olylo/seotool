@@ -255,6 +255,7 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
         url = db.get(Url, url_id)
         if url is None or not url.is_active:
             continue
+        depth = min(depth, url.crawl_depth) if url.crawl_depth is not None else depth
         url.crawl_depth = depth
         visited.add(url.id)
         run.discovered_urls = len(visited)

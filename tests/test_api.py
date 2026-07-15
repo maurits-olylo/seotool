@@ -763,3 +763,31 @@ def test_url_overview_hides_inactive_out_of_scope_records_by_default(
     assert client.get(endpoint).json() == []
     inactive = client.get(f"{endpoint}?active=false").json()
     assert [item["normalized_url"] for item in inactive] == ["https://www.pearle.nl/winkels"]
+
+
+def test_url_overview_marks_depth_from_failed_crawl_as_unreliable(client: TestClient) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Depth context"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={"client_id": customer["id"], "name": "Depth", "base_url": "https://depth.test"},
+    ).json()
+    website_id = UUID(website["id"])
+    with SessionLocal() as db:
+        url = Url(website_id=website_id, normalized_url="https://depth.test/page", crawl_depth=2)
+        job = CrawlJob(website_id=website_id, job_type="full_site_crawl", status="failed")
+        db.add_all([url, job])
+        db.flush()
+        db.add(
+            CrawlRun(
+                crawl_job_id=job.id,
+                website_id=website_id,
+                crawl_type="full_site_crawl",
+                status="failed",
+            )
+        )
+        db.commit()
+
+    item = client.get(f"/api/v1/websites/{website_id}/urls").json()[0]
+    assert item["crawl_depth"] == 2
+    assert item["crawl_depth_reliable"] is False
+    assert "niet voltooid" in item["crawl_depth_context"]

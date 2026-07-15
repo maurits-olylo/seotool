@@ -28,12 +28,43 @@ def list_urls(
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
-) -> list[Url]:
+) -> list[UrlRead]:
     require_website_access(db, principal, website_id)
     query = select(Url).where(Url.website_id == website_id).order_by(Url.normalized_url)
     if active is not None:
         query = query.where(Url.is_active == active)
-    return list(db.scalars(query.offset(offset).limit(limit)))
+    urls = list(db.scalars(query.offset(offset).limit(limit)))
+    latest_full_run = db.scalar(
+        select(CrawlRun)
+        .where(CrawlRun.website_id == website_id, CrawlRun.crawl_type == "full_site_crawl")
+        .order_by(CrawlRun.started_at.desc())
+        .limit(1)
+    )
+    return [_url_read_with_depth_context(url, latest_full_run) for url in urls]
+
+
+def _url_read_with_depth_context(url: Url, run: CrawlRun | None) -> UrlRead:
+    data = UrlRead.model_validate(url).model_dump()
+    if run is None:
+        context = "Nog geen volledige crawl uitgevoerd"
+        reliable = False
+    elif run.status == "succeeded":
+        reliable = True
+        crawl_date = run.started_at.date().isoformat()
+        context = (
+            f"Kortste interne route uit voltooide crawl van {crawl_date}"
+            if url.crawl_depth is not None
+            else f"Geen interne route gevonden in voltooide crawl van {crawl_date}"
+        )
+    elif run.status in {"running", "pause_requested", "paused"}:
+        reliable = False
+        context = "Voorlopige diepte uit de lopende, nog onvoltooide crawl"
+    else:
+        reliable = False
+        context = "Onvolledige dieptemeting: de laatste volledige crawl is niet voltooid"
+    data["crawl_depth_reliable"] = reliable
+    data["crawl_depth_context"] = context
+    return UrlRead.model_validate(data)
 
 
 @router.post(

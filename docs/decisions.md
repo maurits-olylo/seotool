@@ -175,3 +175,16 @@ een ander proces wordt de geërfde verbinding ongeldig gemaakt en transparant op
 
 Gevolg: crawls en andere RQ-jobs delen nooit een fysieke databaseverbinding met het workerproces;
 prepared-statementstatus en transactiestatus kunnen niet meer over een fork lekken.
+
+## 2026-07-15 — Crawldiepte toont de volledigheid van de broncrawl
+
+Context: een volledige crawl wist bij de start de vorige dieptes. Tussenresultaten van een lopende
+of mislukte crawl werden daarna zonder voorbehoud als actuele crawldiepte getoond.
+
+Besluit: het URL-overzicht koppelt de getoonde diepte aan de status van de laatste volledige crawl.
+Alleen een geslaagde crawl levert een betrouwbare kortste route of een betrouwbare conclusie dat
+geen interne route is gevonden. Andere waarden worden expliciet als voorlopig of onvolledig
+gemarkeerd. De crawler overschrijft een al gevonden kortere route niet met een langere wachtrijroute.
+
+Gevolg: een waarde zoals diepte 2 is controleerbaar als resultaat van een voltooide crawl; resultaten
+van een afgebroken crawl kunnen niet langer voor definitieve structuurdata worden aangezien.
