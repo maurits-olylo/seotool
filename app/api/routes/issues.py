@@ -26,6 +26,71 @@ from app.services.authorization import require_website_access, require_write_acc
 
 router = APIRouter(tags=["issues"])
 
+CHANGE_CONTEXT = {
+    "status_code_changed": (
+        "high",
+        "Bereikbaarheid of indexatie kan direct veranderen.",
+        "Controleer de nieuwe status en herstel of bevestig deze.",
+    ),
+    "redirect_target_changed": (
+        "high",
+        "Bezoekers en zoekmachines komen op een andere URL uit.",
+        "Controleer relevantie, keten en eindbestemming.",
+    ),
+    "canonical_changed": (
+        "high",
+        "De voorkeurs-URL voor indexatie is gewijzigd.",
+        "Bevestig dat de canonical bewust naar de juiste URL wijst.",
+    ),
+    "robots_changed": (
+        "high",
+        "Crawl- of indexatie-instructies zijn gewijzigd.",
+        "Controleer of de nieuwe robots-instructie gewenst is.",
+    ),
+    "indexability_changed": (
+        "high",
+        "De pagina kan anders in zoekmachines worden verwerkt.",
+        "Controleer robots, canonical en HTTP-status samen.",
+    ),
+    "title_changed": (
+        "medium",
+        "De zoekresultaattekst en relevantie kunnen veranderen.",
+        "Controleer of de nieuwe title uniek en inhoudelijk passend is.",
+    ),
+    "h1_changed": (
+        "medium",
+        "Het primaire onderwerp van de pagina lijkt gewijzigd.",
+        "Controleer of H1, title en hoofdcontent nog aansluiten.",
+    ),
+    "main_content_changed": (
+        "medium",
+        "De zichtbare hoofdinhoud is gewijzigd.",
+        "Beoordeel of boodschap, actualiteit en zoekintentie verbeterd zijn.",
+    ),
+    "description_changed": (
+        "low",
+        "De snippettekst kan veranderen, meestal zonder indexatie-effect.",
+        "Controleer leesbaarheid en aansluiting op de pagina.",
+    ),
+    "structured_data_changed": (
+        "low",
+        "Machineleesbare informatie is gewijzigd.",
+        "Valideer alleen wanneer relevante schema-velden of types veranderden.",
+    ),
+}
+
+
+def _change_context(change_type: str) -> dict[str, str]:
+    importance, relevance, action = CHANGE_CONTEXT.get(
+        change_type,
+        (
+            "low",
+            "Deze wijziging heeft zonder extra context geen duidelijke SEO-impact.",
+            "Controleer of de wijziging bewust en inhoudelijk relevant is.",
+        ),
+    )
+    return {"importance": importance, "relevance": relevance, "review_action": action}
+
 
 @router.get("/websites/{website_id}/changes", response_model=list[ChangeRead])
 def list_changes(
@@ -53,18 +118,28 @@ def list_changes(
         .order_by(CrawlRun.started_at)
         .limit(1)
     )
-    snapshot_ids = [change.current_snapshot_id for change in changes]
-    snapshot_runs = {
-        snapshot_id: run_id
-        for snapshot_id, run_id in db.execute(
-            select(UrlSnapshot.id, UrlSnapshot.crawl_run_id).where(UrlSnapshot.id.in_(snapshot_ids))
-        )
+    snapshot_ids = {
+        snapshot_id
+        for change in changes
+        for snapshot_id in (change.previous_snapshot_id, change.current_snapshot_id)
+        if snapshot_id
+    }
+    snapshots = {
+        snapshot.id: snapshot
+        for snapshot in db.scalars(select(UrlSnapshot).where(UrlSnapshot.id.in_(snapshot_ids)))
     }
     return [
         {
             **ChangeRead.model_validate(change).model_dump(),
             "is_baseline": baseline_run_id is not None
-            and snapshot_runs.get(change.current_snapshot_id) == baseline_run_id,
+            and snapshots.get(change.current_snapshot_id).crawl_run_id == baseline_run_id,
+            "previous_checked_at": snapshots.get(change.previous_snapshot_id).checked_at
+            if change.previous_snapshot_id and snapshots.get(change.previous_snapshot_id)
+            else None,
+            "current_checked_at": snapshots.get(change.current_snapshot_id).checked_at
+            if snapshots.get(change.current_snapshot_id)
+            else None,
+            **_change_context(change.change_type),
         }
         for change in changes
     ]
@@ -122,7 +197,13 @@ def get_change(
             "old_display": _truncate(previous.main_content if previous else None),
             "new_display": _truncate(current.main_content),
         }
-    return {**ChangeRead.model_validate(change).model_dump(), "details": details}
+    return {
+        **ChangeRead.model_validate(change).model_dump(),
+        "previous_checked_at": previous.checked_at if previous else None,
+        "current_checked_at": current.checked_at if current else None,
+        **_change_context(change.change_type),
+        "details": details,
+    }
 
 
 def _snapshot_links(

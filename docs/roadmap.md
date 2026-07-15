@@ -10,7 +10,7 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 - Eerstvolgend ontwikkelitem: gerichte pagina-exports deployen en tegelijk de globale crawl-drain
   met de actieve HUMAN-crawl valideren.
 - Productie: `https://seo.thact.nl` op Synology NAS `192.168.2.20`.
-- Laatste afgeronde kwaliteitscontrole: 151 tests en Ruff geslaagd.
+- Laatste afgeronde kwaliteitscontrole: 153 tests en Ruff geslaagd.
 - Open productiecontrole fase 1: bevestigen dat `jobsatpearle.be` na de lopende crawl niet meer als
   actieve URL van `werkenbijgrandvision.nl` verschijnt.
 
@@ -121,6 +121,9 @@ Praktijktests:
   kortste interne route aantoonbaar maken.
 
 ### Ruisarme en verklaarbare wijzigingen
+
+Status: in uitvoering; vergelijkingsdata, relevantieniveau, mogelijke impact en aanbevolen controle
+zijn technisch toegevoegd. Verdere normalisatie van dynamische templatewaarden volgt.
 
 - Inventariseer welke kleine technische of cosmetische verschillen nu onterecht een wijziging
   triggeren.

@@ -189,3 +189,15 @@ gemarkeerd. De crawler overschrijft een al gevonden kortere route niet met een l
 Gevolg: een waarde zoals diepte 2 is controleerbaar als resultaat van een voltooide crawl en het
 URL-detail reconstrueert de concrete kortste route uit de links van die crawl. Resultaten van een
 afgebroken crawl kunnen niet langer voor definitieve structuurdata worden aangezien.
+
+## 2026-07-15 — Wijzigingscontext wordt afgeleid, niet als oordeel opgeslagen
+
+Context: losse technische verschillen misten vergelijkingsdata en uitleg. Daardoor leek iedere
+wijziging even belangrijk en was niet duidelijk wat gecontroleerd moest worden.
+
+Besluit: de API combineert de bestaande vorige en huidige snapshots met een vaste, testbare
+context per wijzigingstype: relevantieniveau, mogelijke betekenis en aanbevolen controle. Deze
+duiding wordt afgeleid en niet redundant in `changes` opgeslagen.
+
+Gevolg: historische wijzigingen profiteren direct van betere uitleg zonder dat data hoeft te worden
+herschreven; indexatiekritieke wijzigingen krijgen meer nadruk dan description- of schemaverschillen.

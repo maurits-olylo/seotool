@@ -1050,7 +1050,7 @@ function groupChanges(changes) {
   const groups = new Map();
   changes.filter((change) => !change.is_baseline && isMeaningfulChange(change)).forEach((change) => {
     const key = change.current_snapshot_id;
-    if (!groups.has(key)) groups.set(key, {id: key, url_id: change.url_id, detected_at: change.detected_at, changes: []});
+    if (!groups.has(key)) groups.set(key, {id: key, url_id: change.url_id, detected_at: change.detected_at, previous_checked_at: change.previous_checked_at, current_checked_at: change.current_checked_at, changes: []});
     groups.get(key).changes.push(change);
   });
   return [...groups.values()].sort((a, b) => new Date(b.detected_at) - new Date(a.detected_at));
@@ -1079,7 +1079,8 @@ function renderChanges() {
   $("#change-rows").innerHTML = rows.map((group) => {
     const url = state.urls.get(group.url_id) || "Onbekende URL";
     const parts = [...new Set(group.changes.map(changeLabel))];
-    return `<tr><td>${new Date(group.detected_at).toLocaleString("nl-NL")}</td><td><a class="change-url" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a></td><td><span class="change-kind">${escapeHtml(changeGroupLabel(group))}</span></td><td>${parts.length}</td><td><button class="detail-button" data-change-group-id="${group.id}">Bekijk</button></td></tr>`;
+    const importance = group.changes.some((change) => change.importance === "high") ? "Hoog" : group.changes.some((change) => change.importance === "medium") ? "Middel" : "Laag";
+    return `<tr><td>${new Date(group.detected_at).toLocaleString("nl-NL")}</td><td><a class="change-url" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a></td><td><span class="change-kind">${escapeHtml(changeGroupLabel(group))}</span><small>Relevantie: ${importance}</small></td><td>${parts.length}</td><td><button class="detail-button" data-change-group-id="${group.id}">Bekijk</button></td></tr>`;
   }).join("");
   $("#change-result-count").textContent = `${state.changeFiltered.length} gebeurtenissen`;
   $("#change-page-label").textContent = `Pagina ${state.changePage} van ${pages}`;
@@ -1103,8 +1104,12 @@ async function showChangeGroup(groupId) {
   $("#change-detail-title").textContent = changeGroupLabel(group);
   $("#change-detail-url").textContent = url;
   $("#change-detail-url").href = url;
-  $("#change-detail-date").textContent = new Date(group.detected_at).toLocaleString("nl-NL");
-  $("#change-detail-summary").textContent = `${changes.length} inhoudelijke onderdelen zijn bij dezelfde meting gewijzigd.`;
+  const previousDate = group.previous_checked_at ? new Date(group.previous_checked_at).toLocaleString("nl-NL") : "Geen eerdere meting";
+  const currentDate = group.current_checked_at ? new Date(group.current_checked_at).toLocaleString("nl-NL") : new Date(group.detected_at).toLocaleString("nl-NL");
+  $("#change-detail-date").textContent = `${previousDate} → ${currentDate}`;
+  $("#change-detail-relevance").textContent = [...new Set(changes.map((change) => change.relevance))].join("\n");
+  $("#change-detail-action").textContent = [...new Set(changes.map((change) => change.review_action))].join("\n");
+  $("#change-detail-summary").textContent = `${changes.length} betekenisvolle onderdelen zijn bij dezelfde meting gewijzigd.`;
   $("#change-detail-summary").classList.remove("hidden");
   $("#change-group-details").innerHTML = changes.map((change) => {
     const details = change.details || {};

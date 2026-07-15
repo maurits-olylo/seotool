@@ -32,6 +32,11 @@ class ChangeRead(ORMModel):
     new_value: str | None
     detected_at: datetime
     is_baseline: bool = False
+    previous_checked_at: datetime | None = None
+    current_checked_at: datetime | None = None
+    importance: str = "low"
+    relevance: str = "Controleer of deze wijziging bewust is."
+    review_action: str = "Vergelijk de pagina met de vorige versie."
 
 
 class ChangeDetailRead(ChangeRead):
