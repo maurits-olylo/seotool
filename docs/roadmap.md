@@ -7,9 +7,10 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 ## Huidige status
 
 - Actieve ontwikkellijn: fase 4 — resterende SEO-functionaliteit.
-- Eerstvolgend ontwikkelitem: globale deployment-drain deployen en in productie valideren.
+- Eerstvolgend ontwikkelitem: gerichte pagina-exports deployen en tegelijk de globale crawl-drain
+  met de actieve HUMAN-crawl valideren.
 - Productie: `https://seo.thact.nl` op Synology NAS `192.168.2.20`.
-- Laatste afgeronde kwaliteitscontrole: 145 tests en Ruff geslaagd.
+- Laatste afgeronde kwaliteitscontrole: 147 tests en Ruff geslaagd.
 - Open productiecontrole fase 1: bevestigen dat `jobsatpearle.be` na de lopende crawl niet meer als
   actieve URL van `werkenbijgrandvision.nl` verschijnt.
 
@@ -78,6 +79,8 @@ Status: in uitvoering.
 - Inzichten alleen bij voldoende bewijs als harde issues behandelen.
 
 ### Gerichte pagina-exports
+
+Status: technisch geïmplementeerd; deployment en productievalidatie volgen.
 
 - Voeg bovenaan `URL's`, `Wijzigingen` en `Vacatures` een eigen exportknop toe.
 - Exporteer per knop uitsluitend het datatype en de kolommen van de betreffende pagina.

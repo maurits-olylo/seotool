@@ -151,3 +151,15 @@ een mislukte deployment laat de drain actief en de crawls gepauzeerd.
 
 Gevolg: toekomstige deployments beginnen met `python -m app.maintenance pause-crawls --wait` en
 eindigen pas na een geslaagde healthcheck met `python -m app.maintenance resume-crawls`.
+
+## 2026-07-15 — Pagina-exports bewaren de exacte zichtbare selectie
+
+Context: filters opnieuw uitvoeren in de export-worker kan een andere uitkomst geven wanneer data
+tussentijds wijzigt of wanneer UI- en backendfilterlogica uiteenlopen.
+
+Besluit: de pagina's URL's, Wijzigingen en Vacatures sturen de ID's van de volledige gefilterde
+selectie mee. De exportjob bewaart deze ID's en een leesbare filtersamenvatting. CSV-bestanden
+bevatten daarnaast website, UTC-exporttijd en filters als vaste contextkolommen.
+
+Gevolg: een pagina-export is reproduceerbaar en bevat uitsluitend de selectie die bij het starten
+zichtbaar was; een lege selectie valt niet terug op alle records.

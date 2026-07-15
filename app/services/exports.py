@@ -35,7 +35,7 @@ def generate_export(export_id: str) -> None:
             if export.export_type == "excel":
                 _write_excel(db, export.website_id, path)
             else:
-                _write_csv(db, export.website_id, export.export_type, path)
+                _write_csv(db, export, path)
             export.file_path = str(path)
             export.status = "succeeded"
             export.finished_at = datetime.now(UTC)
@@ -51,7 +51,14 @@ def generate_export(export_id: str) -> None:
             raise
 
 
-def _datasets(db: Session, website_id: object) -> dict[str, tuple[list[str], list[list[object]]]]:
+def _datasets(
+    db: Session,
+    website_id: object,
+    *,
+    selected_type: str | None = None,
+    item_ids: list[str] | None = None,
+) -> dict[str, tuple[list[str], list[list[object]]]]:
+    selected_ids = {uuid.UUID(item_id) for item_id in item_ids or []}
     urls = list(db.scalars(select(Url).where(Url.website_id == website_id)))
     url_ids = [url.id for url in urls]
     url_by_id = {url.id: url.normalized_url for url in urls}
@@ -64,6 +71,15 @@ def _datasets(db: Session, website_id: object) -> dict[str, tuple[list[str], lis
             .order_by(JobListing.valid_through.asc().nullslast(), JobListing.title)
         )
     )
+    if item_ids is not None:
+        if selected_type == "urls":
+            urls = [url for url in urls if url.id in selected_ids]
+            url_ids = [url.id for url in urls]
+            url_by_id = {url.id: url.normalized_url for url in urls}
+        elif selected_type == "changes":
+            changes = [change for change in changes if change.id in selected_ids]
+        elif selected_type == "vacancies":
+            job_listings = [listing for listing in job_listings if listing.id in selected_ids]
     job_issues_by_url = {
         listing.url_id: [
             issue
@@ -251,12 +267,23 @@ def _job_validation_status(listing: JobListing, issues: list[Issue]) -> str:
     return "missing_schema"
 
 
-def _write_csv(db: Session, website_id: object, export_type: str, path: Path) -> None:
-    datasets = _datasets(db, website_id)
-    key = "issues" if export_type == "technical" else export_type
+def _write_csv(db: Session, export: Export, path: Path) -> None:
+    datasets = _datasets(
+        db,
+        export.website_id,
+        selected_type=export.export_type,
+        item_ids=export.item_ids,
+    )
+    key = "issues" if export.export_type == "technical" else export.export_type
     if key not in datasets:
         raise ValueError("Unsupported CSV export type")
     headers, rows = datasets[key]
+    website = db.get(Website, export.website_id)
+    exported_at = datetime.now(UTC).isoformat()
+    filter_text = json.dumps(export.filters or {}, ensure_ascii=False, sort_keys=True)
+    metadata = [website.name if website else str(export.website_id), exported_at, filter_text]
+    headers = [*headers, "website", "exported_at", "filters"]
+    rows = [[*row, *metadata] for row in rows]
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.writer(handle)
         writer.writerow(headers)

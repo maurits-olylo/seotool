@@ -1,3 +1,4 @@
+import csv
 from datetime import timedelta
 from pathlib import Path
 
@@ -181,3 +182,53 @@ def test_datasets_include_human_readable_urls() -> None:
             not header.endswith("_id") for headers, _ in datasets.values() for header in headers
         )
         assert len(datasets["links"][1]) == 1
+
+
+def test_filtered_url_export_contains_exact_selection_and_context(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(export_service, "EXPORT_ROOT", tmp_path)
+    with SessionLocal() as db:
+        client = Client(name="Filtered export client")
+        website = Website(client=client, name="Filtered site", base_url="https://example.com")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        included = Url(website_id=website.id, normalized_url="https://example.com/included")
+        excluded = Url(website_id=website.id, normalized_url="https://example.com/excluded")
+        db.add_all([included, excluded])
+        db.flush()
+        export = Export(
+            website_id=website.id,
+            export_type="urls",
+            item_ids=[str(included.id)],
+            filters={"status": "2xx", "zoekopdracht": "included"},
+        )
+        db.add(export)
+        db.commit()
+        export_id = export.id
+
+    export_service.generate_export(str(export_id))
+
+    with SessionLocal() as db:
+        completed = db.get(Export, export_id)
+        assert completed and completed.file_path
+        with Path(completed.file_path).open(encoding="utf-8", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+        assert [row["url"] for row in rows] == ["https://example.com/included"]
+        assert rows[0]["website"] == "Filtered site"
+        assert '"status": "2xx"' in rows[0]["filters"]
+
+
+def test_empty_filtered_selection_does_not_fall_back_to_all_rows() -> None:
+    with SessionLocal() as db:
+        client = Client(name="Empty selection client")
+        website = Website(client=client, name="Empty site", base_url="https://example.com")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        db.add(Url(website_id=website.id, normalized_url="https://example.com/unselected"))
+        db.commit()
+
+        datasets = export_service._datasets(db, website.id, selected_type="urls", item_ids=[])
+        assert datasets["urls"][1] == []

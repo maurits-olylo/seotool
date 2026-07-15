@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import JSON, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -16,6 +16,8 @@ class Export(Base):
         ForeignKey("websites.id", ondelete="CASCADE"), index=True
     )
     export_type: Mapped[str] = mapped_column(String(30))
+    item_ids: Mapped[list[str] | None] = mapped_column(JSON)
+    filters: Mapped[dict[str, str]] = mapped_column(JSON, default=dict)
     status: Mapped[str] = mapped_column(String(30), default="pending", index=True)
     file_path: Mapped[str | None] = mapped_column(String(2048))
     error_message: Mapped[str | None] = mapped_column(Text)

@@ -41,7 +41,11 @@ def create_export(
             status_code=409,
             detail="Er staat al een export klaar of in de wachtrij",
         )
-    export = Export(**payload.model_dump())
+    data = payload.model_dump()
+    data["item_ids"] = (
+        [str(item_id) for item_id in payload.item_ids] if payload.item_ids is not None else None
+    )
+    export = Export(**data)
     db.add(export)
     db.commit()
     db.refresh(export)
@@ -103,6 +107,12 @@ def download_export(
     website = db.get(Website, export.website_id)
     website_name = website.name if website else "Website"
     export_date = (export.finished_at or export.created_at).date().isoformat()
-    label = "Issuelijst" if export.export_type == "excel" else export.export_type.title()
+    labels = {
+        "excel": "Issuelijst",
+        "urls": "URLs",
+        "changes": "Wijzigingen",
+        "vacancies": "Vacatures",
+    }
+    label = labels.get(export.export_type, export.export_type.title())
     filename = f"Export {label} - {website_name} - {export_date} - SEOMonitor{path.suffix}"
     return FileResponse(path, filename=filename)

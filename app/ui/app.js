@@ -942,6 +942,75 @@ async function generateExcel() {
   } catch (error) { message.classList.add("error"); message.textContent = error.message; button.disabled = false; }
 }
 
+function selectedText(selector, emptyLabel) {
+  const element = $(selector);
+  return element.value ? element.selectedOptions[0]?.textContent || element.value : emptyLabel;
+}
+
+async function startPageExport({buttonSelector, exportType, itemIds, filters}) {
+  const button = $(buttonSelector);
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = "Export voorbereiden…";
+  try {
+    const created = await api("/api/v1/exports", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({website_id: $("#website-select").value, export_type: exportType, item_ids: itemIds, filters}),
+    });
+    let current = created;
+    for (let attempt = 0; attempt < 120 && ["pending", "running"].includes(current.status); attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 1000));
+      current = await api(`/api/v1/exports/${created.id}`);
+    }
+    if (current.status !== "succeeded") throw new Error(current.error_message || "Export kon niet worden afgerond");
+    button.textContent = "Download start…";
+    window.location.assign(`/api/v1/exports/${created.id}/download`);
+  } catch (error) {
+    window.alert(error.message);
+  } finally {
+    window.setTimeout(() => { button.disabled = false; button.textContent = original; }, 1000);
+  }
+}
+
+function exportUrls() {
+  startPageExport({
+    buttonSelector: "#export-urls", exportType: "urls",
+    itemIds: state.urlFiltered.map((url) => url.id),
+    filters: {
+      zoekopdracht: $("#url-search").value.trim() || "Geen",
+      status: selectedText("#url-status-filter", "Alle statuscodes"),
+      indexatie: selectedText("#url-index-filter", "Alle indexatiestatussen"),
+      crawldiepte: selectedText("#url-depth-filter", "Alle crawl-dieptes"),
+    },
+  });
+}
+
+function exportChanges() {
+  startPageExport({
+    buttonSelector: "#export-changes", exportType: "changes",
+    itemIds: state.changeFiltered.flatMap((group) => group.changes.map((change) => change.id)),
+    filters: {
+      zoekopdracht: $("#change-search").value.trim() || "Geen",
+      wijzigingstype: selectedText("#change-type-filter", "Alle wijzigingstypen"),
+      periode: selectedText("#change-period-filter", "Volledige historie"),
+    },
+  });
+}
+
+function exportVacancies() {
+  startPageExport({
+    buttonSelector: "#export-vacancies", exportType: "vacancies",
+    itemIds: state.vacancyFiltered.map((listing) => listing.id),
+    filters: {
+      zoekopdracht: $("#vacancy-search").value.trim() || "Geen",
+      status: selectedText("#vacancy-status-filter", "Alle statussen"),
+      validatie: selectedText("#vacancy-validation-filter", "Alle validaties"),
+      snelkeuze: state.vacancyQuickFilter || "Geen",
+    },
+  });
+}
+
 function changeLabel(change) {
   const known = {
     new_url: "Nieuwe URL", disappeared_url: "URL verdwenen", status_code_changed: "Statuscode gewijzigd",
@@ -1204,6 +1273,9 @@ $("#cancel-crawl").addEventListener("click", () => controlCrawl("cancel"));
 $("#generate-excel").addEventListener("click", generateExcel);
 $("#refresh-operations").addEventListener("click", loadOperations);
 $("#current-export-download").addEventListener("click", () => window.setTimeout(loadOperations, 2000));
+$("#export-urls").addEventListener("click", exportUrls);
+$("#export-changes").addEventListener("click", exportChanges);
+$("#export-vacancies").addEventListener("click", exportVacancies);
 $("#save-search-console").addEventListener("click", () => saveProperty("search_console", "#search-console-property", "#save-search-console", "#search-console-message", state.googleConnectionId));
 $("#save-ga4").addEventListener("click", () => saveProperty("ga4", "#ga4-property", "#save-ga4", "#ga4-message", state.googleConnectionId));
 $("#save-ga4-key-events").addEventListener("click", saveGa4KeyEvents);
