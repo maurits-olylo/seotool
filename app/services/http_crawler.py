@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import httpx
 
 from app.services.security import validate_public_http_url
+from app.services.url_normalization import InvalidUrlError
 
 
 class CrawlError(RuntimeError):
@@ -42,7 +43,7 @@ def fetch_url(
     user_agent: str = "SEO-Monitor-Bot/0.1",
     transport: httpx.BaseTransport | None = None,
 ) -> FetchResult:
-    validate_public_http_url(url)
+    _validate_target(url)
     started = time.monotonic()
     chain: list[dict[str, object]] = []
     current_url = url
@@ -53,7 +54,7 @@ def fetch_url(
         transport=transport,
     ) as client:
         for _ in range(max_redirects + 1):
-            validate_public_http_url(current_url)
+            _validate_target(current_url)
             try:
                 with client.stream("GET", current_url) as response:
                     if response.is_redirect:
@@ -100,7 +101,7 @@ def fetch_metadata(
     user_agent: str = "SEO-Monitor-Bot/0.1",
     transport: httpx.BaseTransport | None = None,
 ) -> FetchMetadata:
-    validate_public_http_url(url)
+    _validate_target(url)
     started = time.monotonic()
     chain: list[dict[str, object]] = []
     current_url = url
@@ -111,7 +112,7 @@ def fetch_metadata(
         transport=transport,
     ) as client:
         for _ in range(max_redirects + 1):
-            validate_public_http_url(current_url)
+            _validate_target(current_url)
             try:
                 response = client.head(current_url)
             except httpx.TimeoutException as exc:
@@ -158,3 +159,10 @@ def _read_limited(response: httpx.Response, maximum: int) -> bytes:
         if len(content) > maximum:
             raise CrawlError("Response exceeds maximum size")
     return bytes(content)
+
+
+def _validate_target(url: str) -> None:
+    try:
+        validate_public_http_url(url)
+    except InvalidUrlError as exc:
+        raise CrawlError(str(exc), error_type="invalid_target") from exc

@@ -226,8 +226,14 @@ def resume_crawl_job(
         raise HTTPException(
             status_code=503, detail="Crawls zijn tijdelijk gepauzeerd voor deployment"
         )
-    if job.status != "paused":
-        raise HTTPException(status_code=409, detail="Alleen een gepauzeerde crawl kan hervatten")
+    if job.status not in {"paused", "failed"}:
+        raise HTTPException(
+            status_code=409, detail="Alleen een gepauzeerde of mislukte crawl kan hervatten"
+        )
+    if job.status == "failed" and not db.scalar(
+        select(CrawlRun.id).where(CrawlRun.crawl_job_id == job.id)
+    ):
+        raise HTTPException(status_code=409, detail="Deze crawl heeft geen hervatbare voortgang")
     job.status = "pending"
     job.finished_at = None
     job.error_message = None

@@ -843,7 +843,7 @@ async function loadOperations() {
       api(`/api/v1/websites/${websiteId}/crawl-runs?limit=20`),
       api(`/api/v1/exports?website_id=${websiteId}&limit=20`),
     ]);
-    const activeRun = state.crawlRuns.find((run) => ["running", "paused"].includes(run.status));
+    const activeRun = state.crawlRuns.find((run) => ["running", "paused"].includes(run.status)) || (state.crawlRuns[0]?.status === "failed" ? state.crawlRuns[0] : null);
     state.activeCrawlJob = activeRun ? await api(`/api/v1/crawl-jobs/${activeRun.crawl_job_id}`) : null;
     state.systemStatus = await api("/api/v1/system/status").catch(() => null);
     $("#operations-website-name").textContent = $("#website-select").selectedOptions[0]?.textContent || "de website";
@@ -883,15 +883,16 @@ function renderOperations() {
   const runLabels = {light_check: "Light check", full_site_crawl: "Volledige crawl", fetch_sitemap: "Sitemap", full_page_analysis: "Pagina-analyse"};
   $("#crawl-run-rows").innerHTML = state.crawlRuns.map((run) => `<tr><td>${new Date(run.started_at).toLocaleString("nl-NL")}</td><td>${runLabels[run.crawl_type] || escapeHtml(run.crawl_type)}</td><td><span class="run-status ${run.status}">${labels[run.status] || run.status}</span></td><td>${run.discovered_urls}</td><td>${run.crawled_urls}</td><td>${run.failed_urls}</td><td>${durationLabel(run)}</td></tr>`).join("");
   $("#crawl-runs-empty").classList.toggle("hidden", state.crawlRuns.length !== 0);
-  const runningCrawl = state.crawlRuns.find((run) => ["running", "paused"].includes(run.status));
-  const crawlStatus = state.activeCrawlJob?.status || runningCrawl?.status;
-  $("#crawl-live-status").classList.toggle("hidden", !runningCrawl);
-  $("#start-light-check").disabled = Boolean(runningCrawl);
-  $("#start-full-crawl").disabled = Boolean(runningCrawl);
-  if (runningCrawl) $("#crawl-live-label").textContent = `${runLabels[runningCrawl.crawl_type] || runningCrawl.crawl_type} · ${labels[crawlStatus] || crawlStatus} · ${runningCrawl.crawled_urls} gecrawld · ${runningCrawl.failed_urls} mislukt`;
+  const activeRun = state.crawlRuns.find((run) => ["running", "paused"].includes(run.status));
+  const controlledRun = activeRun || (state.crawlRuns[0]?.status === "failed" ? state.crawlRuns[0] : null);
+  const crawlStatus = state.activeCrawlJob?.status || controlledRun?.status;
+  $("#crawl-live-status").classList.toggle("hidden", !controlledRun);
+  $("#start-light-check").disabled = Boolean(activeRun);
+  $("#start-full-crawl").disabled = Boolean(activeRun);
+  if (controlledRun) $("#crawl-live-label").textContent = `${runLabels[controlledRun.crawl_type] || controlledRun.crawl_type} · ${labels[crawlStatus] || crawlStatus} · ${controlledRun.crawled_urls} gecrawld · ${controlledRun.failed_urls} mislukt`;
   $("#crawl-progress-track").classList.toggle("hidden", crawlStatus === "paused");
   $("#pause-crawl").classList.toggle("hidden", crawlStatus !== "running");
-  $("#resume-crawl").classList.toggle("hidden", crawlStatus !== "paused");
+  $("#resume-crawl").classList.toggle("hidden", !["paused", "failed"].includes(crawlStatus));
   $("#cancel-crawl").disabled = ["cancel_requested", "cancelled"].includes(crawlStatus);
   const currentExport = state.exports.find((item) => !item.downloaded_at && ["pending", "running", "succeeded"].includes(item.status));
   const exportPanel = $("#current-export"); const exportButton = $("#generate-excel"); const download = $("#current-export-download");
@@ -929,7 +930,7 @@ async function controlCrawl(action) {
   if (action === "cancel" && !window.confirm("Crawl stoppen? Reeds opgeslagen resultaten blijven behouden.")) return;
   const message = $("#crawl-action-message");
   message.classList.remove("error");
-  message.textContent = action === "pause" ? "Crawl wordt na de huidige URL gepauzeerd…" : action === "resume" ? "Crawl wordt hervat…" : "Crawl wordt na de huidige URL gestopt…";
+  message.textContent = action === "pause" ? "Crawl wordt na de huidige URL gepauzeerd…" : action === "resume" ? "Crawl wordt vanaf de opgeslagen voortgang hervat…" : "Crawl wordt na de huidige URL gestopt…";
   try {
     state.activeCrawlJob = await api(`/api/v1/crawl-jobs/${job.id}/${action}`, {method: "POST"});
     await loadOperations();

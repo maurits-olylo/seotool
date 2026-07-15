@@ -201,3 +201,15 @@ duiding wordt afgeleid en niet redundant in `changes` opgeslagen.
 
 Gevolg: historische wijzigingen profiteren direct van betere uitleg zonder dat data hoeft te worden
 herschreven; indexatiekritieke wijzigingen krijgen meer nadruk dan description- of schemaverschillen.
+
+## 2026-07-15 — Onbereikbare URL-doelen stoppen een sitecrawl niet
+
+Context: HUMAN liep na 3.560 pagina's volledig stuk op `http://human.nl/alvriend`, omdat een niet
+oplosbare hostname als onverwachte systeemfout buiten de normale URL-foutafhandeling viel.
+
+Besluit: URL- en DNS-validatiefouten worden als herstelbare `invalid_target`-crawlerfout opgeslagen.
+Ze verhogen het aantal mislukte URL's, maken een bereikbaarheidsissue aan en laten de crawl
+doorlopen. Een mislukte job met bestaande snapshots mag vanuit dezelfde crawlrun hervatten.
+
+Gevolg: een beperkt aantal onbereikbare links resulteert in `partially_succeeded` in plaats van een
+afgebroken sitecrawl; opgeslagen voortgang hoeft na een gerepareerde crawlerfout niet opnieuw.

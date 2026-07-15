@@ -23,6 +23,7 @@ SNAPSHOT_ISSUE_TYPES = {
     "http_5xx",
     "crawl_timeout",
     "redirect_loop",
+    "unreachable_url_target",
     "long_redirect_chain",
     "missing_title",
     "missing_meta_description",
@@ -60,10 +61,24 @@ class IssueSignal:
     confidence: str = "high"
 
 
-CRAWL_ERROR_ISSUE_TYPES = {"crawl_timeout", "redirect_loop"}
+CRAWL_ERROR_ISSUE_TYPES = {"crawl_timeout", "redirect_loop", "unreachable_url_target"}
 
 
 def inspect_crawl_error(error: CrawlError) -> list[IssueSignal]:
+    if error.error_type == "invalid_target":
+        return [
+            _signal(
+                "unreachable_url_target",
+                "reachability",
+                "medium",
+                "URL-doel kan niet worden bereikt",
+                "Controleer of hostname en URL nog bestaan en werk interne links naar een "
+                "bereikbare HTTPS-bestemming bij.",
+                confidence="medium",
+                error_type=error.error_type,
+                error_message=str(error),
+            )
+        ]
     if error.error_type == "timeout":
         return [
             _signal(

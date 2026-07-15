@@ -23,10 +23,14 @@ def test_maps_only_actionable_crawl_errors_to_issues() -> None:
     redirect_loop = inspect_crawl_error(
         CrawlError("Redirect loop detected", error_type="redirect_loop")
     )
+    unreachable = inspect_crawl_error(
+        CrawlError("Hostname could not be resolved", error_type="invalid_target")
+    )
     generic = inspect_crawl_error(CrawlError("Connection reset"))
 
     assert [signal.issue_type for signal in timeout] == ["crawl_timeout"]
     assert [signal.issue_type for signal in redirect_loop] == ["redirect_loop"]
+    assert [signal.issue_type for signal in unreachable] == ["unreachable_url_target"]
     assert generic == []
 
 

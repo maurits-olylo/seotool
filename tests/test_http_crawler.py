@@ -2,6 +2,7 @@ import httpx
 import pytest
 
 from app.services.http_crawler import CrawlError, fetch_metadata, fetch_url
+from app.services.url_normalization import InvalidUrlError
 
 
 @pytest.fixture(autouse=True)
@@ -59,3 +60,16 @@ def test_fetch_metadata_uses_head_without_downloading_body() -> None:
     result = fetch_metadata("https://example.com/file.pdf", transport=httpx.MockTransport(handler))
     assert result.status_code == 200
     assert result.headers["content-length"] == "7500000"
+
+
+def test_unresolvable_hostname_is_a_recoverable_crawl_error(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    def fail_resolution(*_: object, **__: object) -> object:
+        raise InvalidUrlError("Hostname could not be resolved")
+
+    monkeypatch.setattr("app.services.http_crawler.validate_public_http_url", fail_resolution)
+
+    with pytest.raises(CrawlError) as captured:
+        fetch_url("http://human.nl/alvriend")
+
+    assert captured.value.error_type == "invalid_target"
+    assert str(captured.value) == "Hostname could not be resolved"
