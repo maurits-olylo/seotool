@@ -175,13 +175,61 @@ Acceptatie:
 
 ## Fase 5 — Bing hervatten
 
-Status: gepauzeerd totdat voldoende Bing Webmaster Tools-data beschikbaar is.
+Status: in uitvoering; OAuth-koppeling is hersteld en HUMAN is gekoppeld. Data-import volgt.
 
 - Bing aanvullend vergelijken met Google en databron expliciet tonen.
 - Backlinkdiscovery en veranderingen toevoegen wanneer de officiële API dit ondersteunt.
 - Geen scraping-workaround voor ontbrekende officiële functionaliteit.
 
-## Fase 6 — Productieafronding
+## Fase 6 — Intelligente diagnose en UX/UI-polish
+
+Status: gepland; direct na de eerste werkende Bing-data-import oppakken als kernfase van het
+product.
+
+### Van signaal naar diagnose
+
+- Losse URL-signalen clusteren tot één waarschijnlijk onderliggend probleem.
+- URL-patronen herkennen, waaronder paginering, filters, facetten, parameters, templates en
+  canonical- of redirectconfiguraties.
+- Vergelijkbare paginagroepen vormen en afwijkingen binnen zo'n groep aanwijzen in plaats van alle
+  normale waarden als losse regels te tonen.
+- Crawldiepte, indexatie, interne links, wijzigingen, schema en verkeersdata gezamenlijk beoordelen.
+- Mogelijke hoofdoorzaak, alternatieve verklaring, vertrouwen en technisch bewijs apart tonen.
+- Eén hoofdissue koppelen aan geraakte URL's en onderliggende signalen zonder historie te verliezen.
+
+### Van diagnose naar exact handelingsadvies
+
+- Uitleggen waarom het probleem relevant is en welk SEO- of beheerrisico ontstaat.
+- Zo concreet mogelijk aangeven wat moet worden aangepast: bronpagina's, linkpatroon, template,
+  canonical, redirect, robotsregel, sitemap of contentonderdeel.
+- Benoemen wanneer juist geen wijziging nodig is en alleen menselijke beoordeling gevraagd wordt.
+- Een verwachte eindsituatie en controle na implementatie geven: wat moet bij de volgende crawl
+  veranderd zijn om het probleem als opgelost te bevestigen.
+- Adviezen uitsluitend baseren op opgeslagen bewijs; onzekerheid zichtbaar houden en geen
+  onbewezen AI-conclusie als feit presenteren.
+
+### UX/UI-polish
+
+- Issues presenteren als diagnosekaart met samenvatting, waarom, waarschijnlijk probleem,
+  concrete stappen, bewijs en verificatie in een duidelijke volgorde.
+- Grote aantallen vergelijkbare URL's standaard groeperen en voorbeelden plus totaalomvang tonen.
+- Tabellen richten op uitzonderingen en beslissingen; normale herhaling standaard samenvatten.
+- Bron- en doelaantallen eenduidig benoemen, bijvoorbeeld drie links vanaf twee unieke pagina's.
+- Technisch bewijs leesbaar formatteren en ruwe waarden pas op verzoek uitklappen.
+- Dialogen, typografie, witruimte, filters, bulkacties, lege staten en mobiele weergave consistent
+  nalopen.
+
+Acceptatie:
+
+- De 404's op HUMAN-paginering worden als één patroon onderzocht en waar aantoonbaar als één
+  waarschijnlijk paginerings-, filter- of canonicalprobleem gepresenteerd.
+- Een overzicht met honderd URL's op crawldiepte 1 benoemt vooral de waarschijnlijke uitzonderingen.
+- Ieder belangrijk issue beantwoordt: wat gebeurt er, waarom is dat relevant, wat is waarschijnlijk
+  de oorzaak, wat moet concreet worden aangepast en hoe wordt de oplossing gecontroleerd.
+- Een gebruiker kan altijd onderscheid maken tussen feitelijk bewijs, systeeminterpretatie en een
+  onzekere hypothese.
+
+## Fase 7 — Productieafronding
 
 Status: gepland.
 
@@ -199,7 +247,7 @@ Status: gepland.
 - Logging, operationele status en documentatie afronden.
 - Reproduceerbare NAS-installatie en alle relevante MVP-acceptatiecriteria controleren.
 
-## Fase 7 — Schaalbaarheid en parallelle crawls
+## Fase 8 — Schaalbaarheid en parallelle crawls
 
 Status: later; pas oppakken wanneer het aantal gelijktijdige klanten de enkele crawl-worker
 structureel laat vollopen.
@@ -219,7 +267,7 @@ Acceptatie:
 - De ingestelde globale capaciteitslimiet wordt nooit overschreden.
 - Pauzeren, deployen en hervatten werkt aantoonbaar voor meerdere actieve crawls tegelijk.
 
-## Fase 8 — Matomo-integratie
+## Fase 9 — Matomo-integratie
 
 Status: later; uitsluitend oppakken nadat de Bing Webmaster Tools-integratie is hervat en
 gevalideerd.

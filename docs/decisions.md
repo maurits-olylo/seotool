@@ -256,3 +256,19 @@ geen sitemap bestaat, eindigt de job expliciet als mislukt met een begrijpelijke
 
 Gevolg: lege succesregels verdwijnen, websites zonder handmatige sitemapconfiguratie worden toch
 automatisch ontdekt en dubbele URL's vertekenen de telling niet.
+
+## 2026-07-15 — Intelligentie betekent bewijs, verband en uitvoerbare diagnose
+
+Context: losse issues met een generieke beschrijving en actie leveren onvoldoende advieswaarde.
+Honderd vergelijkbare URL-signalen zijn vaak symptomen van één template-, filter-, paginering- of
+canonicalprobleem. Een lange lijst of korte samenvatting helpt dan niet bij de werkelijke oplossing.
+
+Besluit: SEO Monitor ontwikkelt van signaaldetector naar diagnoseplatform. Deterministische analyse
+vormt eerst URL-cohorten, herkent patronen en koppelt signalen over crawls en databronnen. Een
+diagnose scheidt feitelijk bewijs, interpretatie en hypothese; toont vertrouwen en alternatieven; en
+geeft concrete aanpassing plus verificatiecriterium. Taalmodellen mogen later uitleg en aanvullende
+hypothesen ondersteunen, maar uitsluitend op meegeleverd bewijs en nooit als ongecontroleerde bron.
+
+Gevolg: de primaire eenheid in de interface wordt waar mogelijk één onderliggende diagnose met
+geraakte URL's, niet een los issue per URL. UX-polish richt zich op uitzonderingen, beslissingen en
+progressieve uitleg in plaats van meer tabellen of decoratie.
