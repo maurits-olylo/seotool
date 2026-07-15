@@ -186,5 +186,6 @@ Alleen een geslaagde crawl levert een betrouwbare kortste route of een betrouwba
 geen interne route is gevonden. Andere waarden worden expliciet als voorlopig of onvolledig
 gemarkeerd. De crawler overschrijft een al gevonden kortere route niet met een langere wachtrijroute.
 
-Gevolg: een waarde zoals diepte 2 is controleerbaar als resultaat van een voltooide crawl; resultaten
-van een afgebroken crawl kunnen niet langer voor definitieve structuurdata worden aangezien.
+Gevolg: een waarde zoals diepte 2 is controleerbaar als resultaat van een voltooide crawl en het
+URL-detail reconstrueert de concrete kortste route uit de links van die crawl. Resultaten van een
+afgebroken crawl kunnen niet langer voor definitieve structuurdata worden aangezien.

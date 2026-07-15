@@ -817,7 +817,10 @@ function renderUrls() {
 async function showUrl(urlId) {
   const url = state.urlRecords.find((item) => item.id === urlId);
   if (!url) return;
-  const snapshots = await api(`/api/v1/urls/${urlId}/snapshots?limit=1`);
+  const [snapshots, route] = await Promise.all([
+    api(`/api/v1/urls/${urlId}/snapshots?limit=1`),
+    api(`/api/v1/urls/${urlId}/crawl-route`),
+  ]);
   const snapshot = snapshots[0];
   const issues = state.issues.filter((issue) => issue.url_id === urlId && ACTIVE_STATUSES.has(issue.status));
   $("#url-detail-link").textContent = url.normalized_url;
@@ -825,6 +828,7 @@ async function showUrl(urlId) {
   $("#url-detail-status").textContent = `${url.current_status_code ?? "Niet gecontroleerd"}${url.current_final_url && url.current_final_url !== url.normalized_url ? ` → ${url.current_final_url}` : ""}`;
   $("#url-detail-indexation").textContent = {indexable: "Indexeerbaar", blocked: "Niet indexeerbaar", unknown: "Onbekend"}[urlIndexState(url)];
   $("#url-detail-crawl").textContent = `Crawl-diepte: ${url.crawl_depth ?? "onbekend"} · ${url.crawl_depth_context || "Geen meetcontext"} · Paginatype: ${url.page_type || "onbekend"}`;
+  $("#url-detail-route").textContent = route.route.length ? route.route.join("\n→ ") : route.context;
   $("#url-detail-snapshot").textContent = snapshot ? `${new Date(snapshot.checked_at).toLocaleString("nl-NL")} · ${snapshot.response_size ?? 0} bytes · ${snapshot.response_time_ms ?? "—"} ms · ${snapshot.word_count ?? "—"} woorden` : "Geen snapshot beschikbaar.";
   $("#url-detail-issues").textContent = issues.length ? issues.map((issue) => `${labels[issue.severity] || issue.severity}: ${issue.title}`).join("\n") : "Geen actieve issues.";
   $("#url-dialog").showModal();

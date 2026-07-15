@@ -9,9 +9,9 @@ from app.core.queue import enqueue_crawl_job
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.common import utc_now
-from app.models.crawl import CrawlRun
+from app.models.crawl import CrawlRun, UrlLink
 from app.models.discovery import CrawlJob, Url
-from app.schemas.discovery import CrawlJobCreate, CrawlJobRead, UrlRead, UrlRegister
+from app.schemas.discovery import CrawlJobCreate, CrawlJobRead, CrawlRouteRead, UrlRead, UrlRegister
 from app.services.authorization import require_website_access
 from app.services.crawl_deployment import crawl_deployment_is_active
 from app.services.url_registry import register_url
@@ -65,6 +65,61 @@ def _url_read_with_depth_context(url: Url, run: CrawlRun | None) -> UrlRead:
     data["crawl_depth_reliable"] = reliable
     data["crawl_depth_context"] = context
     return UrlRead.model_validate(data)
+
+
+@router.get("/urls/{url_id}/crawl-route", response_model=CrawlRouteRead)
+def get_crawl_route(
+    url_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> CrawlRouteRead:
+    target = db.get(Url, url_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="URL not found")
+    require_website_access(db, principal, target.website_id)
+    run = db.scalar(
+        select(CrawlRun)
+        .where(CrawlRun.website_id == target.website_id, CrawlRun.crawl_type == "full_site_crawl")
+        .order_by(CrawlRun.started_at.desc())
+        .limit(1)
+    )
+    context = _url_read_with_depth_context(target, run).crawl_depth_context
+    if not run or run.status != "succeeded" or target.crawl_depth is None:
+        return CrawlRouteRead(reliable=False, depth=target.crawl_depth, route=[], context=context)
+    route = [target.normalized_url]
+    current = target
+    current_depth = target.crawl_depth
+    while current_depth > 0:
+        predecessor = db.scalar(
+            select(Url)
+            .join(UrlLink, UrlLink.source_url_id == Url.id)
+            .where(
+                UrlLink.crawl_run_id == run.id,
+                UrlLink.target_url_id == current.id,
+                UrlLink.is_internal.is_(True),
+                Url.crawl_depth == current_depth - 1,
+            )
+            .order_by(Url.normalized_url)
+            .limit(1)
+        )
+        if predecessor is None:
+            return CrawlRouteRead(
+                reliable=False,
+                depth=target.crawl_depth,
+                route=list(reversed(route)),
+                context=(
+                    "Diepte is bekend, maar de volledige linkroute kon niet worden gereconstrueerd"
+                ),
+            )
+        route.append(predecessor.normalized_url)
+        current = predecessor
+        current_depth -= 1
+    return CrawlRouteRead(
+        reliable=True,
+        depth=target.crawl_depth,
+        route=list(reversed(route)),
+        context=context,
+    )
 
 
 @router.post(

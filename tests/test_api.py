@@ -10,7 +10,7 @@ from app.api.routes.reports import _period_dates
 from app.core.config import get_settings
 from app.core.security import create_session_token, hash_password
 from app.db.session import SessionLocal
-from app.models.crawl import CrawlRun
+from app.models.crawl import CrawlRun, UrlLink
 from app.models.discovery import CrawlJob, Url
 from app.models.integrations import (
     GoogleAnalyticsEventMetric,
@@ -791,3 +791,57 @@ def test_url_overview_marks_depth_from_failed_crawl_as_unreliable(client: TestCl
     assert item["crawl_depth"] == 2
     assert item["crawl_depth_reliable"] is False
     assert "niet voltooid" in item["crawl_depth_context"]
+
+
+def test_url_detail_returns_shortest_internal_route(client: TestClient) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Route context"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={"client_id": customer["id"], "name": "Route", "base_url": "https://route.test"},
+    ).json()
+    website_id = UUID(website["id"])
+    with SessionLocal() as db:
+        root = Url(website_id=website_id, normalized_url="https://route.test/", crawl_depth=0)
+        middle = Url(website_id=website_id, normalized_url="https://route.test/hub", crawl_depth=1)
+        target = Url(website_id=website_id, normalized_url="https://route.test/page", crawl_depth=2)
+        job = CrawlJob(website_id=website_id, job_type="full_site_crawl", status="succeeded")
+        db.add_all([root, middle, target, job])
+        db.flush()
+        run = CrawlRun(
+            crawl_job_id=job.id,
+            website_id=website_id,
+            crawl_type="full_site_crawl",
+            status="succeeded",
+        )
+        db.add(run)
+        db.flush()
+        db.add_all(
+            [
+                UrlLink(
+                    crawl_run_id=run.id,
+                    source_url_id=root.id,
+                    target_url=middle.normalized_url,
+                    target_url_id=middle.id,
+                    is_internal=True,
+                    is_nofollow=False,
+                ),
+                UrlLink(
+                    crawl_run_id=run.id,
+                    source_url_id=middle.id,
+                    target_url=target.normalized_url,
+                    target_url_id=target.id,
+                    is_internal=True,
+                    is_nofollow=False,
+                ),
+            ]
+        )
+        db.commit()
+        target_id = target.id
+
+    route = client.get(f"/api/v1/urls/{target_id}/crawl-route").json()
+    assert route["reliable"] is True
+    assert route["route"] == [
+        "https://route.test/",
+        "https://route.test/hub",
+        "https://route.test/page",
+    ]

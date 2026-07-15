@@ -32,6 +32,13 @@ class UrlRegister(BaseModel):
     source_url: str = ""
 
 
+class CrawlRouteRead(BaseModel):
+    reliable: bool
+    depth: int | None
+    route: list[str]
+    context: str
+
+
 class CrawlJobCreate(BaseModel):
     website_id: UUID
     job_type: Literal["fetch_sitemap", "light_check", "full_page_analysis", "full_site_crawl"]
