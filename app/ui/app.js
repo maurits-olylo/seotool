@@ -18,6 +18,7 @@ const VIEW_HASHES = {overview: "overzicht", reports: "rapportage", insights: "in
 const CLIENT_STORAGE_KEY = "seo-monitor-client-id";
 const WEBSITE_STORAGE_KEY = "seo-monitor-website-id";
 let operationsPollTimer = null;
+let storyObserver = null;
 
 async function api(path, options = {}) {
   const response = await fetch(path, { credentials: "same-origin", ...options });
@@ -674,9 +675,11 @@ function applyOverviewPresentation(reportMode) {
   $("#overview-eyebrow").textContent = reportMode ? "SEO-RAPPORTAGE" : "PRODUCTIE";
   $("#overview-title").textContent = reportMode ? "Organische groei & SEO" : "Technische SEO-acties";
   $("#client-report-intro").classList.toggle("hidden", !reportMode);
+  $("#overview-intro").classList.toggle("hidden", reportMode);
   $("#client-report").classList.toggle("hidden", !reportMode);
   $("#report-archive").classList.toggle("hidden", !reportMode);
   $("#summary").classList.toggle("hidden", reportMode);
+  $("#overview-story").classList.toggle("hidden", reportMode);
   $("#vacancy-dashboard").classList.toggle("hidden", reportMode);
   $("#internal-action-panel").classList.toggle("hidden", reportMode);
 }
@@ -757,6 +760,7 @@ function renderJobListings() {
   }).join("");
   $("#vacancy-empty").classList.toggle("hidden", state.vacancyFiltered.length !== 0);
   renderVacancyDashboard();
+  renderOverviewStory();
 }
 
 function renderVacancyDashboard() {
@@ -1152,6 +1156,49 @@ function renderGroups() {
     .map(([type, count]) => `<button data-group-type="${escapeHtml(type)}"><strong>${count}</strong><span>${escapeHtml(type.replaceAll("_", " "))}</span></button>`).join("");
 }
 
+function storyRows(items, emptyText) {
+  if (!items.length) return `<div class="story-metric"><strong>0</strong><span>${emptyText}</span></div>`;
+  return items.slice(0, 4).map((item) => `<div class="story-row"><b class="${escapeHtml(item.level || "")}"></b><strong>${escapeHtml(item.title)}</strong><em>${escapeHtml(item.label)}</em></div>`).join("");
+}
+
+function renderOverviewStory() {
+  const active = state.issues.filter((issue) => ACTIVE_STATUSES.has(issue.status));
+  const severityOrder = {high:0, medium:1, low:2};
+  const priority = [...active].sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+  $("#story-priority-content").innerHTML = storyRows(priority.map((issue) => ({title: issue.title, level: issue.severity, label: labels[issue.severity] || issue.severity})), "Geen actieve aandachtspunten");
+  const recent = [...active].sort((a, b) => new Date(b.last_detected_at) - new Date(a.last_detected_at));
+  $("#story-change-content").innerHTML = storyRows(recent.map((issue) => ({title: issue.title, level: issue.severity, label: new Date(issue.last_detected_at).toLocaleDateString("nl-NL")})), "Geen recente signalen");
+  const deep = state.urlRecords.filter((url) => url.crawl_depth !== null).sort((a, b) => b.crawl_depth - a.crawl_depth);
+  $("#story-structure-content").innerHTML = `<div class="story-metric"><strong>${state.urlRecords.length.toLocaleString("nl-NL")}</strong><span>bekende actieve URL’s</span></div>${deep.slice(0, 3).map((url) => `<div class="story-route"><span>${escapeHtml(url.normalized_url.replace(/^https?:\/\//, ""))}</span><i>→</i><span>diepte ${url.crawl_depth}</span></div>`).join("")}`;
+  const summary = state.jobSummary || {};
+  $("#story-vacancy-content").innerHTML = `<div class="story-metric"><strong>${Number(summary.total || 0).toLocaleString("nl-NL")}</strong><span>herkende vacatures</span></div>${storyRows([{title:"Actieve vacatures",label:String(summary.active || 0)},{title:"Loopt bijna af",level:"medium",label:String(summary.expiring_soon || 0)},{title:"Met aandachtspunt",level:"high",label:String(summary.needs_attention || 0)}], "Nog geen vacaturedata")}`;
+}
+
+function activateStoryCard(card) {
+  const cards = [...document.querySelectorAll(".story-card")];
+  cards.forEach((item) => item.classList.toggle("is-active", item === card));
+  const index = Number(card.dataset.storyIndex || 0);
+  $("#story-step").textContent = `${String(index + 1).padStart(2, "0")} / ${String(cards.length).padStart(2, "0")}`;
+  $("#story-title").textContent = card.dataset.storyTitle;
+  $("#story-description").textContent = card.dataset.storyDescription;
+  $("#story-action").textContent = card.dataset.storyAction;
+  $("#story-action").dataset.target = card.dataset.storyTarget;
+  $("#story-progress-bar").style.width = `${((index + 1) / cards.length) * 100}%`;
+}
+
+function setupOverviewStory() {
+  const cards = [...document.querySelectorAll(".story-card")];
+  if (!cards.length) return;
+  activateStoryCard(cards[0]);
+  if (!("IntersectionObserver" in window) || window.matchMedia("(max-width: 1000px)").matches) return;
+  storyObserver?.disconnect();
+  storyObserver = new IntersectionObserver((entries) => {
+    const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+    if (visible) activateStoryCard(visible.target);
+  }, {rootMargin:"-20% 0px -30% 0px", threshold:[.25,.5,.75]});
+  cards.forEach((card) => storyObserver.observe(card));
+}
+
 function render() {
   renderClientReport();
   applyFilters();
@@ -1160,6 +1207,7 @@ function render() {
   state.filtered.forEach((issue) => { if (counts[issue.severity] !== undefined) counts[issue.severity] += 1; });
   $("#summary").innerHTML = [["total","Actief"],["high","Hoog"],["medium","Middel"],["low","Laag"]]
     .map(([key,label]) => `<article class="card ${key}"><strong>${counts[key]}</strong><span>${label}</span></article>`).join("");
+  renderOverviewStory();
   const pages = Math.max(1, Math.ceil(state.filtered.length / PAGE_SIZE));
   state.page = Math.min(state.page, pages);
   const start = (state.page - 1) * PAGE_SIZE;
@@ -1276,6 +1324,11 @@ $("#vacancy-search").addEventListener("input", () => { state.vacancyQuickFilter 
 $("#vacancy-rows").addEventListener("click", (event) => { const button = event.target.closest("[data-issue-id]"); if (button) showIssue(button.dataset.issueId); });
 $("#vacancy-dashboard-stats").addEventListener("click", (event) => { const button = event.target.closest("[data-vacancy-filter]"); if (button) openVacanciesWithFilter(button.dataset.vacancyFilter); });
 $("#open-vacancies").addEventListener("click", () => openVacanciesWithFilter());
+$("#story-action").addEventListener("click", (event) => {
+  const target = event.currentTarget.dataset.target;
+  if (target === "issues") $("#internal-action-panel").scrollIntoView({behavior:"smooth"});
+  else if (target) showView(target);
+});
 $("#close-change-dialog").addEventListener("click", () => $("#change-dialog").close());
 $("#start-light-check").addEventListener("click", () => startCrawl("light_check"));
 $("#start-full-crawl").addEventListener("click", () => startCrawl("full_site_crawl"));
@@ -1302,6 +1355,7 @@ api("/api/v1/me").then((user) => {
   return loadClients();
 }).then(() => {
   showApp();
+  setupOverviewStory();
   const integrationResult = new URLSearchParams(window.location.search).get("integration");
   if (integrationResult) {
     showView("integrations");

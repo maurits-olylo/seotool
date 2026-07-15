@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="/ui/assets/key-events.css">
   <link rel="stylesheet" href="/ui/assets/jobs.css">
   <link rel="stylesheet" href="/ui/assets/insights.css">
+  <link rel="stylesheet" href="/ui/assets/overview-redesign.css?v=20260715-1">
 </head>
 <body>
   <div id="app" class="app-shell hidden">
@@ -33,7 +34,7 @@
     <main>
       <section id="overview-view">
       <header>
-        <div><span id="overview-eyebrow" class="eyebrow">PRODUCTIE</span><h1 id="overview-title">Technische SEO-acties</h1><p id="client-report-intro" class="intro hidden">Organische prestaties, gerealiseerd werk en de belangrijkste vervolgstappen.</p></div>
+        <div><span id="overview-eyebrow" class="eyebrow">PRODUCTIE</span><h1 id="overview-title">Technische SEO-acties</h1><p id="overview-intro" class="intro">Zie wat aandacht vraagt, waarom het telt en waar je vandaag begint.</p><p id="client-report-intro" class="intro hidden">Organische prestaties, gerealiseerd werk en de belangrijkste vervolgstappen.</p></div>
         <div id="report-selectors" class="selectors">
           <label id="client-selector-wrap"><span>Klant</span><select id="client-select" aria-label="Klant"></select></label>
           <label id="website-selector-wrap"><span>Website</span><select id="website-select" aria-label="Website"></select></label>
@@ -58,6 +59,30 @@
         <section class="panel report-section report-new"><div class="panel-head"><div><span class="eyebrow">NIEUW GESIGNALEERD</span><h2>Nieuwe aandachtspunten</h2></div></div><div id="report-new-issues" class="report-list report-list-grid"></div></section>
       </section>
       <section id="summary" class="cards"></section>
+      <section id="overview-story" class="overview-story" aria-label="SEO Monitor in één oogopslag">
+        <div class="story-copy">
+          <span class="eyebrow">VAN SIGNAAL NAAR ACTIE</span>
+          <div class="story-progress" aria-hidden="true"><span id="story-progress-bar"></span></div>
+          <p id="story-step">01 / 04</p>
+          <h2 id="story-title">Begin bij wat echt urgent is.</h2>
+          <p id="story-description">SEO Monitor ordent technische signalen op ernst en organische impact, zodat je niet door ruis hoeft te zoeken.</p>
+          <button id="story-action" class="story-action" type="button">Bekijk actielijst</button>
+        </div>
+        <div class="story-visuals">
+          <article class="story-card story-card-priority" data-story-index="0" data-story-title="Begin bij wat echt urgent is." data-story-description="SEO Monitor ordent technische signalen op ernst en organische impact, zodat je niet door ruis hoeft te zoeken." data-story-action="Bekijk actielijst" data-story-target="issues">
+            <div class="story-window-head"><span>Prioriteiten van vandaag</span><i></i><i></i><i></i></div><div id="story-priority-content" class="story-window-content"></div>
+          </article>
+          <article class="story-card story-card-changes" data-story-index="1" data-story-title="Begrijp wat er veranderde." data-story-description="Vergelijk meetmomenten, zie mogelijke impact en open alleen wijzigingen die een inhoudelijke controle verdienen." data-story-action="Bekijk wijzigingen" data-story-target="changes">
+            <div class="story-window-head"><span>Recente veranderingen</span><i></i><i></i><i></i></div><div id="story-change-content" class="story-window-content"></div>
+          </article>
+          <article class="story-card story-card-structure" data-story-index="2" data-story-title="Maak sitestructuur zichtbaar." data-story-description="Crawldiepte, indexatie en interne routes worden samen één helder verhaal in plaats van losse technische waarden." data-story-action="Bekijk URL’s" data-story-target="urls">
+            <div class="story-window-head"><span>Sitestructuur</span><i></i><i></i><i></i></div><div id="story-structure-content" class="story-window-content"></div>
+          </article>
+          <article class="story-card story-card-vacancies" data-story-index="3" data-story-title="Houd vacatures actueel." data-story-description="Volg lifecycle, structured data en verlopen deadlines zonder vacatures handmatig te hoeven nalopen." data-story-action="Bekijk vacatures" data-story-target="vacancies">
+            <div class="story-window-head"><span>Vacaturemonitor</span><i></i><i></i><i></i></div><div id="story-vacancy-content" class="story-window-content"></div>
+          </article>
+        </div>
+      </section>
       <section id="vacancy-dashboard" class="panel vacancy-dashboard">
         <div class="panel-head"><div><span class="eyebrow">VACATUREMONITOR</span><h2>Vacatures in beeld</h2></div><button id="open-vacancies" class="detail-button">Alle vacatures</button></div>
         <div id="vacancy-dashboard-stats" class="vacancy-dashboard-stats"></div>

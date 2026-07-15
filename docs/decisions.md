@@ -213,3 +213,16 @@ doorlopen. Een mislukte job met bestaande snapshots mag vanuit dezelfde crawlrun
 
 Gevolg: een beperkt aantal onbereikbare links resulteert in `partially_succeeded` in plaats van een
 afgebroken sitecrawl; opgeslagen voortgang hoeft na een gerepareerde crawlerfout niet opnieuw.
+
+## 2026-07-15 — Het overzicht gebruikt een redactioneel scrollverhaal
+
+Context: het technische overzicht was bruikbaar maar visueel vlak. De gewenste referentie combineert
+veel witruimte, grote productvisuals en tekst die tijdens scrollen meebeweegt met de actieve functie.
+
+Besluit: kleuren en typografie van SEO Monitor blijven behouden. Het Overzicht krijgt een ruimere
+hero en een tweekoloms productverhaal: links sticky uitleg en actie, rechts datagedreven visuals voor
+prioriteiten, veranderingen, sitestructuur en vacatures. Op kleinere schermen wordt dit een gewone
+verticale stroom; `prefers-reduced-motion` schakelt overgangen uit.
+
+Gevolg: het startscherm voelt meer als één begeleid verhaal, terwijl tabellen en beheerpagina's hun
+compacte, operationele karakter behouden.
