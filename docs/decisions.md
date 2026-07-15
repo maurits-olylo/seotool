@@ -163,3 +163,15 @@ bevatten daarnaast website, UTC-exporttijd en filters als vaste contextkolommen.
 
 Gevolg: een pagina-export is reproduceerbaar en bevat uitsluitend de selectie die bij het starten
 zichtbaar was; een lege selectie valt niet terug op alle records.
+
+## 2026-07-15 — Databasepoolverbindingen zijn procesgebonden
+
+Context: RQ maakt voor jobs een childproces. De worker had tijdens herstel al een PostgreSQL-
+verbinding geopend, waardoor het childproces die verbinding en psycopg prepared statements erfde.
+Een hervatte HUMAN-crawl mislukte daardoor met `DuplicatePreparedStatement`.
+
+Besluit: iedere SQLAlchemy-verbinding bewaart het proces-ID waarin zij is geopend. Bij checkout in
+een ander proces wordt de geërfde verbinding ongeldig gemaakt en transparant opnieuw geopend.
+
+Gevolg: crawls en andere RQ-jobs delen nooit een fysieke databaseverbinding met het workerproces;
+prepared-statementstatus en transactiestatus kunnen niet meer over een fork lekken.
