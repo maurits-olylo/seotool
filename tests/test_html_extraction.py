@@ -75,3 +75,19 @@ def test_preserves_invalid_json_ld_as_a_validation_marker() -> None:
 
     assert page.schema_data == [{INVALID_JSON_LD_MARKER: True}]
     assert page.schema_types == []
+
+
+def test_skips_malformed_ipv6_link_and_canonical_without_failing_page() -> None:
+    page = extract_page(
+        """
+        <html><head><link rel="canonical" href="https://[invalid/canonical"></head>
+        <body><main>
+          <a href="https://[invalid/link">Malformed</a>
+          <a href="/valid">Valid</a>
+        </main></body></html>
+        """,
+        "https://www.human.nl/medialogica/kijk/afleveringen/2018/aflevering-6.html",
+    )
+
+    assert page.canonical is None
+    assert [link.target_url for link in page.links] == ["https://www.human.nl/valid"]

@@ -22,3 +22,8 @@ def test_custom_ignored_parameter_and_relative_url() -> None:
 def test_rejects_unsupported_protocol() -> None:
     with pytest.raises(InvalidUrlError):
         normalize_url("file:///etc/passwd")
+
+
+def test_rejects_invalid_ipv6_syntax_as_normalization_error() -> None:
+    with pytest.raises(InvalidUrlError, match="syntax"):
+        normalize_url("https://[invalid/path")

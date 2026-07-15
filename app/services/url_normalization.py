@@ -32,8 +32,11 @@ def normalize_url(
     options: NormalizationOptions | None = None,
 ) -> str:
     options = options or NormalizationOptions()
-    absolute_url = urljoin(base_url, url) if base_url else url
-    parts = urlsplit(absolute_url.strip())
+    try:
+        absolute_url = urljoin(base_url, url) if base_url else url
+        parts = urlsplit(absolute_url.strip())
+    except ValueError as exc:
+        raise InvalidUrlError("Invalid URL syntax") from exc
     scheme = parts.scheme.lower()
     if scheme not in {"http", "https"}:
         raise InvalidUrlError("Only HTTP and HTTPS URLs are supported")

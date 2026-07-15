@@ -3,12 +3,14 @@ import re
 from dataclasses import dataclass
 from urllib.parse import urljoin, urlsplit
 
+import structlog
 from bs4 import BeautifulSoup
 
 from app.services.hashing import stable_hash
 from app.services.url_normalization import InvalidUrlError, normalize_url
 
 INVALID_JSON_LD_MARKER = "_seo_monitor_invalid_json_ld"
+logger = structlog.get_logger()
 
 
 @dataclass(frozen=True)
@@ -45,11 +47,13 @@ def extract_page(html: str, page_url: str) -> ExtractedPage:
     description = _meta_content(soup, "description")
     robots = _meta_content(soup, "robots")
     canonical_tag = soup.find("link", rel=lambda value: value and "canonical" in value)
-    canonical = (
-        urljoin(page_url, canonical_tag.get("href"))
-        if canonical_tag and canonical_tag.get("href")
-        else None
-    )
+    canonical = None
+    if canonical_tag and canonical_tag.get("href"):
+        canonical = _resolve_page_url(
+            page_url,
+            str(canonical_tag.get("href")),
+            element="canonical",
+        )
     headings = {
         level: [_clean_text(tag.get_text(" ", strip=True)) for tag in soup.find_all(level)]
         for level in ("h1", "h2", "h3", "h4", "h5", "h6")
@@ -155,16 +159,47 @@ def _extract_links(soup: BeautifulSoup, page_url: str) -> list[ExtractedLink]:
     page_host = urlsplit(page_url).hostname
     links: list[ExtractedLink] = []
     for tag in soup.find_all("a", href=True):
-        target = urljoin(page_url, str(tag["href"]))
-        if urlsplit(target).scheme not in {"http", "https"}:
+        target = _resolve_page_url(page_url, str(tag["href"]), element="link")
+        if target is None:
+            continue
+        try:
+            target_parts = urlsplit(target)
+        except ValueError:
+            _log_invalid_page_url(page_url, target, element="link")
+            continue
+        if target_parts.scheme not in {"http", "https"}:
             continue
         rel = {str(item).lower() for item in (tag.get("rel") or [])}
         links.append(
             ExtractedLink(
                 target_url=target,
                 anchor_text=_clean_text(tag.get_text(" ", strip=True)),
-                is_internal=urlsplit(target).hostname == page_host,
+                is_internal=target_parts.hostname == page_host,
                 is_nofollow="nofollow" in rel,
             )
         )
     return links
+
+
+def _resolve_page_url(page_url: str, raw_url: str, *, element: str) -> str | None:
+    try:
+        return urljoin(page_url, raw_url)
+    except ValueError:
+        _log_invalid_page_url(page_url, raw_url, element=element)
+        return None
+
+
+def _log_invalid_page_url(page_url: str, raw_url: str, *, element: str) -> None:
+    logger.warning(
+        "crawl_html_url_skipped_invalid_syntax",
+        source_url=_safe_log_value(page_url),
+        target_url=_safe_log_value(raw_url),
+        element=element,
+    )
+
+
+def _safe_log_value(value: str) -> str:
+    without_query = value.split("?", 1)[0].split("#", 1)[0]
+    if "@" in without_query:
+        without_query = without_query.rsplit("@", 1)[-1]
+    return without_query[:1000]
