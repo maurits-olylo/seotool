@@ -72,16 +72,6 @@ gebruiker geen websites, URL's, crawls, issues of rapportages van een andere kla
 
 Status: in uitvoering.
 
-### Visuele vernieuwing Overzicht
-
-Status: technisch geïmplementeerd; frontenddeployment en visuele productievalidatie volgen.
-
-- Bestaande kleuren en typografie behouden.
-- Ruimere redactionele hero en zachtere productpresentatie toevoegen.
-- Sticky uitleg links koppelen aan scrollende datavisuals rechts.
-- Prioriteiten, veranderingen, sitestructuur en vacatures met actuele data presenteren.
-- Op mobiel en bij verminderde beweging een rustige lineaire variant tonen.
-
 - Thin-contentdetectie en ruisarme wijzigingsdetectie aanscherpen.
 - Verouderde content buiten vacatures toevoegen met voorzichtige signalering.
 - GSC/GA4-impact en consultantinzichten verder prioriteren.
