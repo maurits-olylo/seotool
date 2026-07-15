@@ -321,14 +321,19 @@ productvoorwaarden.
 
 ## 2026-07-16 — Bing-data blijft een expliciete aanvullende zoekbron
 
-Context: de OAuth-koppeling en propertyselectie bestonden al, maar Bing-pagina- en zoektermdata
-werden nog niet geïmporteerd. Daardoor kon de tool Bing niet naast Google beoordelen.
+Context: de OAuth-koppeling en propertyselectie bestonden al, maar Bing-pagina-, zoekterm- en
+inkomende-linkdata werden nog niet geïmporteerd. Daardoor kon de tool Bing niet naast Google
+beoordelen en bleef officiële linkdata onbenut.
 
 Besluit: Bing-statistieken krijgen eigen dagelijkse tabellen voor pagina's en zoektermen. Imports
 vervangen idempotent de gekozen periode, koppelen genormaliseerde pagina-URL's aan het URL-register
 en bewaren ongekoppelde regels. Handmatige en geplande synchronisatie gebruiken dezelfde service.
-Inzichten noemen Bing altijd als bron en trekken geen zoekmachinebrede conclusie uit alleen Bing.
+Dezelfde import haalt officiële linkaantallen, verwijzende pagina's en ankerteksten op en bewaart
+eerste en laatste waarneming. Links worden alleen als verdwenen gemarkeerd wanneer het betreffende
+doel volledig opnieuw is opgehaald. Inzichten noemen Bing altijd als bron en trekken geen
+zoekmachinebrede conclusie uit alleen Bing.
 
 Gevolg: Bing-dalingen kunnen naast GSC worden beoordeeld zonder databronnen te vermengen. Omdat de
 officiële Bing-statistieken volgens Microsoft periodiek worden bijgewerkt, interpreteert de tool de
-data op periodebasis en niet als realtime signaal.
+data op periodebasis en niet als realtime signaal. Bereikte API-veiligheidslimieten worden als
+gedeeltelijke dekking opgeslagen in plaats van als afwezigheid geïnterpreteerd.

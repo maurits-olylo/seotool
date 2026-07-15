@@ -3,6 +3,7 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     Date,
     DateTime,
     Float,
@@ -124,6 +125,39 @@ class BingQueryMetric(UUIDTimestampMixin, Base):
     impressions: Mapped[int] = mapped_column(Integer, default=0)
     average_click_position: Mapped[float] = mapped_column(Float, default=0)
     average_impression_position: Mapped[float] = mapped_column(Float, default=0)
+
+
+class BingLinkTarget(UUIDTimestampMixin, Base):
+    __tablename__ = "bing_link_targets"
+    __table_args__ = (UniqueConstraint("website_id", "target_url"),)
+
+    website_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("websites.id", ondelete="CASCADE"), index=True
+    )
+    url_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("urls.id", ondelete="SET NULL"), index=True
+    )
+    target_url: Mapped[str] = mapped_column(String(2048))
+    inbound_link_count: Mapped[int] = mapped_column(Integer, default=0)
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+
+
+class BingInboundLink(UUIDTimestampMixin, Base):
+    __tablename__ = "bing_inbound_links"
+    __table_args__ = (UniqueConstraint("website_id", "link_key"),)
+
+    website_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("websites.id", ondelete="CASCADE"), index=True
+    )
+    link_key: Mapped[str] = mapped_column(String(64))
+    target_url: Mapped[str] = mapped_column(String(2048), index=True)
+    source_url: Mapped[str] = mapped_column(String(2048))
+    anchor_text: Mapped[str] = mapped_column(Text, default="")
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
 
 
 class GoogleAnalyticsMetric(UUIDTimestampMixin, Base):

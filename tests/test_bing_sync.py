@@ -8,6 +8,8 @@ from app.db.session import SessionLocal
 from app.models.client import Client
 from app.models.discovery import Url
 from app.models.integrations import (
+    BingInboundLink,
+    BingLinkTarget,
     BingPageMetric,
     BingQueryMetric,
     IntegrationConnection,
@@ -31,11 +33,11 @@ def test_bing_sync_stores_page_and_query_metrics_idempotently(monkeypatch) -> No
     class FakeResponse:
         status_code = 200
 
-        def __init__(self, rows: list[dict[str, object]]) -> None:
-            self.rows = rows
+        def __init__(self, data: object) -> None:
+            self.data = data
 
         def json(self) -> dict[str, object]:
-            return {"d": self.rows}
+            return {"d": self.data}
 
     class FakeBingClient:
         async def __aenter__(self):  # type: ignore[no-untyped-def]
@@ -45,7 +47,7 @@ def test_bing_sync_stores_page_and_query_metrics_idempotently(monkeypatch) -> No
             return None
 
         async def get(self, url, *, params, headers):  # type: ignore[no-untyped-def]
-            assert params == {"siteUrl": "https://example.com/"}
+            assert params["siteUrl"] == "https://example.com/"
             assert headers == {"Authorization": "Bearer bing-access"}
             common = {
                 "Date": _bing_date(metric_date),
@@ -56,7 +58,33 @@ def test_bing_sync_stores_page_and_query_metrics_idempotently(monkeypatch) -> No
             }
             if url.endswith("GetPageStats"):
                 return FakeResponse([{**common, "Query": "https://example.com/page"}])
-            return FakeResponse([{**common, "Query": "voorbeeld zoekterm"}])
+            if url.endswith("GetQueryStats"):
+                return FakeResponse([{**common, "Query": "voorbeeld zoekterm"}])
+            if url.endswith("GetLinkCounts"):
+                assert params["page"] == 0
+                return FakeResponse(
+                    {
+                        "Links": [{"Url": "https://example.com/page", "Count": 12}],
+                        "TotalPages": 1,
+                    }
+                )
+            assert url.endswith("GetUrlLinks")
+            assert params == {
+                "siteUrl": "https://example.com/",
+                "page": 0,
+                "link": "https://example.com/page",
+            }
+            return FakeResponse(
+                {
+                    "Details": [
+                        {
+                            "Url": "https://referrer.example/article",
+                            "AnchorText": "voorbeeld link",
+                        }
+                    ],
+                    "TotalPages": 1,
+                }
+            )
 
     monkeypatch.setattr(
         "app.services.bing_integrations.httpx.AsyncClient",
@@ -72,6 +100,10 @@ def test_bing_sync_stores_page_and_query_metrics_idempotently(monkeypatch) -> No
             assert first["page_rows"] == 1
             assert first["query_rows"] == 1
             assert first["matched_urls"] == 1
+            assert first["link_targets"] == 1
+            assert first["link_details"] == 1
+            assert first["link_counts_truncated"] is False
+            assert first["link_details_truncated"] is False
             assert db.scalar(
                 select(func.count(BingPageMetric.id)).where(
                     BingPageMetric.website_id == website_id
@@ -82,11 +114,20 @@ def test_bing_sync_stores_page_and_query_metrics_idempotently(monkeypatch) -> No
                     BingQueryMetric.website_id == website_id
                 )
             ) == 1
+            assert db.scalar(select(func.count(BingLinkTarget.id))) == 1
+            assert db.scalar(select(func.count(BingInboundLink.id))) == 1
             page = db.scalar(select(BingPageMetric))
             query = db.scalar(select(BingQueryMetric))
             assert page is not None and page.url_id is not None
             assert page.clicks == 4 and page.impressions == 100
             assert query is not None and query.query == "voorbeeld zoekterm"
+            link_target = db.scalar(select(BingLinkTarget))
+            inbound_link = db.scalar(select(BingInboundLink))
+            assert link_target is not None and link_target.url_id is not None
+            assert link_target.inbound_link_count == 12 and link_target.is_active is True
+            assert inbound_link is not None and inbound_link.is_active is True
+            assert inbound_link.source_url == "https://referrer.example/article"
+            assert inbound_link.anchor_text == "voorbeeld link"
     finally:
         get_settings.cache_clear()
 

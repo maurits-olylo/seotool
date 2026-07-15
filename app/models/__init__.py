@@ -3,6 +3,8 @@ from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url, UrlSource
 from app.models.exports import Export
 from app.models.integrations import (
+    BingInboundLink,
+    BingLinkTarget,
     BingPageMetric,
     BingQueryMetric,
     GoogleAnalyticsEventMetric,
@@ -37,6 +39,8 @@ __all__ = [
     "IntegrationConnection",
     "BingPageMetric",
     "BingQueryMetric",
+    "BingInboundLink",
+    "BingLinkTarget",
     "GoogleAnalyticsMetric",
     "GoogleAnalyticsEventMetric",
     "GoogleAnalyticsLandingPageEventMetric",

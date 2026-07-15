@@ -175,19 +175,22 @@ Acceptatie:
 
 ## Fase 5 — Bing hervatten
 
-Status: pagina- en zoektermimport technisch geïmplementeerd; deployment en productievalidatie met
-HUMAN volgen.
+Status: pagina-, zoekterm- en inkomende-linkimport technisch geïmplementeerd; deployment en
+productievalidatie met HUMAN volgen.
 
 - Bing-pagina- en zoektermstatistieken versleuteld geauthenticeerd en idempotent importeren.
 - Bing-URL's aan het blijvende URL-register koppelen en importdekking tonen.
+- Inkomende linkaantallen, verwijzende pagina's en ankerteksten importeren; eerste en laatste
+  waarneming bewaren en verdwenen links alleen bij volledige hercontrole markeren.
 - Handmatige import en dagelijkse synchronisatie ondersteunen met blijvende foutstatus.
 - Dalende Bing-zichtbaarheid naast Google-inzichten tonen en databron expliciet benoemen.
-- Backlinkdiscovery en veranderingen toevoegen wanneer de officiële API dit ondersteunt.
 - Geen scraping-workaround voor ontbrekende officiële functionaliteit.
 
 Acceptatie:
 
 - HUMAN importeert pagina- en zoektermregels zonder duplicaten bij herhaling.
+- HUMAN importeert linkdoelen en inkomende linkdetails zonder duplicaten; gedeeltelijke
+  API-dekking wordt zichtbaar en leidt niet tot valse verdwenen-links-signalen.
 - Bekende HUMAN-URL's worden aan het URL-register gekoppeld; afwijkende URL's blijven als
   controleerbare ongekoppelde regels bewaard.
 - Een Bing-daling wordt als Bing-signaal getoond en niet stilzwijgend met GSC-data vermengd.

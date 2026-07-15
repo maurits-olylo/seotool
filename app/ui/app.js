@@ -548,7 +548,8 @@ async function syncBing() {
   button.disabled = true; button.textContent = "Importeren…"; message.textContent = "";
   try {
     const result = await api(`/api/v1/websites/${websiteId}/integrations/bing_webmaster/sync`, {method: "POST"});
-    message.textContent = `${result.page_rows} pagina-regels en ${result.query_rows} zoektermregels geïmporteerd; ${result.matched_urls} gekoppeld aan URL’s.`;
+    const limited = result.link_counts_truncated || result.link_details_truncated ? " De linkimport bereikte de veiligheidslimiet; dit is opgeslagen als gedeeltelijke dekking." : "";
+    message.textContent = `${result.page_rows} pagina-regels, ${result.query_rows} zoektermregels, ${result.link_targets} linkdoelen en ${result.link_details} inkomende links geïmporteerd; ${result.matched_urls} gekoppeld aan URL’s.${limited}`;
     button.textContent = "Opnieuw synchroniseren";
   } catch (error) { message.textContent = "Bing-import is mislukt."; button.textContent = "Opnieuw proberen"; }
   finally { button.disabled = false; }

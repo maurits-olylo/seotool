@@ -1,14 +1,17 @@
 import re
 from datetime import UTC, date, datetime, timedelta
+from hashlib import sha256
 from uuid import UUID
 
 import httpx
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models.discovery import Url
 from app.models.integrations import (
+    BingInboundLink,
+    BingLinkTarget,
     BingPageMetric,
     BingQueryMetric,
     IntegrationConnection,
@@ -20,6 +23,9 @@ from app.services.url_normalization import InvalidUrlError, normalize_url
 BING_TOKEN_URL = "https://www.bing.com/webmasters/oauth/token"
 BING_API_ROOT = "https://www.bing.com/webmaster/api.svc/json"
 BING_DATE_RE = re.compile(r"/Date\((\d+)(?:[+-]\d+)?\)/")
+MAX_LINK_COUNT_PAGES = 500
+MAX_LINK_DETAIL_TARGETS = 500
+MAX_LINK_DETAIL_PAGES = 100
 
 
 async def get_bing_access_token(db: Session, connection: IntegrationConnection) -> str:
@@ -115,6 +121,12 @@ async def sync_bing_webmaster(
             query_rows = await _bing_rows(
                 http, "GetQueryStats", mapping.external_property_id, token
             )
+            link_counts, counts_truncated = await _bing_link_counts(
+                http, mapping.external_property_id, token
+            )
+            link_details, covered_targets, details_truncated = await _bing_link_details(
+                http, mapping.external_property_id, token, link_counts
+            )
     except (httpx.HTTPError, ValueError) as exc:
         mapping.status = "error"
         mapping.settings = {**mapping.settings, "last_error": str(exc)}
@@ -161,6 +173,16 @@ async def sync_bing_webmaster(
     ]
     db.add_all([*pages, *queries])
     now = datetime.now(UTC)
+    link_result = _store_bing_links(
+        db,
+        website_id,
+        url_map,
+        link_counts,
+        link_details,
+        covered_targets,
+        counts_complete=not counts_truncated,
+        observed_at=now,
+    )
     mapping.status = "active"
     mapping.last_synced_at = now
     mapping.settings = {
@@ -170,6 +192,10 @@ async def sync_bing_webmaster(
         "last_page_rows": len(pages),
         "last_page_matched": matched,
         "last_query_rows": len(queries),
+        "last_link_targets": link_result["link_targets"],
+        "last_link_details": link_result["link_details"],
+        "link_counts_truncated": counts_truncated,
+        "link_details_truncated": details_truncated,
         "last_error": None,
     }
     connection.last_synced_at = now
@@ -182,6 +208,9 @@ async def sync_bing_webmaster(
         "matched_urls": matched,
         "unmatched_urls": len(pages) - matched,
         "query_rows": len(queries),
+        **link_result,
+        "link_counts_truncated": counts_truncated,
+        "link_details_truncated": details_truncated,
     }
 
 
@@ -204,6 +233,159 @@ def _bing_date(value: object) -> date | None:
     if not match:
         return None
     return datetime.fromtimestamp(int(match.group(1)) / 1000, tz=UTC).date()
+
+
+async def _bing_link_counts(
+    http: httpx.AsyncClient, site_url: str, token: str
+) -> tuple[list[dict[str, object]], bool]:
+    rows: list[dict[str, object]] = []
+    page = 0
+    total_pages = 1
+    while page < min(total_pages, MAX_LINK_COUNT_PAGES):
+        payload = await _bing_object(http, "GetLinkCounts", site_url, token, page=page)
+        batch = payload.get("Links", [])
+        if isinstance(batch, list):
+            rows.extend(item for item in batch if isinstance(item, dict))
+        total_pages = max(1, int(payload.get("TotalPages") or 1))
+        page += 1
+    return rows, total_pages > MAX_LINK_COUNT_PAGES
+
+
+async def _bing_link_details(
+    http: httpx.AsyncClient,
+    site_url: str,
+    token: str,
+    counts: list[dict[str, object]],
+) -> tuple[list[dict[str, object]], set[str], bool]:
+    targets = sorted(counts, key=lambda item: int(item.get("Count") or 0), reverse=True)
+    selected = targets[:MAX_LINK_DETAIL_TARGETS]
+    details: list[dict[str, object]] = []
+    covered_targets: set[str] = set()
+    truncated = len(targets) > len(selected)
+    for target in selected:
+        target_url = str(target.get("Url") or "").strip()
+        if not target_url:
+            continue
+        page = 0
+        total_pages = 1
+        while page < min(total_pages, MAX_LINK_DETAIL_PAGES):
+            payload = await _bing_object(
+                http, "GetUrlLinks", site_url, token, page=page, link=target_url
+            )
+            batch = payload.get("Details", [])
+            if isinstance(batch, list):
+                details.extend(
+                    {**item, "TargetUrl": target_url}
+                    for item in batch
+                    if isinstance(item, dict)
+                )
+            total_pages = max(1, int(payload.get("TotalPages") or 1))
+            if total_pages > MAX_LINK_DETAIL_PAGES:
+                truncated = True
+            page += 1
+        if total_pages <= MAX_LINK_DETAIL_PAGES:
+            covered_targets.add(target_url)
+    return details, covered_targets, truncated
+
+
+async def _bing_object(
+    http: httpx.AsyncClient,
+    method: str,
+    site_url: str,
+    token: str,
+    **params: object,
+) -> dict[str, object]:
+    response = await http.get(
+        f"{BING_API_ROOT}/{method}",
+        params={"siteUrl": site_url, **params},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    if response.status_code != 200:
+        raise ValueError(f"Bing Webmaster {method} data could not be loaded")
+    payload = response.json().get("d", {})
+    return payload if isinstance(payload, dict) else {}
+
+
+def _store_bing_links(
+    db: Session,
+    website_id: UUID,
+    url_map: dict[str, UUID],
+    counts: list[dict[str, object]],
+    details: list[dict[str, object]],
+    covered_targets: set[str],
+    *,
+    counts_complete: bool,
+    observed_at: datetime,
+) -> dict[str, int]:
+    if counts_complete:
+        db.execute(
+            update(BingLinkTarget)
+            .where(BingLinkTarget.website_id == website_id)
+            .values(is_active=False)
+        )
+    if covered_targets:
+        db.execute(
+            update(BingInboundLink)
+            .where(
+                BingInboundLink.website_id == website_id,
+                BingInboundLink.target_url.in_(covered_targets),
+            )
+            .values(is_active=False)
+        )
+    for item in counts:
+        target_url = str(item.get("Url") or "").strip()
+        if not target_url:
+            continue
+        record = db.scalar(
+            select(BingLinkTarget).where(
+                BingLinkTarget.website_id == website_id,
+                BingLinkTarget.target_url == target_url,
+            )
+        )
+        if record is None:
+            record = BingLinkTarget(
+                website_id=website_id,
+                target_url=target_url,
+                first_seen_at=observed_at,
+                last_seen_at=observed_at,
+            )
+            db.add(record)
+        try:
+            record.url_id = url_map.get(normalize_url(target_url))
+        except InvalidUrlError:
+            record.url_id = None
+        record.inbound_link_count = int(item.get("Count") or 0)
+        record.last_seen_at = observed_at
+        record.is_active = True
+    for item in details:
+        target_url = str(item.get("TargetUrl") or "").strip()
+        source_url = str(item.get("Url") or "").strip()
+        anchor_text = str(item.get("AnchorText") or "").strip()
+        if not target_url or not source_url:
+            continue
+        link_key = sha256(
+            f"{target_url}\n{source_url}\n{anchor_text}".encode()
+        ).hexdigest()
+        record = db.scalar(
+            select(BingInboundLink).where(
+                BingInboundLink.website_id == website_id,
+                BingInboundLink.link_key == link_key,
+            )
+        )
+        if record is None:
+            record = BingInboundLink(
+                website_id=website_id,
+                link_key=link_key,
+                target_url=target_url,
+                source_url=source_url,
+                anchor_text=anchor_text,
+                first_seen_at=observed_at,
+                last_seen_at=observed_at,
+            )
+            db.add(record)
+        record.last_seen_at = observed_at
+        record.is_active = True
+    return {"link_targets": len(counts), "link_details": len(details)}
 
 
 def _page_metric(
