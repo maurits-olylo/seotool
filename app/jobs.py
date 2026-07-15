@@ -253,6 +253,7 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
             continue
         url.crawl_depth = depth
         visited.add(url.id)
+        run.discovered_urls = len(visited)
         _crawl_one(db, job, run, url, robots=robots)
         _respect_request_delay(job)
         discovered = list(
@@ -470,6 +471,15 @@ def _crawl_one(  # type: ignore[no-untyped-def]
         )
         run.failed_urls += 1
         db.commit()
+    except Exception as exc:
+        logger.exception(
+            "crawl_url_failed_unexpectedly",
+            job_id=str(job.id),
+            crawl_run_id=str(run.id),
+            website_id=str(url.website_id),
+            url=url.normalized_url,
+        )
+        raise RuntimeError(f"Crawl failed for {url.normalized_url}: {exc}") from exc
 
 
 def _load_robots_rules(db, job: CrawlJob) -> RobotsRules | None:  # type: ignore[no-untyped-def]

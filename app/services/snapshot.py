@@ -1,3 +1,6 @@
+from urllib.parse import urlsplit, urlunsplit
+
+import structlog
 from sqlalchemy.orm import Session
 
 from app.models.crawl import UrlLink, UrlSnapshot
@@ -5,9 +8,11 @@ from app.models.discovery import Url
 from app.models.website import Website
 from app.services.html_extraction import extract_page
 from app.services.http_crawler import FetchResult
-from app.services.url_normalization import normalize_url
+from app.services.url_normalization import InvalidUrlError, normalize_url
 from app.services.url_registry import register_url
 from app.services.url_scope import is_url_in_website_scope
+
+logger = structlog.get_logger()
 
 
 def store_fetch_result(
@@ -63,11 +68,23 @@ def store_fetch_result(
             website.settings.allowed_subdomains if website and website.settings else []
         )
         for link in page.links:
+            try:
+                normalized_target = normalize_url(link.target_url)
+            except InvalidUrlError as exc:
+                logger.warning(
+                    "crawl_link_skipped_invalid_url",
+                    website_id=str(url.website_id),
+                    crawl_run_id=str(crawl_run_id),
+                    source_url=_safe_url_for_log(url.normalized_url),
+                    target_url=_safe_url_for_log(link.target_url),
+                    error=str(exc),
+                )
+                continue
             target = None
             is_internal = bool(
                 website
                 and is_url_in_website_scope(
-                    link.target_url,
+                    normalized_target,
                     base_url=website.base_url,
                     allowed_subdomains=allowed_subdomains,
                 )
@@ -76,7 +93,7 @@ def store_fetch_result(
                 target = register_url(
                     db,
                     website_id=url.website_id,
-                    raw_url=link.target_url,
+                    raw_url=normalized_target,
                     source_type="internal_link",
                     source_url=url.normalized_url,
                 )
@@ -84,7 +101,7 @@ def store_fetch_result(
                 UrlLink(
                     crawl_run_id=crawl_run_id,
                     source_url_id=url.id,
-                    target_url=normalize_url(link.target_url),
+                    target_url=normalized_target,
                     target_url_id=target.id if target else None,
                     anchor_text=link.anchor_text,
                     is_internal=is_internal,
@@ -101,3 +118,9 @@ def _charset(content_type: str | None) -> str:
     if content_type and "charset=" in content_type.lower():
         return content_type.lower().split("charset=", 1)[1].split(";", 1)[0].strip()
     return "utf-8"
+
+
+def _safe_url_for_log(value: str) -> str:
+    parts = urlsplit(value)
+    netloc = parts.netloc.rsplit("@", 1)[-1]
+    return urlunsplit((parts.scheme, netloc, parts.path, "", ""))[:1000]
