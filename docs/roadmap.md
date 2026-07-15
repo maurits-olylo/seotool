@@ -7,8 +7,9 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 ## Huidige status
 
 - Actieve ontwikkellijn: fase 4 — resterende SEO-functionaliteit.
+- Eerstvolgend ontwikkelitem: globale deployment-drain voor crawls.
 - Productie: `https://seo.thact.nl` op Synology NAS `192.168.2.20`.
-- Laatste afgeronde kwaliteitscontrole: 124 tests, Ruff en JavaScript-syntax geslaagd.
+- Laatste afgeronde kwaliteitscontrole: 140 tests, Ruff en JavaScript-syntax geslaagd.
 - Open productiecontrole fase 1: bevestigen dat `jobsatpearle.be` na de lopende crawl niet meer als
   actieve URL van `werkenbijgrandvision.nl` verschijnt.
 
@@ -75,6 +76,14 @@ Status: gepland.
 - Volledige acceptatiecontrole met minimaal twee klanten.
 - Scheduler, workers, exports, back-up, restore, updates en rollback valideren.
 - Pauzeren, hervatten, stoppen en herstel na worker-restart operationeel valideren.
+- Globale deployment-drain bouwen:
+  - nieuwe crawls en schedulerjobs tijdelijk blokkeren;
+  - alle actieve crawls na de huidige URL veilig pauzeren;
+  - alleen crawls met pauzereden `deployment` registreren voor hervatting;
+  - wachten totdat geen crawl meer actief verwerkt wordt;
+  - na deployment eerst healthchecks uitvoeren;
+  - deployment-crawls daarna expliciet en automatisch hervatten;
+  - bij een mislukte deployment crawls veilig gepauzeerd laten.
 - Logging, operationele status en documentatie afronden.
 - Reproduceerbare NAS-installatie en alle relevante MVP-acceptatiecriteria controleren.
 
