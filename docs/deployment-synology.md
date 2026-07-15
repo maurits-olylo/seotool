@@ -100,3 +100,23 @@ docker system df
 ```
 
 Configureer meldingen op een mislukte `/health`-controle en bewaak vrije schijfruimte.
+
+# Veilige crawl-drain bij updates
+
+Na installatie van migratie `0020` wordt iedere update om actieve crawls heen uitgevoerd:
+
+```bash
+sudo docker compose -f compose.yaml -f compose.prod.yaml exec -T api \
+  python -m app.maintenance pause-crawls --wait --timeout 600
+```
+
+Ga alleen verder wanneer `active=true safe=true` wordt gemeld. Bouw en herstart daarna de geraakte
+services en voer de healthchecks uit. Hervat uitsluitend na een geslaagde controle:
+
+```bash
+sudo docker compose -f compose.yaml -f compose.prod.yaml exec -T api \
+  python -m app.maintenance resume-crawls
+```
+
+Bij een mislukte deployment blijft de drain bewust actief. Controleer hem met
+`python -m app.maintenance status` en hervat pas nadat de deployment gezond is.

@@ -138,3 +138,16 @@ automatisch gepauzeerd en expliciete stopverzoeken afgerond. De RQ-limiet voor c
 
 Gevolg: deelresultaten blijven behouden, een crawl kan veilig hervatten en een containerupdate laat
 geen onzichtbare `running`-status meer achter.
+
+## 2026-07-15 — Deployments gebruiken een persistente globale crawl-drain
+
+Context: het vervangen van een worker onderbrak actieve crawls. Handmatig alle crawls pauzeren is
+foutgevoelig en mag bestaande handmatige pauzes niet overschrijven.
+
+Besluit: een singleton in PostgreSQL blokkeert tijdens deployment nieuwe crawls uit API,
+onboarding en scheduler. Actieve crawls krijgen coöperatief een pauzeverzoek en ronden hun huidige
+URL af. De drain bewaart exact welke jobs hij zelf pauzeerde. Hervatten start uitsluitend die jobs;
+een mislukte deployment laat de drain actief en de crawls gepauzeerd.
+
+Gevolg: toekomstige deployments beginnen met `python -m app.maintenance pause-crawls --wait` en
+eindigen pas na een geslaagde healthcheck met `python -m app.maintenance resume-crawls`.

@@ -14,6 +14,7 @@ from app.models.discovery import CrawlJob
 from app.models.integrations import WebsiteIntegration
 from app.models.reporting import MonthlyReportSnapshot
 from app.models.website import Website
+from app.services.crawl_deployment import crawl_deployment_is_active
 
 logger = structlog.get_logger()
 
@@ -22,6 +23,9 @@ def schedule_due_jobs() -> int:
     created = 0
     now = datetime.now(UTC)
     with SessionLocal() as db:
+        if crawl_deployment_is_active(db):
+            logger.info("crawl_scheduling_skipped_deployment_drain")
+            return 0
         websites = list(db.scalars(select(Website).where(Website.status == "active")))
         for website in websites:
             for job_type, interval in (

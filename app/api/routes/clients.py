@@ -25,6 +25,7 @@ from app.services.authorization import (
     require_client_access,
     require_global_role,
 )
+from app.services.crawl_deployment import crawl_deployment_is_active
 
 router = APIRouter(prefix="/clients", tags=["clients"])
 
@@ -79,6 +80,10 @@ def onboard_client(
     principal: Principal = Depends(require_api_key),
 ) -> dict[str, Client | Website | CrawlJob]:
     require_global_role(principal, "superuser", "admin")
+    if crawl_deployment_is_active(db):
+        raise HTTPException(
+            status_code=503, detail="Onboarding is tijdelijk gepauzeerd voor deployment"
+        )
     _ensure_unique_client(db, payload.name, payload.internal_reference)
     client = Client(name=payload.name, internal_reference=payload.internal_reference)
     website = Website(

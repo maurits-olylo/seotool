@@ -13,6 +13,7 @@ from app.models.crawl import CrawlRun
 from app.models.discovery import CrawlJob, Url
 from app.schemas.discovery import CrawlJobCreate, CrawlJobRead, UrlRead, UrlRegister
 from app.services.authorization import require_website_access
+from app.services.crawl_deployment import crawl_deployment_is_active
 from app.services.url_registry import register_url
 from app.services.url_scope import is_url_in_website_scope
 
@@ -74,6 +75,10 @@ def create_crawl_job(
     principal: Principal = Depends(require_api_key),
 ) -> CrawlJob:
     website = require_website_access(db, principal, payload.website_id, admin=True)
+    if crawl_deployment_is_active(db):
+        raise HTTPException(
+            status_code=503, detail="Crawls zijn tijdelijk gepauzeerd voor deployment"
+        )
     running = db.scalar(
         select(CrawlJob.id).where(
             CrawlJob.website_id == payload.website_id,
@@ -131,6 +136,10 @@ def resume_crawl_job(
     principal: Principal = Depends(require_api_key),
 ) -> CrawlJob:
     job = _crawl_job_or_404(job_id, db, principal)
+    if crawl_deployment_is_active(db):
+        raise HTTPException(
+            status_code=503, detail="Crawls zijn tijdelijk gepauzeerd voor deployment"
+        )
     if job.status != "paused":
         raise HTTPException(status_code=409, detail="Alleen een gepauzeerde crawl kan hervatten")
     job.status = "pending"

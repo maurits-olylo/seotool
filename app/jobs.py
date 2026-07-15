@@ -14,6 +14,7 @@ from app.models.website import Website
 from app.services.asset_checks import ASSET_ISSUE_TYPES, HTML_ONLY_ISSUE_TYPES, inspect_asset
 from app.services.content_similarity import detect_duplicate_content
 from app.services.contextual_404 import classify_404_issues
+from app.services.crawl_deployment import pause_job_if_deployment_active
 from app.services.http_crawler import CrawlError, fetch_metadata, fetch_url
 from app.services.indexation_analysis import analyze_indexation_consistency
 from app.services.internal_link_analysis import analyze_internal_link_quality, detect_orphan_pages
@@ -46,6 +47,9 @@ def execute_crawl_job(job_id: str) -> None:
     with SessionLocal() as db:
         job = db.get(CrawlJob, uuid.UUID(job_id))
         if job is None or job.status in {"cancelled", "paused", "pause_requested"}:
+            return
+        if pause_job_if_deployment_active(db, job):
+            logger.info("crawl_job_paused_for_deployment", job_id=job_id)
             return
         running = db.scalar(
             select(CrawlJob.id).where(

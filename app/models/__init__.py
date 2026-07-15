@@ -14,6 +14,7 @@ from app.models.integrations import (
 from app.models.issues import ActivityLog, Change, Issue, IssueComment, IssueOccurrence
 from app.models.jobs import JobListing
 from app.models.reporting import MonthlyReportSnapshot
+from app.models.system import CrawlDeploymentControl
 from app.models.user import ClientMembership, User, UserInvitation
 from app.models.website import Website, WebsiteSettings
 
@@ -24,6 +25,7 @@ __all__ = [
     "ActivityLog",
     "CrawlJob",
     "CrawlRun",
+    "CrawlDeploymentControl",
     "Export",
     "Issue",
     "IssueComment",

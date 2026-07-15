@@ -7,11 +7,27 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 ## Huidige status
 
 - Actieve ontwikkellijn: fase 4 — resterende SEO-functionaliteit.
-- Eerstvolgend ontwikkelitem: globale deployment-drain voor crawls.
+- Eerstvolgend ontwikkelitem: globale deployment-drain deployen en in productie valideren.
 - Productie: `https://seo.thact.nl` op Synology NAS `192.168.2.20`.
-- Laatste afgeronde kwaliteitscontrole: 140 tests, Ruff en JavaScript-syntax geslaagd.
+- Laatste afgeronde kwaliteitscontrole: 145 tests en Ruff geslaagd.
 - Open productiecontrole fase 1: bevestigen dat `jobsatpearle.be` na de lopende crawl niet meer als
   actieve URL van `werkenbijgrandvision.nl` verschijnt.
+
+## Operationele veiligheid — globale deployment-drain
+
+Status: technisch geïmplementeerd; deployment en productievalidatie volgen.
+
+- Nieuwe handmatige crawls, onboarding-crawls en scheduler-crawls worden centraal geblokkeerd.
+- Actieve crawls ronden de huidige URL af en gaan daarna naar `paused`.
+- De toestand en de door deployment gepauzeerde job-ID's blijven in PostgreSQL bewaard.
+- Hervatten start alleen crawls die door de actuele deployment zijn gepauzeerd.
+- Een timeout of mislukte deployment laat de blokkade actief totdat expliciet wordt hervat.
+
+Acceptatie:
+
+- `pause-crawls --wait` meldt pas `safe=true` wanneer geen crawl meer verwerkt.
+- Een startverzoek tijdens de drain krijgt HTTP 503 en de scheduler maakt geen crawljob aan.
+- Na healthchecks hervat `resume-crawls` alleen deployment-gepauzeerde crawls.
 
 ## Fase 1 — Multi-client domeinisolatie
 
