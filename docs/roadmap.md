@@ -71,6 +71,16 @@ gebruiker geen websites, URL's, crawls, issues of rapportages van een andere kla
 
 Status: in uitvoering.
 
+### Betrouwbare sitemapjobs
+
+Status: technisch geïmplementeerd; deployment en productievalidatie volgen.
+
+- Ingestelde sitemaps aanvullen met sitemapverwijzingen uit `robots.txt`.
+- Zonder verwijzing gecontroleerd `/sitemap.xml` proberen.
+- Automatisch gevonden sitemapadressen voor volgende jobs bewaren.
+- Unieke gevonden URL's en gelezen sitemapdocumenten tellen.
+- Een job zonder beschikbare sitemap niet langer leeg als geslaagd tonen.
+
 ### Visuele vernieuwing publieke website
 
 Status: afgerond, gedeployed en geaccepteerd.

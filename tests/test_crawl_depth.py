@@ -100,6 +100,16 @@ def test_full_site_crawl_assigns_breadth_first_depths(monkeypatch) -> None:  # t
                 content=b"User-agent: *\nAllow: /",
                 response_time_ms=1,
             )
+        if url.endswith("/sitemap.xml"):
+            return FetchResult(
+                requested_url=url,
+                final_url=url,
+                status_code=404,
+                redirect_chain=[],
+                headers={"content-type": "text/html"},
+                content=b"Not found",
+                response_time_ms=1,
+            )
         return FetchResult(
             requested_url=url,
             final_url=url,

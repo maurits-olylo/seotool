@@ -21,7 +21,7 @@ from app.services.internal_link_analysis import analyze_internal_link_quality, d
 from app.services.issue_engine import reconcile_issues
 from app.services.job_identifier_analysis import analyze_job_identifier_risk
 from app.services.robots import RobotsRules
-from app.services.sitemap import parse_sitemap
+from app.services.sitemap import InvalidSitemapError, parse_sitemap
 from app.services.snapshot import store_fetch_result
 from app.services.structured_data_analysis import analyze_breadcrumb_consistency
 from app.services.technical_checks import (
@@ -78,12 +78,23 @@ def execute_crawl_job(job_id: str) -> None:
                 raise RuntimeError("Website does not exist")
             _deactivate_out_of_scope_urls(db, website)
             db.commit()
-            if job.job_type in {"fetch_sitemap", "full_site_crawl"}:
-                if not resumed:
-                    _import_sitemaps(db, job, run)
             if job.job_type == "fetch_sitemap":
-                run.status = "succeeded"
-                job.status = "succeeded"
+                sitemap_documents, sitemap_urls = _import_sitemaps(db, job, run)
+            elif job.job_type == "full_site_crawl" and not resumed:
+                _import_sitemaps(db, job, run)
+            if job.job_type == "fetch_sitemap":
+                run.crawled_urls = sitemap_documents
+                if sitemap_documents == 0:
+                    message = (
+                        "Geen sitemap ingesteld of gevonden via robots.txt en /sitemap.xml"
+                    )
+                    run.status = "failed"
+                    job.status = "failed"
+                    job.error_message = message
+                else:
+                    run.discovered_urls = sitemap_urls
+                    run.status = "succeeded"
+                    job.status = "succeeded"
                 return
             if job.job_type == "full_site_crawl":
                 site_crawl_complete = _crawl_full_site(db, job, run, resumed=resumed)
@@ -147,23 +158,50 @@ def execute_crawl_job(job_id: str) -> None:
             db.commit()
 
 
-def _import_sitemaps(db, job: CrawlJob, run: CrawlRun) -> None:  # type: ignore[no-untyped-def]
+def _import_sitemaps(db, job: CrawlJob, run: CrawlRun) -> tuple[int, int]:  # type: ignore[no-untyped-def]
     website = db.get(Website, job.website_id)
     if website is None:
         raise RuntimeError("Website does not exist")
-    pending = list(website.settings.sitemap_urls)
+    configured = list(website.settings.sitemap_urls)
+    robots = _load_robots_rules(db, job)
+    robots_sitemaps = list(robots.sitemaps()) if robots else []
+    pending = list(dict.fromkeys([*configured, *robots_sitemaps]))
+    fallback_url = urljoin(website.base_url, "/sitemap.xml")
+    fallback_only = not pending
+    if fallback_only:
+        pending.append(fallback_url)
     visited: set[str] = set()
+    successful_roots: list[str] = []
+    registered_url_ids: set[object] = set()
     while pending and len(visited) < 100:
         sitemap_url = pending.pop(0)
         if sitemap_url in visited:
             continue
         visited.add(sitemap_url)
-        result = fetch_url(
-            sitemap_url,
-            timeout_seconds=website.settings.request_timeout_seconds,
-            max_response_size=website.settings.max_response_size,
-        )
-        document = parse_sitemap(result.content)
+        try:
+            result = fetch_url(
+                sitemap_url,
+                timeout_seconds=website.settings.request_timeout_seconds,
+                max_response_size=website.settings.max_response_size,
+            )
+            if result.status_code != 200:
+                raise InvalidSitemapError(f"Sitemap geeft HTTP {result.status_code}")
+            document = parse_sitemap(result.content)
+        except (CrawlError, InvalidSitemapError):
+            if fallback_only and sitemap_url == fallback_url:
+                logger.info(
+                    "sitemap_fallback_not_found",
+                    website_id=str(website.id),
+                    sitemap_url=sitemap_url,
+                )
+                continue
+            raise
+        if (
+            sitemap_url in configured
+            or sitemap_url in robots_sitemaps
+            or sitemap_url == fallback_url
+        ):
+            successful_roots.append(sitemap_url)
         pending.extend(
             child
             for child in document.child_sitemaps
@@ -186,7 +224,7 @@ def _import_sitemaps(db, job: CrawlJob, run: CrawlRun) -> None:  # type: ignore[
                     url=item.location,
                 )
                 continue
-            register_url(
+            registered = register_url(
                 db,
                 website_id=website.id,
                 raw_url=item.location,
@@ -194,8 +232,13 @@ def _import_sitemaps(db, job: CrawlJob, run: CrawlRun) -> None:  # type: ignore[
                 source_url=sitemap_url,
                 ignored_query_parameters=frozenset(website.settings.ignored_query_parameters),
             )
-            run.discovered_urls += 1
+            registered_url_ids.add(registered.id)
         db.commit()
+    if successful_roots:
+        website.settings.sitemap_urls = list(dict.fromkeys(successful_roots))
+    run.discovered_urls = len(registered_url_ids)
+    db.commit()
+    return len(visited) if successful_roots else 0, len(registered_url_ids)
 
 
 def _crawl_full_site(  # type: ignore[no-untyped-def]

@@ -242,3 +242,17 @@ vertrouwen.
 
 Gevolg: de generieke waarschuwing verdwijnt. Een nieuw signaal benoemt de omvang, inhoudelijke
 overlap en gerelateerde URL's, zodat de aanbevolen identifier een aantoonbaar probleem oplost.
+
+## 2026-07-15 — Een sitemapjob zonder sitemap mag niet slagen
+
+Context: de scheduler maakte voor iedere website dagelijks een sitemapjob. Wanneer
+`website_settings.sitemap_urls` leeg was, rondde de worker die job zonder netwerkverzoek af als
+geslaagd met overal nul. Daardoor leek een niet-uitgevoerde import succesvol.
+
+Besluit: sitemapimport combineert ingestelde URL's met `Sitemap:`-regels uit `robots.txt`. Als beide
+ontbreken, wordt gecontroleerd `/sitemap.xml` geprobeerd. Een succesvolle ontdekking wordt in de
+website-instellingen bewaard. De run telt unieke gevonden URL's en gelezen sitemapdocumenten. Als
+geen sitemap bestaat, eindigt de job expliciet als mislukt met een begrijpelijke reden.
+
+Gevolg: lege succesregels verdwijnen, websites zonder handmatige sitemapconfiguratie worden toch
+automatisch ontdekt en dubbele URL's vertekenen de telling niet.
