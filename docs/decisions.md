@@ -337,3 +337,18 @@ Gevolg: Bing-dalingen kunnen naast GSC worden beoordeeld zonder databronnen te v
 officiële Bing-statistieken volgens Microsoft periodiek worden bijgewerkt, interpreteert de tool de
 data op periodebasis en niet als realtime signaal. Bereikte API-veiligheidslimieten worden als
 gedeeltelijke dekking opgeslagen in plaats van als afwezigheid geïnterpreteerd.
+
+## 2026-07-16 — Dode interne links worden ook per bronpagina gegroepeerd
+
+Context: meerdere dode links op één artikel werden uitsluitend als losse problemen op de
+doel-URL's gepresenteerd. Daardoor bleef de feitelijke redactietaak — één bronpagina nalopen —
+verborgen en ontstond onnodige ruis.
+
+Besluit: vanaf twee verschillende dode interne links krijgt de bronpagina één aanvullende diagnose.
+Het bewijs bewaart per link de doel-URL, ankertekst en status. De diagnose verdwijnt automatisch
+wanneer een volgende volledige crawl minder dan twee dode links op die pagina vindt. Doelgerichte
+404-diagnoses blijven beschikbaar voor het andere patroon: één defect doel waar meerdere pagina's
+naartoe verwijzen.
+
+Gevolg: de interface kan een pagina als één uitvoerbare reparatietaak presenteren zonder de
+onderliggende linkgegevens of sitebrede doelanalyse te verliezen.

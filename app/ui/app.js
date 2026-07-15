@@ -1216,7 +1216,11 @@ async function showIssue(issueId) {
   ].filter(Boolean) : [];
   $("#detail-impact").textContent = impactParts.length ? `Impact (28 dagen): ${impactParts.join(" · ")}` : "";
   $("#detail-impact").classList.toggle("hidden", !impact);
-  $("#detail-evidence").textContent = Object.entries(issue.evidence).map(([key, value]) => `${key.replaceAll("_", " ")}: ${value}`).join("\n") || "Geen aanvullend bewijs opgeslagen.";
+  const brokenLinks = Array.isArray(issue.evidence.broken_links) ? issue.evidence.broken_links : [];
+  $("#detail-broken-links").innerHTML = brokenLinks.map((link) => `<li><a href="${escapeHtml(link.target_url)}" target="_blank" rel="noopener">${escapeHtml(link.target_url)}</a><br><span>Ankertekst: ${escapeHtml(link.anchor_text || "(geen ankertekst)")} · status ${escapeHtml(link.status_code || 404)}</span></li>`).join("");
+  $("#broken-links-section").classList.toggle("hidden", brokenLinks.length === 0);
+  const evidence = Object.entries(issue.evidence).filter(([key]) => key !== "broken_links");
+  $("#detail-evidence").textContent = evidence.map(([key, value]) => `${key.replaceAll("_", " ")}: ${value}`).join("\n") || "Geen aanvullend bewijs opgeslagen.";
   $("#detail-sources").innerHTML = issue.source_urls.map((source) => `<li><a href="${escapeHtml(source)}" target="_blank" rel="noopener">${escapeHtml(source)}</a></li>`).join("");
   $("#source-section").classList.toggle("hidden", issue.source_urls.length === 0);
   $("#issue-dialog").showModal();

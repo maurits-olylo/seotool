@@ -198,7 +198,8 @@ Acceptatie:
 
 ## Fase 6 — Intelligente diagnose en UX/UI-polish
 
-Status: gepland; na productievalidatie van de Bing-data-import oppakken als kernfase van het product.
+Status: in uitvoering; bronpagina's met meerdere dode interne links worden als eerste
+diagnosepatroon gegroepeerd. Verdere patroonherkenning, adviesverrijking en polish volgen.
 
 ### Van signaal naar diagnose
 
