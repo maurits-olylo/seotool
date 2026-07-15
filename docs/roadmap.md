@@ -170,6 +170,26 @@ Status: gepland.
 - Logging, operationele status en documentatie afronden.
 - Reproduceerbare NAS-installatie en alle relevante MVP-acceptatiecriteria controleren.
 
+## Fase 7 — Schaalbaarheid en parallelle crawls
+
+Status: later; pas oppakken wanneer het aantal gelijktijdige klanten de enkele crawl-worker
+structureel laat vollopen.
+
+- Laat volledige sitecrawls van verschillende websites gecontroleerd parallel draaien.
+- Behoud maximaal één actieve crawl per website en voorkom dubbele verwerking van dezelfde job.
+- Maak een globale limiet voor gelijktijdige crawls instelbaar, met een veilige NAS-standaard.
+- Verdeel capaciteit eerlijk over klanten zodat één grote website de wachtrij niet langdurig blokkeert.
+- Begrens totale databaseverbindingen, geheugen, CPU en uitgaand verkeer.
+- Toon per job duidelijk `in wachtrij`, wachtrijpositie en beschikbare worker-capaciteit.
+- Laat de globale deployment-drain alle parallelle workers veilig pauzeren en gericht hervatten.
+
+Acceptatie:
+
+- Twee volledige sitecrawls van verschillende klanten kunnen gelijktijdig voortgang boeken.
+- Een tweede crawl voor dezelfde website blijft geblokkeerd.
+- De ingestelde globale capaciteitslimiet wordt nooit overschreden.
+- Pauzeren, deployen en hervatten werkt aantoonbaar voor meerdere actieve crawls tegelijk.
+
 ## Deploymentafspraak
 
 Releases worden als Git-archive naar `/tmp/seotool-<commit>-r<nummer>.tar.gz` geschreven. Upload naar
