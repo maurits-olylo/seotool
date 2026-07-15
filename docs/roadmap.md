@@ -7,7 +7,7 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 ## Huidige status
 
 - Actieve ontwikkellijn: fase 4 — resterende SEO-functionaliteit.
-- Eerstvolgend ontwikkelitem: ruisarme en verklaarbare wijzigingen verder normaliseren.
+- Eerstvolgend ontwikkelitem na release `da68459`: Bing Webmaster Tools hervatten.
 - Productie: `https://seo.thact.nl` op Synology NAS `192.168.2.20`.
 - Laatste afgeronde kwaliteitscontrole: 154 tests en Ruff geslaagd.
 - Open productiecontrole fase 1: bevestigen dat `jobsatpearle.be` na de lopende crawl niet meer als
@@ -208,6 +208,25 @@ Acceptatie:
 - Een tweede crawl voor dezelfde website blijft geblokkeerd.
 - De ingestelde globale capaciteitslimiet wordt nooit overschreden.
 - Pauzeren, deployen en hervatten werkt aantoonbaar voor meerdere actieve crawls tegelijk.
+
+## Fase 8 — Matomo-integratie
+
+Status: later; uitsluitend oppakken nadat de Bing Webmaster Tools-integratie is hervat en
+gevalideerd.
+
+- Een Matomo-site koppelen via server-URL, `idSite` en een API-token met leestoegang.
+- API-tokens versleuteld bewaren en uitsluitend via POST versturen, nooit in URL's of logs.
+- Bezoeken, paginaweergaven, landingspagina's, verkeersbronnen, doelen en conversies importeren.
+- Matomo-pagina's via genormaliseerde URL's aan het blijvende URL-register koppelen.
+- Issues en wijzigingen verrijken met verkeers- en conversie-impact, gelijkwaardig aan GA4-data.
+- Matomo naast GA4 ondersteunen; geen van beide integraties verplicht maken.
+
+Acceptatie:
+
+- Een gebruiker kan een Matomo-verbinding testen en vervolgens de juiste site selecteren.
+- Alleen gegevens van de gekoppelde Matomo-site worden opgeslagen en getoond.
+- Verkeers- en conversiedata zijn per URL en vergelijkingsperiode beschikbaar.
+- Een ongeldig of ingetrokken token veroorzaakt een duidelijke fout zonder geheimen te loggen.
 
 ## Deploymentafspraak
 
