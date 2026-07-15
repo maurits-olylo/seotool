@@ -196,6 +196,12 @@ product.
 - Crawldiepte, indexatie, interne links, wijzigingen, schema en verkeersdata gezamenlijk beoordelen.
 - Mogelijke hoofdoorzaak, alternatieve verklaring, vertrouwen en technisch bewijs apart tonen.
 - Eén hoofdissue koppelen aan geraakte URL's en onderliggende signalen zonder historie te verliezen.
+- Interne-linkproblemen ook vanuit de bronpagina groeperen: één pagina met meerdere dode uitgaande
+  links wordt één diagnose met de afzonderlijke doelen als bewijs, niet meerdere losse hoofdissues.
+- Per defecte link doel-URL, ankertekst, status/fout, eerste waarneming en aanbevolen vervanging of
+  verwijdering tonen.
+- Zowel bronpatronen als doelpatronen ondersteunen: meerdere defecte links op één pagina en één
+  defect doel waar veel pagina's naartoe linken zijn verschillende, maar gerelateerde diagnoses.
 
 ### Van diagnose naar exact handelingsadvies
 
@@ -238,6 +244,8 @@ Acceptatie:
 
 - De 404's op HUMAN-paginering worden als één patroon onderzocht en waar aantoonbaar als één
   waarschijnlijk paginerings-, filter- of canonicalprobleem gepresenteerd.
+- `https://www.human.nl/artikelen/zo-bespreek-je-moeilijke-onderwerpen-in-de-klas-` verschijnt als
+  één bronpaginadiagnose met alle drie of vier dode interne links, inclusief doel en ankertekst.
 - Een overzicht met honderd URL's op crawldiepte 1 benoemt vooral de waarschijnlijke uitzonderingen.
 - Ieder belangrijk issue beantwoordt: wat gebeurt er, waarom is dat relevant, wat is waarschijnlijk
   de oorzaak, wat moet concreet worden aangepast en hoe wordt de oplossing gecontroleerd.

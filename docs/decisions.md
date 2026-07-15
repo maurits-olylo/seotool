@@ -288,3 +288,17 @@ Iedere onderdrukking blijft zichtbaar, controleerbaar en omkeerbaar.
 
 Gevolg: bulkacties besparen terugkerend handwerk zonder nieuwe problemen breed of onzichtbaar weg
 te filteren. `Fixed` en `ignored` krijgen een voorspelbare, auditbare betekenis.
+
+## 2026-07-16 — Interne-linkissues worden ook per bronpagina geclusterd
+
+Context: meerdere dode links op één artikel verschenen als afzonderlijke issues voor de defecte
+doel-URL's. Technisch klopt ieder signaal, maar redactioneel is het één taak: open de bronpagina en
+herstel daar alle defecte links tegelijk.
+
+Besluit: de diagnose-engine ondersteunt een bronpaginaweergave naast doelgerichte analyse. Per
+bronpagina en linkprobleem ontstaat één hoofdissue met een lijst van onderliggende links. Iedere
+link bewaart doel-URL, ankertekst, fout/status en historie. De losse bewijzen blijven beschikbaar,
+maar worden niet als concurrerende hoofdissues in de actielijst gepresenteerd.
+
+Gevolg: een pagina met vier dode interne links levert één uitvoerbare taak op. Tegelijk kan een
+defect doel dat vanaf veel pagina's wordt gelinkt afzonderlijk als sitebreed patroon worden herkend.
