@@ -68,7 +68,7 @@ def test_similar_vacancies_without_identifier_get_contextual_risk() -> None:
         )
         db.flush()
 
-        assert len(found) == 5
+        assert len(found) == 1
         issues = list(
             db.scalars(
                 select(Issue).where(
@@ -76,14 +76,18 @@ def test_similar_vacancies_without_identifier_get_contextual_risk() -> None:
                 )
             )
         )
-        assert len(issues) == 5
+        assert len(issues) == 1
+        assert issues[0].url_id is None
+        assert issues[0].title == "5 vergelijkbare vacatures missen een identifier"
         assert {issue.severity for issue in issues} == {"medium"}
         occurrence = db.scalar(
             select(IssueOccurrence).where(IssueOccurrence.issue_id == issues[0].id)
         )
         assert occurrence is not None
-        assert occurrence.evidence["group_size"] == 5
-        assert len(occurrence.evidence["related_urls"]) == 4
+        assert occurrence.evidence["affected_vacancies"] == 5
+        assert occurrence.evidence["cluster_count"] == 1
+        assert occurrence.evidence["clusters"][0]["group_size"] == 5
+        assert len(occurrence.evidence["clusters"][0]["urls"]) == 5
 
 
 def test_single_vacancy_without_identifier_is_only_an_optimization() -> None:

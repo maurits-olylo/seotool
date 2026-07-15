@@ -204,6 +204,8 @@ diagnosepatroon gegroepeerd. Verdere patroonherkenning, adviesverrijking en poli
 ### Van signaal naar diagnose
 
 - Losse URL-signalen clusteren tot één waarschijnlijk onderliggend probleem.
+- Vergelijkbare vacatures zonder identifier als één websitebrede templatediagnose tonen, met
+  vacatureclusters, overlap en alle geraakte URL's als bewijs.
 - URL-patronen herkennen, waaronder paginering, filters, facetten, parameters, templates en
   canonical- of redirectconfiguraties.
 - Vergelijkbare paginagroepen vormen en afwijkingen binnen zo'n groep aanwijzen in plaats van alle
@@ -282,6 +284,8 @@ Acceptatie:
   waarschijnlijk paginerings-, filter- of canonicalprobleem gepresenteerd.
 - `https://www.human.nl/artikelen/zo-bespreek-je-moeilijke-onderwerpen-in-de-klas-` verschijnt als
   één bronpaginadiagnose met alle drie of vier dode interne links, inclusief doel en ankertekst.
+- Een groot aantal GrandVision-vacatures zonder identifier verschijnt alleen als één diagnose
+  wanneer aantoonbare gelijkende clusters bestaan; optionele velden zonder risico blijven stil.
 - Een overzicht met honderd URL's op crawldiepte 1 benoemt vooral de waarschijnlijke uitzonderingen.
 - Ieder belangrijk issue beantwoordt: wat gebeurt er, waarom is dat relevant, wat is waarschijnlijk
   de oorzaak, wat moet concreet worden aangepast en hoe wordt de oplossing gecontroleerd.

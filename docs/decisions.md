@@ -352,3 +352,17 @@ naartoe verwijzen.
 
 Gevolg: de interface kan een pagina als één uitvoerbare reparatietaak presenteren zonder de
 onderliggende linkgegevens of sitebrede doelanalyse te verliezen.
+
+## 2026-07-16 — Identifier-risico wordt één vacaturetemplatediagnose
+
+Context: de contextuele identifiercontrole voorkwam al meldingen voor losse optionele velden, maar
+maakte binnen een aantoonbaar gelijkende groep nog één issue per vacature. Een templatefout werd
+daardoor alsnog als tientallen afzonderlijke taken gepresenteerd.
+
+Besluit: alle inhoudelijk gelijkende vacatureclusters zonder identifier worden per website in één
+diagnose samengebracht. Het issue toont het totale aantal geraakte vacatures, de afzonderlijke
+clusters, de minimale inhoudsoverlap en alle URL's. Prioriteit en vertrouwen volgen de grootste
+cluster. Bestaande URL-specifieke identifierissues worden bij een volgende volledige crawl opgelost.
+
+Gevolg: GrandVision krijgt één uitvoerbare templateactie in plaats van herhaling per vacature.
+Ontbrekende optionele velden blijven zonder aantoonbaar risico buiten de actieve issuelijst.

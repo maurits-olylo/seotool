@@ -1219,7 +1219,10 @@ async function showIssue(issueId) {
   const brokenLinks = Array.isArray(issue.evidence.broken_links) ? issue.evidence.broken_links : [];
   $("#detail-broken-links").innerHTML = brokenLinks.map((link) => `<li><a href="${escapeHtml(link.target_url)}" target="_blank" rel="noopener">${escapeHtml(link.target_url)}</a><br><span>Ankertekst: ${escapeHtml(link.anchor_text || "(geen ankertekst)")} · status ${escapeHtml(link.status_code || 404)}</span></li>`).join("");
   $("#broken-links-section").classList.toggle("hidden", brokenLinks.length === 0);
-  const evidence = Object.entries(issue.evidence).filter(([key]) => key !== "broken_links");
+  const vacancyClusters = Array.isArray(issue.evidence.clusters) ? issue.evidence.clusters : [];
+  $("#detail-vacancy-clusters").innerHTML = vacancyClusters.map((cluster, index) => `<section><strong>Cluster ${index + 1}: ${escapeHtml(cluster.group_size)} vacatures</strong><p>Minimale inhoudsoverlap: ${escapeHtml(cluster.minimum_content_overlap_percent)}%</p><ul>${cluster.urls.map((url) => `<li><a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a></li>`).join("")}</ul></section>`).join("");
+  $("#vacancy-clusters-section").classList.toggle("hidden", vacancyClusters.length === 0);
+  const evidence = Object.entries(issue.evidence).filter(([key]) => !["broken_links", "clusters"].includes(key));
   $("#detail-evidence").textContent = evidence.map(([key, value]) => `${key.replaceAll("_", " ")}: ${value}`).join("\n") || "Geen aanvullend bewijs opgeslagen.";
   $("#detail-sources").innerHTML = issue.source_urls.map((source) => `<li><a href="${escapeHtml(source)}" target="_blank" rel="noopener">${escapeHtml(source)}</a></li>`).join("");
   $("#source-section").classList.toggle("hidden", issue.source_urls.length === 0);
