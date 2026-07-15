@@ -61,6 +61,64 @@ Status: in uitvoering.
 - Ontbrekende technische controles uit de acceptatielijst valideren.
 - Inzichten alleen bij voldoende bewijs als harde issues behandelen.
 
+### Gerichte pagina-exports
+
+- Voeg bovenaan `URL's`, `Wijzigingen` en `Vacatures` een eigen exportknop toe.
+- Exporteer per knop uitsluitend het datatype en de kolommen van de betreffende pagina.
+- Pas de actieve zoekopdracht, filters en geselecteerde website toe op de export.
+- Ondersteun zo herbruikbare lijsten rond een specifiek onderwerp of interessegebied zonder het
+  volledige algemene workbook te hoeven downloaden.
+- Vermeld website, exportmoment en toegepaste filters in iedere export.
+
+Acceptatie:
+
+- Een gefilterd URL-overzicht levert alleen de zichtbare URL-selectie als exportdataset op.
+- Een gefilterd wijzigingenoverzicht levert alleen de bijbehorende wijzigingen op.
+- Een gefilterd vacatureoverzicht levert alleen de geselecteerde vacatures en hun relevante status
+  en bevindingen op.
+
+### Waarde en betrouwbaarheid van het URL-overzicht
+
+- Onderzoek welke bruikbare signalen in het URL-overzicht ontbreken en welke bestaande waarden
+  onvoldoende betrouwbaar of onvoldoende verklaard zijn.
+- Signaleer indexeerbare 200-pagina's die vrijwel leeg zijn en alleen basismetadata zoals title en
+  H1 bevatten met een controlegerichte vraag: “Klopt het dat deze pagina live staat?”
+- Maak onderscheid tussen een bewust korte functionele pagina, een lege template, soft 404 en een
+  inhoudelijk dunne landingspagina.
+- Verklaar waarom crawldiepte onbekend is, bijvoorbeeld niet intern bereikbaar, alleen via sitemap
+  gevonden, crawl afgebroken of buiten de voltooide crawlgrens.
+- Valideer crawldiepte tegen de werkelijk kortste interne linkroute en voorkom dat een oudere of
+  onvolledige crawl een misleidende waarde toont.
+- Voeg context en aanbevolen vervolgactie toe in plaats van alleen URL, status en diepte te tonen.
+
+Praktijktests:
+
+- `https://www.schipperkozijnen.nl/aluminium-achterdeuren`: lege live pagina herkennen en gericht
+  laten beoordelen.
+- `https://www.schipperkozijnen.nl/comfort`: onderzoeken waarom crawldiepte 2 wordt getoond en de
+  kortste interne route aantoonbaar maken.
+
+### Ruisarme en verklaarbare wijzigingen
+
+- Inventariseer welke kleine technische of cosmetische verschillen nu onterecht een wijziging
+  triggeren.
+- Normaliseer dynamische, niet-inhoudelijke waarden waar dit veilig en reproduceerbaar kan.
+- Maak onderscheid tussen kleine technische wijziging, inhoudelijke wijziging en SEO-kritieke
+  wijziging.
+- Toon altijd de vorige en huidige meetdatum: “gewijzigd ten opzichte van”.
+- Toon wat inhoudelijk veranderde, waarom dit mogelijk relevant is en welke controle wordt
+  aanbevolen.
+- Groepeer samenhangende wijzigingen per URL en crawl in één gebeurtenis.
+- Geef kleine wijzigingen minder nadruk of verberg ze standaard, zonder de onderliggende historie
+  te verwijderen.
+
+Acceptatie:
+
+- Een gebruiker kan direct zien tussen welke twee snapshots is vergeleken.
+- Iedere zichtbare wijziging bevat betekenis, mogelijke impact en een praktisch controledoel.
+- Witruimte, volgorde zonder semantische betekenis en bekende dynamische templatewaarden leveren
+  geen prominente wijzigingsmelding op.
+
 ## Fase 5 — Bing hervatten
 
 Status: gepauzeerd totdat voldoende Bing Webmaster Tools-data beschikbaar is.
