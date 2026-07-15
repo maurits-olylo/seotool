@@ -219,6 +219,21 @@ product.
 - Dialogen, typografie, witruimte, filters, bulkacties, lege staten en mobiele weergave consistent
   nalopen.
 
+### Bulk afhandelen en blijvend onthouden
+
+- Issues selecteren via vinkjes, huidig filter, URL-groep of issuetype en gezamenlijk afhandelen.
+- Twee expliciete bulkacties bieden:
+  - `Opgelost; opnieuw controleren`: na de volgende crawl verifiëren en opnieuw openen wanneer het
+    signaal nog of weer aanwezig is;
+  - `Afgehandeld voor dit issuetype`: de combinatie website, URL en issuetype blijvend opslaan en
+    hetzelfde signaal bij volgende crawls standaard negeren.
+- Een blijvende afhandeling bewaren met gebruiker, datum, optionele toelichting en exacte scope.
+- Andere issuetypen op dezelfde URL altijd normaal blijven tonen.
+- Hetzelfde issuetype op nieuwe of niet-geselecteerde URL's altijd als nieuw issue tonen.
+- Afgehandelde regels via een apart filter controleerbaar maken en individueel of in bulk kunnen
+  herstellen.
+- Bulkacties en automatische onderdrukking in de issuehistorie en auditlog vastleggen.
+
 Acceptatie:
 
 - De 404's op HUMAN-paginering worden als één patroon onderzocht en waar aantoonbaar als één
@@ -228,6 +243,16 @@ Acceptatie:
   de oorzaak, wat moet concreet worden aangepast en hoe wordt de oplossing gecontroleerd.
 - Een gebruiker kan altijd onderscheid maken tussen feitelijk bewijs, systeeminterpretatie en een
   onzekere hypothese.
+- De geselecteerde GrandVision-vacature- en favorieten-URL's kunnen voor één issuetype in bulk
+  blijvend worden afgehandeld; hetzelfde type komt voor deze URL's niet terug, terwijl andere
+  issuetypen en nieuwe URL's zichtbaar blijven.
+- De interface toont vóór bevestiging hoeveel URL's, welk issuetype en welke blijvende reikwijdte
+  de bulkactie krijgt.
+
+Praktijktest bulkafhandeling:
+
+- Vacature-ID's `29906`, `29820` en `29872`, inclusief merkvarianten onder GrandOptical en Pearle.
+- De drie `/vacatures/favorieten`-varianten onder het hoofddomein, GrandOptical en Pearle.
 
 ## Fase 7 — Productieafronding
 

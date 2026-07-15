@@ -272,3 +272,19 @@ hypothesen ondersteunen, maar uitsluitend op meegeleverd bewijs en nooit als ong
 Gevolg: de primaire eenheid in de interface wordt waar mogelijk één onderliggende diagnose met
 geraakte URL's, niet een los issue per URL. UX-polish richt zich op uitzonderingen, beslissingen en
 progressieve uitleg in plaats van meer tabellen of decoratie.
+
+## 2026-07-16 — Bulkafhandeling heeft een expliciete blijvende scope
+
+Context: dezelfde handmatig beoordeelde signalen opnieuw afhandelen na iedere crawl veroorzaakt
+ruis. Alleen een status `resolved` is daarvoor onvoldoende: de huidige issue-engine opent een
+terugkerend signaal terecht opnieuw, terwijl de gebruiker sommige combinaties van URL en issuetype
+bewust blijvend wil afsluiten.
+
+Besluit: de interface maakt onderscheid tussen oplossen met verificatie en blijvend afhandelen.
+Een blijvende bulkafhandeling wordt apart opgeslagen per website, URL en issuetype, inclusief actor,
+moment en toelichting. De issue-engine onderdrukt daarna alleen exact die combinatie. Andere
+issuetypen op dezelfde URL en hetzelfde type op nieuwe URL's blijven nieuwe signalen opleveren.
+Iedere onderdrukking blijft zichtbaar, controleerbaar en omkeerbaar.
+
+Gevolg: bulkacties besparen terugkerend handwerk zonder nieuwe problemen breed of onzichtbaar weg
+te filteren. `Fixed` en `ignored` krijgen een voorspelbare, auditbare betekenis.
