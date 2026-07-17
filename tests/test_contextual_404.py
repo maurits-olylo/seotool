@@ -158,3 +158,52 @@ def test_groups_multiple_broken_links_on_one_source_page() -> None:
 
         db.refresh(grouped)
         assert grouped.status == "resolved"
+
+
+def test_groups_paginated_404_urls_as_one_pattern() -> None:
+    with SessionLocal() as db:
+        client = Client(name="Pagination client")
+        website = Website(client=client, name="Pagination site", base_url="https://human.test")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        urls = [
+            Url(
+                website_id=website.id,
+                normalized_url=f"https://human.test/durf/artikelen?page={number}",
+                current_status_code=404,
+            )
+            for number in (3, 4, 5)
+        ]
+        db.add_all(urls)
+        db.flush()
+        run = _crawl_run(db, website.id)
+
+        classify_404_issues(db, website_id=website.id, crawl_run_id=run.id)
+
+        issue = db.scalar(
+            select(Issue).where(
+                Issue.website_id == website.id,
+                Issue.url_id.is_(None),
+                Issue.issue_type == "patterned_404_urls",
+            )
+        )
+        assert issue is not None
+        assert issue.title == "3 404-URL's vormen 1 herkenbaar patroon"
+        occurrence = db.scalar(
+            select(IssueOccurrence).where(IssueOccurrence.issue_id == issue.id)
+        )
+        assert occurrence is not None
+        assert occurrence.evidence["pattern_count"] == 1
+        assert occurrence.evidence["patterns"][0]["pattern"] == "/durf/artikelen?page=*"
+        assert occurrence.evidence["patterns"][0]["pattern_type"] == "pagination"
+
+
+def _crawl_run(db, website_id):  # type: ignore[no-untyped-def]
+    job = CrawlJob(website_id=website_id, job_type="full_site_crawl")
+    db.add(job)
+    db.flush()
+    run = CrawlRun(crawl_job_id=job.id, website_id=website_id, crawl_type="full_site_crawl")
+    db.add(run)
+    db.flush()
+    return run

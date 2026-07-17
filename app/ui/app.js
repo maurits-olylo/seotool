@@ -1222,7 +1222,10 @@ async function showIssue(issueId) {
   const vacancyClusters = Array.isArray(issue.evidence.clusters) ? issue.evidence.clusters : [];
   $("#detail-vacancy-clusters").innerHTML = vacancyClusters.map((cluster, index) => `<section><strong>Cluster ${index + 1}: ${escapeHtml(cluster.group_size)} vacatures</strong><p>Minimale inhoudsoverlap: ${escapeHtml(cluster.minimum_content_overlap_percent)}%</p><ul>${cluster.urls.map((url) => `<li><a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a></li>`).join("")}</ul></section>`).join("");
   $("#vacancy-clusters-section").classList.toggle("hidden", vacancyClusters.length === 0);
-  const evidence = Object.entries(issue.evidence).filter(([key]) => !["broken_links", "clusters"].includes(key));
+  const urlPatterns = Array.isArray(issue.evidence.patterns) ? issue.evidence.patterns : [];
+  $("#detail-url-patterns").innerHTML = urlPatterns.map((pattern) => `<section><strong>${escapeHtml(pattern.pattern)}</strong><p>${escapeHtml(pattern.url_count)} URL’s · ${pattern.pattern_type === "pagination" ? "paginering" : "parameters/filter"}</p><ul>${pattern.urls.map((url) => `<li><a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a></li>`).join("")}</ul></section>`).join("");
+  $("#url-patterns-section").classList.toggle("hidden", urlPatterns.length === 0);
+  const evidence = Object.entries(issue.evidence).filter(([key]) => !["broken_links", "clusters", "patterns"].includes(key));
   $("#detail-evidence").textContent = evidence.map(([key, value]) => `${key.replaceAll("_", " ")}: ${value}`).join("\n") || "Geen aanvullend bewijs opgeslagen.";
   $("#detail-sources").innerHTML = issue.source_urls.map((source) => `<li><a href="${escapeHtml(source)}" target="_blank" rel="noopener">${escapeHtml(source)}</a></li>`).join("");
   $("#source-section").classList.toggle("hidden", issue.source_urls.length === 0);

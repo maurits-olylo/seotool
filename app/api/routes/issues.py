@@ -25,6 +25,15 @@ from app.schemas.issues import (
 from app.services.authorization import require_website_access, require_write_access
 
 router = APIRouter(tags=["issues"])
+GROUPABLE_404_ISSUE_TYPES = {"http_404", "internally_linked_404", "sitemap_404"}
+ACTIVE_ISSUE_STATUSES = {
+    "new",
+    "review",
+    "accepted",
+    "planned",
+    "in_progress",
+    "waiting_for_client",
+}
 
 CHANGE_CONTEXT = {
     "status_code_changed": (
@@ -293,6 +302,15 @@ def list_issues(
     if issue_status:
         query = query.where(Issue.status == issue_status)
     issues = list(db.scalars(query))
+    grouped_404_url_ids = _grouped_404_url_ids(db, website_id)
+    issues = [
+        issue
+        for issue in issues
+        if not (
+            issue.issue_type in GROUPABLE_404_ISSUE_TYPES
+            and issue.url_id in grouped_404_url_ids
+        )
+    ]
     impacts = _organic_impacts(db, website_id)
     return [
         {
@@ -301,6 +319,45 @@ def list_issues(
         }
         for issue in issues
     ]
+
+
+def _grouped_404_url_ids(db: Session, website_id: UUID) -> set[UUID]:
+    diagnosis = db.scalar(
+        select(Issue)
+        .where(
+            Issue.website_id == website_id,
+            Issue.issue_type == "patterned_404_urls",
+            Issue.status.in_(ACTIVE_ISSUE_STATUSES),
+        )
+        .order_by(Issue.last_detected_at.desc())
+        .limit(1)
+    )
+    if diagnosis is None:
+        return set()
+    occurrence = db.scalar(
+        select(IssueOccurrence)
+        .where(IssueOccurrence.issue_id == diagnosis.id)
+        .order_by(IssueOccurrence.detected_at.desc())
+        .limit(1)
+    )
+    patterns = occurrence.evidence.get("patterns", []) if occurrence else []
+    grouped_urls = {
+        url
+        for pattern in patterns
+        if isinstance(pattern, dict)
+        for url in pattern.get("urls", [])
+        if isinstance(url, str)
+    }
+    if not grouped_urls:
+        return set()
+    return set(
+        db.scalars(
+            select(Url.id).where(
+                Url.website_id == website_id,
+                Url.normalized_url.in_(grouped_urls),
+            )
+        )
+    )
 
 
 @router.get("/issues/{issue_id}", response_model=IssueDetailRead)

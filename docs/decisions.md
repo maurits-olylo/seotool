@@ -366,3 +366,18 @@ cluster. Bestaande URL-specifieke identifierissues worden bij een volgende volle
 
 Gevolg: GrandVision krijgt één uitvoerbare templateactie in plaats van herhaling per vacature.
 Ontbrekende optionele velden blijven zonder aantoonbaar risico buiten de actieve issuelijst.
+
+## 2026-07-17 — Samenhangende 404-reeksen worden één patroondiagnose
+
+Context: HUMAN bevat paginerings- en parameter-URL's die als losse 404-issues werden getoond. De
+afzonderlijke URL's zijn bewijs, maar de uitvoerbare oorzaak zit waarschijnlijk in één template,
+filter of navigatieregel.
+
+Besluit: expliciete paginering wordt vanaf twee 404-URL's gegroepeerd; algemene parameterreeksen
+vanaf drie. De diagnose bewaart patroon, type, omvang en alle URL's, en onderscheidt een
+waarschijnlijke oorzaak van een alternatieve verklaring. Onderliggende URL-issues blijven in de
+database voor historie, maar verdwijnen uit het hoofdissue-overzicht zolang de patroondiagnose
+actief is.
+
+Gevolg: één technische aanpassing wordt één taak. Wanneer een volgende volledige crawl het patroon
+niet meer aantreft, wordt de diagnose opgelost en vervalt de onderdrukking van losse URL-signalen.

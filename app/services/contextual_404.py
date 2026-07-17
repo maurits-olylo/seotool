@@ -1,3 +1,7 @@
+import re
+from collections import defaultdict
+from urllib.parse import parse_qsl, urlsplit
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -9,6 +13,9 @@ from app.services.technical_checks import IssueSignal
 
 CONTEXTUAL_404_TYPES = {"http_404", "internally_linked_404", "sitemap_404"}
 SOURCE_PAGE_404_TYPE = "multiple_broken_internal_links"
+PATTERNED_404_TYPE = "patterned_404_urls"
+PAGINATION_PARAMETERS = {"page", "paged", "p", "offset", "start"}
+PATH_PAGE_RE = re.compile(r"(?:/page/\d+|/page-\d+)(?:/)?$", re.IGNORECASE)
 
 
 def classify_404_issues(db: Session, *, website_id: object, crawl_run_id: object) -> None:
@@ -48,8 +55,114 @@ def classify_404_issues(db: Session, *, website_id: object, crawl_run_id: object
             signals=[signal],
             checked_issue_types=CONTEXTUAL_404_TYPES,
         )
+    _classify_url_patterns(
+        db,
+        website_id=website_id,
+        crawl_run_id=crawl_run_id,
+        urls=[url.normalized_url for url in urls],
+    )
     _classify_source_pages(db, website_id=website_id, crawl_run_id=crawl_run_id)
     db.commit()
+
+
+def _classify_url_patterns(
+    db: Session,
+    *,
+    website_id: object,
+    crawl_run_id: object,
+    urls: list[str],
+) -> None:
+    candidates: dict[tuple[str, str], set[str]] = defaultdict(set)
+    for url in urls:
+        split = urlsplit(url)
+        query = parse_qsl(split.query, keep_blank_values=True)
+        pagination_names = sorted(
+            {
+                name.lower()
+                for name, value in query
+                if name.lower() in PAGINATION_PARAMETERS and value
+            }
+        )
+        if pagination_names:
+            key = f"{split.path}?{'&'.join(f'{name}=*' for name in pagination_names)}"
+            candidates[("pagination", key)].add(url)
+            continue
+        if query:
+            names = sorted({name.lower() for name, _value in query})
+            key = f"{split.path}?{'&'.join(f'{name}=*' for name in names)}"
+            candidates[("parameter", key)].add(url)
+            continue
+        if PATH_PAGE_RE.search(split.path):
+            key = PATH_PAGE_RE.sub("/page/*", split.path)
+            candidates[("pagination", key)].add(url)
+
+    patterns: list[dict[str, object]] = []
+    for (pattern_type, pattern), grouped_urls in sorted(candidates.items()):
+        minimum_size = 2 if pattern_type == "pagination" else 3
+        if len(grouped_urls) < minimum_size:
+            continue
+        patterns.append(
+            {
+                "pattern_type": pattern_type,
+                "pattern": pattern,
+                "url_count": len(grouped_urls),
+                "urls": sorted(grouped_urls),
+            }
+        )
+
+    signals: list[IssueSignal] = []
+    if patterns:
+        affected_urls = {url for pattern in patterns for url in pattern["urls"]}
+        pagination_count = sum(
+            1 for pattern in patterns if pattern["pattern_type"] == "pagination"
+        )
+        likely_cause = (
+            "De site genereert waarschijnlijk pagineringslinks naar niet-bestaande pagina's."
+            if pagination_count
+            else "De site genereert waarschijnlijk parameter- of filter-URL's die niet bestaan."
+        )
+        signals.append(
+            IssueSignal(
+                issue_type=PATTERNED_404_TYPE,
+                category="internal_links",
+                severity="high",
+                confidence="high" if pagination_count else "medium",
+                title=(
+                    f"{len(affected_urls)} 404-URL's vormen {len(patterns)} herkenbaar patroon"
+                    + ("" if len(patterns) == 1 else "en")
+                ),
+                description=(
+                    f"{likely_cause} De losse 404's zijn daarom waarschijnlijk symptomen van "
+                    "dezelfde navigatie-, filter- of templateconfiguratie."
+                ),
+                recommended_action=(
+                    "Controleer waar deze URL-reeks wordt opgebouwd. Begrens paginering bij de "
+                    "laatste bestaande pagina, verwijder links naar lege resultaten en controleer "
+                    "canonical- en robotsregels voor geldige varianten. Bevestig met een nieuwe "
+                    "crawl dat geen URL uit het patroon nog intern wordt gegenereerd als 404."
+                ),
+                evidence={
+                    "affected_url_count": len(affected_urls),
+                    "pattern_count": len(patterns),
+                    "patterns": patterns,
+                    "likely_cause": likely_cause,
+                    "alternative_explanation": (
+                        "Verouderde handmatige links kunnen hetzelfde patroon nabootsen; "
+                        "controleer daarom eerst de bronpagina's en het pagineringstemplate."
+                    ),
+                    "verification": "geen intern ontdekte URL uit deze patronen geeft nog een 404",
+                },
+            )
+        )
+    reconcile_issues(
+        db,
+        website_id=website_id,
+        url_id=None,
+        crawl_run_id=crawl_run_id,
+        snapshot_id=None,
+        signals=signals,
+        checked_issue_types={PATTERNED_404_TYPE},
+    )
 
 
 def _classify_source_pages(db: Session, *, website_id: object, crawl_run_id: object) -> None:

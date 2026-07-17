@@ -208,6 +208,8 @@ diagnosepatroon gegroepeerd. Verdere patroonherkenning, adviesverrijking en poli
   vacatureclusters, overlap en alle geraakte URL's als bewijs.
 - URL-patronen herkennen, waaronder paginering, filters, facetten, parameters, templates en
   canonical- of redirectconfiguraties.
+- Paginering- en parameterreeksen die meerdere 404's veroorzaken als één websitebrede diagnose
+  tonen; onderliggende URL-issues voor historie bewaren maar niet als dubbele hoofdtaken tonen.
 - Vergelijkbare paginagroepen vormen en afwijkingen binnen zo'n groep aanwijzen in plaats van alle
   normale waarden als losse regels te tonen.
 - Crawldiepte, indexatie, interne links, wijzigingen, schema en verkeersdata gezamenlijk beoordelen.
