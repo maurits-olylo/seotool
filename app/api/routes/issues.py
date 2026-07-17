@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
-from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
+from app.models.crawl import CrawlRun, ElementLocation, UrlLink, UrlSnapshot
 from app.models.discovery import Url
 from app.models.integrations import GoogleAnalyticsMetric, SearchConsoleMetric
 from app.models.issues import ActivityLog, Change, Issue, IssueComment, IssueOccurrence
@@ -23,6 +23,8 @@ from app.schemas.issues import (
     IssueUpdate,
 )
 from app.services.authorization import require_website_access, require_write_access
+from app.services.element_jumps import build_live_jump_url
+from app.services.url_normalization import InvalidUrlError, normalize_url
 
 router = APIRouter(tags=["issues"])
 GROUPABLE_404_ISSUE_TYPES = {"http_404", "internally_linked_404", "sitemap_404"}
@@ -398,7 +400,88 @@ def get_issue(
         "organic_impact": _organic_impacts(db, issue.website_id).get(issue.url_id),
         "evidence": occurrence.evidence if occurrence else {},
         "source_urls": source_urls,
+        "elements": _issue_elements(db, issue, occurrence),
     }
+
+
+def _issue_elements(
+    db: Session,
+    issue: Issue,
+    occurrence: IssueOccurrence | None,
+) -> list[dict[str, object]]:
+    if occurrence is None:
+        return []
+    locations = list(
+        db.scalars(
+            select(ElementLocation)
+            .where(ElementLocation.crawl_run_id == occurrence.crawl_run_id)
+            .order_by(
+                ElementLocation.source_url_id,
+                ElementLocation.element_type,
+                ElementLocation.occurrence_index,
+            )
+        )
+    )
+    target_urls: set[str] = set()
+    source_url_id = issue.url_id
+    if issue.issue_type == "multiple_broken_internal_links":
+        for item in occurrence.evidence.get("broken_links", []):
+            if isinstance(item, dict) and isinstance(item.get("target_url"), str):
+                target_urls.add(_normalized_or_raw(item["target_url"]))
+    elif issue.issue_type in {
+        "internally_linked_404",
+        "internally_linked_redirect",
+        "broken_image",
+    } and issue.url_id:
+        target = db.get(Url, issue.url_id)
+        if target:
+            target_urls.add(_normalized_or_raw(target.normalized_url))
+        source_url_id = None
+
+    matched: list[ElementLocation] = []
+    for location in locations:
+        direct_match = issue.issue_type in (location.issue_types or [])
+        target_match = bool(
+            target_urls
+            and location.target_url
+            and _normalized_or_raw(location.target_url) in target_urls
+        )
+        source_match = source_url_id is None or location.source_url_id == source_url_id
+        if source_match and (direct_match or target_match):
+            matched.append(location)
+
+    source_ids = {location.source_url_id for location in matched}
+    source_map = {
+        item.id: item.normalized_url
+        for item in db.scalars(select(Url).where(Url.id.in_(source_ids)))
+    }
+    return [
+        {
+            "id": location.id,
+            "source_url": source_map[location.source_url_id],
+            "issue_type": issue.issue_type,
+            "element_type": location.element_type,
+            "target_url": location.target_url,
+            "visible_text": location.visible_text,
+            "element_id": location.element_id,
+            "css_selector": location.css_selector,
+            "xpath": location.xpath,
+            "html_fragment": location.html_fragment,
+            "occurrence_index": location.occurrence_index,
+            "text_prefix": location.text_prefix,
+            "text_suffix": location.text_suffix,
+            "jump_url": build_live_jump_url(source_map[location.source_url_id], location),
+        }
+        for location in matched[:100]
+        if location.source_url_id in source_map
+    ]
+
+
+def _normalized_or_raw(value: str) -> str:
+    try:
+        return normalize_url(value)
+    except InvalidUrlError:
+        return value
 
 
 def _organic_impacts(db: Session, website_id: UUID) -> dict[UUID, dict[str, object]]:

@@ -211,7 +211,8 @@ def test_full_site_crawl_keeps_asset_links_without_fetching_assets(monkeypatch) 
         elif url == "https://example.com/":
             content = (
                 b'<main><a href="/page">Page</a><a href="/file.pdf">PDF</a>'
-                b'<a href="/photo.JPG?download=1">Photo</a></main>'
+                b'<a href="/photo.JPG?download=1">Photo</a>'
+                b'<img src="/inline.webp" alt="Inline"></main>'
             )
             content_type = "text/html"
         else:
@@ -261,6 +262,7 @@ def test_full_site_crawl_keeps_asset_links_without_fetching_assets(monkeypatch) 
     assert "https://example.com/photo.JPG?download=1" not in fetched
     assert sorted(audited) == [
         "https://example.com/file.pdf",
+        "https://example.com/inline.webp",
         "https://example.com/photo.JPG?download=1",
     ]
     with SessionLocal() as db:
@@ -271,6 +273,7 @@ def test_full_site_crawl_keeps_asset_links_without_fetching_assets(monkeypatch) 
         assert depths["https://example.com/"] == 0
         assert depths["https://example.com/page"] == 1
         assert depths["https://example.com/file.pdf"] is None
+        assert depths["https://example.com/inline.webp"] is None
         assert depths["https://example.com/photo.JPG?download=1"] is None
         completed = db.get(CrawlJob, job_id)
         assert completed and completed.status == "succeeded"

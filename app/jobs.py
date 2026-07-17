@@ -9,12 +9,13 @@ from sqlalchemy import select, update
 from app.db.session import SessionLocal
 from app.models.common import utc_now
 from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
-from app.models.discovery import CrawlJob, Url
+from app.models.discovery import CrawlJob, Url, UrlSource
 from app.models.website import Website
 from app.services.asset_checks import ASSET_ISSUE_TYPES, HTML_ONLY_ISSUE_TYPES, inspect_asset
 from app.services.content_similarity import detect_duplicate_content
 from app.services.contextual_404 import classify_404_issues
 from app.services.crawl_deployment import pause_job_if_deployment_active
+from app.services.element_locations import mark_target_elements
 from app.services.http_crawler import CrawlError, fetch_metadata, fetch_url
 from app.services.indexation_analysis import analyze_indexation_consistency
 from app.services.internal_link_analysis import analyze_internal_link_quality, detect_orphan_pages
@@ -317,6 +318,21 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
                 .order_by(Url.normalized_url)
             )
         )
+        discovered_by_source = list(
+            db.scalars(
+                select(Url)
+                .join(UrlSource, UrlSource.url_id == Url.id)
+                .where(
+                    Url.website_id == website.id,
+                    UrlSource.source_type == "internal_link",
+                    UrlSource.source_url == url.normalized_url,
+                )
+                .order_by(Url.normalized_url)
+            )
+        )
+        discovered = list(
+            {item.id: item for item in [*discovered, *discovered_by_source]}.values()
+        )
         for target in discovered:
             if not is_probable_html_page(target.normalized_url):
                 if target.id not in audited_assets:
@@ -425,13 +441,22 @@ def _audit_asset(db, job: CrawlJob, run: CrawlRun, url: Url) -> None:  # type: i
         )
         db.add(snapshot)
         db.flush()
+        asset_signals = inspect_asset(result.final_url, response_size, result.status_code)
+        if any(signal.issue_type == "broken_image" for signal in asset_signals):
+            mark_target_elements(
+                db,
+                crawl_run_id=run.id,
+                target_url=url.normalized_url,
+                issue_type="broken_image",
+                element_types={"img"},
+            )
         reconcile_issues(
             db,
             website_id=job.website_id,
             url_id=url.id,
             crawl_run_id=run.id,
             snapshot_id=snapshot.id,
-            signals=inspect_asset(result.final_url, response_size),
+            signals=asset_signals,
             checked_issue_types=ASSET_ISSUE_TYPES | HTML_ONLY_ISSUE_TYPES,
         )
     except CrawlError as exc:

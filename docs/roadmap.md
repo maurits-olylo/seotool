@@ -267,6 +267,26 @@ diagnosepatroon gegroepeerd. Verdere patroonherkenning, adviesverrijking en poli
 - Dialogen, typografie, witruimte, filters, bulkacties, lege staten en mobiele weergave consistent
   nalopen.
 
+### Live elementlokalisatie uitbreiden
+
+Status: eerste versie technisch geïmplementeerd; productievalidatie na een nieuwe volledige crawl.
+
+- Ondersteuning uitbreiden naar meer bestaande en betrouwbaar lokaliseerbare elementen.
+- Betere herkenning en tekstcontext gebruiken wanneer dezelfde zichtbare tekst vaker voorkomt.
+- Altijd terugvallen op bronpagina, HTML-fragment, CSS-selector en XPath wanneer geen veilige
+  URL-jump bestaat.
+- Browser- en compatibiliteitstests uitvoeren voor element-ID's en text-fragment-URL's.
+- Een expliciete betrouwbaarheidsscore toevoegen voor live URL-jumps.
+- Nooit een locatieknop tonen voor ontbrekende elementen waarvoor geen bestaand DOM-doel bestaat.
+
+Acceptatie eerste versie:
+
+- Issue-details tonen per betrokken bestaand element type, tekst, doel-URL en technische context.
+- Een stabiel element-ID heeft voorrang; daarna volgt alleen unieke tekst of unieke prefix/suffix.
+- Interne 404- en redirectlinks, linkplaceholders, dubbele headings, defecte CTA's en gebroken
+  afbeeldingen kunnen locatiebewijs opslaan.
+- Icon-only, lege en dubbele elementen zonder unieke context krijgen geen misleidende jumpknop.
+
 ### Bulk afhandelen en blijvend onthouden
 
 - Issues selecteren via vinkjes, huidig filter, URL-groep of issuetype en gezamenlijk afhandelen.
@@ -372,3 +392,18 @@ Releases worden als Git-archive naar `/tmp/seotool-<commit>-r<nummer>.tar.gz` ge
 de NAS gebeurt via SSH-streaming met `dd`. Controleer op de NAS altijd eerst SHA-256, pak daarna uit
 met `sudo tar --no-same-owner` en bouw en herstart alleen geraakte services. Migrations worden alleen
 uitgevoerd wanneer een nieuw Alembic-bestand onderdeel van de release is.
+
+## Fase 10 — Volwaardige visuele issue-inspectie
+
+Status: toekomstig; laatste brede productfase na de huidige roadmap.
+
+- Een eigen inspectiemodus bouwen die opgeslagen of opnieuw gerenderde pagina's binnen SEO Monitor
+  toont, automatisch naar het betrokken element scrolt en issues met overlays markeert.
+- Zowel bestaande als ontbrekende elementen ondersteunen, waaronder ontbrekende H1's,
+  alt-attributen, CTA's, formulierlabels en breadcrumbs.
+- Gebroken afbeeldingen, headingproblemen, interne 404-links, redirects en
+  schema-contentmismatches visueel aanwijzen.
+- Accessibilityproblemen, LCP-elementen, layout shifts en overlappende pop-ups of sticky elementen
+  in dezelfde inspectiestroom opnemen.
+- Opgeslagen crawlbewijs en optionele her-rendering scheiden, zodat zichtbaar blijft welk bewijs
+  historisch is en wat live opnieuw is vastgesteld.

@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from app.db.session import SessionLocal
 from app.models.client import Client
-from app.models.crawl import CrawlRun, UrlLink
+from app.models.crawl import CrawlRun, ElementLocation, UrlLink
 from app.models.discovery import CrawlJob, Url
 from app.models.website import Website, WebsiteSettings
 from app.services.http_crawler import FetchResult
@@ -51,6 +51,9 @@ def test_stores_snapshot_and_links() -> None:
         assert snapshot.is_indexable is True
         assert url.current_status_code == 200
         assert len(list(db.scalars(select(UrlLink)))) == 2
+        locations = list(db.scalars(select(ElementLocation)))
+        assert locations
+        assert any(item.element_type == "h1" for item in locations)
 
 
 def test_skips_link_with_invalid_port_without_failing_snapshot() -> None:

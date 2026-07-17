@@ -46,6 +46,10 @@ SNAPSHOT_ISSUE_TYPES = {
     "job_posting_not_detail_page",
     "job_posting_missing_recommended_fields",
     "robots_txt_blocked",
+    "duplicate_heading_text",
+    "cms_link_placeholder",
+    "invalid_or_empty_link",
+    "broken_application_cta",
 }
 
 

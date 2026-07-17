@@ -8,6 +8,7 @@ from app.models.crawl import UrlLink, UrlSnapshot
 from app.models.discovery import Url, UrlSource
 from app.models.integrations import GoogleAnalyticsMetric, SearchConsoleMetric
 from app.models.issues import Issue
+from app.services.element_locations import mark_target_elements
 from app.services.issue_engine import reconcile_issues
 from app.services.technical_checks import IssueSignal
 from app.services.url_filtering import is_probable_html_page
@@ -105,6 +106,13 @@ def analyze_internal_link_quality(
         signals: list[IssueSignal] = []
         inbound_count = inbound_counts.get(url.id, 0)
         if _is_internally_linked_redirect(url, inbound_count):
+            mark_target_elements(
+                db,
+                crawl_run_id=crawl_run_id,
+                target_url=url.normalized_url,
+                issue_type="internally_linked_redirect",
+                element_types={"a", "button"},
+            )
             signals.append(
                 IssueSignal(
                     issue_type="internally_linked_redirect",

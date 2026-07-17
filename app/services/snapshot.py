@@ -3,7 +3,7 @@ from urllib.parse import urlsplit, urlunsplit
 import structlog
 from sqlalchemy.orm import Session
 
-from app.models.crawl import UrlLink, UrlSnapshot
+from app.models.crawl import ElementLocation, UrlLink, UrlSnapshot
 from app.models.discovery import Url
 from app.models.website import Website
 from app.services.html_extraction import extract_page
@@ -108,6 +108,46 @@ def store_fetch_result(
                     is_nofollow=link.is_nofollow,
                 )
             )
+        for element in page.elements:
+            db.add(
+                ElementLocation(
+                    website_id=url.website_id,
+                    source_url_id=url.id,
+                    snapshot_id=snapshot.id,
+                    crawl_run_id=crawl_run_id,
+                    issue_types=element.issue_types,
+                    element_type=element.element_type,
+                    target_url=element.target_url,
+                    visible_text=element.visible_text,
+                    element_id=element.element_id,
+                    css_selector=element.css_selector,
+                    xpath=element.xpath,
+                    html_fragment=element.html_fragment,
+                    occurrence_index=element.occurrence_index,
+                    text_prefix=element.text_prefix,
+                    text_suffix=element.text_suffix,
+                    text_is_unique=element.text_is_unique,
+                    context_is_unique=element.context_is_unique,
+                    rendered_dynamically=element.rendered_dynamically,
+                )
+            )
+            if element.element_type == "img" and element.target_url:
+                try:
+                    normalized_image = normalize_url(element.target_url)
+                except InvalidUrlError:
+                    continue
+                if website and is_url_in_website_scope(
+                    normalized_image,
+                    base_url=website.base_url,
+                    allowed_subdomains=allowed_subdomains,
+                ):
+                    register_url(
+                        db,
+                        website_id=url.website_id,
+                        raw_url=normalized_image,
+                        source_type="internal_link",
+                        source_url=url.normalized_url,
+                    )
     from app.services.analysis import analyze_snapshot
 
     analyze_snapshot(db, snapshot)

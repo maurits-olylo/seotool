@@ -1,5 +1,5 @@
 from app.models.client import Client
-from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
+from app.models.crawl import CrawlRun, ElementLocation, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url, UrlSource
 from app.models.exports import Export
 from app.models.integrations import (
@@ -29,6 +29,7 @@ __all__ = [
     "ActivityLog",
     "CrawlJob",
     "CrawlRun",
+    "ElementLocation",
     "CrawlDeploymentControl",
     "Export",
     "Issue",

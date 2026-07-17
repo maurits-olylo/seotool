@@ -10,7 +10,7 @@ from app.api.routes.reports import _period_dates
 from app.core.config import get_settings
 from app.core.security import create_session_token, hash_password
 from app.db.session import SessionLocal
-from app.models.crawl import CrawlRun, UrlLink
+from app.models.crawl import CrawlRun, ElementLocation, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url
 from app.models.integrations import (
     GoogleAnalyticsEventMetric,
@@ -581,6 +581,86 @@ def test_issue_detail_exposes_evidence_and_updates_status(client: TestClient) ->
     updated = client.patch(f"/api/v1/issues/{issue_id}", json={"status": "planned"})
     assert updated.status_code == 200
     assert updated.json()["status"] == "planned"
+
+
+def test_issue_detail_returns_live_element_location(client: TestClient) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Element UI"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": customer["id"],
+            "name": "Element site",
+            "base_url": "https://example.com",
+        },
+    ).json()
+    website_id = UUID(website["id"])
+    with SessionLocal() as db:
+        source = Url(website_id=website_id, normalized_url="https://example.com/article")
+        target = Url(
+            website_id=website_id,
+            normalized_url="https://example.com/missing",
+            current_status_code=404,
+        )
+        job = CrawlJob(website_id=website_id, job_type="full_site_crawl")
+        db.add_all([source, target, job])
+        db.flush()
+        run = CrawlRun(crawl_job_id=job.id, website_id=website_id, crawl_type="full_site_crawl")
+        db.add(run)
+        db.flush()
+        snapshot = UrlSnapshot(
+            url_id=source.id,
+            crawl_run_id=run.id,
+            requested_url=source.normalized_url,
+            final_url=source.normalized_url,
+            status_code=200,
+            redirect_chain=[],
+        )
+        issue = Issue(
+            website_id=website_id,
+            url_id=target.id,
+            issue_type="internally_linked_404",
+            category="internal_links",
+            severity="high",
+            title="Interne link naar 404",
+            description="Defect doel.",
+            recommended_action="Werk de link bij.",
+        )
+        db.add_all([snapshot, issue])
+        db.flush()
+        db.add_all(
+            [
+                IssueOccurrence(
+                    issue_id=issue.id,
+                    crawl_run_id=run.id,
+                    evidence={"incoming_internal_links": 1},
+                ),
+                ElementLocation(
+                    website_id=website_id,
+                    source_url_id=source.id,
+                    snapshot_id=snapshot.id,
+                    crawl_run_id=run.id,
+                    issue_types=["internally_linked_404"],
+                    element_type="a",
+                    target_url=target.normalized_url,
+                    visible_text="Oud artikel",
+                    element_id="oude-link",
+                    css_selector='a[id="oude-link"]',
+                    xpath="/html/body/a[1]",
+                    html_fragment='<a id="oude-link" href="/missing">Oud artikel</a>',
+                    occurrence_index=1,
+                    text_is_unique=True,
+                    context_is_unique=True,
+                    rendered_dynamically=False,
+                ),
+            ]
+        )
+        db.commit()
+        issue_id = issue.id
+
+    payload = client.get(f"/api/v1/issues/{issue_id}").json()
+    assert len(payload["elements"]) == 1
+    assert payload["elements"][0]["source_url"] == "https://example.com/article"
+    assert payload["elements"][0]["jump_url"] == "https://example.com/article#oude-link"
 
 
 def test_client_integration_and_website_property_mapping(client: TestClient) -> None:

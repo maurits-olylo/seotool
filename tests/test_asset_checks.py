@@ -15,3 +15,9 @@ def test_flags_oversized_document() -> None:
 def test_accepts_small_or_unknown_assets() -> None:
     assert inspect_asset("https://example.com/photo.webp", 500_000) == []
     assert inspect_asset("https://example.com/file.pdf", None) == []
+
+
+def test_flags_broken_image() -> None:
+    signals = inspect_asset("https://example.com/missing.jpg", 100, 404)
+    assert [signal.issue_type for signal in signals] == ["broken_image"]
+    assert signals[0].evidence["status_code"] == 404

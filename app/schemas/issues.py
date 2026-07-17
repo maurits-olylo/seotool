@@ -64,9 +64,27 @@ class IssueRead(ORMModel):
     organic_impact: dict[str, object] | None = None
 
 
+class ElementLocationRead(BaseModel):
+    id: UUID
+    source_url: str
+    issue_type: str
+    element_type: str
+    target_url: str | None
+    visible_text: str | None
+    element_id: str | None
+    css_selector: str | None
+    xpath: str | None
+    html_fragment: str
+    occurrence_index: int
+    text_prefix: str | None
+    text_suffix: str | None
+    jump_url: str | None
+
+
 class IssueDetailRead(IssueRead):
     evidence: dict[str, object]
     source_urls: list[str]
+    elements: list[ElementLocationRead]
 
 
 class IssueUpdate(BaseModel):

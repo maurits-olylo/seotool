@@ -73,6 +73,15 @@ Orphan-analyse draait alleen wanneer de breadth-first wachtrij volledig is verwe
 de crawl afkapt, wordt de run `partially_succeeded` en blijven bestaande orphan-statussen ongewijzigd.
 
 Niet-HTML-assets blijven als URL en linkdoel bewaard, maar komen niet in de HTML-crawlwachtrij.
+
+### Elementlocaties
+
+HTML-crawls bewaren bestaande links, knoppen, H1-H3-koppen en afbeeldingen generiek in
+`element_locations`. Iedere locatie hoort bij website, bron-URL, snapshot en crawlrun en bevat
+zichtbare tekst, doel, element-ID, selector, XPath, fragment, volgnummer en omliggende tekst.
+Issue-types worden aan dezelfde locatie gekoppeld zodra de crawler het bijbehorende signaal kan
+vaststellen. De live jump gebruikt alleen een bestaand ID, unieke zichtbare tekst of aantoonbaar
+unieke tekstcontext; ontbrekende elementen krijgen geen kunstmatige locatie.
 Afbeeldingen en documenten krijgen een lichte HEAD-controle. Grote afbeeldingen (meer dan 2 MB) en
 documenten (meer dan 5 MB) leveren afzonderlijke issues op zonder de volledige bestanden te downloaden.
 

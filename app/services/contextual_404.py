@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.models.crawl import UrlLink
 from app.models.discovery import Url, UrlSource
 from app.models.issues import Issue
+from app.services.element_locations import mark_target_elements
 from app.services.issue_engine import reconcile_issues
 from app.services.technical_checks import IssueSignal
 
@@ -47,6 +48,14 @@ def classify_404_issues(db: Session, *, website_id: object, crawl_run_id: object
             )
         )
         signal = _signal(incoming_links=incoming_links, in_sitemap=in_sitemap is not None)
+        if incoming_links:
+            mark_target_elements(
+                db,
+                crawl_run_id=crawl_run_id,
+                target_url=url.normalized_url,
+                issue_type="internally_linked_404",
+                element_types={"a", "button"},
+            )
         reconcile_issues(
             db,
             website_id=website_id,

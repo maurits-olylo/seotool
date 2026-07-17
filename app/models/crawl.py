@@ -85,3 +85,36 @@ class UrlLink(Base):
     is_internal: Mapped[bool] = mapped_column(Boolean)
     is_nofollow: Mapped[bool] = mapped_column(Boolean)
     http_status: Mapped[int | None] = mapped_column(Integer)
+
+
+class ElementLocation(Base):
+    __tablename__ = "element_locations"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    website_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("websites.id", ondelete="CASCADE"), index=True
+    )
+    source_url_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("urls.id", ondelete="CASCADE"), index=True
+    )
+    snapshot_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("url_snapshots.id", ondelete="CASCADE"), index=True
+    )
+    crawl_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("crawl_runs.id", ondelete="CASCADE"), index=True
+    )
+    issue_types: Mapped[list[str]] = mapped_column(JSON, default=list)
+    element_type: Mapped[str] = mapped_column(String(40), index=True)
+    target_url: Mapped[str | None] = mapped_column(String(2048))
+    visible_text: Mapped[str | None] = mapped_column(Text)
+    element_id: Mapped[str | None] = mapped_column(String(512))
+    css_selector: Mapped[str | None] = mapped_column(Text)
+    xpath: Mapped[str | None] = mapped_column(Text)
+    html_fragment: Mapped[str] = mapped_column(Text)
+    occurrence_index: Mapped[int] = mapped_column(Integer, default=1)
+    text_prefix: Mapped[str | None] = mapped_column(Text)
+    text_suffix: Mapped[str | None] = mapped_column(Text)
+    text_is_unique: Mapped[bool] = mapped_column(Boolean, default=False)
+    context_is_unique: Mapped[bool] = mapped_column(Boolean, default=False)
+    rendered_dynamically: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

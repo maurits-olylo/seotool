@@ -3,10 +3,11 @@ import json
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.crawl import UrlLink, UrlSnapshot
+from app.models.crawl import ElementLocation, UrlLink, UrlSnapshot
 from app.models.discovery import Url
 from app.models.issues import Change
 from app.services.change_detection import DetectedChange, compare_snapshots
+from app.services.element_issues import ELEMENT_ISSUE_TYPES, inspect_element_locations
 from app.services.issue_engine import reconcile_issues
 from app.services.job_listings import update_job_listing
 from app.services.job_posting import inspect_job_posting
@@ -50,6 +51,12 @@ def analyze_snapshot(db: Session, snapshot: UrlSnapshot) -> None:
             )
         )
     signals = inspect_snapshot(snapshot)
+    element_locations = list(
+        db.scalars(
+            select(ElementLocation).where(ElementLocation.snapshot_id == snapshot.id)
+        )
+    )
+    signals.extend(inspect_element_locations(element_locations))
     inbound_internal_links = (
         db.scalar(
             select(func.count(UrlLink.id)).where(
@@ -96,7 +103,7 @@ def analyze_snapshot(db: Session, snapshot: UrlSnapshot) -> None:
         crawl_run_id=snapshot.crawl_run_id,
         snapshot_id=snapshot.id,
         signals=signals,
-        checked_issue_types=SNAPSHOT_ISSUE_TYPES,
+        checked_issue_types=SNAPSHOT_ISSUE_TYPES | ELEMENT_ISSUE_TYPES,
     )
 
 

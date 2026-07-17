@@ -3,7 +3,7 @@ from app.services.url_filtering import asset_kind
 
 IMAGE_SIZE_LIMIT = 2_000_000
 DOCUMENT_SIZE_LIMIT = 5_000_000
-ASSET_ISSUE_TYPES = {"oversized_image", "oversized_document"}
+ASSET_ISSUE_TYPES = {"oversized_image", "oversized_document", "broken_image"}
 HTML_ONLY_ISSUE_TYPES = {
     "canonical_other_url",
     "conflicting_robots",
@@ -25,10 +25,24 @@ HTML_ONLY_ISSUE_TYPES = {
 }
 
 
-def inspect_asset(url: str, response_size: int | None) -> list[IssueSignal]:
+def inspect_asset(
+    url: str, response_size: int | None, status_code: int | None = 200
+) -> list[IssueSignal]:
+    kind = asset_kind(url)
+    if kind == "image" and status_code is not None and status_code >= 400:
+        return [
+            IssueSignal(
+                issue_type="broken_image",
+                category="content",
+                severity="medium",
+                title="Afbeelding kan niet worden geladen",
+                description=f"De afbeeldings-URL geeft HTTP-status {status_code}.",
+                recommended_action="Herstel het afbeeldingsbestand of vervang de bron-URL.",
+                evidence={"status_code": status_code},
+            )
+        ]
     if response_size is None:
         return []
-    kind = asset_kind(url)
     if kind == "image" and response_size > IMAGE_SIZE_LIMIT:
         return [_oversized_signal("image", response_size, IMAGE_SIZE_LIMIT)]
     if kind == "document" and response_size > DOCUMENT_SIZE_LIMIT:

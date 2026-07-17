@@ -395,6 +395,21 @@ crawlhistorie bewaard.
 Gevolg: de gebruiker ziet uitsluitend andere pagina's waarop de defecte link daadwerkelijk moet
 worden hersteld.
 
+## 2026-07-17 — Live elementjumps gebruiken alleen opgeslagen betrouwbaar bewijs
+
+Context: issuebewijs benoemde URL's en aantallen, maar wees het betrokken bestaande DOM-element niet
+aan. Een generieke visuele inspectiemodus is waardevol, maar vraagt rendering, overlays en een
+aanzienlijk bredere architectuur.
+
+Besluit: de eerste versie bewaart links, knoppen, H1-H3-koppen en afbeeldingen generiek per
+snapshot. Een live jump gebruikt eerst een element-ID, daarna unieke zichtbare tekst en pas daarna
+unieke prefix-/suffixcontext. Zonder betrouwbaar doel toont de interface alleen bronpagina,
+selector, XPath, fragment en tekstcontext. De klantwebsite wordt nooit aangepast. Ontbrekende
+elementen vallen expliciet buiten deze eerste versie.
+
+Gevolg: gebruikers kunnen bestaande probleemlocaties sneller vinden zonder schijnzekerheid. Een
+volwaardige gerenderde inspectiemodus blijft als laatste roadmapfase apart gepland.
+
 ## 2026-07-17 — Het URL-overzicht toont actieve diagnoses
 
 Context: de URL-tabel liet vooral status, indexatie en crawldiepte zien. Een indexeerbare maar
