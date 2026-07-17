@@ -160,6 +160,33 @@ class BingInboundLink(UUIDTimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
 
 
+class BingReferringDomain(UUIDTimestampMixin, Base):
+    __tablename__ = "bing_referring_domains"
+    __table_args__ = (UniqueConstraint("website_id", "domain"),)
+
+    website_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("websites.id", ondelete="CASCADE"), index=True
+    )
+    domain: Mapped[str] = mapped_column(String(2048))
+    backlink_count: Mapped[int] = mapped_column(Integer, default=0)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+
+
+class BingReferringAnchor(UUIDTimestampMixin, Base):
+    __tablename__ = "bing_referring_anchors"
+    __table_args__ = (UniqueConstraint("website_id", "anchor_key"),)
+
+    website_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("websites.id", ondelete="CASCADE"), index=True
+    )
+    anchor_key: Mapped[str] = mapped_column(String(64))
+    anchor_text: Mapped[str] = mapped_column(Text)
+    backlink_count: Mapped[int] = mapped_column(Integer, default=0)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+
+
 class GoogleAnalyticsMetric(UUIDTimestampMixin, Base):
     __tablename__ = "google_analytics_metrics"
     __table_args__ = (UniqueConstraint("website_id", "date", "landing_page"),)

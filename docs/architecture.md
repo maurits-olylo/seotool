@@ -116,6 +116,15 @@ Hierdoor kan de consultant veel verkeer zonder leads, een relatief lage leadrati
 leadratio onderscheiden. Na introductie of wijziging van de eventselectie is een historische
 GA4-synchronisatie nodig om de landingspaginaverdeling opnieuw op te bouwen.
 
+## Bing-backlinks
+
+De gedocumenteerde Bing Webmaster API blijft automatisch pagina- en zoektermdata ophalen en probeert
+de officiële linkmethoden. Omdat die methoden bij gevulde actuele Bing-properties lege linkdata
+kunnen teruggeven, geldt een leeg API-resultaat niet als bewijs voor nul backlinks en verwijdert het
+geen handmatig geïmporteerde historie. De interface accepteert de drie officiële Bing-exports voor
+verwijzende domeinen, pagina's en ankerteksten als één complete meting. Records worden per website
+gededupliceerd; alleen een volledig gevalideerde set mag eerder actieve exportrecords deactiveren.
+
 ## Vacaturemonitor
 
 `job_listings` bewaart de actuele, genormaliseerde toestand van herkende vacaturepagina’s per

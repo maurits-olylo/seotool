@@ -104,16 +104,23 @@ def test_bing_sync_stores_page_and_query_metrics_idempotently(monkeypatch) -> No
             assert first["link_details"] == 1
             assert first["link_counts_truncated"] is False
             assert first["link_details_truncated"] is False
-            assert db.scalar(
-                select(func.count(BingPageMetric.id)).where(
-                    BingPageMetric.website_id == website_id
+            assert first["link_api_status"] == "available"
+            assert (
+                db.scalar(
+                    select(func.count(BingPageMetric.id)).where(
+                        BingPageMetric.website_id == website_id
+                    )
                 )
-            ) == 1
-            assert db.scalar(
-                select(func.count(BingQueryMetric.id)).where(
-                    BingQueryMetric.website_id == website_id
+                == 1
+            )
+            assert (
+                db.scalar(
+                    select(func.count(BingQueryMetric.id)).where(
+                        BingQueryMetric.website_id == website_id
+                    )
                 )
-            ) == 1
+                == 1
+            )
             assert db.scalar(select(func.count(BingLinkTarget.id))) == 1
             assert db.scalar(select(func.count(BingInboundLink.id))) == 1
             page = db.scalar(select(BingPageMetric))

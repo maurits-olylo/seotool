@@ -25,6 +25,7 @@ from app.models.integrations import (
 )
 from app.models.website import Website
 from app.schemas.integrations import (
+    BingBacklinkCsvImport,
     BingPropertiesRead,
     GoogleAnalyticsKeyEventRead,
     GoogleAnalyticsKeyEventSelection,
@@ -36,6 +37,10 @@ from app.schemas.integrations import (
     WebsiteIntegrationUpsert,
 )
 from app.services.authorization import require_client_access, require_website_access
+from app.services.bing_backlink_import import (
+    InvalidBingBacklinkExport,
+    import_bing_backlink_exports,
+)
 from app.services.bing_integrations import BING_TOKEN_URL, list_bing_sites, sync_bing_webmaster
 from app.services.google_analytics import sync_google_analytics
 from app.services.google_integrations import list_google_properties
@@ -558,14 +563,10 @@ def integration_history_status(
                 )
             ),
             "bing_from": db.scalar(
-                select(func.min(BingPageMetric.date)).where(
-                    BingPageMetric.website_id == website_id
-                )
+                select(func.min(BingPageMetric.date)).where(BingPageMetric.website_id == website_id)
             ),
             "bing_through": db.scalar(
-                select(func.max(BingPageMetric.date)).where(
-                    BingPageMetric.website_id == website_id
-                )
+                select(func.max(BingPageMetric.date)).where(BingPageMetric.website_id == website_id)
             ),
         },
     }
@@ -611,3 +612,24 @@ async def synchronize_bing_webmaster(
         return await sync_bing_webmaster(db, website_id, days)
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.post("/websites/{website_id}/integrations/bing_webmaster/backlinks/import")
+def import_bing_backlinks(
+    website_id: UUID,
+    payload: BingBacklinkCsvImport,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, int | str]:
+    require_website_access(db, principal, website_id, admin=True)
+    try:
+        return import_bing_backlink_exports(
+            db,
+            website_id=website_id,
+            domains_csv=payload.domains_csv,
+            pages_csv=payload.pages_csv,
+            anchors_csv=payload.anchors_csv,
+        )
+    except InvalidBingBacklinkExport as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc

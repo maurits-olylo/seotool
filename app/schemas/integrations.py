@@ -71,6 +71,12 @@ class BingPropertiesRead(BaseModel):
     sites: list[BingProperty]
 
 
+class BingBacklinkCsvImport(BaseModel):
+    domains_csv: str = Field(min_length=1, max_length=2_000_000)
+    pages_csv: str = Field(min_length=1, max_length=20_000_000)
+    anchors_csv: str = Field(min_length=1, max_length=4_000_000)
+
+
 class GoogleAnalyticsKeyEventRead(BaseModel):
     event_name: str
     key_events: float

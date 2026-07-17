@@ -4,6 +4,19 @@ Dit document bewaart blijvende technische en productkeuzes. Nieuwe besluiten wor
 toegevoegd met datum, context, keuze en gevolgen. Details van de implementatie staan in
 `docs/architecture.md`.
 
+## 2026-07-17 — Bing-backlinks gebruiken een officiële exportfallback
+
+Context: HUMAN toont in Bing Webmaster Tools 712 verwijzende domeinen en 20,5 duizend verwijzende
+pagina's, terwijl de gedocumenteerde `GetLinkCounts`-methode voor dezelfde property leeg antwoordt.
+
+Besluit: API-synchronisatie blijft beschikbaar, maar een leeg linkantwoord wordt niet als nulmeting
+geïnterpreteerd. SEO Monitor importeert daarnaast de officiële Referring Domains, Referring Pages en
+Referring Anchors CSV-bestanden gezamenlijk. Pas na validatie van alle drie bestanden wordt de meting
+opgeslagen en mogen ontbrekende oude exportrecords inactief worden.
+
+Gevolg: backlinkdata blijft reproduceerbaar en herhaalbaar zonder scraping van het Bing-portaal.
+De databron en het importmoment blijven zichtbaar in de integratie-instellingen.
+
 ## 2026-07-17 — Een volledige crawl combineert alle actieve discoverybronnen
 
 Context: sitemapimport registreerde URL's correct, maar de full-site frontier selecteerde na het

@@ -549,9 +549,25 @@ async function syncBing() {
   try {
     const result = await api(`/api/v1/websites/${websiteId}/integrations/bing_webmaster/sync`, {method: "POST"});
     const limited = result.link_counts_truncated || result.link_details_truncated ? " De linkimport bereikte de veiligheidslimiet; dit is opgeslagen als gedeeltelijke dekking." : "";
-    message.textContent = `${result.page_rows} pagina-regels, ${result.query_rows} zoektermregels, ${result.link_targets} linkdoelen en ${result.link_details} inkomende links geïmporteerd; ${result.matched_urls} gekoppeld aan URL’s.${limited}`;
+    const linkStatus = result.link_api_status === "unavailable_empty" ? " Bing leverde via de API geen backlinkdekking; bestaande exportdata blijft behouden." : ` ${result.link_targets} linkdoelen en ${result.link_details} inkomende links geïmporteerd.`;
+    message.textContent = `${result.page_rows} pagina-regels en ${result.query_rows} zoektermregels geïmporteerd; ${result.matched_urls} gekoppeld aan URL’s.${linkStatus}${limited}`;
     button.textContent = "Opnieuw synchroniseren";
   } catch (error) { message.textContent = "Bing-import is mislukt."; button.textContent = "Opnieuw proberen"; }
+  finally { button.disabled = false; }
+}
+
+async function importBingBacklinks() {
+  const websiteId = $("#website-select").value;
+  const button = $("#import-bing-backlinks");
+  const message = $("#bing-backlink-import-message");
+  const files = [$("#bing-domains-file").files[0], $("#bing-pages-file").files[0], $("#bing-anchors-file").files[0]];
+  if (!websiteId || files.some((file) => !file)) { message.textContent = "Selecteer alle drie de Bing CSV-exports."; return; }
+  button.disabled = true; message.textContent = "Backlinkexports worden geïmporteerd…";
+  try {
+    const [domainsCsv, pagesCsv, anchorsCsv] = await Promise.all(files.map((file) => file.text()));
+    const result = await api(`/api/v1/websites/${websiteId}/integrations/bing_webmaster/backlinks/import`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({domains_csv:domainsCsv, pages_csv:pagesCsv, anchors_csv:anchorsCsv})});
+    message.textContent = `${result.domains} domeinen, ${result.pages} verwijzende pagina’s en ${result.anchors} ankerteksten geïmporteerd; ${result.matched_targets} doelen gekoppeld.`;
+  } catch (error) { message.textContent = error.message; }
   finally { button.disabled = false; }
 }
 
@@ -1327,6 +1343,7 @@ $("#save-bing").addEventListener("click", () => saveProperty("bing_webmaster", "
 $("#sync-search-console").addEventListener("click", syncSearchConsole);
 $("#sync-ga4").addEventListener("click", syncGa4);
 $("#sync-bing").addEventListener("click", syncBing);
+$("#import-bing-backlinks").addEventListener("click", importBingBacklinks);
 $("#sync-integration-history").addEventListener("click", syncIntegrationHistory);
 
 api("/api/v1/me").then((user) => {

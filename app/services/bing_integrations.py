@@ -115,9 +115,7 @@ async def sync_bing_webmaster(
 
     try:
         async with httpx.AsyncClient(timeout=60) as http:
-            page_rows = await _bing_rows(
-                http, "GetPageStats", mapping.external_property_id, token
-            )
+            page_rows = await _bing_rows(http, "GetPageStats", mapping.external_property_id, token)
             query_rows = await _bing_rows(
                 http, "GetQueryStats", mapping.external_property_id, token
             )
@@ -180,7 +178,7 @@ async def sync_bing_webmaster(
         link_counts,
         link_details,
         covered_targets,
-        counts_complete=not counts_truncated,
+        counts_complete=bool(link_counts) and not counts_truncated,
         observed_at=now,
     )
     mapping.status = "active"
@@ -196,6 +194,7 @@ async def sync_bing_webmaster(
         "last_link_details": link_result["link_details"],
         "link_counts_truncated": counts_truncated,
         "link_details_truncated": details_truncated,
+        "link_api_status": "available" if link_counts else "unavailable_empty",
         "last_error": None,
     }
     connection.last_synced_at = now
@@ -211,6 +210,7 @@ async def sync_bing_webmaster(
         **link_result,
         "link_counts_truncated": counts_truncated,
         "link_details_truncated": details_truncated,
+        "link_api_status": "available" if link_counts else "unavailable_empty",
     }
 
 
@@ -275,9 +275,7 @@ async def _bing_link_details(
             batch = payload.get("Details", [])
             if isinstance(batch, list):
                 details.extend(
-                    {**item, "TargetUrl": target_url}
-                    for item in batch
-                    if isinstance(item, dict)
+                    {**item, "TargetUrl": target_url} for item in batch if isinstance(item, dict)
                 )
             total_pages = max(1, int(payload.get("TotalPages") or 1))
             if total_pages > MAX_LINK_DETAIL_PAGES:
@@ -363,9 +361,7 @@ def _store_bing_links(
         anchor_text = str(item.get("AnchorText") or "").strip()
         if not target_url or not source_url:
             continue
-        link_key = sha256(
-            f"{target_url}\n{source_url}\n{anchor_text}".encode()
-        ).hexdigest()
+        link_key = sha256(f"{target_url}\n{source_url}\n{anchor_text}".encode()).hexdigest()
         record = db.scalar(
             select(BingInboundLink).where(
                 BingInboundLink.website_id == website_id,
