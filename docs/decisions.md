@@ -394,3 +394,16 @@ crawlhistorie bewaard.
 
 Gevolg: de gebruiker ziet uitsluitend andere pagina's waarop de defecte link daadwerkelijk moet
 worden hersteld.
+
+## 2026-07-17 — Het URL-overzicht toont actieve diagnoses
+
+Context: de URL-tabel liet vooral status, indexatie en crawldiepte zien. Een indexeerbare maar
+nagenoeg lege pagina kon daardoor als een normale regel ogen, terwijl de bestaande thin-contentcheck
+wel degelijk een actief issue had aangemaakt.
+
+Besluit: iedere URL-regel toont voortaan het belangrijkste actieve issue, de hoogste prioriteit en
+het aantal aanvullende signalen. Opgeloste, geverifieerde en genegeerde issues tellen niet mee.
+Crawldiepte behoudt de meetcontext en de detailweergave toont de kortste gevonden route.
+
+Gevolg: het URL-overzicht wordt een uitzonderingen- en beslissingenlijst zonder bestaande
+crawlgegevens of issuehistorie te dupliceren.

@@ -94,7 +94,7 @@
         <section class="panel urls-panel">
           <div class="panel-head"><div><span class="eyebrow">INVENTARIS</span><h2>Bekende URLs</h2></div><div class="panel-tools"><span id="url-result-count" class="result-count"></span><button id="export-urls" class="detail-button">Exporteer CSV</button></div></div>
           <div class="url-filters"><input id="url-search" type="search" placeholder="Zoek op URL" aria-label="Zoek op URL"><select id="url-status-filter"><option value="">Alle statuscodes</option><option value="2xx">2xx</option><option value="3xx">3xx</option><option value="4xx">4xx</option><option value="5xx">5xx</option><option value="none">Niet gecontroleerd</option></select><select id="url-index-filter"><option value="">Alle indexatiestatussen</option><option value="indexable">Indexeerbaar</option><option value="blocked">Niet indexeerbaar</option><option value="unknown">Onbekend</option></select><select id="url-depth-filter"><option value="">Alle crawl-dieptes</option><option value="0-2">Diepte 0–2</option><option value="3-4">Diepte 3–4</option><option value="5+">Diepte 5+</option><option value="none">Geen interne route</option></select></div>
-          <div class="table-wrap"><table class="url-table"><thead><tr><th>URL</th><th>Status</th><th>Indexatie</th><th>Diepte</th><th>Laatst geanalyseerd</th><th></th></tr></thead><tbody id="url-rows"></tbody></table></div>
+          <div class="table-wrap"><table class="url-table"><thead><tr><th>URL</th><th>Status</th><th>Indexatie</th><th>Signaal</th><th>Diepte</th><th>Laatst geanalyseerd</th><th></th></tr></thead><tbody id="url-rows"></tbody></table></div>
           <p id="url-empty" class="empty hidden">Geen URLs gevonden.</p>
           <footer class="pager"><button id="url-previous-page" class="page-button">Vorige</button><span id="url-page-label"></span><button id="url-next-page" class="page-button">Volgende</button></footer>
         </section>
@@ -171,6 +171,6 @@
     <dl><div><dt>Vergeleken meetmomenten</dt><dd id="change-detail-date"></dd></div><div><dt>Mogelijke relevantie</dt><dd id="change-detail-relevance"></dd></div><div><dt>Aanbevolen controle</dt><dd id="change-detail-action"></dd></div></dl>
     <div id="change-group-details"></div>
   </dialog>
-  <script src="/ui/assets/app.js?v=20260717-1" defer></script>
+  <script src="/ui/assets/app.js?v=20260717-2" defer></script>
 </body>
 </html>

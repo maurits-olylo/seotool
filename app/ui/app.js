@@ -819,7 +819,10 @@ function renderUrls() {
     const checked = url.last_full_analyzed_at ? new Date(url.last_full_analyzed_at).toLocaleDateString("nl-NL") : "—";
     const depth = url.crawl_depth ?? "—";
     const depthLabel = url.crawl_depth_reliable ? depth : `${depth}*`;
-    return `<tr><td><a class="url-address" href="${escapeHtml(url.normalized_url)}" target="_blank" rel="noopener">${escapeHtml(url.normalized_url)}</a></td><td><span class="status-code">${url.current_status_code ?? "—"}</span></td><td><span class="index-state ${indexState}">${indexLabel}</span></td><td title="${escapeHtml(url.crawl_depth_context || "")}">${depthLabel}</td><td>${checked}</td><td><button class="detail-button" data-url-id="${url.id}">Bekijk</button></td></tr>`;
+    const issueTitle = url.active_issue_titles?.[0];
+    const issueCount = url.active_issue_count || 0;
+    const issueSignal = issueTitle ? `<span class="severity ${escapeHtml(url.highest_issue_severity || "low")}">${escapeHtml(labels[url.highest_issue_severity] || url.highest_issue_severity || "Signaal")}</span><span>${escapeHtml(issueTitle)}${issueCount > 1 ? ` · +${issueCount - 1}` : ""}</span>` : "Geen actief signaal";
+    return `<tr><td><a class="url-address" href="${escapeHtml(url.normalized_url)}" target="_blank" rel="noopener">${escapeHtml(url.normalized_url)}</a></td><td><span class="status-code">${url.current_status_code ?? "—"}</span></td><td><span class="index-state ${indexState}">${indexLabel}</span></td><td>${issueSignal}</td><td title="${escapeHtml(url.crawl_depth_context || "")}">${depthLabel}</td><td>${checked}</td><td><button class="detail-button" data-url-id="${url.id}">Bekijk</button></td></tr>`;
   }).join("");
   $("#url-result-count").textContent = `${state.urlFiltered.length} URLs`;
   $("#url-page-label").textContent = `Pagina ${state.urlPage} van ${pages}`;

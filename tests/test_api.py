@@ -793,6 +793,59 @@ def test_url_overview_marks_depth_from_failed_crawl_as_unreliable(client: TestCl
     assert "niet voltooid" in item["crawl_depth_context"]
 
 
+def test_url_overview_includes_active_issue_summary(client: TestClient) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "URL signals"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": customer["id"],
+            "name": "Signals",
+            "base_url": "https://signals.test",
+        },
+    ).json()
+    website_id = UUID(website["id"])
+    with SessionLocal() as db:
+        url = Url(
+            website_id=website_id,
+            normalized_url="https://signals.test/empty",
+            current_status_code=200,
+        )
+        db.add(url)
+        db.flush()
+        db.add_all(
+            [
+                Issue(
+                    website_id=website_id,
+                    url_id=url.id,
+                    issue_type="thin_content",
+                    category="onpage",
+                    severity="medium",
+                    status="new",
+                    title="Nagenoeg lege pagina",
+                    description="De pagina bevat nauwelijks hoofdcontent.",
+                    recommended_action="Controleer of deze pagina live hoort te staan.",
+                ),
+                Issue(
+                    website_id=website_id,
+                    url_id=url.id,
+                    issue_type="missing_meta_description",
+                    category="onpage",
+                    severity="low",
+                    status="resolved",
+                    title="Meta description ontbreekt",
+                    description="Ontbreekt.",
+                    recommended_action="Voeg toe.",
+                ),
+            ]
+        )
+        db.commit()
+
+    item = client.get(f"/api/v1/websites/{website_id}/urls").json()[0]
+    assert item["active_issue_count"] == 1
+    assert item["highest_issue_severity"] == "medium"
+    assert item["active_issue_titles"] == ["Nagenoeg lege pagina"]
+
+
 def test_url_detail_returns_shortest_internal_route(client: TestClient) -> None:
     customer = client.post("/api/v1/clients", json={"name": "Route context"}).json()
     website = client.post(

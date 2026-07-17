@@ -11,6 +11,7 @@ from app.db.session import get_db
 from app.models.common import utc_now
 from app.models.crawl import CrawlRun, UrlLink
 from app.models.discovery import CrawlJob, Url
+from app.models.issues import Issue
 from app.schemas.discovery import CrawlJobCreate, CrawlJobRead, CrawlRouteRead, UrlRead, UrlRegister
 from app.services.authorization import require_website_access
 from app.services.crawl_deployment import crawl_deployment_is_active
@@ -18,6 +19,15 @@ from app.services.url_registry import register_url
 from app.services.url_scope import is_url_in_website_scope
 
 router = APIRouter(tags=["discovery"])
+ACTIVE_ISSUE_STATUSES = {
+    "new",
+    "review",
+    "accepted",
+    "planned",
+    "in_progress",
+    "waiting_for_client",
+}
+SEVERITY_RANK = {"critical": 4, "high": 3, "medium": 2, "low": 1}
 
 
 @router.get("/websites/{website_id}/urls", response_model=list[UrlRead])
@@ -40,10 +50,18 @@ def list_urls(
         .order_by(CrawlRun.started_at.desc())
         .limit(1)
     )
-    return [_url_read_with_depth_context(url, latest_full_run) for url in urls]
+    issue_summaries = _active_issue_summaries(db, [url.id for url in urls])
+    return [
+        _url_read_with_depth_context(url, latest_full_run, issue_summaries.get(url.id))
+        for url in urls
+    ]
 
 
-def _url_read_with_depth_context(url: Url, run: CrawlRun | None) -> UrlRead:
+def _url_read_with_depth_context(
+    url: Url,
+    run: CrawlRun | None,
+    issue_summary: dict[str, object] | None = None,
+) -> UrlRead:
     data = UrlRead.model_validate(url).model_dump()
     if run is None:
         context = "Nog geen volledige crawl uitgevoerd"
@@ -64,7 +82,50 @@ def _url_read_with_depth_context(url: Url, run: CrawlRun | None) -> UrlRead:
         context = "Onvolledige dieptemeting: de laatste volledige crawl is niet voltooid"
     data["crawl_depth_reliable"] = reliable
     data["crawl_depth_context"] = context
+    if issue_summary:
+        data.update(issue_summary)
     return UrlRead.model_validate(data)
+
+
+def _active_issue_summaries(
+    db: Session, url_ids: list[UUID]
+) -> dict[UUID, dict[str, object]]:
+    if not url_ids:
+        return {}
+    issues = list(
+        db.scalars(
+            select(Issue)
+            .where(
+                Issue.url_id.in_(url_ids),
+                Issue.status.in_(ACTIVE_ISSUE_STATUSES),
+            )
+            .order_by(Issue.url_id, Issue.severity, Issue.title)
+        )
+    )
+    grouped: dict[UUID, list[Issue]] = {}
+    for issue in issues:
+        if issue.url_id is not None:
+            grouped.setdefault(issue.url_id, []).append(issue)
+    return {
+        url_id: {
+            "active_issue_count": len(items),
+            "highest_issue_severity": max(
+                items,
+                key=lambda item: SEVERITY_RANK.get(item.severity, 0),
+            ).severity,
+            "active_issue_titles": [
+                item.title
+                for item in sorted(
+                    items,
+                    key=lambda item: (
+                        -SEVERITY_RANK.get(item.severity, 0),
+                        item.title,
+                    ),
+                )
+            ],
+        }
+        for url_id, items in grouped.items()
+    }
 
 
 @router.get("/urls/{url_id}/crawl-route", response_model=CrawlRouteRead)

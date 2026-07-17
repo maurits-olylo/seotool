@@ -22,6 +22,9 @@ class UrlRead(ORMModel):
     crawl_depth: int | None
     crawl_depth_reliable: bool = False
     crawl_depth_context: str = "Nog niet gemeten"
+    active_issue_count: int = 0
+    highest_issue_severity: str | None = None
+    active_issue_titles: list[str] = Field(default_factory=list)
     last_light_checked_at: datetime | None
     last_full_analyzed_at: datetime | None
 

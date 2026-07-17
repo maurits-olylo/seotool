@@ -260,6 +260,8 @@ diagnosepatroon gegroepeerd. Verdere patroonherkenning, adviesverrijking en poli
   concrete stappen, bewijs en verificatie in een duidelijke volgorde.
 - Grote aantallen vergelijkbare URL's standaard groeperen en voorbeelden plus totaalomvang tonen.
 - Tabellen richten op uitzonderingen en beslissingen; normale herhaling standaard samenvatten.
+- In het URL-overzicht actieve signalen direct naast de URL tonen, met hoogste prioriteit en
+  belangrijkste diagnose, zodat status en crawldiepte niet zonder inhoudelijke context staan.
 - Bron- en doelaantallen eenduidig benoemen, bijvoorbeeld drie links vanaf twee unieke pagina's.
 - Technisch bewijs leesbaar formatteren en ruwe waarden pas op verzoek uitklappen.
 - Dialogen, typografie, witruimte, filters, bulkacties, lege staten en mobiele weergave consistent
