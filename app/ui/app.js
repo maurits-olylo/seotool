@@ -708,8 +708,9 @@ function stopOperationsPolling() {
 async function loadIssues() {
   const websiteId = $("#website-select").value;
   if (!websiteId) { state.issues = []; render(); return; }
+  const status = $("#status-filter").value || "active";
   const [issues, urls] = await Promise.all([
-    api(`/api/v1/websites/${websiteId}/issues`),
+    api(`/api/v1/websites/${websiteId}/issues?status=${encodeURIComponent(status)}`),
     loadAllUrls(websiteId),
   ]);
   state.issues = issues;
@@ -1252,7 +1253,8 @@ async function saveIssueStatus() {
 $("#logout").addEventListener("click", async () => { await fetch("/ui/logout", { method: "POST" }); window.location.assign("/"); });
 $("#client-select").addEventListener("change", async () => { localStorage.setItem(CLIENT_STORAGE_KEY, $("#client-select").value); localStorage.removeItem(WEBSITE_STORAGE_KEY); await loadWebsites(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); });
 $("#website-select").addEventListener("change", async () => { localStorage.setItem(WEBSITE_STORAGE_KEY, $("#website-select").value); state.selectedReportSnapshotId = null; state.consultantInsights = null; await loadIssues(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); if (!$("#insights-view").classList.contains("hidden")) await loadConsultantInsights(); if (!$("#urls-view").classList.contains("hidden")) renderUrls(); if (!$("#changes-view").classList.contains("hidden")) await loadChanges(); if (!$("#vacancies-view").classList.contains("hidden")) await loadJobListings(); if (!$("#operations-view").classList.contains("hidden")) await loadOperations(); });
-for (const selector of ["#severity-filter", "#type-filter", "#impact-filter", "#status-filter"]) $(selector).addEventListener("change", () => { state.page = 1; render(); });
+for (const selector of ["#severity-filter", "#type-filter", "#impact-filter"]) $(selector).addEventListener("change", () => { state.page = 1; render(); });
+$("#status-filter").addEventListener("change", loadIssues);
 $("#search-filter").addEventListener("input", () => { state.page = 1; render(); });
 $("#previous-page").addEventListener("click", () => { state.page -= 1; render(); });
 $("#next-page").addEventListener("click", () => { state.page += 1; render(); });

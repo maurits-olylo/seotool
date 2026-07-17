@@ -582,6 +582,14 @@ def test_issue_detail_exposes_evidence_and_updates_status(client: TestClient) ->
     assert updated.status_code == 200
     assert updated.json()["status"] == "planned"
 
+    resolved = client.patch(f"/api/v1/issues/{issue_id}", json={"status": "resolved"})
+    assert resolved.status_code == 200
+    assert resolved.json()["status"] == "resolved"
+    assert client.get(f"/api/v1/websites/{website_id}/issues").json() == []
+    history = client.get(f"/api/v1/websites/{website_id}/issues?status=all").json()
+    assert len(history) == 1
+    assert history[0]["status"] == "resolved"
+
 
 def test_issue_detail_returns_live_element_location(client: TestClient) -> None:
     customer = client.post("/api/v1/clients", json={"name": "Element UI"}).json()
@@ -661,6 +669,99 @@ def test_issue_detail_returns_live_element_location(client: TestClient) -> None:
     assert len(payload["elements"]) == 1
     assert payload["elements"][0]["source_url"] == "https://example.com/article"
     assert payload["elements"][0]["jump_url"] == "https://example.com/article#oude-link"
+
+
+def test_grouped_broken_links_use_latest_matching_element_evidence(client: TestClient) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Grouped elements"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": customer["id"],
+            "name": "Grouped element site",
+            "base_url": "https://example.com",
+        },
+    ).json()
+    website_id = UUID(website["id"])
+    with SessionLocal() as db:
+        source = Url(website_id=website_id, normalized_url="https://example.com/locaties")
+        targets = [
+            Url(website_id=website_id, normalized_url="https://example.com/missing-one"),
+            Url(website_id=website_id, normalized_url="https://example.com/missing-two"),
+        ]
+        old_job = CrawlJob(website_id=website_id, job_type="full_site_crawl")
+        current_job = CrawlJob(website_id=website_id, job_type="full_site_crawl")
+        db.add_all([source, *targets, old_job, current_job])
+        db.flush()
+        old_run = CrawlRun(
+            crawl_job_id=old_job.id,
+            website_id=website_id,
+            crawl_type="full_site_crawl",
+        )
+        current_run = CrawlRun(
+            crawl_job_id=current_job.id,
+            website_id=website_id,
+            crawl_type="full_site_crawl",
+        )
+        db.add_all([old_run, current_run])
+        db.flush()
+        snapshot = UrlSnapshot(
+            url_id=source.id,
+            crawl_run_id=old_run.id,
+            requested_url=source.normalized_url,
+            final_url=source.normalized_url,
+            status_code=200,
+            redirect_chain=[],
+        )
+        issue = Issue(
+            website_id=website_id,
+            url_id=source.id,
+            issue_type="multiple_broken_internal_links",
+            category="internal_links",
+            severity="high",
+            title="2 dode interne links op deze pagina",
+            description="Twee defecte links.",
+            recommended_action="Werk beide links bij.",
+        )
+        db.add_all([snapshot, issue])
+        db.flush()
+        db.add(
+            IssueOccurrence(
+                issue_id=issue.id,
+                crawl_run_id=current_run.id,
+                evidence={
+                    "broken_links": [
+                        {"target_url": target.normalized_url, "anchor_text": f"Link {index}"}
+                        for index, target in enumerate(targets, start=1)
+                    ]
+                },
+            )
+        )
+        for index, target in enumerate(targets, start=1):
+            db.add(
+                ElementLocation(
+                    website_id=website_id,
+                    source_url_id=source.id,
+                    snapshot_id=snapshot.id,
+                    crawl_run_id=old_run.id,
+                    issue_types=[],
+                    element_type="a",
+                    target_url=target.normalized_url,
+                    visible_text=f"Link {index}",
+                    css_selector=f"main > a:nth-of-type({index})",
+                    xpath=f"/html/body/main/a[{index}]",
+                    html_fragment=f'<a href="/missing-{index}">Link {index}</a>',
+                    occurrence_index=index,
+                    text_is_unique=True,
+                    context_is_unique=True,
+                    rendered_dynamically=False,
+                )
+            )
+        db.commit()
+        issue_id = issue.id
+
+    elements = client.get(f"/api/v1/issues/{issue_id}").json()["elements"]
+    assert [element["visible_text"] for element in elements] == ["Link 1", "Link 2"]
+    assert all(element["jump_url"] for element in elements)
 
 
 def test_client_integration_and_website_property_mapping(client: TestClient) -> None:

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
+from app.models.common import utc_now
 from app.models.crawl import CrawlRun, ElementLocation, UrlLink, UrlSnapshot
 from app.models.discovery import Url
 from app.models.integrations import GoogleAnalyticsMetric, SearchConsoleMetric
@@ -293,7 +294,7 @@ def _json_difference_display(differences: list[dict[str, object]], side: str) ->
 @router.get("/websites/{website_id}/issues", response_model=list[IssueRead])
 def list_issues(
     website_id: UUID,
-    issue_status: str | None = Query(default=None, alias="status"),
+    issue_status: str = Query(default="active", alias="status"),
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> list[dict[str, object]]:
@@ -301,7 +302,9 @@ def list_issues(
     query = (
         select(Issue).where(Issue.website_id == website_id).order_by(Issue.last_detected_at.desc())
     )
-    if issue_status:
+    if issue_status == "active":
+        query = query.where(Issue.status.in_(ACTIVE_ISSUE_STATUSES))
+    elif issue_status != "all":
         query = query.where(Issue.status == issue_status)
     issues = list(db.scalars(query))
     grouped_404_url_ids = _grouped_404_url_ids(db, website_id)
@@ -438,17 +441,46 @@ def _issue_elements(
             target_urls.add(_normalized_or_raw(target.normalized_url))
         source_url_id = None
 
-    matched: list[ElementLocation] = []
-    for location in locations:
-        direct_match = issue.issue_type in (location.issue_types or [])
-        target_match = bool(
-            target_urls
-            and location.target_url
-            and _normalized_or_raw(location.target_url) in target_urls
+    def matching(items: list[ElementLocation]) -> list[ElementLocation]:
+        result: list[ElementLocation] = []
+        for location in items:
+            direct_match = issue.issue_type in (location.issue_types or [])
+            target_match = bool(
+                target_urls
+                and location.target_url
+                and _normalized_or_raw(location.target_url) in target_urls
+            )
+            source_match = source_url_id is None or location.source_url_id == source_url_id
+            if source_match and (direct_match or target_match):
+                result.append(location)
+        return result
+
+    matched = matching(locations)
+    # A resumed or partially completed crawl can diagnose current link failures while the
+    # source page's element evidence belongs to its latest earlier snapshot. Use that evidence
+    # only when it still matches the current source and target; never manufacture a jump.
+    if not matched and source_url_id is not None:
+        historical_locations = list(
+            db.scalars(
+                select(ElementLocation)
+                .where(
+                    ElementLocation.website_id == issue.website_id,
+                    ElementLocation.source_url_id == source_url_id,
+                )
+                .order_by(ElementLocation.created_at.desc())
+                .limit(500)
+            )
         )
-        source_match = source_url_id is None or location.source_url_id == source_url_id
-        if source_match and (direct_match or target_match):
-            matched.append(location)
+        matched = matching(historical_locations)
+
+    latest_by_element: dict[tuple[str, str | None, int], ElementLocation] = {}
+    for location in matched:
+        key = (location.element_type, location.target_url, location.occurrence_index)
+        latest_by_element.setdefault(key, location)
+    matched = sorted(
+        latest_by_element.values(),
+        key=lambda item: (item.element_type, item.occurrence_index, item.target_url or ""),
+    )
 
     source_ids = {location.source_url_id for location in matched}
     source_map = {
@@ -570,6 +602,16 @@ def update_issue(
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(issue, key, value)
     if payload.status and payload.status != previous_status:
+        now = utc_now()
+        if payload.status == "resolved":
+            issue.resolved_at = now
+            issue.verified_at = None
+        elif payload.status == "verified":
+            issue.resolved_at = issue.resolved_at or now
+            issue.verified_at = now
+        elif payload.status in ACTIVE_ISSUE_STATUSES:
+            issue.resolved_at = None
+            issue.verified_at = None
         actor = db.get(User, principal.user_id) if principal.user_id else None
         db.add(
             ActivityLog(
