@@ -61,9 +61,12 @@ bevindingen, maar geen technische database-ID's. Bestanden staan in een gedeeld 
 ## Crawl-diepte
 
 Een volledige sitecrawl start op de genormaliseerde basis-URL met diepte 0 en verwerkt interne
-links breadth-first. Nieuw ontdekte URL's worden binnen dezelfde crawl ingepland. De kortste
-gevonden afstand vanaf de basis-URL wordt als `urls.crawl_depth` opgeslagen. URL's die alleen uit
-een sitemap of eerdere crawl bekend zijn en niet intern bereikbaar zijn, houden een lege diepte.
+links breadth-first. De frontier combineert de basis-URL, actuele sitemap-URL's, interne links en
+alle eerder bekende actieve URL's. Nieuw ontdekte URL's worden binnen dezelfde crawl ingepland.
+Intern bereikbare URL's worden vóór sitemap-only en eerder bekende seeds verwerkt, zodat de kortste
+gevonden afstand vanaf de basis-URL betrouwbaar als `urls.crawl_depth` wordt opgeslagen. URL's die
+alleen uit een sitemap of eerdere crawl bekend zijn en niet intern bereikbaar zijn, worden wel
+gecontroleerd maar houden een lege diepte.
 
 Na de breadth-first crawl worden actieve sitemap-URL's met een lege diepte als orphan page
 gemarkeerd. Het issue wordt per URL gededupliceerd en automatisch opgelost zodra de URL bij een

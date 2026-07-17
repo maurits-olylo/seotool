@@ -4,6 +4,21 @@ Dit document bewaart blijvende technische en productkeuzes. Nieuwe besluiten wor
 toegevoegd met datum, context, keuze en gevolgen. Details van de implementatie staan in
 `docs/architecture.md`.
 
+## 2026-07-17 — Een volledige crawl combineert alle actieve discoverybronnen
+
+Context: sitemapimport registreerde URL's correct, maar de full-site frontier selecteerde na het
+wissen van crawldieptes alleen de basis-URL en vervolgens intern bereikbare pagina's. Daardoor kon
+een crawl 51 pagina's verwerken terwijl 93 sitemap-URL's en 106 actieve bekende URL's bestonden.
+
+Besluit: de full-site frontier start met alle actieve HTML-URL's uit sitemap, interne discovery en
+historie. Intern vanaf de basis-URL bereikbare pagina's houden voorrang, zodat breadth-first diepte
+correct blijft. Sitemap-only en eerder bekende pagina's worden ook gecontroleerd, maar krijgen
+alleen een diepte wanneer een echte interne route wordt gevonden. `discovered_urls` telt de unieke
+volledige frontier; `crawled_urls` telt succesvolle verzoeken.
+
+Gevolg: full-site crawls controleren niet langer alleen de intern verbonden component. Hervatten
+reconstrueert dezelfde gecombineerde frontier uit actieve URL's en bestaande snapshots.
+
 ## 2026-07-14 — Bestaande functionaliteit blijft leidend
 
 Context: de repository bevat inmiddels gebruikers, klanttoegang, GSC, GA4, Bing, rapportages en

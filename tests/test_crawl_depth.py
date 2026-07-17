@@ -152,6 +152,83 @@ def test_full_site_crawl_assigns_breadth_first_depths(monkeypatch) -> None:  # t
         assert completed and completed.status == "succeeded"
 
 
+def test_full_site_crawl_combines_sitemap_internal_and_known_urls(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    fetched: list[str] = []
+    sitemap = b"""<?xml version="1.0"?>
+    <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+      <url><loc>https://example.com/sitemap-only</loc></url>
+    </urlset>"""
+
+    def fake_fetch(url: str, **_: object) -> FetchResult:
+        fetched.append(url)
+        if url.endswith("/robots.txt"):
+            content = b"User-agent: *\nAllow: /"
+            content_type = "text/plain"
+        elif url.endswith("/sitemap.xml"):
+            content = sitemap
+            content_type = "application/xml"
+        elif url == "https://example.com/":
+            content = b'<main><a href="/internal">Internal</a></main>'
+            content_type = "text/html"
+        else:
+            content = b"<main>Page</main>"
+            content_type = "text/html"
+        return FetchResult(
+            requested_url=url,
+            final_url=url,
+            status_code=200,
+            redirect_chain=[],
+            headers={"content-type": content_type},
+            content=content,
+            response_time_ms=1,
+        )
+
+    monkeypatch.setattr("app.jobs.fetch_url", fake_fetch)
+    with SessionLocal() as db:
+        client = Client(name="Combined discovery client")
+        website = Website(client=client, name="Combined site", base_url="https://example.com/")
+        website.settings = WebsiteSettings(
+            sitemap_urls=["https://example.com/sitemap.xml"],
+            max_urls=10,
+        )
+        db.add(website)
+        db.flush()
+        db.add(
+            Url(
+                website_id=website.id,
+                normalized_url="https://example.com/previously-known",
+            )
+        )
+        job = CrawlJob(
+            website_id=website.id,
+            job_type="full_site_crawl",
+            settings_snapshot={"max_urls": 10},
+        )
+        db.add(job)
+        db.commit()
+        job_id = job.id
+
+    execute_crawl_job(str(job_id))
+
+    assert {
+        "https://example.com/",
+        "https://example.com/internal",
+        "https://example.com/sitemap-only",
+        "https://example.com/previously-known",
+    }.issubset(fetched)
+    with SessionLocal() as db:
+        run = db.scalar(select(CrawlRun).where(CrawlRun.crawl_job_id == job_id))
+        depths = {
+            url.normalized_url: url.crawl_depth
+            for url in db.scalars(select(Url).order_by(Url.normalized_url))
+        }
+        assert run and run.discovered_urls == 4 and run.crawled_urls == 4
+        assert depths["https://example.com/"] == 0
+        assert depths["https://example.com/internal"] == 1
+        assert depths["https://example.com/sitemap-only"] is None
+        assert depths["https://example.com/previously-known"] is None
+
+
 def test_limited_full_crawl_is_partial_and_skips_orphan_analysis(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     orphan_analysis_calls: list[object] = []
 

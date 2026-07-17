@@ -271,21 +271,22 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
         for item in db.scalars(select(Url).where(Url.id.in_(snapshot_url_ids)))
         if is_probable_html_page(item.normalized_url)
     }
-    pending = [
-        (item.id, item.crawl_depth or 0)
+    eligible_urls = [
+        item
         for item in db.scalars(
             select(Url)
-            .where(
-                Url.website_id == website.id,
-                Url.is_active.is_(True),
-                Url.crawl_depth.is_not(None),
-            )
-            .order_by(Url.crawl_depth, Url.normalized_url)
+            .where(Url.website_id == website.id, Url.is_active.is_(True))
+            .order_by(Url.normalized_url)
         )
-        if item.id not in visited and is_probable_html_page(item.normalized_url)
+        if is_probable_html_page(item.normalized_url)
     ]
-    if not pending and root.id not in visited:
-        pending = [(root.id, 0)]
+    pending = [
+        (item.id, item.crawl_depth)
+        for item in eligible_urls
+        if item.id not in visited
+    ]
+    pending_ids = {url_id for url_id, _depth in pending}
+    frontier_ids = visited | pending_ids
     audited_assets = {
         item.id
         for item in db.scalars(select(Url).where(Url.id.in_(snapshot_url_ids)))
@@ -294,16 +295,22 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
     maximum = int(job.settings_snapshot.get("max_urls", website.settings.max_urls))
     while pending and len(visited) < maximum:
         _check_crawl_control(db, job, run)
+        # Process URLs reached from the root before sitemap-only and previously known
+        # seeds. This preserves breadth-first crawl depth while still auditing every
+        # active URL source in the same full-site crawl.
+        pending.sort(key=lambda item: (item[1] is None, item[1] or 0))
         url_id, depth = pending.pop(0)
+        pending_ids.discard(url_id)
         if url_id in visited:
             continue
         url = db.get(Url, url_id)
         if url is None or not url.is_active:
             continue
-        depth = min(depth, url.crawl_depth) if url.crawl_depth is not None else depth
-        url.crawl_depth = depth
+        if depth is not None:
+            depth = min(depth, url.crawl_depth) if url.crawl_depth is not None else depth
+            url.crawl_depth = depth
         visited.add(url.id)
-        run.discovered_urls = len(visited)
+        run.discovered_urls = len(frontier_ids)
         _crawl_one(db, job, run, url, robots=robots)
         _respect_request_delay(job)
         discovered = list(
@@ -340,13 +347,17 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
                     audited_assets.add(target.id)
                     _respect_request_delay(job)
                 continue
-            next_depth = depth + 1
-            if target.crawl_depth is None or next_depth < target.crawl_depth:
+            next_depth = depth + 1 if depth is not None else None
+            if next_depth is not None and (
+                target.crawl_depth is None or next_depth < target.crawl_depth
+            ):
                 target.crawl_depth = next_depth
-            if target.id not in visited:
+            frontier_ids.add(target.id)
+            if target.id not in visited and target.id not in pending_ids:
                 pending.append((target.id, next_depth))
+                pending_ids.add(target.id)
         db.commit()
-    run.discovered_urls = len(visited)
+    run.discovered_urls = len(frontier_ids)
     complete = not pending
     if complete:
         _check_crawl_control(db, job, run)
