@@ -34,6 +34,7 @@ def classify_404_issues(db: Session, *, website_id: object, crawl_run_id: object
                 select(func.count(UrlLink.id)).where(
                     UrlLink.crawl_run_id == crawl_run_id,
                     UrlLink.target_url_id == url.id,
+                    UrlLink.source_url_id != url.id,
                     UrlLink.is_internal.is_(True),
                 )
             )
@@ -177,6 +178,7 @@ def _classify_source_pages(db: Session, *, website_id: object, crawl_run_id: obj
         .where(
             UrlLink.crawl_run_id == crawl_run_id,
             UrlLink.is_internal.is_(True),
+            UrlLink.source_url_id != UrlLink.target_url_id,
             Url.current_status_code == 404,
         )
         .order_by(UrlLink.source_url_id, UrlLink.target_url, UrlLink.anchor_text)

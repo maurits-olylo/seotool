@@ -381,3 +381,16 @@ actief is.
 
 Gevolg: één technische aanpassing wordt één taak. Wanneer een volgende volledige crawl het patroon
 niet meer aantreft, wordt de diagnose opgelost en vervalt de onderdrukking van losse URL-signalen.
+
+## 2026-07-17 — Een foutpagina telt niet als eigen interne linkbron
+
+Context: sommige 404-templates bevatten een link naar de aangevraagde URL zelf. Daardoor verscheen
+de defecte doel-URL ook tussen de pagina's die naar zichzelf verwezen en werd het aantal bruikbare
+interne linkbronnen met één overschat.
+
+Besluit: links waarbij bron- en doelrecord gelijk zijn tellen niet mee voor contextuele 404-impact,
+de bronpaginaweergave en groepering van meerdere dode links. De ruwe link blijft wel in de
+crawlhistorie bewaard.
+
+Gevolg: de gebruiker ziet uitsluitend andere pagina's waarop de defecte link daadwerkelijk moet
+worden hersteld.

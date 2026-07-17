@@ -47,6 +47,17 @@ def test_classifies_linked_and_sitemap_404s_exclusively() -> None:
             )
         )
         db.add(
+            UrlLink(
+                crawl_run_id=run.id,
+                source_url_id=linked.id,
+                target_url=linked.normalized_url,
+                target_url_id=linked.id,
+                anchor_text="Zelfverwijzing op foutpagina",
+                is_internal=True,
+                is_nofollow=False,
+            )
+        )
+        db.add(
             Issue(
                 website_id=website.id,
                 url_id=linked.id,
@@ -67,6 +78,18 @@ def test_classifies_linked_and_sitemap_404s_exclusively() -> None:
         assert states[(linked.id, "http_404")] == "resolved"
         assert states[(linked.id, "internally_linked_404")] == "new"
         assert states[(sitemap.id, "sitemap_404")] == "new"
+        linked_issue = db.scalar(
+            select(Issue).where(
+                Issue.url_id == linked.id,
+                Issue.issue_type == "internally_linked_404",
+            )
+        )
+        assert linked_issue is not None
+        occurrence = db.scalar(
+            select(IssueOccurrence).where(IssueOccurrence.issue_id == linked_issue.id)
+        )
+        assert occurrence is not None
+        assert occurrence.evidence["incoming_internal_links"] == 1
 
 
 def test_groups_multiple_broken_links_on_one_source_page() -> None:

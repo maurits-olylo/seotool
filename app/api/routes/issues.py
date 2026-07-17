@@ -385,6 +385,7 @@ def get_issue(
                 .where(
                     UrlLink.crawl_run_id == occurrence.crawl_run_id,
                     UrlLink.target_url_id == issue.url_id,
+                    UrlLink.source_url_id != issue.url_id,
                     UrlLink.is_internal.is_(True),
                 )
                 .distinct()
