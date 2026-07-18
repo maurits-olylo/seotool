@@ -99,17 +99,45 @@ def test_extracts_multiple_issue_elements_and_duplicate_context() -> None:
 
     headings = [item for item in page.elements if item.element_type == "h2"]
     assert len(headings) == 2
-    assert all("duplicate_heading_text" in item.issue_types for item in headings)
+    assert all("duplicate_heading_text" not in item.issue_types for item in headings)
     assert all(item.text_is_unique is False for item in headings)
     assert all(item.context_is_unique is True for item in headings)
     assert any("cms_link_placeholder" in item.issue_types for item in page.elements)
-    assert any("invalid_or_empty_link" in item.issue_types for item in page.elements)
+    assert all("invalid_or_empty_link" not in item.issue_types for item in page.elements)
     assert any("broken_application_cta" in item.issue_types for item in page.elements)
     assert any(
         link.target_url == "https://example.com/solliciteren" for link in page.links
     )
     icon_link = next(item for item in page.elements if "zonder-tekst" in (item.target_url or ""))
     assert icon_link.visible_text is None
+
+
+def test_interactive_controls_are_not_reported_as_broken_seo_links() -> None:
+    page = extract_page(
+        """
+        <html><body>
+          <div class="modal">
+            <a class="repeat-remove" href="#">Bijlage verwijderen</a>
+            <button type="button">Upload nog een bestand</button>
+          </div>
+          <a class="st-custom-button" data-network="linkedin" href="#">LinkedIn</a>
+          <a onclick="openDialog()">Open formulier</a>
+        </body></html>
+        """,
+        "https://example.com/pagina",
+    )
+
+    assert page.elements
+    assert all("invalid_or_empty_link" not in item.issue_types for item in page.elements)
+
+
+def test_broken_application_cta_remains_actionable() -> None:
+    page = extract_page(
+        '<html><body><button type="button">Solliciteer nu</button></body></html>',
+        "https://example.com/vacature",
+    )
+
+    assert "broken_application_cta" in page.elements[0].issue_types
 
 
 def test_static_extraction_does_not_claim_dynamically_rendered_element() -> None:

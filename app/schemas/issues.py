@@ -86,6 +86,12 @@ class GuidanceStatementRead(BaseModel):
     basis: Literal["fact", "interpretation", "hypothesis"]
 
 
+class GuidanceSourceRead(BaseModel):
+    title: str
+    url: str
+    publisher: str
+
+
 class IssueGuidanceRead(BaseModel):
     relevance: GuidanceStatementRead
     likely_cause: GuidanceStatementRead | None
@@ -93,6 +99,7 @@ class IssueGuidanceRead(BaseModel):
     steps: list[str]
     verification: str
     confidence: str
+    sources: list[GuidanceSourceRead]
 
 
 class IssueDetailRead(IssueRead):

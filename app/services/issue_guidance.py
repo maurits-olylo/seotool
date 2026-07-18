@@ -9,6 +9,111 @@ class GuidanceStatement:
     basis: str
 
 
+@dataclass(frozen=True)
+class GuidanceSource:
+    title: str
+    url: str
+    publisher: str = "Google Search Central"
+
+
+SOURCES = {
+    "http": GuidanceSource(
+        "HTTP-statuscodes en netwerkfouten",
+        "https://developers.google.com/search/docs/crawling-indexing/http-network-errors",
+    ),
+    "redirect": GuidanceSource(
+        "Redirects en Google Search",
+        "https://developers.google.com/search/docs/crawling-indexing/301-redirects",
+    ),
+    "canonical": GuidanceSource(
+        "Canonical URL's en dubbele URL's",
+        "https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls",
+    ),
+    "robots": GuidanceSource(
+        "Robots meta tags en X-Robots-Tag",
+        "https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag",
+    ),
+    "robots_txt": GuidanceSource(
+        "Inleiding robots.txt",
+        "https://developers.google.com/search/docs/crawling-indexing/robots/intro",
+    ),
+    "sitemap": GuidanceSource(
+        "Een sitemap bouwen en indienen",
+        "https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap",
+    ),
+    "title": GuidanceSource(
+        "Title links beïnvloeden",
+        "https://developers.google.com/search/docs/appearance/title-link",
+    ),
+    "snippet": GuidanceSource(
+        "Snippets in zoekresultaten",
+        "https://developers.google.com/search/docs/appearance/snippet",
+    ),
+    "links": GuidanceSource(
+        "Best practices voor crawlbare links",
+        "https://developers.google.com/search/docs/crawling-indexing/links-crawlable",
+    ),
+    "structured_data": GuidanceSource(
+        "Inleiding structured data",
+        "https://developers.google.com/search/docs/appearance/structured-data/intro-structured-data",
+    ),
+    "breadcrumb": GuidanceSource(
+        "Breadcrumb structured data",
+        "https://developers.google.com/search/docs/appearance/structured-data/breadcrumb",
+    ),
+    "job_posting": GuidanceSource(
+        "JobPosting structured data",
+        "https://developers.google.com/search/docs/appearance/structured-data/job-posting",
+    ),
+    "helpful_content": GuidanceSource(
+        "Nuttige, betrouwbare content maken",
+        "https://developers.google.com/search/docs/fundamentals/creating-helpful-content",
+    ),
+    "performance": GuidanceSource(
+        "Largest Contentful Paint optimaliseren",
+        "https://web.dev/articles/optimize-lcp",
+        "web.dev",
+    ),
+}
+
+SOURCE_KEYS_BY_TYPE = {
+    "http_404": ("http",), "http_410": ("http",), "http_5xx": ("http",),
+    "crawl_timeout": ("http",), "unreachable_url_target": ("http",),
+    "redirect_loop": ("redirect",), "long_redirect_chain": ("redirect",),
+    "internally_linked_redirect": ("redirect", "links"),
+    "missing_title": ("title",), "duplicate_title": ("title",),
+    "missing_h1": ("title",), "multiple_h1": ("title",),
+    "missing_meta_description": ("snippet",), "duplicate_meta_description": ("snippet",),
+    "canonical_other_url": ("canonical",), "duplicate_content": ("canonical",),
+    "near_duplicate_content": ("canonical",), "conflicting_robots": ("robots",),
+    "unexpected_noindex": ("robots",), "robots_txt_blocked": ("robots_txt",),
+    "sitemap_redirect": ("sitemap", "redirect"), "sitemap_404": ("sitemap", "http"),
+    "invalid_json_ld": ("structured_data",),
+    "missing_breadcrumb_schema": ("breadcrumb",),
+    "job_posting_schema_missing": ("job_posting",),
+    "job_posting_missing_fields": ("job_posting",),
+    "job_posting_invalid_dates": ("job_posting",),
+    "job_posting_missing_application": ("job_posting",),
+    "job_posting_remote_location_missing": ("job_posting",),
+    "job_posting_location_incomplete": ("job_posting",),
+    "job_posting_not_detail_page": ("job_posting",),
+    "job_posting_identifier_collision_risk": ("job_posting",),
+    "expired_job_posting": ("job_posting",),
+    "expired_job_posting_linked": ("job_posting", "links"),
+    "expired_job_posting_404": ("job_posting", "http"),
+    "broken_application_cta": ("job_posting",),
+    "internally_linked_404": ("links", "http"),
+    "multiple_broken_internal_links": ("links", "http"),
+    "patterned_404_urls": ("links", "http"),
+    "orphan_page": ("links",), "deep_page": ("links",),
+    "important_page_few_internal_links": ("links",),
+    "cms_link_placeholder": ("links",),
+    "thin_content": ("helpful_content",), "possibly_outdated_content": ("helpful_content",),
+    "broken_image": ("helpful_content",),
+    "oversized_image": ("performance",), "oversized_document": ("performance",),
+}
+
+
 CATEGORY_RELEVANCE = {
     "reachability": "Bezoekers en zoekmachines kunnen de URL mogelijk niet betrouwbaar bereiken.",
     "indexation": "Dit signaal kan beïnvloeden welke URL zoekmachines crawlen of indexeren.",
@@ -28,10 +133,6 @@ CATEGORY_RELEVANCE = {
 }
 
 TYPE_RELEVANCE = {
-    "duplicate_heading_text": (
-        "Herhaalde kopteksten kunnen de inhoudsstructuur onduidelijk maken. Herhaling in vaste "
-        "interfaceblokken kan bewust zijn en vraagt dan geen aanpassing."
-    ),
     "job_posting_schema_missing": (
         "Zonder JobPosting-schema kan Google deze vacature niet betrouwbaar als vacature herkennen."
     ),
@@ -71,10 +172,6 @@ VERIFICATION_BY_TYPE = {
     "orphan_page": (
         "De pagina heeft een bewuste interne route of is bewust buiten de navigatie gehouden."
     ),
-    "duplicate_heading_text": (
-        "De volgende crawl vindt geen onbedoeld herhaalde koptekst meer; bewuste UI-herhaling is "
-        "als zodanig beoordeeld."
-    ),
     "job_posting_schema_missing": (
         "De volgende crawl vindt geldig JobPosting-schema op de vacaturedetailpagina."
     ),
@@ -111,6 +208,7 @@ def build_issue_guidance(issue: Issue, evidence: dict[str, object]) -> dict[str,
         )
     )
     action = issue.recommended_action.strip()
+    source_keys = SOURCE_KEYS_BY_TYPE.get(issue.issue_type, ())
     return {
         "relevance": {"text": relevance, "basis": "interpretation"},
         "likely_cause": {"text": cause.text, "basis": cause.basis} if cause else None,
@@ -124,4 +222,12 @@ def build_issue_guidance(issue: Issue, evidence: dict[str, object]) -> dict[str,
         else ["Beoordeel het opgeslagen bewijs en bepaal de passende wijziging."],
         "verification": verification_text,
         "confidence": issue.confidence,
+        "sources": [
+            {
+                "title": SOURCES[key].title,
+                "url": SOURCES[key].url,
+                "publisher": SOURCES[key].publisher,
+            }
+            for key in source_keys
+        ],
     }

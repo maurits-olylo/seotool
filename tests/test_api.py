@@ -597,6 +597,7 @@ def test_issue_detail_exposes_evidence_and_updates_status(client: TestClient) ->
     assert detail.json()["source_urls"] == []
     assert detail.json()["guidance"]["likely_cause"] is None
     assert "volgende crawl" in detail.json()["guidance"]["verification"]
+    assert detail.json()["guidance"]["sources"][0]["publisher"] == "Google Search Central"
 
     updated = client.patch(f"/api/v1/issues/{issue_id}", json={"status": "planned"})
     assert updated.status_code == 200

@@ -43,13 +43,18 @@ def test_guidance_falls_back_to_observation_and_safe_verification() -> None:
     assert guidance["alternative_explanation"] is None
     assert guidance["steps"] == ["Pas het betreffende onderdeel aan."]
     assert "volgende crawl" in str(guidance["verification"])
+    assert guidance["sources"] == [
+        {
+            "title": "Title links beïnvloeden",
+            "url": "https://developers.google.com/search/docs/appearance/title-link",
+            "publisher": "Google Search Central",
+        }
+    ]
 
 
-def test_guidance_adds_specific_value_for_job_schema_and_duplicate_headings() -> None:
+def test_guidance_adds_specific_value_and_source_for_job_schema() -> None:
     job_guidance = build_issue_guidance(
         _issue("job_posting_schema_missing", "structured_data"), {}
     )
-    heading_guidance = build_issue_guidance(_issue("duplicate_heading_text"), {})
-
     assert "Google" in job_guidance["relevance"]["text"]  # type: ignore[index]
-    assert "bewust" in heading_guidance["relevance"]["text"]  # type: ignore[index]
+    assert job_guidance["sources"][0]["publisher"] == "Google Search Central"  # type: ignore[index]

@@ -1355,6 +1355,8 @@ async function showIssue(issueId) {
   $("#detail-description").textContent = issue.description;
   const guidance = issue.guidance;
   $("#detail-relevance").textContent = guidance.relevance.text;
+  $("#detail-guidance-sources").innerHTML = (guidance.sources || []).map((source) => `<li><a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.title)}</a><span>${escapeHtml(source.publisher)}</span></li>`).join("");
+  $("#guidance-sources-section").classList.toggle("hidden", !(guidance.sources || []).length);
   $("#detail-cause-section").classList.toggle("hidden", !guidance.likely_cause);
   $("#detail-alternative-section").classList.toggle("hidden", !guidance.alternative_explanation);
   $("#detail-cause").textContent = guidance.likely_cause?.text || "";

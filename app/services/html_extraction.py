@@ -208,18 +208,11 @@ def _extract_elements(soup: BeautifulSoup, page_url: str) -> list[ExtractedEleme
     text_counts: dict[tuple[str, str], int] = {}
     raw_items: list[dict[str, object]] = []
     occurrences: dict[tuple[str, str, str], int] = {}
-    heading_counts = {
-        (tag.name, _clean_text(tag.get_text(" ", strip=True)).casefold()): 0
-        for tag in tags
-        if tag.name in {"h1", "h2", "h3"}
-    }
     for tag in tags:
         visible_text = _element_text(tag)
         if visible_text:
             text_key = (_text_group(tag), visible_text.casefold())
             text_counts[text_key] = text_counts.get(text_key, 0) + 1
-        if tag.name in {"h1", "h2", "h3"} and visible_text:
-            heading_counts[(tag.name, visible_text.casefold())] += 1
 
     context_counts: dict[tuple[str, str, str, str], int] = {}
     for tag in tags:
@@ -259,7 +252,6 @@ def _extract_elements(soup: BeautifulSoup, page_url: str) -> list[ExtractedEleme
             tag,
             visible_text,
             h1_count=h1_count,
-            heading_counts=heading_counts,
         )
         text_key = (_text_group(tag), visible_text.casefold()) if visible_text else None
         result.append(
@@ -314,17 +306,10 @@ def _initial_element_issue_types(
     visible_text: str | None,
     *,
     h1_count: int,
-    heading_counts: dict[tuple[str, str], int],
 ) -> list[str]:
     issues: list[str] = []
     if tag.name == "h1" and h1_count > 1:
         issues.append("multiple_h1")
-    if (
-        tag.name in {"h1", "h2", "h3"}
-        and visible_text
-        and heading_counts.get((tag.name, visible_text.casefold()), 0) > 1
-    ):
-        issues.append("duplicate_heading_text")
     if tag.name in {"a", "button"}:
         form = tag.find_parent("form") if tag.name == "button" else None
         raw = _clean_text(
@@ -345,8 +330,8 @@ def _initial_element_issue_types(
         )
         if placeholder:
             issues.append("cms_link_placeholder")
-        elif invalid:
-            issues.append("broken_application_cta" if is_cta else "invalid_or_empty_link")
+        elif invalid and is_cta:
+            issues.append("broken_application_cta")
     return issues
 
 
