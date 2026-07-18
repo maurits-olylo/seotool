@@ -58,6 +58,18 @@ komt uit de environment.
 
 ## Updates
 
+### Tijdelijke route: releasepakket via Mac
+
+Zolang Git niet op de NAS is geïnstalleerd, wordt het releasepakket op de Mac vanaf een exacte
+commit gemaakt. Leg de SHA-256 lokaal vast, upload via SSH en controleer dezelfde checksum op de NAS
+voordat het pakket wordt uitgepakt. De globale crawl-drain en databaseback-up blijven verplicht.
+
+### Doelroute: GitHub vanaf de NAS
+
+Installeer in fase 7 Git op de NAS en configureer minimaal bevoegde GitHub-authenticatie. Controleer
+de remote en actieve branch eenmalig. Productie-updates mogen daarna alleen met
+`git pull --ff-only`; lokale wijzigingen in de productiemap blokkeren de deployment.
+
 ```bash
 BACKUP_DIR=/volume1/docker/seo-monitor/backups ./scripts/backup.sh
 git pull --ff-only

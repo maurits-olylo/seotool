@@ -343,6 +343,12 @@ Praktijktest bulkafhandeling:
 
 Status: gepland.
 
+- Git op de Synology NAS installeren en read-only of minimaal bevoegde GitHub-authenticatie voor
+  deployments configureren; daarna updates vanuit de productiemap met `git pull --ff-only`
+  uitvoeren.
+- Tot Git en GitHub-authenticatie op de NAS beschikbaar zijn, releases op de Mac vanaf een exacte
+  commit als archive maken, de SHA-256 vastleggen, het pakket via SSH naar de NAS uploaden en pas na
+  checksumcontrole uitpakken.
 - Volledige acceptatiecontrole met minimaal twee klanten.
 - Scheduler, workers, exports, back-up, restore, updates en rollback valideren.
 - Pauzeren, hervatten, stoppen en herstel na worker-restart operationeel valideren.
