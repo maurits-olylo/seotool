@@ -1,4 +1,5 @@
 import csv
+import re
 from datetime import UTC, datetime
 from hashlib import sha256
 from io import StringIO
@@ -183,7 +184,7 @@ def import_bing_backlink_exports(
 
 
 def _read_rows(content: str, headers: tuple[str, ...], maximum: int) -> list[dict[str, str]]:
-    reader = csv.DictReader(StringIO(content.lstrip("\ufeff")))
+    reader = csv.DictReader(StringIO(_repair_bing_csv(content.lstrip("\ufeff"))))
     if tuple(reader.fieldnames or ()) != headers:
         raise InvalidBingBacklinkExport(
             f"Ongeldige Bing-export; verwacht kolommen: {', '.join(headers)}"
@@ -194,10 +195,17 @@ def _read_rows(content: str, headers: tuple[str, ...], maximum: int) -> list[dic
     return rows
 
 
-def _positive_count(value: str, field: str) -> int:
+def _repair_bing_csv(content: str) -> str:
+    """Repair Bing's invalid encoding for an anchor consisting of one quote."""
+    return "\n".join(
+        re.sub(r'^""","([0-9]+)"$', r'"""","\1"', line) for line in content.splitlines()
+    )
+
+
+def _positive_count(value: str | None, field: str) -> int:
     try:
         count = int(value)
-    except ValueError as exc:
+    except (TypeError, ValueError) as exc:
         raise InvalidBingBacklinkExport(f"{field} bevat geen geldig aantal") from exc
     if count < 0:
         raise InvalidBingBacklinkExport(f"{field} mag niet negatief zijn")

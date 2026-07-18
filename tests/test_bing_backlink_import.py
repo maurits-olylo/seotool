@@ -79,3 +79,34 @@ def test_rejects_wrong_bing_export_columns() -> None:
             raise AssertionError("Invalid export should fail")
         except InvalidBingBacklinkExport:
             pass
+
+
+def test_repairs_quote_only_anchor_from_real_bing_export() -> None:
+    domains = '"Domain","Backlinks Count"\n"https://ref.example","1"\n'
+    pages = (
+        '"Source Url","Anchor text","Target Url"\n'
+        '"https://ref.example/a","quote","https://example.com/"\n'
+    )
+    anchors = '"Anchor","Backlinks Count"\n""","1"\n'
+    with SessionLocal() as db:
+        client = Client(name="Bing malformed CSV client")
+        website = Website(
+            client=client,
+            name="Bing malformed CSV site",
+            base_url="https://example.com/",
+        )
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.commit()
+
+        result = import_bing_backlink_exports(
+            db,
+            website_id=website.id,
+            domains_csv=domains,
+            pages_csv=pages,
+            anchors_csv=anchors,
+        )
+
+        anchor = db.scalar(select(BingReferringAnchor))
+        assert result["anchors"] == 1
+        assert anchor and anchor.anchor_text == '"' and anchor.backlink_count == 1
