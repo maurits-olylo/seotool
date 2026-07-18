@@ -13,7 +13,7 @@ const labels = {
   pause_requested: "Pauze wordt voorbereid", paused: "Gepauzeerd",
   cancel_requested: "Stop wordt voorbereid",
 };
-const state = { currentUser: null, clients: [], websites: [], organizationWebsites: [], issues: [], changes: [], changeGroups: [], jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
+const state = { currentUser: null, clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
 const VIEW_HASHES = {overview: "overzicht", reports: "rapportage", insights: "inzichten", urls: "urls", changes: "wijzigingen", vacancies: "vacatures", operations: "beheer", organization: "organisatie", integrations: "integraties"};
 const CLIENT_STORAGE_KEY = "seo-monitor-client-id";
 const WEBSITE_STORAGE_KEY = "seo-monitor-website-id";
@@ -723,13 +723,24 @@ function stopOperationsPolling() {
 
 async function loadIssues() {
   const websiteId = $("#website-select").value;
-  if (!websiteId) { state.issues = []; render(); return; }
+  if (!websiteId) {
+    state.issues = [];
+    state.suppressions = [];
+    state.selectedIssueIds.clear();
+    state.selectedSuppressionIds.clear();
+    render();
+    return;
+  }
   const status = $("#status-filter").value || "active";
-  const [issues, urls] = await Promise.all([
+  const [issues, urls, suppressions] = await Promise.all([
     api(`/api/v1/websites/${websiteId}/issues?status=${encodeURIComponent(status)}`),
     loadAllUrls(websiteId),
+    api(`/api/v1/websites/${websiteId}/issue-suppressions`),
   ]);
   state.issues = issues;
+  state.suppressions = suppressions;
+  state.selectedIssueIds.clear();
+  state.selectedSuppressionIds.clear();
   state.urlRecords = urls;
   state.urls = new Map(urls.map((url) => [url.id, url.normalized_url]));
   const types = [...new Set(issues.map((issue) => issue.issue_type))].sort();
@@ -1199,6 +1210,7 @@ function render() {
   const start = (state.page - 1) * PAGE_SIZE;
   const rows = state.filtered.slice(start, start + PAGE_SIZE);
   $("#issues").innerHTML = rows.map((issue) => `<tr>
+    <td class="selection-cell"><input class="issue-select" type="checkbox" data-select-issue-id="${issue.id}" aria-label="Selecteer ${escapeHtml(issue.title)}" ${state.selectedIssueIds.has(issue.id) ? "checked" : ""}></td>
     <td><span class="severity ${issue.severity}">${labels[issue.severity] || issue.severity}</span></td>
     <td><strong>${escapeHtml(issue.title)}</strong>${issueUrlMarkup(issue)}</td>
     <td>${impactMarkup(issue)}</td>
@@ -1211,6 +1223,103 @@ function render() {
   $("#previous-page").disabled = state.page === 1;
   $("#next-page").disabled = state.page === pages;
   $("#empty").classList.toggle("hidden", rows.length !== 0);
+  const pageIds = rows.map((issue) => issue.id);
+  const selectedOnPage = pageIds.filter((id) => state.selectedIssueIds.has(id)).length;
+  $("#select-page-issues").checked = pageIds.length > 0 && selectedOnPage === pageIds.length;
+  $("#select-page-issues").indeterminate = selectedOnPage > 0 && selectedOnPage < pageIds.length;
+  renderIssueBulkBar();
+  renderSuppressions();
+}
+
+function renderIssueBulkBar() {
+  const selected = state.selectedIssueIds.size;
+  $("#issue-selection-count").textContent = `${selected} geselecteerd`;
+  $("#resolve-selected-issues").disabled = selected === 0;
+  $("#suppress-selected-issues").disabled = selected === 0;
+  $("#clear-issue-selection").disabled = selected === 0;
+}
+
+function renderSuppressions() {
+  $("#suppression-rows").innerHTML = state.suppressions.map((suppression) => {
+    const url = state.urls.get(suppression.url_id) || "Onbekende URL";
+    return `<tr><td class="selection-cell"><input class="suppression-select" type="checkbox" data-select-suppression-id="${suppression.id}" aria-label="Selecteer afgehandelde regel" ${state.selectedSuppressionIds.has(suppression.id) ? "checked" : ""}></td><td><strong>${escapeHtml(suppression.issue_type.replaceAll("_", " "))}</strong><a class="url" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a></td><td>${escapeHtml(suppression.actor || "Systeem")}</td><td>${escapeHtml(suppression.comment || "—")}</td><td>${new Date(suppression.updated_at).toLocaleDateString("nl-NL")}</td><td><button class="detail-button" type="button" data-restore-suppression="${suppression.id}">Herstellen</button></td></tr>`;
+  }).join("");
+  $("#suppression-empty").classList.toggle("hidden", state.suppressions.length !== 0);
+  const selected = state.selectedSuppressionIds.size;
+  $("#suppression-selection-count").textContent = `${selected} regels geselecteerd`;
+  $("#restore-selected-suppressions").disabled = selected === 0;
+  $("#select-suppressions").checked = state.suppressions.length > 0 && selected === state.suppressions.length;
+  $("#select-suppressions").indeterminate = selected > 0 && selected < state.suppressions.length;
+}
+
+async function runIssueBulkAction(action) {
+  const issueIds = [...state.selectedIssueIds];
+  if (!issueIds.length) return;
+  const selectedIssues = state.issues.filter((issue) => state.selectedIssueIds.has(issue.id));
+  if (action === "suppress_issue_type" && selectedIssues.some((issue) => !issue.url_id)) {
+    window.alert("Een websitebrede diagnose kan niet blijvend per URL worden afgehandeld. Verwijder deze uit de selectie.");
+    return;
+  }
+  const actionLabel = action === "suppress_issue_type"
+    ? "blijvend afhandelen voor het geselecteerde issuetype"
+    : "als opgelost markeren en bij de volgende crawl opnieuw controleren";
+  if (!window.confirm(`${issueIds.length} issue(s) ${actionLabel}?`)) return;
+  const websiteId = $("#website-select").value;
+  const comment = $("#issue-bulk-comment").value.trim();
+  const message = $("#issue-bulk-message");
+  message.classList.remove("error");
+  message.textContent = "Actie wordt verwerkt…";
+  try {
+    const result = await api(`/api/v1/websites/${websiteId}/issues/bulk`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({issue_ids: issueIds, action, comment: comment || null}),
+    });
+    $("#issue-bulk-comment").value = "";
+    await loadIssues();
+    message.textContent = action === "suppress_issue_type"
+      ? `${result.updated_count} issue(s) blijvend afgehandeld voor dit issuetype.`
+      : `${result.updated_count} issue(s) opgelost en klaargezet voor hercontrole.`;
+  } catch (error) {
+    message.classList.add("error");
+    message.textContent = `Actie mislukt: ${error.message}`;
+  }
+}
+
+async function restoreSuppression(suppressionId) {
+  if (!window.confirm("Deze regel herstellen? Het issue wordt weer zichtbaar en bij volgende crawls opnieuw beoordeeld.")) return;
+  const websiteId = $("#website-select").value;
+  const message = $("#issue-bulk-message");
+  message.classList.remove("error");
+  message.textContent = "Regel wordt hersteld…";
+  try {
+    await api(`/api/v1/websites/${websiteId}/issue-suppressions/${suppressionId}/restore`, {method: "POST"});
+    await loadIssues();
+    message.textContent = "De afgehandelde regel is hersteld en het issue is weer zichtbaar.";
+  } catch (error) {
+    message.classList.add("error");
+    message.textContent = `Herstellen mislukt: ${error.message}`;
+  }
+}
+
+async function restoreSelectedSuppressions() {
+  const suppressionIds = [...state.selectedSuppressionIds];
+  if (!suppressionIds.length || !window.confirm(`${suppressionIds.length} afgehandelde regel(s) herstellen?`)) return;
+  const websiteId = $("#website-select").value;
+  const message = $("#issue-bulk-message");
+  message.classList.remove("error");
+  message.textContent = "Geselecteerde regels worden hersteld…";
+  try {
+    for (const suppressionId of suppressionIds) {
+      await api(`/api/v1/websites/${websiteId}/issue-suppressions/${suppressionId}/restore`, {method: "POST"});
+    }
+    await loadIssues();
+    message.textContent = `${suppressionIds.length} afgehandelde regel(s) hersteld.`;
+  } catch (error) {
+    message.classList.add("error");
+    message.textContent = `Herstellen mislukt: ${error.message}`;
+    await loadIssues();
+  }
 }
 
 async function showIssue(issueId) {
@@ -1275,6 +1384,40 @@ $("#search-filter").addEventListener("input", () => { state.page = 1; render(); 
 $("#previous-page").addEventListener("click", () => { state.page -= 1; render(); });
 $("#next-page").addEventListener("click", () => { state.page += 1; render(); });
 $("#issues").addEventListener("click", (event) => { const button = event.target.closest("[data-issue-id]"); if (button) showIssue(button.dataset.issueId); });
+$("#issues").addEventListener("change", (event) => {
+  const checkbox = event.target.closest("[data-select-issue-id]");
+  if (!checkbox) return;
+  if (checkbox.checked) state.selectedIssueIds.add(checkbox.dataset.selectIssueId);
+  else state.selectedIssueIds.delete(checkbox.dataset.selectIssueId);
+  renderIssueBulkBar();
+  const pageCheckboxes = [...document.querySelectorAll("#issues .issue-select")];
+  const selectedOnPage = pageCheckboxes.filter((item) => item.checked).length;
+  $("#select-page-issues").checked = pageCheckboxes.length > 0 && selectedOnPage === pageCheckboxes.length;
+  $("#select-page-issues").indeterminate = selectedOnPage > 0 && selectedOnPage < pageCheckboxes.length;
+});
+$("#select-page-issues").addEventListener("change", (event) => {
+  document.querySelectorAll("#issues .issue-select").forEach((checkbox) => {
+    checkbox.checked = event.target.checked;
+    if (event.target.checked) state.selectedIssueIds.add(checkbox.dataset.selectIssueId);
+    else state.selectedIssueIds.delete(checkbox.dataset.selectIssueId);
+  });
+  renderIssueBulkBar();
+});
+$("#select-filtered-issues").addEventListener("click", () => { state.filtered.forEach((issue) => state.selectedIssueIds.add(issue.id)); render(); });
+$("#clear-issue-selection").addEventListener("click", () => { state.selectedIssueIds.clear(); render(); });
+$("#resolve-selected-issues").addEventListener("click", () => runIssueBulkAction("resolve_and_recheck"));
+$("#suppress-selected-issues").addEventListener("click", () => runIssueBulkAction("suppress_issue_type"));
+$("#toggle-suppressions").addEventListener("click", (event) => {
+  const show = $("#suppression-panel").classList.contains("hidden");
+  $("#suppression-panel").classList.toggle("hidden", !show);
+  event.currentTarget.setAttribute("aria-expanded", String(show));
+  event.currentTarget.textContent = show ? "Afgehandelde regels verbergen" : "Afgehandelde regels bekijken";
+});
+$("#suppression-rows").addEventListener("click", (event) => { const button = event.target.closest("[data-restore-suppression]"); if (button) restoreSuppression(button.dataset.restoreSuppression); });
+$("#suppression-rows").addEventListener("change", (event) => { const checkbox = event.target.closest("[data-select-suppression-id]"); if (!checkbox) return; if (checkbox.checked) state.selectedSuppressionIds.add(checkbox.dataset.selectSuppressionId); else state.selectedSuppressionIds.delete(checkbox.dataset.selectSuppressionId); renderSuppressions(); });
+$("#select-suppressions").addEventListener("change", (event) => { state.selectedSuppressionIds.clear(); if (event.target.checked) state.suppressions.forEach((suppression) => state.selectedSuppressionIds.add(suppression.id)); renderSuppressions(); });
+$("#select-all-suppressions").addEventListener("click", () => { state.suppressions.forEach((suppression) => state.selectedSuppressionIds.add(suppression.id)); renderSuppressions(); });
+$("#restore-selected-suppressions").addEventListener("click", restoreSelectedSuppressions);
 $("#issue-groups").addEventListener("click", (event) => { const button = event.target.closest("[data-group-type]"); if (button) { $("#type-filter").value = button.dataset.groupType; state.page = 1; render(); } });
 $("#report-periods").addEventListener("click", async (event) => { const button = event.target.closest("[data-report-period]"); if (!button) return; state.reportPeriod = button.dataset.reportPeriod; $("#report-periods").querySelectorAll("button").forEach((item) => item.classList.toggle("active", item === button)); state.clientReport = null; renderClientReport(); await loadClientReport(); });
 $("#report-archive").addEventListener("click", async (event) => {

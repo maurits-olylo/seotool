@@ -289,9 +289,10 @@ Acceptatie eerste versie:
 
 ### Bulk afhandelen en blijvend onthouden
 
-Backendstatus: gereed op 2026-07-18. De database, bulk-API, exacte onderdrukking in de issue-engine,
-auditregistratie, lijstweergave en individueel herstel zijn beschikbaar. Selectievakjes, acties op
-het huidige filter en bulkherstel in de interface volgen in het UX-deel van deze fase.
+Status: gereed op 2026-07-18. De database, bulk-API, exacte onderdrukking in de issue-engine,
+auditregistratie, selectievakjes, selectie op het huidige filter, zichtbare feedback, lijstweergave
+en individueel herstel zijn beschikbaar. Bulkherstel van meerdere afgehandelde regels tegelijk kan
+later worden toegevoegd wanneer de praktijk daar behoefte aan toont.
 
 - Issues selecteren via vinkjes, huidig filter, URL-groep of issuetype en gezamenlijk afhandelen.
 - Twee expliciete bulkacties bieden:

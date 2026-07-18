@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/ui/assets/app.css">
   <link rel="stylesheet" href="/ui/assets/responsive.css">
   <link rel="stylesheet" href="/ui/assets/dashboard.css">
-  <link rel="stylesheet" href="/ui/assets/actionable.css?v=20260717-1">
+  <link rel="stylesheet" href="/ui/assets/actionable.css?v=20260718-2">
   <link rel="stylesheet" href="/ui/assets/integrations.css">
   <link rel="stylesheet" href="/ui/assets/oauth.css">
   <link rel="stylesheet" href="/ui/assets/properties.css">
@@ -75,9 +75,16 @@
           <select id="status-filter" aria-label="Status"><option value="active">Alleen actief</option><option value="new">Nieuw</option><option value="review">Te beoordelen</option><option value="planned">Gepland</option><option value="in_progress">Bezig</option><option value="waiting_for_client">Wacht op klant</option><option value="all">Inclusief historie</option></select>
         </div>
         <div id="issue-groups" class="issue-groups"></div>
-        <div class="table-wrap"><table><thead><tr><th>Prioriteit</th><th>Issue en pagina</th><th>Impact 28 dagen</th><th>Status</th><th>Laatst gezien</th><th></th></tr></thead><tbody id="issues"></tbody></table></div>
+        <section id="issue-bulk-bar" class="issue-bulk-bar">
+          <div><strong id="issue-selection-count">0 geselecteerd</strong><button id="select-filtered-issues" class="text-button" type="button">Selecteer huidig filter</button><button id="clear-issue-selection" class="text-button" type="button">Wis selectie</button></div>
+          <label>Toelichting (optioneel)<input id="issue-bulk-comment" type="text" maxlength="2000" placeholder="Waarom handel je deze issues af?"></label>
+          <div class="issue-bulk-actions"><button id="resolve-selected-issues" class="detail-button" type="button" disabled>Opgelost; opnieuw controleren</button><button id="suppress-selected-issues" class="primary-button" type="button" disabled>Afgehandeld voor dit issuetype</button></div>
+          <p id="issue-bulk-message" class="issue-bulk-message" role="status"></p>
+        </section>
+        <div class="table-wrap"><table><thead><tr><th class="selection-cell"><input id="select-page-issues" type="checkbox" aria-label="Selecteer issues op deze pagina"></th><th>Prioriteit</th><th>Issue en pagina</th><th>Impact 28 dagen</th><th>Status</th><th>Laatst gezien</th><th></th></tr></thead><tbody id="issues"></tbody></table></div>
         <p id="empty" class="empty hidden">Geen issues gevonden.</p>
         <footer class="pager"><button id="previous-page" class="page-button">Vorige</button><span id="page-label"></span><button id="next-page" class="page-button">Volgende</button></footer>
+        <section class="suppression-section"><button id="toggle-suppressions" class="text-button" type="button" aria-expanded="false">Afgehandelde regels bekijken</button><div id="suppression-panel" class="hidden"><div class="suppression-tools"><strong id="suppression-selection-count">0 regels geselecteerd</strong><button id="select-all-suppressions" class="text-button" type="button">Selecteer alles</button><button id="restore-selected-suppressions" class="detail-button" type="button" disabled>Herstel geselecteerde regels</button></div><div class="table-wrap"><table><thead><tr><th class="selection-cell"><input id="select-suppressions" type="checkbox" aria-label="Selecteer alle afgehandelde regels"></th><th>Issue-type en URL</th><th>Afgehandeld door</th><th>Toelichting</th><th>Datum</th><th></th></tr></thead><tbody id="suppression-rows"></tbody></table></div><p id="suppression-empty" class="empty hidden">Geen blijvend afgehandelde regels.</p></div></section>
       </section>
       </section>
       <section id="insights-view" class="hidden">
@@ -171,6 +178,6 @@
     <dl><div><dt>Vergeleken meetmomenten</dt><dd id="change-detail-date"></dd></div><div><dt>Mogelijke relevantie</dt><dd id="change-detail-relevance"></dd></div><div><dt>Aanbevolen controle</dt><dd id="change-detail-action"></dd></div></dl>
     <div id="change-group-details"></div>
   </dialog>
-  <script src="/ui/assets/app.js?v=20260718-1" defer></script>
+  <script src="/ui/assets/app.js?v=20260718-2" defer></script>
 </body>
 </html>
