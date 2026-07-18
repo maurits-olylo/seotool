@@ -37,6 +37,7 @@ def test_issue_bulk_controls_and_client_logic_are_served(client: TestClient) -> 
     assert 'id="resolve-selected-issues"' in page.text
     assert 'id="suppress-selected-issues"' in page.text
     assert 'id="suppression-panel"' in page.text
+    assert 'id="issue-detail-loading"' in page.text
 
     script = client.get("/ui/assets/app.js")
     assert script.status_code == 200
@@ -44,6 +45,7 @@ def test_issue_bulk_controls_and_client_logic_are_served(client: TestClient) -> 
     assert 'runIssueBulkAction("suppress_issue_type")' in script.text
     assert "restoreSuppression" in script.text
     assert "restoreSelectedSuppressions" in script.text
+    assert "Details worden geladen…" in script.text
 
 
 def test_crud_client_and_website(client: TestClient) -> None:
@@ -593,7 +595,7 @@ def test_issue_detail_exposes_evidence_and_updates_status(client: TestClient) ->
     assert detail.status_code == 200
     assert detail.json()["evidence"] == {"status_code": 404}
     assert detail.json()["source_urls"] == []
-    assert detail.json()["guidance"]["likely_cause"]["basis"] == "fact"
+    assert detail.json()["guidance"]["likely_cause"] is None
     assert "volgende crawl" in detail.json()["guidance"]["verification"]
 
     updated = client.patch(f"/api/v1/issues/{issue_id}", json={"status": "planned"})

@@ -576,7 +576,11 @@ def get_issue(
         )
     return {
         **IssueRead.model_validate(issue).model_dump(),
-        "organic_impact": _organic_impacts(db, issue.website_id).get(issue.url_id),
+        "organic_impact": (
+            _organic_impacts(db, issue.website_id, issue.url_id).get(issue.url_id)
+            if issue.url_id
+            else None
+        ),
         "evidence": occurrence.evidence if occurrence else {},
         "source_urls": source_urls,
         "elements": _issue_elements(db, issue, occurrence),
@@ -591,17 +595,6 @@ def _issue_elements(
 ) -> list[dict[str, object]]:
     if occurrence is None:
         return []
-    locations = list(
-        db.scalars(
-            select(ElementLocation)
-            .where(ElementLocation.crawl_run_id == occurrence.crawl_run_id)
-            .order_by(
-                ElementLocation.source_url_id,
-                ElementLocation.element_type,
-                ElementLocation.occurrence_index,
-            )
-        )
-    )
     target_urls: set[str] = set()
     source_url_id = issue.url_id
     if issue.issue_type == "multiple_broken_internal_links":
@@ -621,6 +614,25 @@ def _issue_elements(
         if target:
             target_urls.add(_normalized_or_raw(target.normalized_url))
         source_url_id = None
+
+    location_query = select(ElementLocation).where(
+        ElementLocation.crawl_run_id == occurrence.crawl_run_id
+    )
+    if source_url_id is not None:
+        location_query = location_query.where(ElementLocation.source_url_id == source_url_id)
+    elif target_urls:
+        location_query = location_query.where(ElementLocation.target_url.in_(target_urls))
+    else:
+        return []
+    locations = list(
+        db.scalars(
+            location_query.order_by(
+                ElementLocation.source_url_id,
+                ElementLocation.element_type,
+                ElementLocation.occurrence_index,
+            ).limit(500)
+        )
+    )
 
     def matching(items: list[ElementLocation]) -> list[ElementLocation]:
         result: list[ElementLocation] = []
@@ -697,8 +709,23 @@ def _normalized_or_raw(value: str) -> str:
         return value
 
 
-def _organic_impacts(db: Session, website_id: UUID) -> dict[UUID, dict[str, object]]:
+def _organic_impacts(
+    db: Session, website_id: UUID, url_id: UUID | None = None
+) -> dict[UUID, dict[str, object]]:
     since = date.today() - timedelta(days=28)
+    search_conditions = [
+        SearchConsoleMetric.website_id == website_id,
+        SearchConsoleMetric.date >= since,
+        SearchConsoleMetric.url_id.is_not(None),
+    ]
+    analytics_conditions = [
+        GoogleAnalyticsMetric.website_id == website_id,
+        GoogleAnalyticsMetric.date >= since,
+        GoogleAnalyticsMetric.url_id.is_not(None),
+    ]
+    if url_id is not None:
+        search_conditions.append(SearchConsoleMetric.url_id == url_id)
+        analytics_conditions.append(GoogleAnalyticsMetric.url_id == url_id)
     rows = db.execute(
         select(
             SearchConsoleMetric.url_id,
@@ -706,11 +733,7 @@ def _organic_impacts(db: Session, website_id: UUID) -> dict[UUID, dict[str, obje
             func.sum(SearchConsoleMetric.impressions),
             func.avg(SearchConsoleMetric.position),
         )
-        .where(
-            SearchConsoleMetric.website_id == website_id,
-            SearchConsoleMetric.date >= since,
-            SearchConsoleMetric.url_id.is_not(None),
-        )
+        .where(*search_conditions)
         .group_by(SearchConsoleMetric.url_id)
     )
     result: dict[UUID, dict[str, object]] = {}
@@ -737,11 +760,7 @@ def _organic_impacts(db: Session, website_id: UUID) -> dict[UUID, dict[str, obje
             func.sum(GoogleAnalyticsMetric.active_users),
             func.sum(GoogleAnalyticsMetric.key_events),
         )
-        .where(
-            GoogleAnalyticsMetric.website_id == website_id,
-            GoogleAnalyticsMetric.date >= since,
-            GoogleAnalyticsMetric.url_id.is_not(None),
-        )
+        .where(*analytics_conditions)
         .group_by(GoogleAnalyticsMetric.url_id)
     )
     for url_id, sessions, active_users, key_events in analytics_rows:

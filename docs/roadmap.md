@@ -227,7 +227,9 @@ diagnosepatroon gegroepeerd. Verdere patroonherkenning, adviesverrijking en poli
 Status: eerste bewijsgebonden versie gereed op 2026-07-18. Ieder issuedetail levert een vaste
 structuur voor relevantie, waarschijnlijke oorzaak, alternatieve verklaring, concrete actie en
 verificatie. Feitelijke metingen, systeeminterpretaties en hypotheses worden zichtbaar van elkaar
-onderscheiden. Verdere issuetype-specifieke verdieping volgt samen met nieuwe diagnoses.
+onderscheiden. Productievalidatie liet zien dat generieke oorzaak- en hypotheseteksten geen waarde
+toevoegen; sinds de correctie worden deze secties alleen getoond wanneer opgeslagen diagnosebewijs
+bestaat. Verdere issuetype-specifieke verdieping volgt samen met nieuwe diagnoses.
 
 - Uitleggen waarom het probleem relevant is en welk SEO- of beheerrisico ontstaat.
 - Zo concreet mogelijk aangeven wat moet worden aangepast: bronpagina's, linkpatroon, template,
@@ -260,6 +262,11 @@ onderscheiden. Verdere issuetype-specifieke verdieping volgt samen met nieuwe di
 - Geen voorstel tonen wanneer broninhoud, zoekintentie of bewijs onvoldoende betrouwbaar is.
 
 ### UX/UI-polish
+
+Productiebevinding 2026-07-18: het issuedetail deed circa vijf seconden over een antwoord doordat
+elementbewijs en verkeersimpact voor de volledige crawl en website werden geladen. De detailquery
+is beperkt tot de gekozen URL en het betrokken doel, en de dialoog opent direct met laadstatus.
+Productiemeting na deployment bepaalt of verdere indexering of caching nodig is.
 
 - Issues presenteren als diagnosekaart met samenvatting, waarom, waarschijnlijk probleem,
   concrete stappen, bewijs en verificatie in een duidelijke volgorde.

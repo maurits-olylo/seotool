@@ -27,6 +27,23 @@ CATEGORY_RELEVANCE = {
     ),
 }
 
+TYPE_RELEVANCE = {
+    "duplicate_heading_text": (
+        "Herhaalde kopteksten kunnen de inhoudsstructuur onduidelijk maken. Herhaling in vaste "
+        "interfaceblokken kan bewust zijn en vraagt dan geen aanpassing."
+    ),
+    "job_posting_schema_missing": (
+        "Zonder JobPosting-schema kan Google deze vacature niet betrouwbaar als vacature herkennen."
+    ),
+    "multiple_broken_internal_links": (
+        "Meerdere dode links onderbreken dezelfde gebruikersroute en verspillen crawlverkeer."
+    ),
+    "patterned_404_urls": (
+        "Een terugkerend 404-patroon wijst op structurele URL-generatie en kan veel "
+        "ruis veroorzaken."
+    ),
+}
+
 VERIFICATION_BY_TYPE = {
     "http_404": (
         "De URL geeft na de volgende crawl de bedoelde 200-status of één relevante redirect."
@@ -54,49 +71,35 @@ VERIFICATION_BY_TYPE = {
     "orphan_page": (
         "De pagina heeft een bewuste interne route of is bewust buiten de navigatie gehouden."
     ),
-}
-
-OBSERVATION_BY_TYPE = {
-    "missing_title": (
-        "De laatste analyse heeft geen title voor deze indexeerbare pagina opgeslagen."
+    "duplicate_heading_text": (
+        "De volgende crawl vindt geen onbedoeld herhaalde koptekst meer; bewuste UI-herhaling is "
+        "als zodanig beoordeeld."
     ),
-    "missing_meta_description": (
-        "De laatste analyse heeft geen meta description voor deze pagina opgeslagen."
+    "job_posting_schema_missing": (
+        "De volgende crawl vindt geldig JobPosting-schema op de vacaturedetailpagina."
     ),
-    "missing_h1": "De laatste analyse heeft geen H1 voor deze pagina opgeslagen.",
-    "multiple_h1": "De laatste analyse heeft meerdere H1-koppen op deze pagina opgeslagen.",
-    "http_404": "De laatst opgeslagen HTTP-status voor deze URL is 404.",
-    "http_410": "De laatst opgeslagen HTTP-status voor deze URL is 410.",
-    "http_5xx": "De laatst opgeslagen HTTP-status is een serverfout.",
-    "invalid_json_ld": "Minstens één opgeslagen JSON-LD-blok kon niet worden gelezen.",
 }
 
 
 def build_issue_guidance(issue: Issue, evidence: dict[str, object]) -> dict[str, object]:
-    relevance = CATEGORY_RELEVANCE.get(
-        issue.category,
-        "Dit signaal wijkt af van de verwachte technische of inhoudelijke toestand.",
+    relevance = TYPE_RELEVANCE.get(
+        issue.issue_type,
+        CATEGORY_RELEVANCE.get(
+            issue.category,
+            "Dit signaal wijkt af van de verwachte technische of inhoudelijke toestand.",
+        ),
     )
     likely_cause = evidence.get("likely_cause")
     if isinstance(likely_cause, str) and likely_cause.strip():
         cause = GuidanceStatement(likely_cause.strip(), "interpretation")
     else:
-        observation = OBSERVATION_BY_TYPE.get(
-            issue.issue_type,
-            "De laatste controle bevestigt het signaal, maar stelt de onderliggende "
-            "oorzaak niet vast.",
-        )
-        cause = GuidanceStatement(observation, "fact")
+        cause = None
 
     alternative = evidence.get("alternative_explanation")
     alternative_statement = (
         GuidanceStatement(alternative.strip(), "hypothesis")
         if isinstance(alternative, str) and alternative.strip()
-        else GuidanceStatement(
-            "Er is nog geen alternatieve oorzaak bewezen; controleer de pagina of "
-            "configuratie vóór aanpassing.",
-            "hypothesis",
-        )
+        else None
     )
     verification = evidence.get("verification")
     verification_text = (
@@ -110,11 +113,12 @@ def build_issue_guidance(issue: Issue, evidence: dict[str, object]) -> dict[str,
     action = issue.recommended_action.strip()
     return {
         "relevance": {"text": relevance, "basis": "interpretation"},
-        "likely_cause": {"text": cause.text, "basis": cause.basis},
-        "alternative_explanation": {
-            "text": alternative_statement.text,
-            "basis": alternative_statement.basis,
-        },
+        "likely_cause": {"text": cause.text, "basis": cause.basis} if cause else None,
+        "alternative_explanation": (
+            {"text": alternative_statement.text, "basis": alternative_statement.basis}
+            if alternative_statement
+            else None
+        ),
         "steps": [action]
         if action
         else ["Beoordeel het opgeslagen bewijs en bepaal de passende wijziging."],

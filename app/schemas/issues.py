@@ -88,8 +88,8 @@ class GuidanceStatementRead(BaseModel):
 
 class IssueGuidanceRead(BaseModel):
     relevance: GuidanceStatementRead
-    likely_cause: GuidanceStatementRead
-    alternative_explanation: GuidanceStatementRead
+    likely_cause: GuidanceStatementRead | None
+    alternative_explanation: GuidanceStatementRead | None
     steps: list[str]
     verification: str
     confidence: str

@@ -39,7 +39,17 @@ def test_guidance_uses_stored_diagnosis_without_presenting_it_as_fact() -> None:
 def test_guidance_falls_back_to_observation_and_safe_verification() -> None:
     guidance = build_issue_guidance(_issue("missing_title"), {})
 
-    assert guidance["likely_cause"]["basis"] == "fact"  # type: ignore[index]
-    assert "geen title" in guidance["likely_cause"]["text"]  # type: ignore[index]
+    assert guidance["likely_cause"] is None
+    assert guidance["alternative_explanation"] is None
     assert guidance["steps"] == ["Pas het betreffende onderdeel aan."]
     assert "volgende crawl" in str(guidance["verification"])
+
+
+def test_guidance_adds_specific_value_for_job_schema_and_duplicate_headings() -> None:
+    job_guidance = build_issue_guidance(
+        _issue("job_posting_schema_missing", "structured_data"), {}
+    )
+    heading_guidance = build_issue_guidance(_issue("duplicate_heading_text"), {})
+
+    assert "Google" in job_guidance["relevance"]["text"]  # type: ignore[index]
+    assert "bewust" in heading_guidance["relevance"]["text"]  # type: ignore[index]

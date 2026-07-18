@@ -1323,9 +1323,29 @@ async function restoreSelectedSuppressions() {
 }
 
 async function showIssue(issueId) {
-  const issue = await api(`/api/v1/issues/${issueId}`);
-  if (!issue) return;
   state.selectedIssueId = issueId;
+  const summary = state.issues.find((item) => item.id === issueId);
+  $("#detail-title").textContent = summary?.title || "Issuedetail";
+  const summaryUrl = summary ? issueUrl(summary) : "";
+  $("#detail-url").textContent = summaryUrl || "Websitebreed issue";
+  if (summaryUrl) $("#detail-url").href = summaryUrl; else $("#detail-url").removeAttribute("href");
+  $("#detail-impact").classList.add("hidden");
+  $("#issue-detail-content").classList.add("hidden");
+  $("#issue-detail-loading").classList.remove("hidden");
+  $("#issue-detail-loading strong").textContent = "Details worden geladen…";
+  $("#issue-dialog").showModal();
+  let issue;
+  try {
+    issue = await api(`/api/v1/issues/${issueId}`);
+  } catch (error) {
+    $("#issue-detail-loading .loading-spinner").classList.add("hidden");
+    $("#issue-detail-loading strong").textContent = `Laden mislukt: ${error.message}`;
+    return;
+  }
+  if (!issue) return;
+  $("#issue-detail-loading .loading-spinner").classList.remove("hidden");
+  $("#issue-detail-loading").classList.add("hidden");
+  $("#issue-detail-content").classList.remove("hidden");
   $("#detail-title").textContent = issue.title;
   const url = issueUrl(issue); $("#detail-url").textContent = url || "Websitebreed issue";
   if (url) $("#detail-url").href = url; else $("#detail-url").removeAttribute("href");
@@ -1335,13 +1355,17 @@ async function showIssue(issueId) {
   $("#detail-description").textContent = issue.description;
   const guidance = issue.guidance;
   $("#detail-relevance").textContent = guidance.relevance.text;
-  $("#detail-cause").textContent = guidance.likely_cause.text;
-  $("#detail-alternative").textContent = guidance.alternative_explanation.text;
+  $("#detail-cause-section").classList.toggle("hidden", !guidance.likely_cause);
+  $("#detail-alternative-section").classList.toggle("hidden", !guidance.alternative_explanation);
+  $("#detail-cause").textContent = guidance.likely_cause?.text || "";
+  $("#detail-alternative").textContent = guidance.alternative_explanation?.text || "";
   $("#detail-steps").innerHTML = guidance.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("");
   $("#detail-verification").textContent = guidance.verification;
   const basisLabels = {fact: "Feitelijke meting", interpretation: "Systeeminterpretatie", hypothesis: "Hypothese"};
-  $("#detail-cause-basis").className = `basis-badge ${guidance.likely_cause.basis}`;
-  $("#detail-cause-basis").textContent = basisLabels[guidance.likely_cause.basis];
+  if (guidance.likely_cause) {
+    $("#detail-cause-basis").className = `basis-badge ${guidance.likely_cause.basis}`;
+    $("#detail-cause-basis").textContent = basisLabels[guidance.likely_cause.basis];
+  }
   const elementLabels = {a: "Link", button: "Knop", h1: "H1-kop", h2: "H2-kop", h3: "H3-kop", img: "Afbeelding"};
   $("#detail-element-locations").innerHTML = (issue.elements || []).map((element) => `<article class="element-location"><strong>${escapeHtml(elementLabels[element.element_type] || element.element_type)}${element.occurrence_index > 1 ? ` ${element.occurrence_index}` : ""}</strong>${element.visible_text ? `<p>${escapeHtml(element.visible_text)}</p>` : ""}${element.target_url ? `<p class="element-target">Doel: ${escapeHtml(element.target_url)}</p>` : ""}<div class="element-actions"><a class="detail-button" href="${escapeHtml(element.source_url)}" target="_blank" rel="noopener">Open bronpagina</a>${element.jump_url ? `<a class="detail-button location-button" href="${escapeHtml(element.jump_url)}" target="_blank" rel="noopener">Toon locatie</a>` : ""}</div><details><summary>Technisch fragment</summary><dl><div><dt>CSS-selector</dt><dd><code>${escapeHtml(element.css_selector || "Niet beschikbaar")}</code></dd></div><div><dt>XPath</dt><dd><code>${escapeHtml(element.xpath || "Niet beschikbaar")}</code></dd></div></dl><pre>${escapeHtml(element.html_fragment)}</pre>${element.text_prefix || element.text_suffix ? `<p>Context: ${escapeHtml(element.text_prefix || "")} <mark>${escapeHtml(element.visible_text || "element")}</mark> ${escapeHtml(element.text_suffix || "")}</p>` : ""}</details></article>`).join("");
   $("#element-locations-section").classList.toggle("hidden", !(issue.elements || []).length);
@@ -1369,7 +1393,6 @@ async function showIssue(issueId) {
   $("#detail-evidence").textContent = evidence.map(([key, value]) => `${key.replaceAll("_", " ")}: ${value}`).join("\n") || "Geen aanvullend bewijs opgeslagen.";
   $("#detail-sources").innerHTML = issue.source_urls.map((source) => `<li><a href="${escapeHtml(source)}" target="_blank" rel="noopener">${escapeHtml(source)}</a></li>`).join("");
   $("#source-section").classList.toggle("hidden", issue.source_urls.length === 0);
-  $("#issue-dialog").showModal();
 }
 
 async function saveIssueStatus() {

@@ -335,6 +335,11 @@ controle. De interface labelt feitelijke meting, systeeminterpretatie en hypothe
 Gevolg: adviezen blijven reproduceerbaar vanuit opgeslagen data en kunnen later door een modulaire
 AI-laag worden verrijkt zonder AI-conclusies met crawlerfeiten te vermengen.
 
+Productiecorrectie: oorzaak en alternatieve verklaring zijn optioneel. Zonder opgeslagen
+diagnosebewijs worden die secties niet gevuld met generieke tekst. Issuedetails laden bovendien
+uitsluitend elementlocaties en 28-daagse impact voor de gekozen URL of het gekozen linkdoel; nooit
+meer standaard voor de volledige crawl of website.
+
 ## 2026-07-16 — Interne-linkissues worden ook per bronpagina geclusterd
 
 Context: meerdere dode links op één artikel verschenen als afzonderlijke issues voor de defecte
