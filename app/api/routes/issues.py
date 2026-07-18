@@ -12,15 +12,25 @@ from app.models.common import utc_now
 from app.models.crawl import CrawlRun, ElementLocation, UrlLink, UrlSnapshot
 from app.models.discovery import Url
 from app.models.integrations import GoogleAnalyticsMetric, SearchConsoleMetric
-from app.models.issues import ActivityLog, Change, Issue, IssueComment, IssueOccurrence
+from app.models.issues import (
+    ActivityLog,
+    Change,
+    Issue,
+    IssueComment,
+    IssueOccurrence,
+    IssueSuppression,
+)
 from app.models.user import User
 from app.schemas.issues import (
     ChangeDetailRead,
     ChangeRead,
     CommentCreate,
     CommentRead,
+    IssueBulkAction,
+    IssueBulkResult,
     IssueDetailRead,
     IssueRead,
+    IssueSuppressionRead,
     IssueUpdate,
 )
 from app.services.authorization import require_website_access, require_write_access
@@ -37,6 +47,12 @@ ACTIVE_ISSUE_STATUSES = {
     "in_progress",
     "waiting_for_client",
 }
+
+
+def _actor_name(db: Session, principal: Principal) -> str:
+    actor = db.get(User, principal.user_id) if principal.user_id else None
+    return actor.email if actor else "API"
+
 
 CHANGE_CONTEXT = {
     "status_code_changed": (
@@ -312,8 +328,7 @@ def list_issues(
         issue
         for issue in issues
         if not (
-            issue.issue_type in GROUPABLE_404_ISSUE_TYPES
-            and issue.url_id in grouped_404_url_ids
+            issue.issue_type in GROUPABLE_404_ISSUE_TYPES and issue.url_id in grouped_404_url_ids
         )
     ]
     impacts = _organic_impacts(db, website_id)
@@ -324,6 +339,166 @@ def list_issues(
         }
         for issue in issues
     ]
+
+
+@router.post(
+    "/websites/{website_id}/issues/bulk",
+    response_model=IssueBulkResult,
+)
+def bulk_update_issues(
+    website_id: UUID,
+    payload: IssueBulkAction,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> IssueBulkResult:
+    require_write_access(principal)
+    require_website_access(db, principal, website_id)
+    issue_ids = list(dict.fromkeys(payload.issue_ids))
+    issues = list(
+        db.scalars(select(Issue).where(Issue.website_id == website_id, Issue.id.in_(issue_ids)))
+    )
+    found_ids = {issue.id for issue in issues}
+    missing_ids = [str(issue_id) for issue_id in issue_ids if issue_id not in found_ids]
+    if missing_ids:
+        raise HTTPException(
+            status_code=404,
+            detail={"message": "Een of meer issues zijn niet gevonden.", "issue_ids": missing_ids},
+        )
+    if payload.action == "suppress_issue_type" and any(issue.url_id is None for issue in issues):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Alleen issues die aan een URL zijn gekoppeld kunnen blijvend worden afgehandeld."
+            ),
+        )
+
+    now = utc_now()
+    actor = _actor_name(db, principal)
+    suppression_count = 0
+    for issue in issues:
+        previous_status = issue.status
+        if payload.action == "resolve_and_recheck":
+            issue.status = "resolved"
+            issue.resolved_at = now
+            issue.verified_at = None
+        else:
+            suppression = db.scalar(
+                select(IssueSuppression).where(
+                    IssueSuppression.website_id == website_id,
+                    IssueSuppression.url_id == issue.url_id,
+                    IssueSuppression.issue_type == issue.issue_type,
+                )
+            )
+            if suppression is None:
+                suppression = IssueSuppression(
+                    website_id=website_id,
+                    url_id=issue.url_id,
+                    issue_type=issue.issue_type,
+                    actor=actor,
+                    comment=payload.comment,
+                )
+                db.add(suppression)
+            else:
+                suppression.actor = actor
+                suppression.comment = payload.comment
+                suppression.is_active = True
+                suppression.updated_at = now
+                suppression.restored_at = None
+                suppression.restored_by = None
+            issue.status = "ignored"
+            issue.resolved_at = now
+            issue.verified_at = None
+            suppression_count += 1
+        if payload.comment:
+            db.add(IssueComment(issue_id=issue.id, author=actor, comment=payload.comment))
+        db.add(
+            ActivityLog(
+                website_id=website_id,
+                actor=actor,
+                activity_type="issue_bulk_action",
+                summary=f"{issue.title}: {previous_status} → {issue.status}",
+                details={
+                    "issue_id": str(issue.id),
+                    "action": payload.action,
+                    "from": previous_status,
+                    "to": issue.status,
+                    "comment": payload.comment,
+                },
+            )
+        )
+    db.commit()
+    return IssueBulkResult(
+        action=payload.action,
+        updated_count=len(issues),
+        suppression_count=suppression_count,
+    )
+
+
+@router.get(
+    "/websites/{website_id}/issue-suppressions",
+    response_model=list[IssueSuppressionRead],
+)
+def list_issue_suppressions(
+    website_id: UUID,
+    active_only: bool = True,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> list[IssueSuppression]:
+    require_website_access(db, principal, website_id)
+    query = select(IssueSuppression).where(IssueSuppression.website_id == website_id)
+    if active_only:
+        query = query.where(IssueSuppression.is_active.is_(True))
+    return list(db.scalars(query.order_by(IssueSuppression.updated_at.desc())))
+
+
+@router.post(
+    "/websites/{website_id}/issue-suppressions/{suppression_id}/restore",
+    response_model=IssueSuppressionRead,
+)
+def restore_issue_suppression(
+    website_id: UUID,
+    suppression_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> IssueSuppression:
+    require_write_access(principal)
+    require_website_access(db, principal, website_id)
+    suppression = db.get(IssueSuppression, suppression_id)
+    if suppression is None or suppression.website_id != website_id:
+        raise HTTPException(status_code=404, detail="Onderdrukkingsregel niet gevonden.")
+    now = utc_now()
+    actor = _actor_name(db, principal)
+    suppression.is_active = False
+    suppression.updated_at = now
+    suppression.restored_at = now
+    suppression.restored_by = actor
+    issue = db.scalar(
+        select(Issue).where(
+            Issue.website_id == website_id,
+            Issue.url_id == suppression.url_id,
+            Issue.issue_type == suppression.issue_type,
+        )
+    )
+    if issue is not None and issue.status == "ignored":
+        issue.status = "new"
+        issue.resolved_at = None
+        issue.verified_at = None
+    db.add(
+        ActivityLog(
+            website_id=website_id,
+            actor=actor,
+            activity_type="issue_suppression_restored",
+            summary=f"Onderdrukking voor {suppression.issue_type} hersteld.",
+            details={
+                "suppression_id": str(suppression.id),
+                "url_id": str(suppression.url_id),
+                "issue_type": suppression.issue_type,
+            },
+        )
+    )
+    db.commit()
+    db.refresh(suppression)
+    return suppression
 
 
 def _grouped_404_url_ids(db: Session, website_id: UUID) -> set[UUID]:
@@ -431,11 +606,15 @@ def _issue_elements(
         for item in occurrence.evidence.get("broken_links", []):
             if isinstance(item, dict) and isinstance(item.get("target_url"), str):
                 target_urls.add(_normalized_or_raw(item["target_url"]))
-    elif issue.issue_type in {
-        "internally_linked_404",
-        "internally_linked_redirect",
-        "broken_image",
-    } and issue.url_id:
+    elif (
+        issue.issue_type
+        in {
+            "internally_linked_404",
+            "internally_linked_redirect",
+            "broken_image",
+        }
+        and issue.url_id
+    ):
         target = db.get(Url, issue.url_id)
         if target:
             target_urls.add(_normalized_or_raw(target.normalized_url))
@@ -612,11 +791,10 @@ def update_issue(
         elif payload.status in ACTIVE_ISSUE_STATUSES:
             issue.resolved_at = None
             issue.verified_at = None
-        actor = db.get(User, principal.user_id) if principal.user_id else None
         db.add(
             ActivityLog(
                 website_id=issue.website_id,
-                actor=actor.email if actor else "API",
+                actor=_actor_name(db, principal),
                 activity_type="issue_status_changed",
                 summary=f"{issue.title}: {previous_status} → {payload.status}",
                 details={"issue_id": str(issue.id), "from": previous_status, "to": payload.status},

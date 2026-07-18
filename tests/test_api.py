@@ -19,7 +19,7 @@ from app.models.integrations import (
     SearchConsoleMetric,
     WebsiteIntegration,
 )
-from app.models.issues import Issue, IssueOccurrence
+from app.models.issues import ActivityLog, Issue, IssueOccurrence, IssueSuppression
 from app.models.reporting import MonthlyReportSnapshot
 from app.models.user import ClientMembership, User
 
@@ -589,6 +589,84 @@ def test_issue_detail_exposes_evidence_and_updates_status(client: TestClient) ->
     history = client.get(f"/api/v1/websites/{website_id}/issues?status=all").json()
     assert len(history) == 1
     assert history[0]["status"] == "resolved"
+
+
+def test_bulk_issue_actions_suppress_restore_and_audit(client: TestClient) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Bulk issues"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={"client_id": customer["id"], "name": "Bulk site", "base_url": "https://example.com"},
+    ).json()
+    website_id = UUID(website["id"])
+    with SessionLocal() as db:
+        url = Url(website_id=website_id, normalized_url="https://example.com/page")
+        db.add(url)
+        db.flush()
+        first = Issue(
+            website_id=website_id,
+            url_id=url.id,
+            issue_type="missing_title",
+            category="onpage",
+            severity="medium",
+            title="Title ontbreekt",
+            description="Test",
+            recommended_action="Herstel",
+        )
+        second = Issue(
+            website_id=website_id,
+            url_id=url.id,
+            issue_type="missing_description",
+            category="onpage",
+            severity="low",
+            title="Beschrijving ontbreekt",
+            description="Test",
+            recommended_action="Herstel",
+        )
+        db.add_all([first, second])
+        db.commit()
+        first_id, second_id = first.id, second.id
+
+    response = client.post(
+        f"/api/v1/websites/{website_id}/issues/bulk",
+        json={
+            "issue_ids": [str(first_id)],
+            "action": "suppress_issue_type",
+            "comment": "Bewuste uitzondering",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json() == {
+        "action": "suppress_issue_type",
+        "updated_count": 1,
+        "suppression_count": 1,
+    }
+    resolved = client.post(
+        f"/api/v1/websites/{website_id}/issues/bulk",
+        json={"issue_ids": [str(second_id)], "action": "resolve_and_recheck"},
+    )
+    assert resolved.status_code == 200
+
+    suppressions = client.get(f"/api/v1/websites/{website_id}/issue-suppressions").json()
+    assert len(suppressions) == 1
+    assert suppressions[0]["issue_type"] == "missing_title"
+    suppression_id = suppressions[0]["id"]
+
+    restored = client.post(
+        f"/api/v1/websites/{website_id}/issue-suppressions/{suppression_id}/restore"
+    )
+    assert restored.status_code == 200
+    assert restored.json()["is_active"] is False
+    assert client.get(f"/api/v1/websites/{website_id}/issue-suppressions").json() == []
+    with SessionLocal() as db:
+        assert db.get(Issue, first_id).status == "new"
+        assert db.get(Issue, second_id).status == "resolved"
+        suppression = db.get(IssueSuppression, UUID(suppression_id))
+        assert suppression and suppression.restored_at is not None
+        activities = list(
+            db.scalars(select(ActivityLog).where(ActivityLog.website_id == website_id))
+        )
+        assert [item.activity_type for item in activities].count("issue_bulk_action") == 2
+        assert any(item.activity_type == "issue_suppression_restored" for item in activities)
 
 
 def test_issue_detail_returns_live_element_location(client: TestClient) -> None:

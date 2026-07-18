@@ -17,7 +17,14 @@ from app.models.integrations import (
     SearchConsoleQueryMetric,
     WebsiteIntegration,
 )
-from app.models.issues import ActivityLog, Change, Issue, IssueComment, IssueOccurrence
+from app.models.issues import (
+    ActivityLog,
+    Change,
+    Issue,
+    IssueComment,
+    IssueOccurrence,
+    IssueSuppression,
+)
 from app.models.jobs import JobListing
 from app.models.reporting import MonthlyReportSnapshot
 from app.models.system import CrawlDeploymentControl
@@ -37,6 +44,7 @@ __all__ = [
     "Issue",
     "IssueComment",
     "IssueOccurrence",
+    "IssueSuppression",
     "JobListing",
     "MonthlyReportSnapshot",
     "IntegrationConnection",

@@ -314,6 +314,10 @@ moment en toelichting. De issue-engine onderdrukt daarna alleen exact die combin
 issuetypen op dezelfde URL en hetzelfde type op nieuwe URL's blijven nieuwe signalen opleveren.
 Iedere onderdrukking blijft zichtbaar, controleerbaar en omkeerbaar.
 
+Implementatie: `issue_suppressions` bewaart de exacte scope en herstelstatus. De bulk-API maakt
+onderscheid tussen `resolve_and_recheck` en `suppress_issue_type`; herstel activeert het bestaande
+issue opnieuw voor beoordeling. Iedere actie wordt daarnaast in `activity_log` vastgelegd.
+
 Gevolg: bulkacties besparen terugkerend handwerk zonder nieuwe problemen breed of onzichtbaar weg
 te filteren. `Fixed` en `ignored` krijgen een voorspelbare, auditbare betekenis.
 

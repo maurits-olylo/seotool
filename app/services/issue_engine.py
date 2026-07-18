@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.common import utc_now
-from app.models.issues import Issue, IssueOccurrence
+from app.models.issues import Issue, IssueOccurrence, IssueSuppression
 from app.services.technical_checks import IssueSignal
 
 REOPENABLE_STATUSES = {"resolved", "verified", "ignored", "accepted_risk"}
@@ -22,6 +22,20 @@ def reconcile_issues(
 ) -> list[Issue]:
     now = utc_now()
     signal_map = {signal.issue_type: signal for signal in signals}
+    suppressed_types = set(
+        db.scalars(
+            select(IssueSuppression.issue_type).where(
+                IssueSuppression.website_id == website_id,
+                IssueSuppression.url_id == url_id,
+                IssueSuppression.is_active.is_(True),
+            )
+        )
+    )
+    signal_map = {
+        issue_type: signal
+        for issue_type, signal in signal_map.items()
+        if issue_type not in suppressed_types
+    }
     existing = list(
         db.scalars(select(Issue).where(Issue.website_id == website_id, Issue.url_id == url_id))
     )
@@ -74,7 +88,11 @@ def reconcile_issues(
         touched.append(issue)
 
     for issue in existing:
-        if issue.issue_type not in checked_issue_types or issue.issue_type in signal_map:
+        if (
+            issue.issue_type in suppressed_types
+            or issue.issue_type not in checked_issue_types
+            or issue.issue_type in signal_map
+        ):
             continue
         if issue.status == "resolved":
             issue.status = "verified"

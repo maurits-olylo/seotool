@@ -2,7 +2,7 @@ from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.schemas.common import ORMModel
 
@@ -91,6 +91,32 @@ class IssueUpdate(BaseModel):
     status: IssueStatus | None = None
     assigned_to: str | None = None
     due_date: date | None = None
+
+
+class IssueBulkAction(BaseModel):
+    issue_ids: list[UUID] = Field(min_length=1, max_length=1000)
+    action: Literal["resolve_and_recheck", "suppress_issue_type"]
+    comment: str | None = Field(default=None, max_length=2000)
+
+
+class IssueBulkResult(BaseModel):
+    action: str
+    updated_count: int
+    suppression_count: int = 0
+
+
+class IssueSuppressionRead(ORMModel):
+    id: UUID
+    website_id: UUID
+    url_id: UUID
+    issue_type: str
+    actor: str | None
+    comment: str | None
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    restored_at: datetime | None
+    restored_by: str | None
 
 
 class CommentCreate(BaseModel):

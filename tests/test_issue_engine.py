@@ -4,7 +4,7 @@ from app.db.session import SessionLocal
 from app.models.client import Client
 from app.models.crawl import CrawlRun, UrlSnapshot
 from app.models.discovery import CrawlJob, Url
-from app.models.issues import Issue, IssueOccurrence
+from app.models.issues import Issue, IssueOccurrence, IssueSuppression
 from app.models.website import Website, WebsiteSettings
 from app.services.issue_engine import reconcile_issues, verify_resolved_issues
 from app.services.technical_checks import IssueSignal
@@ -120,6 +120,76 @@ def test_second_clean_check_verifies_resolved_issue() -> None:
         )
         assert issue.status == "verified"
         assert issue.verified_at is not None
+
+
+def test_active_suppression_prevents_exact_issue_from_reopening() -> None:
+    with SessionLocal() as db:
+        client = Client(name="Suppression client")
+        website = Website(client=client, name="Suppression site", base_url="https://example.com")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        url = Url(website_id=website.id, normalized_url="https://example.com/page")
+        other_url = Url(website_id=website.id, normalized_url="https://example.com/other")
+        db.add_all([url, other_url])
+        db.flush()
+        suppressed_issue = Issue(
+            website_id=website.id,
+            url_id=url.id,
+            issue_type="missing_title",
+            category="onpage",
+            severity="medium",
+            status="ignored",
+            title="Title ontbreekt",
+            description="Test",
+            recommended_action="Herstel",
+        )
+        db.add_all(
+            [
+                suppressed_issue,
+                IssueSuppression(
+                    website_id=website.id,
+                    url_id=url.id,
+                    issue_type="missing_title",
+                    actor="tester@example.com",
+                ),
+            ]
+        )
+        db.flush()
+        signal = IssueSignal(
+            "missing_title", "onpage", "medium", "Title ontbreekt", "Test", "Herstel", {}
+        )
+
+        run, snapshot = _run(db, website.id, url.id)
+        touched = reconcile_issues(
+            db,
+            website_id=website.id,
+            url_id=url.id,
+            crawl_run_id=run.id,
+            snapshot_id=snapshot.id,
+            signals=[signal],
+            checked_issue_types={"missing_title"},
+        )
+        assert touched == []
+        assert suppressed_issue.status == "ignored"
+        assert not list(
+            db.scalars(
+                select(IssueOccurrence).where(IssueOccurrence.issue_id == suppressed_issue.id)
+            )
+        )
+
+        other_run, other_snapshot = _run(db, website.id, other_url.id)
+        touched = reconcile_issues(
+            db,
+            website_id=website.id,
+            url_id=other_url.id,
+            crawl_run_id=other_run.id,
+            snapshot_id=other_snapshot.id,
+            signals=[signal],
+            checked_issue_types={"missing_title"},
+        )
+        assert len(touched) == 1
+        assert touched[0].status == "new"
 
 
 def _run(db, website_id, url_id):  # type: ignore[no-untyped-def]
