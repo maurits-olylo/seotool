@@ -35,6 +35,7 @@ from app.schemas.issues import (
 )
 from app.services.authorization import require_website_access, require_write_access
 from app.services.element_jumps import build_live_jump_url
+from app.services.issue_guidance import build_issue_guidance
 from app.services.url_normalization import InvalidUrlError, normalize_url
 
 router = APIRouter(tags=["issues"])
@@ -579,6 +580,7 @@ def get_issue(
         "evidence": occurrence.evidence if occurrence else {},
         "source_urls": source_urls,
         "elements": _issue_elements(db, issue, occurrence),
+        "guidance": build_issue_guidance(issue, occurrence.evidence if occurrence else {}),
     }
 
 

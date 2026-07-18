@@ -321,6 +321,20 @@ issue opnieuw voor beoordeling. Iedere actie wordt daarnaast in `activity_log` v
 Gevolg: bulkacties besparen terugkerend handwerk zonder nieuwe problemen breed of onzichtbaar weg
 te filteren. `Fixed` en `ignored` krijgen een voorspelbare, auditbare betekenis.
 
+## 2026-07-18 — Handelingsadvies blijft bewijsgebonden en verklaart onzekerheid
+
+Context: een aanbeveling is pas bruikbaar wanneer duidelijk is wat gemeten is, wat het systeem
+daaruit afleidt en wat nog slechts een mogelijke verklaring is. Een generieke oorzaaktekst kan
+anders meer zekerheid suggereren dan de crawl werkelijk levert.
+
+Besluit: issuedetails krijgen centraal opgebouwde guidance met relevantie, waarschijnlijke oorzaak,
+alternatieve verklaring, concrete stap en verificatie. Opgeslagen diagnosevelden hebben voorrang.
+Ontbreekt oorzaakbewijs, dan beschrijft de tool alleen de waarneming en vraagt om menselijke
+controle. De interface labelt feitelijke meting, systeeminterpretatie en hypothese afzonderlijk.
+
+Gevolg: adviezen blijven reproduceerbaar vanuit opgeslagen data en kunnen later door een modulaire
+AI-laag worden verrijkt zonder AI-conclusies met crawlerfeiten te vermengen.
+
 ## 2026-07-16 — Interne-linkissues worden ook per bronpagina geclusterd
 
 Context: meerdere dode links op één artikel verschenen als afzonderlijke issues voor de defecte

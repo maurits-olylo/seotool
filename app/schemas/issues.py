@@ -81,10 +81,25 @@ class ElementLocationRead(BaseModel):
     jump_url: str | None
 
 
+class GuidanceStatementRead(BaseModel):
+    text: str
+    basis: Literal["fact", "interpretation", "hypothesis"]
+
+
+class IssueGuidanceRead(BaseModel):
+    relevance: GuidanceStatementRead
+    likely_cause: GuidanceStatementRead
+    alternative_explanation: GuidanceStatementRead
+    steps: list[str]
+    verification: str
+    confidence: str
+
+
 class IssueDetailRead(IssueRead):
     evidence: dict[str, object]
     source_urls: list[str]
     elements: list[ElementLocationRead]
+    guidance: IssueGuidanceRead
 
 
 class IssueUpdate(BaseModel):

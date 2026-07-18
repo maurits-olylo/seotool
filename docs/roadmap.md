@@ -224,6 +224,11 @@ diagnosepatroon gegroepeerd. Verdere patroonherkenning, adviesverrijking en poli
 
 ### Van diagnose naar exact handelingsadvies
 
+Status: eerste bewijsgebonden versie gereed op 2026-07-18. Ieder issuedetail levert een vaste
+structuur voor relevantie, waarschijnlijke oorzaak, alternatieve verklaring, concrete actie en
+verificatie. Feitelijke metingen, systeeminterpretaties en hypotheses worden zichtbaar van elkaar
+onderscheiden. Verdere issuetype-specifieke verdieping volgt samen met nieuwe diagnoses.
+
 - Uitleggen waarom het probleem relevant is en welk SEO- of beheerrisico ontstaat.
 - Zo concreet mogelijk aangeven wat moet worden aangepast: bronpagina's, linkpatroon, template,
   canonical, redirect, robotsregel, sitemap of contentonderdeel.

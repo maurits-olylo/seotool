@@ -1333,7 +1333,15 @@ async function showIssue(issueId) {
   $("#detail-status").value = issue.status;
   $("#client-status-label").textContent = labels[issue.status] || issue.status;
   $("#detail-description").textContent = issue.description;
-  $("#detail-action").textContent = issue.recommended_action;
+  const guidance = issue.guidance;
+  $("#detail-relevance").textContent = guidance.relevance.text;
+  $("#detail-cause").textContent = guidance.likely_cause.text;
+  $("#detail-alternative").textContent = guidance.alternative_explanation.text;
+  $("#detail-steps").innerHTML = guidance.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("");
+  $("#detail-verification").textContent = guidance.verification;
+  const basisLabels = {fact: "Feitelijke meting", interpretation: "Systeeminterpretatie", hypothesis: "Hypothese"};
+  $("#detail-cause-basis").className = `basis-badge ${guidance.likely_cause.basis}`;
+  $("#detail-cause-basis").textContent = basisLabels[guidance.likely_cause.basis];
   const elementLabels = {a: "Link", button: "Knop", h1: "H1-kop", h2: "H2-kop", h3: "H3-kop", img: "Afbeelding"};
   $("#detail-element-locations").innerHTML = (issue.elements || []).map((element) => `<article class="element-location"><strong>${escapeHtml(elementLabels[element.element_type] || element.element_type)}${element.occurrence_index > 1 ? ` ${element.occurrence_index}` : ""}</strong>${element.visible_text ? `<p>${escapeHtml(element.visible_text)}</p>` : ""}${element.target_url ? `<p class="element-target">Doel: ${escapeHtml(element.target_url)}</p>` : ""}<div class="element-actions"><a class="detail-button" href="${escapeHtml(element.source_url)}" target="_blank" rel="noopener">Open bronpagina</a>${element.jump_url ? `<a class="detail-button location-button" href="${escapeHtml(element.jump_url)}" target="_blank" rel="noopener">Toon locatie</a>` : ""}</div><details><summary>Technisch fragment</summary><dl><div><dt>CSS-selector</dt><dd><code>${escapeHtml(element.css_selector || "Niet beschikbaar")}</code></dd></div><div><dt>XPath</dt><dd><code>${escapeHtml(element.xpath || "Niet beschikbaar")}</code></dd></div></dl><pre>${escapeHtml(element.html_fragment)}</pre>${element.text_prefix || element.text_suffix ? `<p>Context: ${escapeHtml(element.text_prefix || "")} <mark>${escapeHtml(element.visible_text || "element")}</mark> ${escapeHtml(element.text_suffix || "")}</p>` : ""}</details></article>`).join("");
   $("#element-locations-section").classList.toggle("hidden", !(issue.elements || []).length);

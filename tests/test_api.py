@@ -593,6 +593,8 @@ def test_issue_detail_exposes_evidence_and_updates_status(client: TestClient) ->
     assert detail.status_code == 200
     assert detail.json()["evidence"] == {"status_code": 404}
     assert detail.json()["source_urls"] == []
+    assert detail.json()["guidance"]["likely_cause"]["basis"] == "fact"
+    assert "volgende crawl" in detail.json()["guidance"]["verification"]
 
     updated = client.patch(f"/api/v1/issues/{issue_id}", json={"status": "planned"})
     assert updated.status_code == 200
