@@ -110,3 +110,34 @@ def test_repairs_quote_only_anchor_from_real_bing_export() -> None:
         anchor = db.scalar(select(BingReferringAnchor))
         assert result["anchors"] == 1
         assert anchor and anchor.anchor_text == '"' and anchor.backlink_count == 1
+
+
+def test_repairs_quote_only_anchor_in_referring_pages_export() -> None:
+    domains = '"Domain","Backlinks Count"\n"https://ref.example","1"\n'
+    pages = (
+        '"Source Url","Anchor text","Target Url"\n'
+        '"https://ref.example/a",""","https://example.com/"\n'
+    )
+    anchors = '"Anchor","Backlinks Count"\n"Example","1"\n'
+    with SessionLocal() as db:
+        client = Client(name="Bing malformed pages client")
+        website = Website(
+            client=client,
+            name="Bing malformed pages site",
+            base_url="https://example.com/",
+        )
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.commit()
+
+        result = import_bing_backlink_exports(
+            db,
+            website_id=website.id,
+            domains_csv=domains,
+            pages_csv=pages,
+            anchors_csv=anchors,
+        )
+
+        link = db.scalar(select(BingInboundLink))
+        assert result["pages"] == 1
+        assert link and link.anchor_text == '"'

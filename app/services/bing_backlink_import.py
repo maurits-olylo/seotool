@@ -1,5 +1,4 @@
 import csv
-import re
 from datetime import UTC, datetime
 from hashlib import sha256
 from io import StringIO
@@ -196,10 +195,17 @@ def _read_rows(content: str, headers: tuple[str, ...], maximum: int) -> list[dic
 
 
 def _repair_bing_csv(content: str) -> str:
-    """Repair Bing's invalid encoding for an anchor consisting of one quote."""
-    return "\n".join(
-        re.sub(r'^""","([0-9]+)"$', r'"""","\1"', line) for line in content.splitlines()
-    )
+    """Repair Bing's invalid encoding for a field consisting of one quote."""
+
+    def repair_line(line: str) -> str:
+        if line.startswith('""",'):
+            line = '""""' + line[3:]
+        line = line.replace(',""",', ',"""",')
+        if line.endswith(',"""'):
+            line += '"'
+        return line
+
+    return "\n".join(repair_line(line) for line in content.splitlines())
 
 
 def _positive_count(value: str | None, field: str) -> int:
