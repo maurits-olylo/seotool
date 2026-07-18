@@ -141,3 +141,40 @@ def test_repairs_quote_only_anchor_in_referring_pages_export() -> None:
         link = db.scalar(select(BingInboundLink))
         assert result["pages"] == 1
         assert link and link.anchor_text == '"'
+
+
+def test_matches_bing_root_host_to_registered_www_url() -> None:
+    domains = '"Domain","Backlinks Count"\n"https://ref.example","1"\n'
+    pages = (
+        '"Source Url","Anchor text","Target Url"\n'
+        '"https://ref.example/a","Example","https://example.com/page"\n'
+    )
+    anchors = '"Anchor","Backlinks Count"\n"Example","1"\n'
+    with SessionLocal() as db:
+        client = Client(name="Bing www client")
+        website = Website(
+            client=client,
+            name="Bing www site",
+            base_url="https://www.example.com/",
+        )
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        registered = Url(
+            website_id=website.id,
+            normalized_url="https://www.example.com/page",
+        )
+        db.add(registered)
+        db.commit()
+
+        result = import_bing_backlink_exports(
+            db,
+            website_id=website.id,
+            domains_csv=domains,
+            pages_csv=pages,
+            anchors_csv=anchors,
+        )
+
+        target = db.scalar(select(BingLinkTarget))
+        assert result["matched_targets"] == 1
+        assert target and target.url_id == registered.id

@@ -15,7 +15,9 @@ from app.models.integrations import (
     BingReferringDomain,
     WebsiteIntegration,
 )
-from app.services.url_normalization import InvalidUrlError, normalize_url
+from app.models.website import Website
+from app.services.url_matching import find_equivalent_website_url_id
+from app.services.url_normalization import InvalidUrlError
 
 
 class InvalidBingBacklinkExport(ValueError):
@@ -34,6 +36,9 @@ def import_bing_backlink_exports(
     pages = _read_rows(pages_csv, ("Source Url", "Anchor text", "Target Url"), 100_000)
     anchors = _read_rows(anchors_csv, ("Anchor", "Backlinks Count"), 50_000)
     observed_at = datetime.now(UTC)
+    website = db.get(Website, website_id)
+    if website is None:
+        raise InvalidBingBacklinkExport("Website bestaat niet")
 
     db.execute(
         update(BingReferringDomain)
@@ -144,7 +149,9 @@ def import_bing_backlink_exports(
             )
             db.add(record)
         try:
-            record.url_id = url_map.get(normalize_url(target_url))
+            record.url_id = find_equivalent_website_url_id(
+                url_map, target_url, base_url=website.base_url
+            )
         except InvalidUrlError:
             record.url_id = None
         matched_targets += int(record.url_id is not None)

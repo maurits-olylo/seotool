@@ -17,8 +17,10 @@ from app.models.integrations import (
     IntegrationConnection,
     WebsiteIntegration,
 )
+from app.models.website import Website
 from app.services.oauth import decrypt_token, encrypt_token
-from app.services.url_normalization import InvalidUrlError, normalize_url
+from app.services.url_matching import find_equivalent_website_url_id
+from app.services.url_normalization import InvalidUrlError
 
 BING_TOKEN_URL = "https://www.bing.com/webmasters/oauth/token"
 BING_API_ROOT = "https://www.bing.com/webmaster/api.svc/json"
@@ -137,6 +139,9 @@ async def sync_bing_webmaster(
         item.normalized_url: item.id
         for item in db.scalars(select(Url).where(Url.website_id == website_id))
     }
+    website = db.get(Website, website_id)
+    if website is None:
+        raise ValueError("Website does not exist")
     db.execute(
         delete(BingPageMetric).where(
             BingPageMetric.website_id == website_id,
@@ -157,7 +162,7 @@ async def sync_bing_webmaster(
         if not metric_date or metric_date < start_date or not page_url:
             continue
         try:
-            url_id = url_map.get(normalize_url(page_url))
+            url_id = find_equivalent_website_url_id(url_map, page_url, base_url=website.base_url)
         except InvalidUrlError:
             url_id = None
         matched += int(url_id is not None)
@@ -178,6 +183,7 @@ async def sync_bing_webmaster(
         link_counts,
         link_details,
         covered_targets,
+        base_url=website.base_url,
         counts_complete=bool(link_counts) and not counts_truncated,
         observed_at=now,
     )
@@ -312,6 +318,7 @@ def _store_bing_links(
     details: list[dict[str, object]],
     covered_targets: set[str],
     *,
+    base_url: str,
     counts_complete: bool,
     observed_at: datetime,
 ) -> dict[str, int]:
@@ -349,7 +356,7 @@ def _store_bing_links(
             )
             db.add(record)
         try:
-            record.url_id = url_map.get(normalize_url(target_url))
+            record.url_id = find_equivalent_website_url_id(url_map, target_url, base_url=base_url)
         except InvalidUrlError:
             record.url_id = None
         record.inbound_link_count = int(item.get("Count") or 0)
