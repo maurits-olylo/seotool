@@ -18,6 +18,22 @@ def test_detects_404() -> None:
     assert [signal.issue_type for signal in inspect_snapshot(snapshot)] == ["http_404"]
 
 
+def test_long_redirect_chain_is_a_low_priority_review() -> None:
+    snapshot = UrlSnapshot(
+        requested_url="https://example.com/old",
+        final_url="https://example.com/final",
+        status_code=200,
+        redirect_chain=[{"status_code": 301}] * 4,
+    )
+
+    signal = next(
+        item for item in inspect_snapshot(snapshot) if item.issue_type == "long_redirect_chain"
+    )
+
+    assert signal.severity == "low"
+    assert "waar praktisch" in signal.recommended_action
+
+
 def test_maps_only_actionable_crawl_errors_to_issues() -> None:
     timeout = inspect_crawl_error(CrawlError("Timed out", error_type="timeout"))
     redirect_loop = inspect_crawl_error(

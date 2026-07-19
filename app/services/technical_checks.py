@@ -140,10 +140,11 @@ def inspect_snapshot(snapshot: UrlSnapshot, *, today: date | None = None) -> lis
             _signal(
                 "long_redirect_chain",
                 "reachability",
-                "medium",
+                "low",
                 "Lange redirectketen",
-                "Verkort de redirectketen tot maximaal één stap.",
+                "Controleer of iedere tussenstap nog nodig is en verkort de keten waar praktisch.",
                 redirects=len(snapshot.redirect_chain),
+                confidence="high",
             )
         )
     if snapshot.redirect_chain:

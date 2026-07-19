@@ -500,5 +500,9 @@ Daarnaast onderscheidt `nature` aantoonbare problemen, contextafhankelijke contr
 optimalisaties. 410, robotsblokkade, beperkte content, bijna-duplicaten, ontbrekende H1 en zwakke
 interne ondersteuning vragen controle; meta descriptions en breadcrumbmarkup zijn optimalisaties.
 
+Auditcorrectie: een redirectketen van meer dan drie stappen blijft zichtbaar, maar met lage
+prioriteit en zonder een niet-onderbouwde harde norm van maximaal één stap. Contextueel risico op
+vacature-identifiers wordt als kwaliteitsoptimalisatie gepresenteerd, niet als bewezen SEO-fout.
+
 Gevolg: gebruikers kunnen technische SEO-issues apart filteren zonder nuttige controles te
 verwijderen of ze ten onrechte als harde SEO-fout te presenteren.

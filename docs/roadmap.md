@@ -213,6 +213,8 @@ Status: eerste scopeclassificatie op 2026-07-19 gedeployed en in productie geval
 - Scope wordt afgeleid uit issuetype, zodat bestaande historie zonder migratie correct is gelabeld.
 - De actielijst onderscheidt daarnaast aantoonbare problemen, contextafhankelijke controles en
   optionele optimalisaties volgens de goedgekeurde audit.
+- Lange redirectketens hebben lage prioriteit en vacature-identifierrisico is een
+  kwaliteitsoptimalisatie; hiermee zijn de statische auditclassificaties verwerkt.
 
 ### Van signaal naar diagnose
 
