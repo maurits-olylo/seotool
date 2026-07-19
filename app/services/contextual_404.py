@@ -1,5 +1,6 @@
 import re
 from collections import defaultdict
+from collections.abc import Callable
 from urllib.parse import parse_qsl, urlsplit
 
 from sqlalchemy import func, select
@@ -19,7 +20,14 @@ PAGINATION_PARAMETERS = {"page", "paged", "p", "offset", "start"}
 PATH_PAGE_RE = re.compile(r"(?:/page/\d+|/page-\d+)(?:/)?$", re.IGNORECASE)
 
 
-def classify_404_issues(db: Session, *, website_id: object, crawl_run_id: object) -> None:
+def classify_404_issues(
+    db: Session,
+    *,
+    website_id: object,
+    crawl_run_id: object,
+    check_control: Callable[[], None] | None = None,
+) -> None:
+    _check_control(check_control)
     urls = list(
         db.scalars(
             select(Url).where(
@@ -30,6 +38,7 @@ def classify_404_issues(db: Session, *, website_id: object, crawl_run_id: object
         )
     )
     for url in urls:
+        _check_control(check_control)
         incoming_links = (
             db.scalar(
                 select(func.count(UrlLink.id)).where(
@@ -71,7 +80,13 @@ def classify_404_issues(db: Session, *, website_id: object, crawl_run_id: object
         crawl_run_id=crawl_run_id,
         urls=[url.normalized_url for url in urls],
     )
-    _classify_source_pages(db, website_id=website_id, crawl_run_id=crawl_run_id)
+    _check_control(check_control)
+    _classify_source_pages(
+        db,
+        website_id=website_id,
+        crawl_run_id=crawl_run_id,
+        check_control=check_control,
+    )
     db.commit()
 
 
@@ -175,7 +190,14 @@ def _classify_url_patterns(
     )
 
 
-def _classify_source_pages(db: Session, *, website_id: object, crawl_run_id: object) -> None:
+def _classify_source_pages(
+    db: Session,
+    *,
+    website_id: object,
+    crawl_run_id: object,
+    check_control: Callable[[], None] | None = None,
+) -> None:
+    _check_control(check_control)
     rows = db.execute(
         select(
             UrlLink.source_url_id,
@@ -194,7 +216,9 @@ def _classify_source_pages(db: Session, *, website_id: object, crawl_run_id: obj
     )
     broken_by_source: dict[object, list[dict[str, object]]] = {}
     seen: set[tuple[object, str, str]] = set()
-    for source_id, target_url, anchor_text, status_code in rows:
+    for row_index, (source_id, target_url, anchor_text, status_code) in enumerate(rows):
+        if row_index % 100 == 0:
+            _check_control(check_control)
         key = (source_id, target_url, anchor_text or "")
         if key in seen:
             continue
@@ -222,6 +246,7 @@ def _classify_source_pages(db: Session, *, website_id: object, crawl_run_id: obj
         )
     )
     for source_id in source_ids:
+        _check_control(check_control)
         broken_links = broken_by_source.get(source_id, [])
         signals: list[IssueSignal] = []
         if len(broken_links) >= 2:
@@ -261,6 +286,11 @@ def _classify_source_pages(db: Session, *, website_id: object, crawl_run_id: obj
             signals=signals,
             checked_issue_types={SOURCE_PAGE_404_TYPE},
         )
+
+
+def _check_control(check_control: Callable[[], None] | None) -> None:
+    if check_control is not None:
+        check_control()
 
 
 def _signal(*, incoming_links: int, in_sitemap: bool) -> IssueSignal:

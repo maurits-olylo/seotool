@@ -41,6 +41,9 @@ De HTTP-laag valideert elke URL en redirect tegen SSRF, begrenst redirects, time
 responsegrootte. HTML-extractie levert afzonderlijke hashes voor HTML, hoofdcontent, metadata,
 links en structured data. Iedere meting wordt opgeslagen als `url_snapshot`; links horen bij de
 betreffende `crawl_run`, terwijl `urls` alleen de actuele samenvatting en blijvende identiteit houdt.
+Pauze- en stopverzoeken worden niet alleen tussen URL-verzoeken verwerkt, maar ook tijdens lange
+sitebrede analyses na de laatste URL. Hierdoor kan een grote crawl tijdens issueclassificatie
+coöperatief worden beëindigd zonder een worker geforceerd te herstarten.
 
 ## Issue lifecycle
 

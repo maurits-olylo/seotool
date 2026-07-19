@@ -100,7 +100,12 @@ def execute_crawl_job(job_id: str) -> None:
             if job.job_type == "full_site_crawl":
                 site_crawl_complete = _crawl_full_site(db, job, run, resumed=resumed)
                 _check_crawl_control(db, job, run)
-                classify_404_issues(db, website_id=job.website_id, crawl_run_id=run.id)
+                classify_404_issues(
+                    db,
+                    website_id=job.website_id,
+                    crawl_run_id=run.id,
+                    check_control=lambda: _check_crawl_control(db, job, run),
+                )
                 run.status = (
                     "succeeded"
                     if run.failed_urls == 0 and site_crawl_complete
@@ -130,7 +135,12 @@ def execute_crawl_job(job_id: str) -> None:
                 else:
                     _audit_asset(db, job, run, url)
                 _respect_request_delay(job)
-            classify_404_issues(db, website_id=job.website_id, crawl_run_id=run.id)
+            classify_404_issues(
+                db,
+                website_id=job.website_id,
+                crawl_run_id=run.id,
+                check_control=lambda: _check_crawl_control(db, job, run),
+            )
             run.status = "succeeded" if run.failed_urls == 0 else "partially_succeeded"
             job.status = run.status
         except CrawlPaused:

@@ -473,3 +473,16 @@ Crawldiepte behoudt de meetcontext en de detailweergave toont de kortste gevonde
 
 Gevolg: het URL-overzicht wordt een uitzonderingen- en beslissingenlijst zonder bestaande
 crawlgegevens of issuehistorie te dupliceren.
+
+## 2026-07-19 — Crawlbesturing geldt ook tijdens sitebrede na-analyse
+
+Context: een HUMAN-light-check had alle 5.365 URL's verwerkt, maar bleef tijdens de daaropvolgende
+404-classificatie op `running`. Een stopverzoek werd pas tussen URL-verzoeken gecontroleerd en kon
+daardoor niet meer zonder workerrestart worden afgehandeld.
+
+Besluit: potentieel lange sitebrede analyses ontvangen dezelfde coöperatieve controle als de
+crawllus. De 404-classificatie controleert vóór en tijdens verwerking van URL's, linkregels en
+bronpagina's op pauze- en stopverzoeken.
+
+Gevolg: een grote crawl kan ook na het laatste netwerkverzoek tijdig worden gepauzeerd of gestopt;
+deelresultaten blijven behouden en een workerrestart is niet langer de normale uitweg.

@@ -1,6 +1,7 @@
 from sqlalchemy import select
 
 from app.db.session import SessionLocal
+from app.jobs import execute_crawl_job
 from app.models.client import Client
 from app.models.crawl import CrawlRun
 from app.models.discovery import CrawlJob
@@ -65,6 +66,44 @@ def test_worker_restart_finishes_requested_cancellation() -> None:
         job_id = job.id
 
     recover_interrupted_crawls()
+
+    with SessionLocal() as db:
+        job = db.get(CrawlJob, job_id)
+        run = db.scalar(select(CrawlRun).where(CrawlRun.crawl_job_id == job_id))
+        assert job and job.status == "cancelled" and job.finished_at is not None
+        assert run and run.status == "cancelled" and run.finished_at is not None
+
+
+def test_cancellation_interrupts_post_crawl_404_analysis(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    with SessionLocal() as db:
+        client = Client(name="Post-analysis cancellation")
+        website = Website(client=client, name="Large site", base_url="https://example.com/")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        job = CrawlJob(
+            website_id=website.id,
+            job_type="light_check",
+            settings_snapshot={"max_urls": 100, "request_delay_ms": 0},
+        )
+        db.add(job)
+        db.commit()
+        job_id = job.id
+
+    monkeypatch.setattr("app.jobs._load_robots_rules", lambda db, job: None)
+
+    def request_cancel_during_analysis(
+        db, *, website_id, crawl_run_id, check_control  # type: ignore[no-untyped-def]
+    ) -> None:
+        job = db.get(CrawlJob, job_id)
+        assert job is not None
+        job.status = "cancel_requested"
+        db.flush()
+        check_control()
+
+    monkeypatch.setattr("app.jobs.classify_404_issues", request_cancel_during_analysis)
+
+    execute_crawl_job(str(job_id))
 
     with SessionLocal() as db:
         job = db.get(CrawlJob, job_id)
