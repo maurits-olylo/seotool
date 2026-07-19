@@ -32,7 +32,11 @@ def upgrade() -> None:
         "google_analytics_event_metrics",
         ["website_id"],
     )
-    op.create_index("ix_google_analytics_event_metrics_date", "google_analytics_event_metrics", ["date"])
+    op.create_index(
+        "ix_google_analytics_event_metrics_date",
+        "google_analytics_event_metrics",
+        ["date"],
+    )
     op.create_index(
         "ix_google_analytics_event_metrics_event_name",
         "google_analytics_event_metrics",
