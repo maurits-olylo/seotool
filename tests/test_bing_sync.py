@@ -16,7 +16,7 @@ from app.models.integrations import (
     WebsiteIntegration,
 )
 from app.models.website import Website, WebsiteSettings
-from app.services.bing_integrations import sync_bing_webmaster
+from app.services.bing_integrations import _store_bing_links, sync_bing_webmaster
 from app.services.oauth import encrypt_token
 
 
@@ -178,6 +178,127 @@ def test_bing_sync_records_api_failure(monkeypatch) -> None:  # type: ignore[no-
             assert "GetPageStats" in str(mapping.settings["last_error"])
     finally:
         get_settings.cache_clear()
+
+
+def test_empty_bing_link_api_preserves_existing_history(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setenv("TOKEN_ENCRYPTION_KEY", "09" * 32)
+    get_settings.cache_clear()
+
+    class FakeResponse:
+        status_code = 200
+
+        def __init__(self, data: object) -> None:
+            self.data = data
+
+        def json(self) -> dict[str, object]:
+            return {"d": self.data}
+
+    class EmptyLinkBingClient:
+        async def __aenter__(self):  # type: ignore[no-untyped-def]
+            return self
+
+        async def __aexit__(self, *args):  # type: ignore[no-untyped-def]
+            return None
+
+        async def get(self, url, *, params, headers):  # type: ignore[no-untyped-def]
+            assert headers == {"Authorization": "Bearer bing-access"}
+            if url.endswith(("GetPageStats", "GetQueryStats")):
+                return FakeResponse([])
+            assert url.endswith("GetLinkCounts")
+            return FakeResponse({"Links": [], "TotalPages": 1})
+
+    monkeypatch.setattr(
+        "app.services.bing_integrations.httpx.AsyncClient",
+        lambda **kwargs: EmptyLinkBingClient(),
+    )
+    try:
+        with SessionLocal() as db:
+            website_id = _mapped_website(db)
+            observed_at = datetime.now(UTC) - timedelta(days=1)
+            db.add_all(
+                [
+                    BingLinkTarget(
+                        website_id=website_id,
+                        target_url="https://example.com/existing",
+                        inbound_link_count=8,
+                        first_seen_at=observed_at,
+                        last_seen_at=observed_at,
+                    ),
+                    BingInboundLink(
+                        website_id=website_id,
+                        link_key="existing-link",
+                        target_url="https://example.com/existing",
+                        source_url="https://referrer.example/existing",
+                        anchor_text="existing",
+                        first_seen_at=observed_at,
+                        last_seen_at=observed_at,
+                    ),
+                ]
+            )
+            db.commit()
+
+            result = asyncio.run(sync_bing_webmaster(db, website_id))
+
+            assert result["link_api_status"] == "unavailable_empty"
+            assert db.scalar(select(BingLinkTarget)).is_active is True
+            assert db.scalar(select(BingInboundLink)).is_active is True
+    finally:
+        get_settings.cache_clear()
+
+
+def test_partial_bing_link_coverage_only_deactivates_completed_targets() -> None:
+    with SessionLocal() as db:
+        client = Client(name="Partial Bing coverage")
+        website = Website(client=client, name="Partial site", base_url="https://example.com/")
+        db.add(website)
+        db.flush()
+        website_id = website.id
+        observed_at = datetime.now(UTC) - timedelta(days=1)
+        db.add_all(
+            [
+                BingInboundLink(
+                    website_id=website_id,
+                    link_key="covered-old",
+                    target_url="https://example.com/covered",
+                    source_url="https://referrer.example/old",
+                    anchor_text="old",
+                    first_seen_at=observed_at,
+                    last_seen_at=observed_at,
+                ),
+                BingInboundLink(
+                    website_id=website_id,
+                    link_key="uncovered-old",
+                    target_url="https://example.com/uncovered",
+                    source_url="https://referrer.example/uncovered",
+                    anchor_text="uncovered",
+                    first_seen_at=observed_at,
+                    last_seen_at=observed_at,
+                ),
+            ]
+        )
+        db.commit()
+
+        _store_bing_links(
+            db,
+            website_id,
+            {},
+            [],
+            [],
+            {"https://example.com/covered"},
+            base_url="https://example.com/",
+            counts_complete=False,
+            observed_at=datetime.now(UTC),
+        )
+        db.commit()
+
+        links = {
+            link.target_url: link.is_active
+            for link in db.scalars(select(BingInboundLink)).all()
+        }
+        assert links == {
+            "https://example.com/covered": False,
+            "https://example.com/uncovered": True,
+        }
 
 
 def _mapped_website(db):  # type: ignore[no-untyped-def]
