@@ -496,6 +496,9 @@ onderwerp en kon dat verschil niet zichtbaar maken.
 Besluit: de API leidt centraal een `scope` af uit het issuetype. Bestaande categorieën en issue-
 historie blijven intact. Afbeeldings-, kopstructuur- en dieptesignalen worden kwaliteitscontrole,
 bestandsgrootte wordt performance en mogelijke contentouderdom wordt redactioneel gepresenteerd.
+Daarnaast onderscheidt `nature` aantoonbare problemen, contextafhankelijke controles en optionele
+optimalisaties. 410, robotsblokkade, beperkte content, bijna-duplicaten, ontbrekende H1 en zwakke
+interne ondersteuning vragen controle; meta descriptions en breadcrumbmarkup zijn optimalisaties.
 
 Gevolg: gebruikers kunnen technische SEO-issues apart filteren zonder nuttige controles te
 verwijderen of ze ten onrechte als harde SEO-fout te presenteren.

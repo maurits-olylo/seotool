@@ -766,6 +766,7 @@ async function loadAllUrls(websiteId) {
 const vacancyLifecycleLabels = {active: "Actief", expiring_soon: "Loopt bijna af", expired: "Verlopen", removed: "Verwijderd", redirected: "Doorgestuurd"};
 const vacancyValidationLabels = {error: "Fout", warning: "Waarschuwing", valid: "Geldig", not_available: "Geen schema"};
 const issueScopeLabels = {seo: "SEO", seo_ux: "SEO + UX", quality: "Kwaliteitscontrole", performance: "Performance", editorial: "Redactioneel"};
+const issueNatureLabels = {problem: "Probleem", review: "Controleren", optimization: "Optimalisatie"};
 
 async function loadJobListings() {
   const websiteId = $("#website-select").value;
@@ -1174,13 +1175,14 @@ function applyFilters() {
   const query = $("#search-filter").value.trim().toLowerCase();
   const severity = $("#severity-filter").value;
   const scope = $("#scope-filter").value;
+  const nature = $("#nature-filter").value;
   const type = $("#type-filter").value;
   const impact = $("#impact-filter").value;
   const status = $("#status-filter").value;
   state.filtered = state.issues.filter((issue) => {
     const statusMatch = status === "all" || (status === "active" ? ACTIVE_STATUSES.has(issue.status) : issue.status === status);
     const searchText = `${issue.title} ${issue.issue_type} ${issueUrlLabel(issue)}`.toLowerCase();
-    return statusMatch && (!severity || issue.severity === severity) && (!scope || issue.scope === scope) && (!type || issue.issue_type === type) && (!impact || impactLevel(issue) === impact) && (!query || searchText.includes(query));
+    return statusMatch && (!severity || issue.severity === severity) && (!scope || issue.scope === scope) && (!nature || issue.nature === nature) && (!type || issue.issue_type === type) && (!impact || impactLevel(issue) === impact) && (!query || searchText.includes(query));
   }).sort((a, b) => ({high: 0, medium: 1, low: 2}[a.severity] - {high: 0, medium: 1, low: 2}[b.severity] || impactRank(a) - impactRank(b) || impactVolume(b) - impactVolume(a) || new Date(b.last_detected_at) - new Date(a.last_detected_at)));
 }
 
@@ -1188,13 +1190,14 @@ function renderGroups() {
   const query = $("#search-filter").value.trim().toLowerCase();
   const severity = $("#severity-filter").value;
   const scope = $("#scope-filter").value;
+  const nature = $("#nature-filter").value;
   const impact = $("#impact-filter").value;
   const status = $("#status-filter").value;
   const counts = new Map();
   state.issues.forEach((issue) => {
     const statusMatch = status === "all" || (status === "active" ? ACTIVE_STATUSES.has(issue.status) : issue.status === status);
     const searchText = `${issue.title} ${issue.issue_type} ${issueUrlLabel(issue)}`.toLowerCase();
-    if (statusMatch && (!severity || issue.severity === severity) && (!scope || issue.scope === scope) && (!impact || impactLevel(issue) === impact) && (!query || searchText.includes(query))) counts.set(issue.issue_type, (counts.get(issue.issue_type) || 0) + 1);
+    if (statusMatch && (!severity || issue.severity === severity) && (!scope || issue.scope === scope) && (!nature || issue.nature === nature) && (!impact || impactLevel(issue) === impact) && (!query || searchText.includes(query))) counts.set(issue.issue_type, (counts.get(issue.issue_type) || 0) + 1);
   });
   $("#issue-groups").innerHTML = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
     .map(([type, count]) => `<button data-group-type="${escapeHtml(type)}"><strong>${count}</strong><span>${escapeHtml(type.replaceAll("_", " "))}</span></button>`).join("");
@@ -1215,7 +1218,7 @@ function render() {
   $("#issues").innerHTML = rows.map((issue) => `<tr>
     <td class="selection-cell"><input class="issue-select" type="checkbox" data-select-issue-id="${issue.id}" aria-label="Selecteer ${escapeHtml(issue.title)}" ${state.selectedIssueIds.has(issue.id) ? "checked" : ""}></td>
     <td><span class="severity ${issue.severity}">${labels[issue.severity] || issue.severity}</span></td>
-    <td><strong>${escapeHtml(issue.title)}</strong><span class="issue-scope ${escapeHtml(issue.scope)}">${escapeHtml(issueScopeLabels[issue.scope] || issue.scope)}</span>${issueUrlMarkup(issue)}</td>
+    <td><strong>${escapeHtml(issue.title)}</strong><span class="issue-classification"><span class="issue-scope ${escapeHtml(issue.scope)}">${escapeHtml(issueScopeLabels[issue.scope] || issue.scope)}</span><span class="issue-nature ${escapeHtml(issue.nature)}">${escapeHtml(issueNatureLabels[issue.nature] || issue.nature)}</span></span>${issueUrlMarkup(issue)}</td>
     <td>${impactMarkup(issue)}</td>
     <td><span class="badge">${labels[issue.status] || issue.status}</span></td>
     <td>${new Date(issue.last_detected_at).toLocaleDateString("nl-NL")}</td>
@@ -1352,7 +1355,7 @@ async function showIssue(issueId) {
   $("#detail-title").textContent = issue.title;
   const url = issueUrl(issue); $("#detail-url").textContent = url || "Websitebreed issue";
   if (url) $("#detail-url").href = url; else $("#detail-url").removeAttribute("href");
-  $("#detail-severity").textContent = `${labels[issue.severity] || issue.severity} · ${issueScopeLabels[issue.scope] || issue.scope}`;
+  $("#detail-severity").textContent = `${labels[issue.severity] || issue.severity} · ${issueScopeLabels[issue.scope] || issue.scope} · ${issueNatureLabels[issue.nature] || issue.nature}`;
   $("#detail-status").value = issue.status;
   $("#client-status-label").textContent = labels[issue.status] || issue.status;
   $("#detail-description").textContent = issue.description;
@@ -1414,7 +1417,7 @@ async function saveIssueStatus() {
 $("#logout").addEventListener("click", async () => { await fetch("/ui/logout", { method: "POST" }); window.location.assign("/"); });
 $("#client-select").addEventListener("change", async () => { localStorage.setItem(CLIENT_STORAGE_KEY, $("#client-select").value); localStorage.removeItem(WEBSITE_STORAGE_KEY); await loadWebsites(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); });
 $("#website-select").addEventListener("change", async () => { localStorage.setItem(WEBSITE_STORAGE_KEY, $("#website-select").value); state.selectedReportSnapshotId = null; state.consultantInsights = null; await loadIssues(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); if (!$("#insights-view").classList.contains("hidden")) await loadConsultantInsights(); if (!$("#urls-view").classList.contains("hidden")) renderUrls(); if (!$("#changes-view").classList.contains("hidden")) await loadChanges(); if (!$("#vacancies-view").classList.contains("hidden")) await loadJobListings(); if (!$("#operations-view").classList.contains("hidden")) await loadOperations(); });
-for (const selector of ["#severity-filter", "#scope-filter", "#type-filter", "#impact-filter"]) $(selector).addEventListener("change", () => { state.page = 1; render(); });
+for (const selector of ["#severity-filter", "#scope-filter", "#nature-filter", "#type-filter", "#impact-filter"]) $(selector).addEventListener("change", () => { state.page = 1; render(); });
 $("#status-filter").addEventListener("change", loadIssues);
 $("#search-filter").addEventListener("input", () => { state.page = 1; render(); });
 $("#previous-page").addEventListener("click", () => { state.page -= 1; render(); });

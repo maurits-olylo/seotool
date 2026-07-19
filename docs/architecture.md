@@ -56,6 +56,8 @@ terugkerend signaal opent hetzelfde issue opnieuw. `issue_occurrences` bewaart b
 links. De afgeleide `scope` beschrijft hoe het product het signaal presenteert: SEO, SEO+UX,
 kwaliteitscontrole, performance of redactioneel. Scope wordt centraal uit het issuetype afgeleid,
 zodat historische en nieuwe issues zonder dataherschrijving dezelfde classificatie krijgen.
+De eveneens afgeleide `nature` maakt zichtbaar of de meting een aantoonbaar probleem, een
+contextafhankelijke controle of een optionele optimalisatie is. Prioriteit blijft daarvan losstaan.
 
 ## Jobs en exports
 

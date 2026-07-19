@@ -35,6 +35,7 @@ def test_issue_bulk_controls_and_client_logic_are_served(client: TestClient) -> 
     assert page.status_code == 200
     assert 'id="select-filtered-issues"' in page.text
     assert 'id="scope-filter"' in page.text
+    assert 'id="nature-filter"' in page.text
     assert 'id="resolve-selected-issues"' in page.text
     assert 'id="suppress-selected-issues"' in page.text
     assert 'id="suppression-panel"' in page.text
@@ -596,6 +597,7 @@ def test_issue_detail_exposes_evidence_and_updates_status(client: TestClient) ->
     assert detail.status_code == 200
     assert detail.json()["evidence"] == {"status_code": 404}
     assert detail.json()["scope"] == "seo"
+    assert detail.json()["nature"] == "problem"
     assert detail.json()["source_urls"] == []
     assert detail.json()["guidance"]["likely_cause"] is None
     assert "volgende crawl" in detail.json()["guidance"]["verification"]
@@ -613,6 +615,7 @@ def test_issue_detail_exposes_evidence_and_updates_status(client: TestClient) ->
     assert len(history) == 1
     assert history[0]["status"] == "resolved"
     assert history[0]["scope"] == "seo"
+    assert history[0]["nature"] == "problem"
 
 
 def test_bulk_issue_actions_suppress_restore_and_audit(client: TestClient) -> None:
