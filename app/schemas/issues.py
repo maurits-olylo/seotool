@@ -48,6 +48,7 @@ class IssueRead(ORMModel):
     website_id: UUID
     url_id: UUID | None
     issue_type: str
+    scope: Literal["seo", "seo_ux", "quality", "performance", "editorial"] = "seo"
     category: str
     severity: str
     confidence: str

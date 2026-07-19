@@ -52,6 +52,11 @@ Na opslag vergelijkt de analyse-engine een snapshot met zijn voorganger en schri
 Verdwenen signalen worden `resolved`, een volgende schone controle kan ze `verified` maken en een
 terugkerend signaal opent hetzelfde issue opnieuw. `issue_occurrences` bewaart bewijs per crawl.
 
+`category` beschrijft het technische onderwerp van een issue, zoals bereikbaarheid of interne
+links. De afgeleide `scope` beschrijft hoe het product het signaal presenteert: SEO, SEO+UX,
+kwaliteitscontrole, performance of redactioneel. Scope wordt centraal uit het issuetype afgeleid,
+zodat historische en nieuwe issues zonder dataherschrijving dezelfde classificatie krijgen.
+
 ## Jobs en exports
 
 De API en scheduler schrijven eerst een persistent `crawl_job` en plaatsen daarna alleen het ID op

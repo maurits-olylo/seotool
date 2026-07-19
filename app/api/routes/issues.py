@@ -35,6 +35,7 @@ from app.schemas.issues import (
 )
 from app.services.authorization import require_website_access, require_write_access
 from app.services.element_jumps import build_live_jump_url
+from app.services.issue_classification import issue_scope
 from app.services.issue_guidance import build_issue_guidance
 from app.services.url_normalization import InvalidUrlError, normalize_url
 
@@ -336,6 +337,7 @@ def list_issues(
     return [
         {
             **IssueRead.model_validate(issue).model_dump(),
+            "scope": issue_scope(issue.issue_type),
             "organic_impact": impacts.get(issue.url_id),
         }
         for issue in issues
@@ -576,6 +578,7 @@ def get_issue(
         )
     return {
         **IssueRead.model_validate(issue).model_dump(),
+        "scope": issue_scope(issue.issue_type),
         "organic_impact": (
             _organic_impacts(db, issue.website_id, issue.url_id).get(issue.url_id)
             if issue.url_id

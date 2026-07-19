@@ -486,3 +486,16 @@ bronpagina's op pauze- en stopverzoeken.
 
 Gevolg: een grote crawl kan ook na het laatste netwerkverzoek tijdig worden gepauzeerd of gestopt;
 deelresultaten blijven behouden en een workerrestart is niet langer de normale uitweg.
+
+## 2026-07-19 — Issues onderscheiden onderwerp en productscope
+
+Context: de goedgekeurde issue-audit onderscheidt harde SEO-problemen van UX-, performance-,
+redactionele en semantische controles. De bestaande `category` benoemt alleen het technische
+onderwerp en kon dat verschil niet zichtbaar maken.
+
+Besluit: de API leidt centraal een `scope` af uit het issuetype. Bestaande categorieën en issue-
+historie blijven intact. Afbeeldings-, kopstructuur- en dieptesignalen worden kwaliteitscontrole,
+bestandsgrootte wordt performance en mogelijke contentouderdom wordt redactioneel gepresenteerd.
+
+Gevolg: gebruikers kunnen technische SEO-issues apart filteren zonder nuttige controles te
+verwijderen of ze ten onrechte als harde SEO-fout te presenteren.
