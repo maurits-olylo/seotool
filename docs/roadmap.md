@@ -6,12 +6,12 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 
 ## Huidige status
 
-- Actieve ontwikkellijn: fase 4 — resterende SEO-functionaliteit.
-- Eerstvolgend ontwikkelitem na release `da68459`: Bing Webmaster Tools hervatten.
+- Actieve ontwikkellijn: fase 6 — intelligente diagnose en UX/UI-polish.
+- Eerstvolgend ontwikkelitem: contextafhankelijke SEO-signalen volgens de goedgekeurde issue-audit.
 - Productie: `https://seo.thact.nl` op Synology NAS `192.168.2.20`.
-- Laatste afgeronde kwaliteitscontrole: 154 tests en Ruff geslaagd.
-- Open productiecontrole fase 1: bevestigen dat `jobsatpearle.be` na de lopende crawl niet meer als
-  actieve URL van `werkenbijgrandvision.nl` verschijnt.
+- Laatste afgeronde kwaliteitscontrole: 193 tests en Ruff geslaagd.
+- Multi-client domeinisolatie is op 2026-07-19 in productie bevestigd: `jobsatpearle.be` komt niet
+  meer als actieve URL van `werkenbijgrandvision.nl` voor.
 
 ## Operationele veiligheid — globale deployment-drain
 
@@ -31,7 +31,7 @@ Acceptatie:
 
 ## Fase 1 — Multi-client domeinisolatie
 
-Status: technisch geïmplementeerd en gedeployed; productievalidatie loopt.
+Status: afgerond, gedeployed en op 2026-07-19 in productie gevalideerd.
 
 - Basis-host, equivalente www/root-variant en expliciete subdomeinen vormen de website-scope.
 - Sitemapimport, interne links, handmatige registratie en bestaande URL-records respecteren scope.
@@ -175,8 +175,9 @@ Acceptatie:
 
 ## Fase 5 — Bing hervatten
 
-Status: pagina-, zoekterm- en inkomende-linkimport technisch geïmplementeerd; deployment en
-productievalidatie met HUMAN volgen.
+Status: afgerond, gedeployed en op 2026-07-19 met HUMAN gevalideerd. De officiële API leverde
+pagina- en zoektermdata maar geen backlinkdekking; de volledige handmatige exporthistorie bleef
+correct behouden.
 
 - Bing-pagina- en zoektermstatistieken versleuteld geauthenticeerd en idempotent importeren.
 - Bing-URL's aan het blijvende URL-register koppelen en importdekking tonen.
@@ -200,6 +201,16 @@ Acceptatie:
 
 Status: in uitvoering; bronpagina's met meerdere dode interne links worden als eerste
 diagnosepatroon gegroepeerd. Verdere patroonherkenning, adviesverrijking en polish volgen.
+
+### SEO-issues en kwaliteitscontroles expliciet onderscheiden
+
+Status: eerste scopeclassificatie op 2026-07-19 gedeployed en in productie gevalideerd.
+
+- API en interface onderscheiden SEO, SEO+UX, kwaliteitscontrole, performance en redactioneel.
+- Afbeeldings-, kopstructuur- en dieptesignalen staan niet langer zonder voorbehoud als SEO-fout.
+- Bestandsgrootte wordt als performancecontrole en mogelijke contentouderdom als redactionele
+  controle gepresenteerd.
+- Scope wordt afgeleid uit issuetype, zodat bestaande historie zonder migratie correct is gelabeld.
 
 ### Van signaal naar diagnose
 

@@ -33,6 +33,9 @@ COMMUNICATIESTIJL
 - Geef altijd praktische, uitvoerbare stappen.
 - Geef maximaal vier stappen tegelijk.
 - Meld alleen informatie die nodig is om de huidige fase uit te voeren of te controleren.
+- Wanneer de gebruiker na gegeven terminalcommando's antwoordt met `ja`, neem dan aan dat die
+  commando's succesvol zijn uitgevoerd en ga direct verder. Vraag niet opnieuw om bevestiging,
+  tenzij de gebruiker een foutmelding of afwijkende uitvoer deelt.
 
 CODE EN IMPLEMENTATIE
 
