@@ -146,6 +146,7 @@ def _classify_url_patterns(
             if pagination_count
             else "De site genereert waarschijnlijk parameter- of filter-URL's die niet bestaan."
         )
+        pattern_label = "patroon" if len(patterns) == 1 else "patronen"
         signals.append(
             IssueSignal(
                 issue_type=PATTERNED_404_TYPE,
@@ -153,8 +154,8 @@ def _classify_url_patterns(
                 severity="high",
                 confidence="high" if pagination_count else "medium",
                 title=(
-                    f"{len(affected_urls)} 404-URL's vormen {len(patterns)} herkenbaar patroon"
-                    + ("" if len(patterns) == 1 else "en")
+                    f"{len(affected_urls)} 404-URL's vormen {len(patterns)} "
+                    f"herkenbaar {pattern_label}"
                 ),
                 description=(
                     f"{likely_cause} De losse 404's zijn daarom waarschijnlijk symptomen van "

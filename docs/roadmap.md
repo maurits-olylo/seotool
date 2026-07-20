@@ -227,6 +227,8 @@ Status: eerste scopeclassificatie op 2026-07-19 gedeployed en in productie geval
   canonical- of redirectconfiguraties.
 - Paginering- en parameterreeksen die meerdere 404's veroorzaken als één websitebrede diagnose
   tonen; onderliggende URL-issues voor historie bewaren maar niet als dubbele hoofdtaken tonen.
+- Lichte checks behouden de specifiekere 404-context uit de laatste volledige crawl en openen niet
+  daarnaast opnieuw een generieke 404-taak voor dezelfde URL.
 - Vergelijkbare paginagroepen vormen en afwijkingen binnen zo'n groep aanwijzen in plaats van alle
   normale waarden als losse regels te tonen.
 - Crawldiepte, indexatie, interne links, wijzigingen, schema en verkeersdata gezamenlijk beoordelen.

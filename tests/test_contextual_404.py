@@ -2,10 +2,11 @@ from sqlalchemy import select
 
 from app.db.session import SessionLocal
 from app.models.client import Client
-from app.models.crawl import CrawlRun, UrlLink
+from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url, UrlSource
 from app.models.issues import Issue, IssueOccurrence
 from app.models.website import Website, WebsiteSettings
+from app.services.analysis import analyze_snapshot
 from app.services.contextual_404 import classify_404_issues
 
 
@@ -90,6 +91,70 @@ def test_classifies_linked_and_sitemap_404s_exclusively() -> None:
         )
         assert occurrence is not None
         assert occurrence.evidence["incoming_internal_links"] == 1
+
+
+def test_light_check_does_not_reopen_generic_404_beside_contextual_issue() -> None:
+    with SessionLocal() as db:
+        client = Client(name="404 lifecycle client")
+        website = Website(client=client, name="404 site", base_url="https://example.com")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        url = Url(
+            website_id=website.id,
+            normalized_url="https://example.com/missing",
+            current_status_code=404,
+        )
+        db.add(url)
+        db.flush()
+        contextual = Issue(
+            website_id=website.id,
+            url_id=url.id,
+            issue_type="internally_linked_404",
+            category="internal_links",
+            severity="high",
+            title="Interne links wijzen naar een 404",
+            description="Context bestaat uit een volledige crawl.",
+            recommended_action="Herstel de interne links.",
+        )
+        generic = Issue(
+            website_id=website.id,
+            url_id=url.id,
+            issue_type="http_404",
+            category="reachability",
+            severity="high",
+            title="Pagina geeft 404",
+            description="Generieke bereikbaarheidssituatie.",
+            recommended_action="Herstel de pagina.",
+        )
+        job = CrawlJob(website_id=website.id, job_type="light_check")
+        db.add_all([contextual, generic, job])
+        db.flush()
+        run = CrawlRun(
+            crawl_job_id=job.id,
+            website_id=website.id,
+            crawl_type="light_check",
+        )
+        db.add(run)
+        db.flush()
+        snapshot = UrlSnapshot(
+            url_id=url.id,
+            crawl_run_id=run.id,
+            requested_url=url.normalized_url,
+            final_url=url.normalized_url,
+            status_code=404,
+            redirect_chain=[],
+            is_indexable=False,
+        )
+        db.add(snapshot)
+        db.flush()
+
+        analyze_snapshot(db, snapshot)
+        db.flush()
+
+        issues = list(db.scalars(select(Issue).where(Issue.url_id == url.id)))
+        states = {issue.issue_type: issue.status for issue in issues}
+        assert states == {"internally_linked_404": "new", "http_404": "resolved"}
 
 
 def test_groups_multiple_broken_links_on_one_source_page() -> None:

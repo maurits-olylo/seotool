@@ -5,13 +5,17 @@ from sqlalchemy.orm import Session
 
 from app.models.crawl import ElementLocation, UrlLink, UrlSnapshot
 from app.models.discovery import Url
-from app.models.issues import Change
+from app.models.issues import Change, Issue
 from app.services.change_detection import DetectedChange, compare_snapshots
 from app.services.element_issues import ELEMENT_ISSUE_TYPES, inspect_element_locations
 from app.services.issue_engine import reconcile_issues
 from app.services.job_listings import update_job_listing
 from app.services.job_posting import inspect_job_posting
-from app.services.technical_checks import SNAPSHOT_ISSUE_TYPES, inspect_snapshot
+from app.services.technical_checks import (
+    SNAPSHOT_ISSUE_TYPES,
+    IssueSignal,
+    inspect_snapshot,
+)
 
 
 def analyze_snapshot(db: Session, snapshot: UrlSnapshot) -> None:
@@ -51,6 +55,7 @@ def analyze_snapshot(db: Session, snapshot: UrlSnapshot) -> None:
             )
         )
     signals = inspect_snapshot(snapshot)
+    signals = _prefer_contextual_404(db, url=url, signals=signals)
     element_locations = list(
         db.scalars(
             select(ElementLocation).where(ElementLocation.snapshot_id == snapshot.id)
@@ -105,6 +110,27 @@ def analyze_snapshot(db: Session, snapshot: UrlSnapshot) -> None:
         signals=signals,
         checked_issue_types=SNAPSHOT_ISSUE_TYPES | ELEMENT_ISSUE_TYPES,
     )
+
+
+def _prefer_contextual_404(
+    db: Session, *, url: Url, signals: list[IssueSignal]
+) -> list[IssueSignal]:
+    """Keep a later light check from reopening a less specific generic 404 issue."""
+    if not any(signal.issue_type == "http_404" for signal in signals):
+        return signals
+    contextual_issue_id = db.scalar(
+        select(Issue.id)
+        .where(
+            Issue.website_id == url.website_id,
+            Issue.url_id == url.id,
+            Issue.issue_type.in_(("internally_linked_404", "sitemap_404")),
+            Issue.status.not_in(("resolved", "verified")),
+        )
+        .limit(1)
+    )
+    if contextual_issue_id is None:
+        return signals
+    return [signal for signal in signals if signal.issue_type != "http_404"]
 
 
 def _internal_links(db: Session, snapshot: UrlSnapshot) -> list[tuple[str, str, bool]]:
