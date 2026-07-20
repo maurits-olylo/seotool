@@ -117,3 +117,109 @@ def test_does_not_group_duplicate_metadata_without_the_shared_value() -> None:
         assert analyze_template_issue_clusters(
             db, website_id=website.id, crawl_run_id=run.id
         ) == []
+
+
+def test_groups_small_child_families_at_the_shared_parent_level() -> None:
+    with SessionLocal() as db:
+        client = Client(name="Parent client")
+        website = Website(client=client, name="Parent site", base_url="https://parent.example")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        job = CrawlJob(website_id=website.id, job_type="full_site_crawl")
+        db.add(job)
+        db.flush()
+        run = CrawlRun(crawl_job_id=job.id, website_id=website.id, crawl_type="full_site_crawl")
+        db.add(run)
+        db.flush()
+
+        for suffix in "abcdefghij":
+            url = Url(
+                website_id=website.id,
+                normalized_url=f"https://parent.example/guides/topic-{suffix}/page",
+            )
+            db.add(url)
+            db.flush()
+            issue = Issue(
+                website_id=website.id,
+                url_id=url.id,
+                issue_type="deep_page",
+                category="internal_links",
+                severity="low",
+                title="Diepe pagina",
+                description="Controleer de structuur.",
+                recommended_action="Voeg een link toe.",
+            )
+            db.add(issue)
+            db.flush()
+            db.add(
+                IssueOccurrence(
+                    issue_id=issue.id,
+                    crawl_run_id=run.id,
+                    evidence={"crawl_depth": 5},
+                )
+            )
+        db.flush()
+
+        diagnosis = analyze_template_issue_clusters(
+            db, website_id=website.id, crawl_run_id=run.id
+        )[0]
+        db.flush()
+        occurrence = db.scalar(
+            select(IssueOccurrence).where(IssueOccurrence.issue_id == diagnosis.id)
+        )
+
+        assert occurrence is not None
+        assert occurrence.evidence["clusters"][0]["cluster_key"] == "/guides/*"
+        assert occurrence.evidence["affected_signal_count"] == 10
+
+
+def test_groups_an_exact_duplicate_pair() -> None:
+    with SessionLocal() as db:
+        client = Client(name="Pair client")
+        website = Website(client=client, name="Pair site", base_url="https://pair.example")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        job = CrawlJob(website_id=website.id, job_type="full_site_crawl")
+        db.add(job)
+        db.flush()
+        run = CrawlRun(crawl_job_id=job.id, website_id=website.id, crawl_type="full_site_crawl")
+        db.add(run)
+        db.flush()
+        for suffix in ("one", "two"):
+            url = Url(website_id=website.id, normalized_url=f"https://pair.example/{suffix}")
+            db.add(url)
+            db.flush()
+            issue = Issue(
+                website_id=website.id,
+                url_id=url.id,
+                issue_type="duplicate_title",
+                category="onpage",
+                severity="medium",
+                title="Dubbele title",
+                description="Dezelfde title.",
+                recommended_action="Maak de title onderscheidend.",
+            )
+            db.add(issue)
+            db.flush()
+            db.add(
+                IssueOccurrence(
+                    issue_id=issue.id,
+                    crawl_run_id=run.id,
+                    evidence={"value": "Gedeelde title"},
+                )
+            )
+        db.flush()
+
+        diagnosis = analyze_template_issue_clusters(
+            db, website_id=website.id, crawl_run_id=run.id
+        )[0]
+        db.flush()
+        occurrence = db.scalar(
+            select(IssueOccurrence).where(IssueOccurrence.issue_id == diagnosis.id)
+        )
+
+        assert occurrence is not None
+        assert occurrence.evidence["affected_signal_count"] == 2
+        assert occurrence.evidence["clusters"][0]["cluster_key"] == "value:Gedeelde title"

@@ -332,6 +332,7 @@ def list_issues(
         db, website_id, "pagination_series_review"
     )
     grouped_redirect_url_ids = _grouped_redirect_url_ids(db, website_id)
+    grouped_broken_url_ids = _grouped_broken_url_ids(db, website_id)
     grouped_template_issue_keys = _grouped_template_issue_keys(db, website_id)
     issues = [
         issue
@@ -348,6 +349,10 @@ def list_issues(
             or (
                 issue.issue_type == "internally_linked_redirect"
                 and issue.url_id in grouped_redirect_url_ids
+            )
+            or (
+                issue.issue_type == "internally_linked_404"
+                and issue.url_id in grouped_broken_url_ids
             )
             or (issue.url_id, issue.issue_type) in grouped_template_issue_keys
         )
@@ -602,6 +607,45 @@ def _grouped_redirect_url_ids(db: Session, website_id: UUID) -> set[UUID]:
             select(Url.id).where(
                 Url.website_id == website_id,
                 Url.normalized_url.in_(redirect_urls),
+            )
+        )
+    )
+
+
+def _grouped_broken_url_ids(db: Session, website_id: UUID) -> set[UUID]:
+    """Return 404 targets already represented by a grouped source-page task."""
+    diagnoses = list(
+        db.scalars(
+            select(Issue).where(
+                Issue.website_id == website_id,
+                Issue.issue_type == "multiple_broken_internal_links",
+                Issue.status.in_(ACTIVE_ISSUE_STATUSES),
+            )
+        )
+    )
+    diagnosis_ids = {diagnosis.id for diagnosis in diagnoses}
+    latest_by_issue: dict[UUID, IssueOccurrence] = {}
+    if diagnosis_ids:
+        for occurrence in db.scalars(
+            select(IssueOccurrence)
+            .where(IssueOccurrence.issue_id.in_(diagnosis_ids))
+            .order_by(IssueOccurrence.issue_id, IssueOccurrence.detected_at.desc())
+        ):
+            latest_by_issue.setdefault(occurrence.issue_id, occurrence)
+    target_urls = {
+        item["target_url"]
+        for diagnosis in diagnoses
+        if (occurrence := latest_by_issue.get(diagnosis.id)) is not None
+        for item in occurrence.evidence.get("broken_links", [])
+        if isinstance(item, dict) and isinstance(item.get("target_url"), str)
+    }
+    if not target_urls:
+        return set()
+    return set(
+        db.scalars(
+            select(Url.id).where(
+                Url.website_id == website_id,
+                Url.normalized_url.in_(target_urls),
             )
         )
     )

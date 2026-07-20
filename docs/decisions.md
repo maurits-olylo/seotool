@@ -534,9 +534,14 @@ redirectproblemen of meetbewijs te verbergen.
 
 Grote groepen met hetzelfde issuetype en een gedeelde URL-familie of metadatawaarde worden als één
 websitebrede templatecontrole gepresenteerd. Drempels verschillen per signaal: drie URL's voor exact
-gelijke metadata/canonical, vijf voor content-, H1-, ontbrekende-veld- en orphanfamilies en tien voor
+gelijke canonicalwaarden, twee voor exact gelijke metadata, vijf voor content-, H1-, ontbrekende-veld- en orphanfamilies en tien voor
 crawldiepte. Pagineringskinderen worden uitgesloten omdat die al een specifiekere reeksdiagnose
 hebben. Onderliggende issues en historie blijven opgeslagen.
+
+Kleine families die de drempel niet zelfstandig halen, worden nog één keer op het bovenliggende
+padsegment beoordeeld. Een `internally_linked_404`-doeltaak verdwijnt uit de hoofdactielijst wanneer
+hetzelfde doel al voorkomt in een actieve gegroepeerde bronpaginataak; het onderliggende issue blijft
+opgeslagen en komt terug zodra de brongroep niet meer actief is.
 
 Canonicalcontrole wordt alleen uitgevoerd op bereikbare pagina's met een 200-status. Een 404-pagina
 met een canonical naar de foutpagina levert daardoor niet langer een tweede canonicalissue op.

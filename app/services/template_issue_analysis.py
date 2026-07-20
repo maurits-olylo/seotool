@@ -34,13 +34,21 @@ ACTIVE_STATUSES = {
 MINIMUM_CLUSTER_SIZE = {
     "canonical_other_url": 3,
     "deep_page": 10,
-    "duplicate_meta_description": 3,
-    "duplicate_title": 3,
+    "duplicate_meta_description": 2,
+    "duplicate_title": 2,
     "missing_h1": 5,
     "missing_meta_description": 5,
     "multiple_h1": 5,
     "orphan_page": 5,
     "thin_content": 5,
+}
+HIERARCHICAL_ISSUE_TYPES = {
+    "deep_page",
+    "missing_h1",
+    "missing_meta_description",
+    "multiple_h1",
+    "orphan_page",
+    "thin_content",
 }
 NUMBER_RE = re.compile(r"\d+")
 UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f-]{27,}$", re.IGNORECASE)
@@ -100,19 +108,36 @@ def analyze_template_issue_clusters(
 
     clusters: list[dict[str, object]] = []
     affected_pairs: set[tuple[str, str]] = set()
+    covered_issue_ids: set[object] = set()
     for (issue_type, cluster_key), items in sorted(grouped.items()):
-        unique_urls = sorted({url.normalized_url for _issue, url, _evidence in items})
-        if len(unique_urls) < MINIMUM_CLUSTER_SIZE[issue_type]:
-            continue
-        affected_pairs.update((issue_type, url) for url in unique_urls)
-        clusters.append(
-            {
-                "issue_type": issue_type,
-                "cluster_key": cluster_key,
-                "url_count": len(unique_urls),
-                "urls": unique_urls,
-                "sample_evidence": _compact_evidence(items[0][2]),
-            }
+        if _append_cluster(
+            clusters,
+            affected_pairs,
+            issue_type=issue_type,
+            cluster_key=cluster_key,
+            items=items,
+        ):
+            covered_issue_ids.update(issue.id for issue, _url, _evidence in items)
+
+    parent_groups: dict[
+        tuple[str, str], list[tuple[Issue, Url, dict[str, object]]]
+    ] = defaultdict(list)
+    for items in grouped.values():
+        for item in items:
+            issue, url, evidence = item
+            if issue.id in covered_issue_ids or issue.issue_type not in HIERARCHICAL_ISSUE_TYPES:
+                continue
+            parent_key = _parent_cluster_key(
+                issue.issue_type, evidence, url.normalized_url
+            )
+            parent_groups[(issue.issue_type, parent_key)].append(item)
+    for (issue_type, cluster_key), items in sorted(parent_groups.items()):
+        _append_cluster(
+            clusters,
+            affected_pairs,
+            issue_type=issue_type,
+            cluster_key=cluster_key,
+            items=items,
         )
 
     signals: list[IssueSignal] = []
@@ -191,6 +216,39 @@ def _compact_evidence(evidence: dict[str, object]) -> dict[str, object]:
     return {key: value for key, value in evidence.items() if key in allowed_keys}
 
 
+def _append_cluster(
+    clusters: list[dict[str, object]],
+    affected_pairs: set[tuple[str, str]],
+    *,
+    issue_type: str,
+    cluster_key: str,
+    items: list[tuple[Issue, Url, dict[str, object]]],
+) -> bool:
+    unique_urls = sorted({url.normalized_url for _issue, url, _evidence in items})
+    if len(unique_urls) < MINIMUM_CLUSTER_SIZE[issue_type]:
+        return False
+    affected_pairs.update((issue_type, url) for url in unique_urls)
+    clusters.append(
+        {
+            "issue_type": issue_type,
+            "cluster_key": cluster_key,
+            "url_count": len(unique_urls),
+            "urls": unique_urls,
+            "sample_evidence": _compact_evidence(items[0][2]),
+        }
+    )
+    return True
+
+
+def _parent_cluster_key(issue_type: str, evidence: dict[str, object], url: str) -> str:
+    path = _parent_path_family(url)
+    if issue_type == "thin_content":
+        return f"{evidence.get('content_level', 'unknown')}:{path}"
+    if issue_type == "multiple_h1":
+        return f"count:{evidence.get('count', 'unknown')}:{path}"
+    return path
+
+
 def _path_family(value: str) -> str:
     parts = [part for part in urlsplit(value).path.strip("/").split("/") if part]
     normalized = [
@@ -201,6 +259,14 @@ def _path_family(value: str) -> str:
     if len(normalized) == 1:
         return f"/{normalized[0]}"
     return "/" + "/".join(normalized[:2]) + "/*"
+
+
+def _parent_path_family(value: str) -> str:
+    parts = [part for part in urlsplit(value).path.strip("/").split("/") if part]
+    if not parts:
+        return "/"
+    first = "{uuid}" if UUID_RE.match(parts[0]) else NUMBER_RE.sub("{n}", parts[0])
+    return f"/{first}/*"
 
 
 def _active_diagnosis_urls(
