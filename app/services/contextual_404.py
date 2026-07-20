@@ -18,6 +18,7 @@ SOURCE_PAGE_404_TYPE = "multiple_broken_internal_links"
 PATTERNED_404_TYPE = "patterned_404_urls"
 PAGINATION_PARAMETERS = {"page", "paged", "p", "offset", "start"}
 PATH_PAGE_RE = re.compile(r"(?:/page/\d+|/page-\d+)(?:/)?$", re.IGNORECASE)
+NUMBERED_SLUG_RE = re.compile(r"(?<=-)\d+(?=(?:\.html)?/?$)", re.IGNORECASE)
 
 
 def classify_404_issues(
@@ -120,6 +121,10 @@ def _classify_url_patterns(
         if PATH_PAGE_RE.search(split.path):
             key = PATH_PAGE_RE.sub("/page/*", split.path)
             candidates[("pagination", key)].add(url)
+            continue
+        if NUMBERED_SLUG_RE.search(split.path):
+            key = NUMBERED_SLUG_RE.sub("*", split.path)
+            candidates[("numbered_series", key)].add(url)
 
     patterns: list[dict[str, object]] = []
     for (pattern_type, pattern), grouped_urls in sorted(candidates.items()):
@@ -141,11 +146,22 @@ def _classify_url_patterns(
         pagination_count = sum(
             1 for pattern in patterns if pattern["pattern_type"] == "pagination"
         )
-        likely_cause = (
-            "De site genereert waarschijnlijk pagineringslinks naar niet-bestaande pagina's."
-            if pagination_count
-            else "De site genereert waarschijnlijk parameter- of filter-URL's die niet bestaan."
+        numbered_series_count = sum(
+            1 for pattern in patterns if pattern["pattern_type"] == "numbered_series"
         )
+        if pagination_count:
+            likely_cause = (
+                "De site genereert waarschijnlijk pagineringslinks naar niet-bestaande pagina's."
+            )
+        elif numbered_series_count:
+            likely_cause = (
+                "Een overzicht, archief of template verwijst waarschijnlijk naar een reeks "
+                "niet-bestaande genummerde pagina's."
+            )
+        else:
+            likely_cause = (
+                "De site genereert waarschijnlijk parameter- of filter-URL's die niet bestaan."
+            )
         pattern_label = "patroon" if len(patterns) == 1 else "patronen"
         signals.append(
             IssueSignal(

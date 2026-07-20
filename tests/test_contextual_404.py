@@ -287,6 +287,62 @@ def test_groups_paginated_404_urls_as_one_pattern() -> None:
         assert occurrence.evidence["patterns"][0]["pattern_type"] == "pagination"
 
 
+def test_groups_numbered_slug_series_but_not_an_isolated_pair() -> None:
+    with SessionLocal() as db:
+        client = Client(name="Numbered series client")
+        website = Website(client=client, name="Series site", base_url="https://human.test")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        urls = [
+            Url(
+                website_id=website.id,
+                normalized_url=f"https://human.test/vrienden/win-een-boek-{number}",
+                current_status_code=404,
+            )
+            for number in (3, 5, 8)
+        ]
+        urls.extend(
+            Url(
+                website_id=website.id,
+                normalized_url=f"https://human.test/losse-aflevering-{number}.html",
+                current_status_code=404,
+            )
+            for number in (1, 2)
+        )
+        db.add_all(urls)
+        db.flush()
+        run = _crawl_run(db, website.id)
+
+        classify_404_issues(db, website_id=website.id, crawl_run_id=run.id)
+
+        issue = db.scalar(
+            select(Issue).where(
+                Issue.website_id == website.id,
+                Issue.url_id.is_(None),
+                Issue.issue_type == "patterned_404_urls",
+            )
+        )
+        assert issue is not None
+        occurrence = db.scalar(
+            select(IssueOccurrence).where(IssueOccurrence.issue_id == issue.id)
+        )
+        assert occurrence is not None
+        assert occurrence.evidence["affected_url_count"] == 3
+        assert occurrence.evidence["patterns"] == [
+            {
+                "pattern_type": "numbered_series",
+                "pattern": "/vrienden/win-een-boek-*",
+                "url_count": 3,
+                "urls": [
+                    "https://human.test/vrienden/win-een-boek-3",
+                    "https://human.test/vrienden/win-een-boek-5",
+                    "https://human.test/vrienden/win-een-boek-8",
+                ],
+            }
+        ]
+
+
 def _crawl_run(db, website_id):  # type: ignore[no-untyped-def]
     job = CrawlJob(website_id=website_id, job_type="full_site_crawl")
     db.add(job)
