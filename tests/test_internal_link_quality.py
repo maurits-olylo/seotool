@@ -9,7 +9,10 @@ from app.models.discovery import CrawlJob, Url
 from app.models.integrations import SearchConsoleMetric
 from app.models.issues import Issue, IssueOccurrence
 from app.models.website import Website, WebsiteSettings
-from app.services.internal_link_analysis import analyze_internal_link_quality
+from app.services.internal_link_analysis import (
+    analyze_internal_link_quality,
+    analyze_redirect_source_groups,
+)
 
 
 def test_detects_redirect_deep_page_and_weakly_linked_important_page() -> None:
@@ -115,6 +118,78 @@ def test_detects_redirect_deep_page_and_weakly_linked_important_page() -> None:
             == []
         )
         assert set(db.scalars(select(Issue.status))) == {"resolved"}
+
+
+def test_groups_multiple_redirect_links_on_the_source_page() -> None:
+    with SessionLocal() as db:
+        client = Client(name="Redirect group client")
+        website = Website(client=client, name="Redirect site", base_url="https://example.com/")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        source = _url(db, website.id, "/article", depth=1)
+        redirects = [
+            _url(
+                db,
+                website.id,
+                f"/old-{number}",
+                depth=2,
+                final_url=f"https://example.com/new-{number}",
+            )
+            for number in range(2)
+        ]
+        run = _run(db, website.id)
+        for url in (source, *redirects):
+            db.add(_snapshot(url, run))
+        db.add_all(
+            UrlLink(
+                crawl_run_id=run.id,
+                source_url_id=source.id,
+                target_url=redirect.normalized_url,
+                target_url_id=redirect.id,
+                anchor_text=f"Oude link {number}",
+                is_internal=True,
+                is_nofollow=False,
+            )
+            for number, redirect in enumerate(redirects, start=1)
+        )
+        db.flush()
+
+        analyze_internal_link_quality(db, website_id=website.id, crawl_run_id=run.id)
+
+        grouped = db.scalar(
+            select(Issue).where(Issue.issue_type == "multiple_redirected_internal_links")
+        )
+        assert grouped is not None
+        assert grouped.url_id == source.id
+        assert grouped.title == "2 interne links gaan via een redirect"
+        occurrence = db.scalar(
+            select(IssueOccurrence).where(IssueOccurrence.issue_id == grouped.id)
+        )
+        assert occurrence is not None
+        assert occurrence.evidence["redirected_link_count"] == 2
+        assert occurrence.evidence["redirected_links"][0]["final_url"] == (
+            "https://example.com/new-0"
+        )
+
+        next_run = _run(db, website.id)
+        db.add(
+            UrlLink(
+                crawl_run_id=next_run.id,
+                source_url_id=source.id,
+                target_url=redirects[0].normalized_url,
+                target_url_id=redirects[0].id,
+                anchor_text="Enkele oude link",
+                is_internal=True,
+                is_nofollow=False,
+            )
+        )
+        db.flush()
+
+        assert analyze_redirect_source_groups(
+            db, website_id=website.id, crawl_run_id=next_run.id
+        ) == []
+        assert grouped.status == "resolved"
 
 
 def _url(db, website_id, path, *, depth, final_url=None):  # type: ignore[no-untyped-def]

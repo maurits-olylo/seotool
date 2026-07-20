@@ -1035,6 +1035,73 @@ def test_issue_list_hides_pagination_children_behind_series_review(client: TestC
     assert payload[0]["nature"] == "review"
 
 
+def test_issue_list_hides_redirect_targets_behind_source_page_group(client: TestClient) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Redirect UI"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": customer["id"],
+            "name": "Redirect site",
+            "base_url": "https://example.com",
+        },
+    ).json()
+    website_id = UUID(website["id"])
+    with SessionLocal() as db:
+        source = Url(website_id=website_id, normalized_url="https://example.com/article")
+        target = Url(website_id=website_id, normalized_url="https://example.com/old")
+        job = CrawlJob(website_id=website_id, job_type="full_site_crawl")
+        db.add_all([source, target, job])
+        db.flush()
+        run = CrawlRun(
+            crawl_job_id=job.id,
+            website_id=website_id,
+            crawl_type="full_site_crawl",
+        )
+        child = Issue(
+            website_id=website_id,
+            url_id=target.id,
+            issue_type="internally_linked_redirect",
+            category="internal_links",
+            severity="medium",
+            title="Interne links wijzen naar een redirect",
+            description="Oud doel.",
+            recommended_action="Werk de link bij.",
+        )
+        diagnosis = Issue(
+            website_id=website_id,
+            url_id=source.id,
+            issue_type="multiple_redirected_internal_links",
+            category="internal_links",
+            severity="medium",
+            title="2 interne links gaan via een redirect",
+            description="Gezamenlijke broncontrole.",
+            recommended_action="Werk beide links bij.",
+        )
+        db.add_all([run, child, diagnosis])
+        db.flush()
+        db.add(
+            IssueOccurrence(
+                issue_id=diagnosis.id,
+                crawl_run_id=run.id,
+                evidence={
+                    "redirected_links": [
+                        {
+                            "redirect_url": target.normalized_url,
+                            "final_url": "https://example.com/new",
+                        }
+                    ]
+                },
+            )
+        )
+        db.commit()
+
+    payload = client.get(f"/api/v1/websites/{website_id}/issues").json()
+
+    assert [item["issue_type"] for item in payload] == [
+        "multiple_redirected_internal_links"
+    ]
+
+
 def test_running_crawl_can_pause_resume_and_cancel(client: TestClient) -> None:
     customer = client.post("/api/v1/clients", json={"name": "Controlled crawl"}).json()
     website = client.post(

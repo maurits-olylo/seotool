@@ -71,3 +71,12 @@ def test_pagination_guidance_treats_repeated_signals_as_one_template_review() ->
     assert {source["publisher"] for source in guidance["sources"]} == {
         "Google Search Central"
     }
+
+
+def test_grouped_redirect_guidance_focuses_on_the_source_page() -> None:
+    guidance = build_issue_guidance(
+        _issue("multiple_redirected_internal_links", "internal_links"), {}
+    )
+
+    assert "één onderhoudstaak" in guidance["relevance"]["text"]  # type: ignore[index]
+    assert "bronpagina" in str(guidance["verification"])

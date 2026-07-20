@@ -19,6 +19,7 @@ INTERNAL_LINK_ISSUE_TYPES = {
     "important_page_few_internal_links",
     "internally_linked_redirect",
 }
+SOURCE_REDIRECT_ISSUE_TYPE = "multiple_redirected_internal_links"
 MAX_RECOMMENDED_CRAWL_DEPTH = 3
 MAX_WEAK_INBOUND_LINKS = 1
 
@@ -194,7 +195,75 @@ def analyze_internal_link_quality(
                 checked_issue_types=INTERNAL_LINK_ISSUE_TYPES,
             )
         )
+    touched.extend(
+        analyze_redirect_source_groups(
+            db,
+            website_id=website_id,
+            crawl_run_id=crawl_run_id,
+        )
+    )
     db.commit()
+    return touched
+
+
+def analyze_redirect_source_groups(
+    db: Session, *, website_id: object, crawl_run_id: object
+) -> list[Issue]:
+    """Group multiple redirect links by the source page where they can be fixed together."""
+    redirects_by_source = _redirect_links_by_source(db, crawl_run_id=crawl_run_id)
+    source_ids = set(redirects_by_source)
+    source_ids.update(
+        db.scalars(
+            select(Issue.url_id).where(
+                Issue.website_id == website_id,
+                Issue.issue_type == SOURCE_REDIRECT_ISSUE_TYPE,
+                Issue.url_id.is_not(None),
+            )
+        )
+    )
+    touched: list[Issue] = []
+    for source_id in source_ids:
+        redirected_links = redirects_by_source.get(source_id, [])
+        signals: list[IssueSignal] = []
+        if len(redirected_links) >= 2:
+            signals.append(
+                IssueSignal(
+                    issue_type=SOURCE_REDIRECT_ISSUE_TYPE,
+                    category="internal_links",
+                    severity="medium",
+                    title=f"{len(redirected_links)} interne links gaan via een redirect",
+                    description=(
+                        "Deze bronpagina linkt naar meerdere oude URL's die eerst doorsturen. "
+                        "De links kunnen gezamenlijk op deze pagina of in het gedeelde "
+                        "contentblok worden bijgewerkt."
+                    ),
+                    recommended_action=(
+                        "Vervang op deze bronpagina iedere redirect-URL door de opgeslagen "
+                        "eind-URL. Controleer daarna dat alle links rechtstreeks een 200-status "
+                        "geven en dat ankerteksten inhoudelijk blijven passen."
+                    ),
+                    evidence={
+                        "redirected_link_count": len(redirected_links),
+                        "redirected_links": redirected_links,
+                        "likely_scope": "bronpagina of gedeeld contentblok",
+                        "verification": (
+                            "geen interne link op deze pagina gaat nog via een redirect"
+                        ),
+                    },
+                    confidence="high",
+                )
+            )
+        touched.extend(
+            reconcile_issues(
+                db,
+                website_id=website_id,
+                url_id=source_id,
+                crawl_run_id=crawl_run_id,
+                snapshot_id=None,
+                signals=signals,
+                checked_issue_types={SOURCE_REDIRECT_ISSUE_TYPE},
+            )
+        )
     return touched
 
 
@@ -226,6 +295,48 @@ def _inbound_link_sources(db: Session, *, crawl_run_id: object) -> dict[object, 
     result: dict[object, list[str]] = {}
     for target_url_id, source_url in rows:
         result.setdefault(target_url_id, []).append(source_url)
+    return result
+
+
+def _redirect_links_by_source(
+    db: Session, *, crawl_run_id: object
+) -> dict[object, list[dict[str, object]]]:
+    rows = db.execute(
+        select(
+            UrlLink.source_url_id,
+            UrlLink.target_url,
+            UrlLink.anchor_text,
+            Url.current_final_url,
+            Url.current_status_code,
+        )
+        .join(Url, Url.id == UrlLink.target_url_id)
+        .where(
+            UrlLink.crawl_run_id == crawl_run_id,
+            UrlLink.is_internal.is_(True),
+            UrlLink.source_url_id != UrlLink.target_url_id,
+            Url.current_final_url.is_not(None),
+        )
+        .order_by(UrlLink.source_url_id, UrlLink.target_url, UrlLink.anchor_text)
+    )
+    result: dict[object, list[dict[str, object]]] = {}
+    seen: set[tuple[object, str, str]] = set()
+    for source_id, target_url, anchor_text, final_url, status_code in rows:
+        try:
+            is_redirect = normalize_url(target_url) != normalize_url(final_url)
+        except InvalidUrlError:
+            is_redirect = False
+        key = (source_id, target_url, anchor_text or "")
+        if not is_redirect or key in seen:
+            continue
+        seen.add(key)
+        result.setdefault(source_id, []).append(
+            {
+                "redirect_url": target_url,
+                "final_url": final_url,
+                "anchor_text": anchor_text or "(geen ankertekst)",
+                "status_code": status_code,
+            }
+        )
     return result
 
 

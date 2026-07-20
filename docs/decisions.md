@@ -516,3 +516,16 @@ bewijs bij en lost de diagnose op wanneer de reeks geen afwijkingen meer bevat.
 
 Gevolg: tientallen pagina's met hetzelfde templategedrag leveren één controleerbare taak op, zonder
 feitelijke metingen of historie te verwijderen.
+
+## Redirectlinks groeperen op bronpagina
+
+Wanneer één bronpagina minimaal twee interne links naar redirect-URL's bevat, worden deze links als
+één bronpaginataak gepresenteerd. De afzonderlijke redirectdoelen en historie blijven opgeslagen;
+doelen die niet door een brongroep worden gedekt blijven als zelfstandige taak zichtbaar. De
+groepsdiagnose bevat per link de oude URL, eind-URL, ankertekst en status.
+
+`deep_page` blijft beschikbaar als kwaliteitscontrole, maar wordt als contextafhankelijke controle
+gelabeld in plaats van als bewezen probleem.
+
+Gevolg: de actielijst volgt het niveau waarop de wijziging kan worden uitgevoerd, zonder enkelvoudige
+redirectproblemen of meetbewijs te verbergen.

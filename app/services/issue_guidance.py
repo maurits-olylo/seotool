@@ -104,6 +104,7 @@ SOURCE_KEYS_BY_TYPE = {
     "broken_application_cta": ("job_posting",),
     "internally_linked_404": ("links", "http"),
     "multiple_broken_internal_links": ("links", "http"),
+    "multiple_redirected_internal_links": ("links", "redirect"),
     "patterned_404_urls": ("links", "http"),
     "pagination_series_review": ("canonical", "title", "snippet", "links"),
     "orphan_page": ("links",), "deep_page": ("links",),
@@ -140,6 +141,10 @@ TYPE_RELEVANCE = {
     "multiple_broken_internal_links": (
         "Meerdere dode links onderbreken dezelfde gebruikersroute en verspillen crawlverkeer."
     ),
+    "multiple_redirected_internal_links": (
+        "Meerdere redirectlinks op één bronpagina zijn meestal één onderhoudstaak voor dezelfde "
+        "pagina of hetzelfde gedeelde contentblok."
+    ),
     "patterned_404_urls": (
         "Een terugkerend 404-patroon wijst op structurele URL-generatie en kan veel "
         "ruis veroorzaken."
@@ -174,6 +179,9 @@ VERIFICATION_BY_TYPE = {
     "invalid_json_ld": "Alle JSON-LD-blokken zijn leesbaar en opnieuw gevalideerd.",
     "internally_linked_404": "Geen interne bronpagina linkt nog naar dit 404-doel.",
     "internally_linked_redirect": "Interne links wijzen rechtstreeks naar de definitieve 200-URL.",
+    "multiple_redirected_internal_links": (
+        "Geen interne link op de bronpagina gaat nog via een redirect."
+    ),
     "orphan_page": (
         "De pagina heeft een bewuste interne route of is bewust buiten de navigatie gehouden."
     ),

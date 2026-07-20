@@ -330,6 +330,7 @@ def list_issues(
     grouped_pagination_url_ids = _grouped_diagnosis_url_ids(
         db, website_id, "pagination_series_review"
     )
+    grouped_redirect_url_ids = _grouped_redirect_url_ids(db, website_id)
     issues = [
         issue
         for issue in issues
@@ -341,6 +342,10 @@ def list_issues(
             or (
                 issue.issue_type in PAGINATION_CHILD_ISSUE_TYPES
                 and issue.url_id in grouped_pagination_url_ids
+            )
+            or (
+                issue.issue_type == "internally_linked_redirect"
+                and issue.url_id in grouped_redirect_url_ids
             )
         )
     ]
@@ -561,6 +566,44 @@ def _grouped_diagnosis_url_ids(
     )
 
 
+def _grouped_redirect_url_ids(db: Session, website_id: UUID) -> set[UUID]:
+    diagnoses = list(
+        db.scalars(
+            select(Issue).where(
+                Issue.website_id == website_id,
+                Issue.issue_type == "multiple_redirected_internal_links",
+                Issue.status.in_(ACTIVE_ISSUE_STATUSES),
+            )
+        )
+    )
+    redirect_urls: set[str] = set()
+    diagnosis_ids = {diagnosis.id for diagnosis in diagnoses}
+    latest_by_issue: dict[UUID, IssueOccurrence] = {}
+    if diagnosis_ids:
+        occurrences = db.scalars(
+            select(IssueOccurrence)
+            .where(IssueOccurrence.issue_id.in_(diagnosis_ids))
+            .order_by(IssueOccurrence.issue_id, IssueOccurrence.detected_at.desc())
+        )
+        for occurrence in occurrences:
+            latest_by_issue.setdefault(occurrence.issue_id, occurrence)
+    for diagnosis in diagnoses:
+        occurrence = latest_by_issue.get(diagnosis.id)
+        for item in occurrence.evidence.get("redirected_links", []) if occurrence else []:
+            if isinstance(item, dict) and isinstance(item.get("redirect_url"), str):
+                redirect_urls.add(item["redirect_url"])
+    if not redirect_urls:
+        return set()
+    return set(
+        db.scalars(
+            select(Url.id).where(
+                Url.website_id == website_id,
+                Url.normalized_url.in_(redirect_urls),
+            )
+        )
+    )
+
+
 @router.get("/issues/{issue_id}", response_model=IssueDetailRead)
 def get_issue(
     issue_id: UUID,
@@ -619,10 +662,23 @@ def _issue_elements(
         return []
     target_urls: set[str] = set()
     source_url_id = issue.url_id
-    if issue.issue_type == "multiple_broken_internal_links":
-        for item in occurrence.evidence.get("broken_links", []):
-            if isinstance(item, dict) and isinstance(item.get("target_url"), str):
-                target_urls.add(_normalized_or_raw(item["target_url"]))
+    if issue.issue_type in {
+        "multiple_broken_internal_links",
+        "multiple_redirected_internal_links",
+    }:
+        evidence_key = (
+            "broken_links"
+            if issue.issue_type == "multiple_broken_internal_links"
+            else "redirected_links"
+        )
+        target_key = (
+            "target_url"
+            if issue.issue_type == "multiple_broken_internal_links"
+            else "redirect_url"
+        )
+        for item in occurrence.evidence.get(evidence_key, []):
+            if isinstance(item, dict) and isinstance(item.get(target_key), str):
+                target_urls.add(_normalized_or_raw(item[target_key]))
     elif (
         issue.issue_type
         in {

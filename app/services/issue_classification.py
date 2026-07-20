@@ -15,6 +15,7 @@ ISSUE_SCOPE_BY_TYPE: dict[str, IssueScope] = {
 
 ISSUE_NATURE_BY_TYPE: dict[str, IssueNature] = {
     "duplicate_meta_description": "optimization",
+    "deep_page": "review",
     "http_410": "review",
     "important_page_few_internal_links": "review",
     "job_posting_identifier_collision_risk": "optimization",

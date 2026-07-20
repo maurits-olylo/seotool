@@ -244,6 +244,8 @@ Status: eerste scopeclassificatie op 2026-07-19 gedeployed en in productie geval
   verwijdering tonen.
 - Zowel bronpatronen als doelpatronen ondersteunen: meerdere defecte links op één pagina en één
   defect doel waar veel pagina's naartoe linken zijn verschillende, maar gerelateerde diagnoses.
+- Bronpagina's met minimaal twee redirectlinks als één onderhoudstaak tonen; de onderliggende
+  redirectdoelen blijven historisch bewaard en enkelvoudige gevallen blijven afzonderlijk zichtbaar.
 
 ### Van diagnose naar exact handelingsadvies
 

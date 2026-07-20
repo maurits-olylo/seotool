@@ -13,6 +13,7 @@ def test_issue_scope_separates_non_seo_control_signals() -> None:
 
 
 def test_issue_nature_marks_contextual_and_optional_signals() -> None:
+    assert issue_nature("deep_page") == "review"
     assert issue_nature("http_404") == "problem"
     assert issue_nature("http_410") == "review"
     assert issue_nature("near_duplicate_content") == "review"
