@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.models.crawl import UrlSnapshot
 from app.models.discovery import Url
 from app.models.issues import Issue
-from app.services.content_similarity import near_duplicate_groups
+from app.services.content_similarity import exact_duplicate_groups, near_duplicate_groups
 from app.services.issue_engine import reconcile_issues
 from app.services.job_posting import job_posting_identifier
 from app.services.technical_checks import IssueSignal
@@ -39,7 +39,12 @@ def analyze_job_identifier_risk(
     clusters: list[dict[str, object]] = []
     affected_urls: set[str] = set()
     largest_group = 0
-    for group, scores in near_duplicate_groups(rows, excluded_indices=set()):
+    exact_groups = exact_duplicate_groups(rows)
+    exact_members = {index for group in exact_groups for index in group}
+    similarity_groups = [
+        (group, [1.0]) for group in exact_groups
+    ] + near_duplicate_groups(rows, excluded_indices=exact_members)
+    for group, scores in similarity_groups:
         urls = [rows[index][0].normalized_url for index in group]
         affected_urls.update(urls)
         largest_group = max(largest_group, len(group))

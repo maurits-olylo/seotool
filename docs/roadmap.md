@@ -221,6 +221,8 @@ Status: eerste scopeclassificatie op 2026-07-19 gedeployed en in productie geval
 - Losse URL-signalen clusteren tot één waarschijnlijk onderliggend probleem.
 - Vergelijkbare vacatures zonder identifier als één websitebrede templatediagnose tonen, met
   vacatureclusters, overlap en alle geraakte URL's als bewijs.
+- Exact gelijke vacaturecontent eerst op contenthash groeperen, zodat algemene templatewoorden de
+  conservatieve bijna-duplicaatfilter niet kunnen laten missen dat pagina's aantoonbaar gelijk zijn.
 - URL-patronen herkennen, waaronder paginering, filters, facetten, parameters, templates en
   canonical- of redirectconfiguraties.
 - Paginering- en parameterreeksen die meerdere 404's veroorzaken als één websitebrede diagnose

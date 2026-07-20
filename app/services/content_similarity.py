@@ -39,12 +39,7 @@ def detect_duplicate_content(
             .order_by(Url.normalized_url)
         )
     )
-    by_hash: dict[str, list[int]] = defaultdict(list)
-    for index, (_, snapshot) in enumerate(rows):
-        if _is_comparable(snapshot) and snapshot.main_content_hash:
-            by_hash[snapshot.main_content_hash].append(index)
-
-    exact_groups = [indices for indices in by_hash.values() if len(indices) > 1]
+    exact_groups = exact_duplicate_groups(rows)
     exact_members = {index for group in exact_groups for index in group}
     near_groups = near_duplicate_groups(rows, excluded_indices=exact_members)
 
@@ -114,6 +109,15 @@ def detect_duplicate_content(
             )
         )
     return touched
+
+
+def exact_duplicate_groups(rows: list[tuple[Url, UrlSnapshot]]) -> list[list[int]]:
+    """Return comparable pages grouped by an identical main-content hash."""
+    by_hash: dict[str, list[int]] = defaultdict(list)
+    for index, (_, snapshot) in enumerate(rows):
+        if _is_comparable(snapshot) and snapshot.main_content_hash:
+            by_hash[snapshot.main_content_hash].append(index)
+    return [indices for indices in by_hash.values() if len(indices) > 1]
 
 
 def _add_duplicate_metadata_signals(

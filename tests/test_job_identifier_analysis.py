@@ -131,6 +131,53 @@ def test_single_vacancy_without_identifier_is_only_an_optimization() -> None:
         assert db.scalar(select(Issue)) is None
 
 
+def test_exact_duplicate_vacancies_are_grouped_before_common_shingle_filtering() -> None:
+    with SessionLocal() as db:
+        client = Client(name="Exacte vacaturetemplates")
+        website = Website(client=client, name="Vacatures", base_url="https://exact.example/")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        run = _run(db, website.id)
+        content = _content("dezelfde vacature")
+        for number in range(11):
+            url = Url(
+                website_id=website.id,
+                normalized_url=f"https://exact.example/vacatures/rol-{number}",
+                current_status_code=200,
+                is_indexable=True,
+            )
+            db.add(url)
+            db.flush()
+            db.add(
+                UrlSnapshot(
+                    url_id=url.id,
+                    crawl_run_id=run.id,
+                    requested_url=url.normalized_url,
+                    final_url=url.normalized_url,
+                    status_code=200,
+                    redirect_chain=[],
+                    word_count=len(content.split()),
+                    main_content=content,
+                    main_content_hash="exact-shared-hash",
+                    schema_types=["JobPosting"],
+                    schema_data=[{"@type": "JobPosting", "title": "Rol"}],
+                    is_indexable=True,
+                )
+            )
+        db.flush()
+
+        found = analyze_job_identifier_risk(db, website_id=website.id, crawl_run_id=run.id)
+
+        assert len(found) == 1
+        assert found[0].title == "11 vergelijkbare vacatures missen een identifier"
+        occurrence = db.scalar(
+            select(IssueOccurrence).where(IssueOccurrence.issue_id == found[0].id)
+        )
+        assert occurrence is not None
+        assert occurrence.evidence["clusters"][0]["minimum_content_overlap_percent"] == 100.0
+
+
 def _run(db, website_id):  # type: ignore[no-untyped-def]
     job = CrawlJob(website_id=website_id, job_type="full_site_crawl")
     db.add(job)
