@@ -22,6 +22,7 @@ ISSUE_NATURE_BY_TYPE: dict[str, IssueNature] = {
     "missing_h1": "review",
     "missing_meta_description": "optimization",
     "near_duplicate_content": "review",
+    "pagination_series_review": "review",
     "robots_txt_blocked": "review",
     "thin_content": "review",
 }

@@ -105,6 +105,7 @@ SOURCE_KEYS_BY_TYPE = {
     "internally_linked_404": ("links", "http"),
     "multiple_broken_internal_links": ("links", "http"),
     "patterned_404_urls": ("links", "http"),
+    "pagination_series_review": ("canonical", "title", "snippet", "links"),
     "orphan_page": ("links",), "deep_page": ("links",),
     "important_page_few_internal_links": ("links",),
     "cms_link_placeholder": ("links",),
@@ -143,6 +144,10 @@ TYPE_RELEVANCE = {
         "Een terugkerend 404-patroon wijst op structurele URL-generatie en kan veel "
         "ruis veroorzaken."
     ),
+    "pagination_series_review": (
+        "Een pagineringsreeks moet als één technisch geheel worden beoordeeld; losse metadata-, "
+        "canonical- en dieptesignalen beschrijven meestal hetzelfde templategedrag."
+    ),
 }
 
 VERIFICATION_BY_TYPE = {
@@ -174,6 +179,9 @@ VERIFICATION_BY_TYPE = {
     ),
     "job_posting_schema_missing": (
         "De volgende crawl vindt geldig JobPosting-schema op de vacaturedetailpagina."
+    ),
+    "pagination_series_review": (
+        "De volgende volledige crawl vindt alleen geldige reeks-URL's en geen lege grenspagina's."
     ),
 }
 

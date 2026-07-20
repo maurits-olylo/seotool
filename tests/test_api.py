@@ -974,6 +974,67 @@ def test_url_registry_deduplicates_and_creates_job(client: TestClient) -> None:
     assert [item["id"] for item in exports.json()] == [export.json()["id"]]
 
 
+def test_issue_list_hides_pagination_children_behind_series_review(client: TestClient) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Pagination UI"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": customer["id"],
+            "name": "Pagination site",
+            "base_url": "https://example.com",
+        },
+    ).json()
+    website_id = UUID(website["id"])
+    with SessionLocal() as db:
+        url = Url(
+            website_id=website_id,
+            normalized_url="https://example.com/articles?page=2",
+        )
+        job = CrawlJob(website_id=website_id, job_type="full_site_crawl")
+        db.add_all([url, job])
+        db.flush()
+        run = CrawlRun(
+            crawl_job_id=job.id,
+            website_id=website_id,
+            crawl_type="full_site_crawl",
+        )
+        child = Issue(
+            website_id=website_id,
+            url_id=url.id,
+            issue_type="duplicate_title",
+            category="onpage",
+            severity="medium",
+            title="Dubbele title",
+            description="Herhaald pagineringssignaal.",
+            recommended_action="Controleer de reeks.",
+        )
+        diagnosis = Issue(
+            website_id=website_id,
+            url_id=None,
+            issue_type="pagination_series_review",
+            category="indexation",
+            severity="low",
+            title="Pagineringsreeks",
+            description="Gezamenlijke controle.",
+            recommended_action="Controleer het template.",
+        )
+        db.add_all([run, child, diagnosis])
+        db.flush()
+        db.add(
+            IssueOccurrence(
+                issue_id=diagnosis.id,
+                crawl_run_id=run.id,
+                evidence={"patterns": [{"urls": [url.normalized_url]}]},
+            )
+        )
+        db.commit()
+
+    payload = client.get(f"/api/v1/websites/{website_id}/issues").json()
+
+    assert [item["issue_type"] for item in payload] == ["pagination_series_review"]
+    assert payload[0]["nature"] == "review"
+
+
 def test_running_crawl_can_pause_resume_and_cancel(client: TestClient) -> None:
     customer = client.post("/api/v1/clients", json={"name": "Controlled crawl"}).json()
     website = client.post(

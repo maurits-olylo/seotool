@@ -506,3 +506,13 @@ vacature-identifiers wordt als kwaliteitsoptimalisatie gepresenteerd, niet als b
 
 Gevolg: gebruikers kunnen technische SEO-issues apart filteren zonder nuttige controles te
 verwijderen of ze ten onrechte als harde SEO-fout te presenteren.
+
+## Pagineringsreeksen als één templatecontrole
+
+Metadata, canonical, crawldiepte en lege grenspagina's worden per pagineringsreeks samengebracht in
+één websitebrede diagnose. De URL-issues en historie blijven opgeslagen, maar de actieve actielijst
+verbergt deze kinderen zolang de groepsdiagnose actief is. Een volgende volledige crawl werkt het
+bewijs bij en lost de diagnose op wanneer de reeks geen afwijkingen meer bevat.
+
+Gevolg: tientallen pagina's met hetzelfde templategedrag leveren één controleerbare taak op, zonder
+feitelijke metingen of historie te verwijderen.

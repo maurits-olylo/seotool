@@ -36,6 +36,8 @@ COMMUNICATIESTIJL
 - Wanneer de gebruiker na gegeven terminalcommando's antwoordt met `ja`, neem dan aan dat die
   commando's succesvol zijn uitgevoerd en ga direct verder. Vraag niet opnieuw om bevestiging,
   tenzij de gebruiker een foutmelding of afwijkende uitvoer deelt.
+- Bundel samenhangende correcties in één logisch releasepakket. Maak niet voor iedere kleine
+  wijziging een aparte release, behalve wanneer een directe productiestoring een losse hotfix vereist.
 
 CODE EN IMPLEMENTATIE
 

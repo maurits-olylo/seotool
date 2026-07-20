@@ -37,6 +37,7 @@ from app.services.authorization import require_website_access, require_write_acc
 from app.services.element_jumps import build_live_jump_url
 from app.services.issue_classification import issue_nature, issue_scope
 from app.services.issue_guidance import build_issue_guidance
+from app.services.pagination_analysis import PAGINATION_CHILD_ISSUE_TYPES
 from app.services.url_normalization import InvalidUrlError, normalize_url
 
 router = APIRouter(tags=["issues"])
@@ -326,11 +327,21 @@ def list_issues(
         query = query.where(Issue.status == issue_status)
     issues = list(db.scalars(query))
     grouped_404_url_ids = _grouped_404_url_ids(db, website_id)
+    grouped_pagination_url_ids = _grouped_diagnosis_url_ids(
+        db, website_id, "pagination_series_review"
+    )
     issues = [
         issue
         for issue in issues
         if not (
-            issue.issue_type in GROUPABLE_404_ISSUE_TYPES and issue.url_id in grouped_404_url_ids
+            (
+                issue.issue_type in GROUPABLE_404_ISSUE_TYPES
+                and issue.url_id in grouped_404_url_ids
+            )
+            or (
+                issue.issue_type in PAGINATION_CHILD_ISSUE_TYPES
+                and issue.url_id in grouped_pagination_url_ids
+            )
         )
     ]
     impacts = _organic_impacts(db, website_id)
@@ -506,11 +517,17 @@ def restore_issue_suppression(
 
 
 def _grouped_404_url_ids(db: Session, website_id: UUID) -> set[UUID]:
+    return _grouped_diagnosis_url_ids(db, website_id, "patterned_404_urls")
+
+
+def _grouped_diagnosis_url_ids(
+    db: Session, website_id: UUID, issue_type: str
+) -> set[UUID]:
     diagnosis = db.scalar(
         select(Issue)
         .where(
             Issue.website_id == website_id,
-            Issue.issue_type == "patterned_404_urls",
+            Issue.issue_type == issue_type,
             Issue.status.in_(ACTIVE_ISSUE_STATUSES),
         )
         .order_by(Issue.last_detected_at.desc())

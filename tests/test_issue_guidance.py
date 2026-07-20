@@ -58,3 +58,16 @@ def test_guidance_adds_specific_value_and_source_for_job_schema() -> None:
     )
     assert "Google" in job_guidance["relevance"]["text"]  # type: ignore[index]
     assert job_guidance["sources"][0]["publisher"] == "Google Search Central"  # type: ignore[index]
+
+
+def test_pagination_guidance_treats_repeated_signals_as_one_template_review() -> None:
+    guidance = build_issue_guidance(
+        _issue("pagination_series_review", "indexation"),
+        {"verification": "geen lege grenspagina's"},
+    )
+
+    assert "één technisch geheel" in guidance["relevance"]["text"]  # type: ignore[index]
+    assert guidance["verification"] == "geen lege grenspagina's"
+    assert {source["publisher"] for source in guidance["sources"]} == {
+        "Google Search Central"
+    }

@@ -233,6 +233,8 @@ Status: eerste scopeclassificatie op 2026-07-19 gedeployed en in productie geval
   daarnaast opnieuw een generieke 404-taak voor dezelfde URL.
 - Vergelijkbare paginagroepen vormen en afwijkingen binnen zo'n groep aanwijzen in plaats van alle
   normale waarden als losse regels te tonen.
+- Pagineringsreeksen bundelen metadata-, canonical-, diepte- en grensfouten tot één templatecontrole;
+  onderliggende URL-signalen blijven historisch bewaard maar verdwijnen uit de hoofdactielijst.
 - Crawldiepte, indexatie, interne links, wijzigingen, schema en verkeersdata gezamenlijk beoordelen.
 - Mogelijke hoofdoorzaak, alternatieve verklaring, vertrouwen en technisch bewijs apart tonen.
 - Eén hoofdissue koppelen aan geraakte URL's en onderliggende signalen zonder historie te verliezen.
