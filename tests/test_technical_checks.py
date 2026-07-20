@@ -18,6 +18,19 @@ def test_detects_404() -> None:
     assert [signal.issue_type for signal in inspect_snapshot(snapshot)] == ["http_404"]
 
 
+def test_ignores_error_page_canonical() -> None:
+    snapshot = UrlSnapshot(
+        requested_url="https://example.com/missing",
+        final_url="https://example.com/missing",
+        status_code=404,
+        canonical="https://example.com/404",
+        headings={},
+        redirect_chain=[],
+    )
+
+    assert {signal.issue_type for signal in inspect_snapshot(snapshot)} == {"http_404"}
+
+
 def test_long_redirect_chain_is_a_low_priority_review() -> None:
     snapshot = UrlSnapshot(
         requested_url="https://example.com/old",

@@ -113,6 +113,7 @@ SOURCE_KEYS_BY_TYPE = {
     "thin_content": ("helpful_content",), "possibly_outdated_content": ("helpful_content",),
     "broken_image": ("helpful_content",),
     "oversized_image": ("performance",), "oversized_document": ("performance",),
+    "template_signal_clusters": ("canonical", "title", "snippet", "links", "helpful_content"),
 }
 
 
@@ -153,6 +154,10 @@ TYPE_RELEVANCE = {
         "Een pagineringsreeks moet als één technisch geheel worden beoordeeld; losse metadata-, "
         "canonical- en dieptesignalen beschrijven meestal hetzelfde templategedrag."
     ),
+    "template_signal_clusters": (
+        "Herhaalde signalen binnen dezelfde URL-familie of metadatawaarde wijzen meestal op één "
+        "template-, component- of contenttypebeslissing."
+    ),
 }
 
 VERIFICATION_BY_TYPE = {
@@ -190,6 +195,10 @@ VERIFICATION_BY_TYPE = {
     ),
     "pagination_series_review": (
         "De volgende volledige crawl vindt alleen geldige reeks-URL's en geen lege grenspagina's."
+    ),
+    "template_signal_clusters": (
+        "De volgende volledige crawl werkt ieder aangepast cluster bij zonder dezelfde "
+        "onbedoelde herhaling."
     ),
 }
 

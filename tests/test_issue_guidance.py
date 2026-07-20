@@ -80,3 +80,14 @@ def test_grouped_redirect_guidance_focuses_on_the_source_page() -> None:
 
     assert "één onderhoudstaak" in guidance["relevance"]["text"]  # type: ignore[index]
     assert "bronpagina" in str(guidance["verification"])
+
+
+def test_template_cluster_guidance_focuses_on_one_shared_review() -> None:
+    guidance = build_issue_guidance(
+        _issue("template_signal_clusters"),
+        {"verification": "het signaal verdwijnt uit de URL-familie"},
+    )
+
+    assert "template" in guidance["relevance"]["text"]  # type: ignore[index]
+    assert guidance["verification"] == "het signaal verdwijnt uit de URL-familie"
+    assert guidance["sources"]

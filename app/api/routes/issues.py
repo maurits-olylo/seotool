@@ -38,6 +38,7 @@ from app.services.element_jumps import build_live_jump_url
 from app.services.issue_classification import issue_nature, issue_scope
 from app.services.issue_guidance import build_issue_guidance
 from app.services.pagination_analysis import PAGINATION_CHILD_ISSUE_TYPES
+from app.services.template_issue_analysis import TEMPLATE_CLUSTER_ISSUE_TYPE
 from app.services.url_normalization import InvalidUrlError, normalize_url
 
 router = APIRouter(tags=["issues"])
@@ -331,6 +332,7 @@ def list_issues(
         db, website_id, "pagination_series_review"
     )
     grouped_redirect_url_ids = _grouped_redirect_url_ids(db, website_id)
+    grouped_template_issue_keys = _grouped_template_issue_keys(db, website_id)
     issues = [
         issue
         for issue in issues
@@ -347,6 +349,7 @@ def list_issues(
                 issue.issue_type == "internally_linked_redirect"
                 and issue.url_id in grouped_redirect_url_ids
             )
+            or (issue.url_id, issue.issue_type) in grouped_template_issue_keys
         )
     ]
     impacts = _organic_impacts(db, website_id)
@@ -602,6 +605,53 @@ def _grouped_redirect_url_ids(db: Session, website_id: UUID) -> set[UUID]:
             )
         )
     )
+
+
+def _grouped_template_issue_keys(db: Session, website_id: UUID) -> set[tuple[UUID, str]]:
+    diagnosis = db.scalar(
+        select(Issue)
+        .where(
+            Issue.website_id == website_id,
+            Issue.issue_type == TEMPLATE_CLUSTER_ISSUE_TYPE,
+            Issue.status.in_(ACTIVE_ISSUE_STATUSES),
+        )
+        .order_by(Issue.last_detected_at.desc())
+        .limit(1)
+    )
+    if diagnosis is None:
+        return set()
+    occurrence = db.scalar(
+        select(IssueOccurrence)
+        .where(IssueOccurrence.issue_id == diagnosis.id)
+        .order_by(IssueOccurrence.detected_at.desc())
+        .limit(1)
+    )
+    if occurrence is None:
+        return set()
+    types_by_url: dict[str, set[str]] = {}
+    for cluster in occurrence.evidence.get("clusters", []):
+        if not isinstance(cluster, dict) or not isinstance(cluster.get("issue_type"), str):
+            continue
+        for url in cluster.get("urls", []):
+            if isinstance(url, str):
+                types_by_url.setdefault(url, set()).add(cluster["issue_type"])
+    if not types_by_url:
+        return set()
+    urls_by_value = {
+        url.normalized_url: url.id
+        for url in db.scalars(
+            select(Url).where(
+                Url.website_id == website_id,
+                Url.normalized_url.in_(types_by_url),
+            )
+        )
+    }
+    return {
+        (urls_by_value[url], issue_type)
+        for url, issue_types in types_by_url.items()
+        if url in urls_by_value
+        for issue_type in issue_types
+    }
 
 
 @router.get("/issues/{issue_id}", response_model=IssueDetailRead)

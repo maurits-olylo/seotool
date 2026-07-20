@@ -529,3 +529,14 @@ gelabeld in plaats van als bewezen probleem.
 
 Gevolg: de actielijst volgt het niveau waarop de wijziging kan worden uitgevoerd, zonder enkelvoudige
 redirectproblemen of meetbewijs te verbergen.
+
+## Herhaalde URL-signalen als templateclusters
+
+Grote groepen met hetzelfde issuetype en een gedeelde URL-familie of metadatawaarde worden als één
+websitebrede templatecontrole gepresenteerd. Drempels verschillen per signaal: drie URL's voor exact
+gelijke metadata/canonical, vijf voor content-, H1-, ontbrekende-veld- en orphanfamilies en tien voor
+crawldiepte. Pagineringskinderen worden uitgesloten omdat die al een specifiekere reeksdiagnose
+hebben. Onderliggende issues en historie blijven opgeslagen.
+
+Canonicalcontrole wordt alleen uitgevoerd op bereikbare pagina's met een 200-status. Een 404-pagina
+met een canonical naar de foutpagina levert daardoor niet langer een tweede canonicalissue op.

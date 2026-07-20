@@ -26,6 +26,7 @@ ISSUE_NATURE_BY_TYPE: dict[str, IssueNature] = {
     "pagination_series_review": "review",
     "robots_txt_blocked": "review",
     "thin_content": "review",
+    "template_signal_clusters": "review",
 }
 
 

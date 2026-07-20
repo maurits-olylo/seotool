@@ -205,7 +205,8 @@ def inspect_snapshot(snapshot: UrlSnapshot, *, today: date | None = None) -> lis
             )
         )
     if (
-        snapshot.canonical
+        status == 200
+        and snapshot.canonical
         and snapshot.final_url
         and _canonical_difference_is_actionable(snapshot.final_url, snapshot.canonical)
     ):

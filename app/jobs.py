@@ -31,6 +31,7 @@ from app.services.technical_checks import (
     IssueSignal,
     inspect_crawl_error,
 )
+from app.services.template_issue_analysis import analyze_template_issue_clusters
 from app.services.url_filtering import is_probable_html_page
 from app.services.url_registry import register_url
 from app.services.url_scope import is_url_in_website_scope
@@ -409,6 +410,12 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
         )
         _check_crawl_control(db, job, run)
         analyze_pagination_series(
+            db,
+            website_id=website.id,
+            crawl_run_id=run.id,
+        )
+        _check_crawl_control(db, job, run)
+        analyze_template_issue_clusters(
             db,
             website_id=website.id,
             crawl_run_id=run.id,
