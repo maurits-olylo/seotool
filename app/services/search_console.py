@@ -1,3 +1,5 @@
+import asyncio
+import time
 from datetime import UTC, date, datetime, timedelta
 from urllib.parse import quote
 from uuid import UUID
@@ -14,12 +16,14 @@ from app.models.integrations import (
     WebsiteIntegration,
 )
 from app.services.google_integrations import get_google_access_token
+from app.services.metric_storage import insert_metric_rows
 from app.services.url_normalization import InvalidUrlError, normalize_url
 
 
 async def sync_search_console(
     db: Session, website_id: UUID, days: int | None = None
 ) -> dict[str, object]:
+    sync_started = time.perf_counter()
     mapping = db.scalar(
         select(WebsiteIntegration).where(
             WebsiteIntegration.website_id == website_id,
@@ -76,8 +80,12 @@ async def sync_search_console(
 
     async with httpx.AsyncClient(timeout=60) as http:
         try:
-            rows = await fetch_rows(["date", "page"])
-            query_rows = await fetch_rows(["date", "query", "page"])
+            api_started = time.perf_counter()
+            rows, query_rows = await asyncio.gather(
+                fetch_rows(["date", "page"]),
+                fetch_rows(["date", "query", "page"]),
+            )
+            api_duration_ms = round((time.perf_counter() - api_started) * 1000)
         except ValueError:
             mapping.status = "error"
             mapping.settings = {
@@ -91,7 +99,16 @@ async def sync_search_console(
         item.normalized_url: item.id
         for item in db.scalars(select(Url).where(Url.website_id == website_id))
     }
+    database_started = time.perf_counter()
+    db.execute(
+        delete(SearchConsoleMetric).where(
+            SearchConsoleMetric.website_id == website_id,
+            SearchConsoleMetric.date >= start_date,
+            SearchConsoleMetric.date <= end_date,
+        )
+    )
     matched = 0
+    page_metrics: list[dict[str, object]] = []
     for row in rows:
         keys = row.get("keys", [])
         if len(keys) < 2:
@@ -104,21 +121,19 @@ async def sync_search_console(
             normalized = page_url
         url_id = url_map.get(normalized)
         matched += int(url_id is not None)
-        metric = db.scalar(
-            select(SearchConsoleMetric).where(
-                SearchConsoleMetric.website_id == website_id,
-                SearchConsoleMetric.date == metric_date,
-                SearchConsoleMetric.page_url == page_url,
-            )
+        page_metrics.append(
+            {
+                "website_id": website_id,
+                "url_id": url_id,
+                "date": metric_date,
+                "page_url": page_url,
+                "clicks": float(row.get("clicks", 0)),
+                "impressions": int(row.get("impressions", 0)),
+                "ctr": float(row.get("ctr", 0)),
+                "position": float(row.get("position", 0)),
+            }
         )
-        if metric is None:
-            metric = SearchConsoleMetric(website_id=website_id, date=metric_date, page_url=page_url)
-            db.add(metric)
-        metric.url_id = url_id
-        metric.clicks = float(row.get("clicks", 0))
-        metric.impressions = int(row.get("impressions", 0))
-        metric.ctr = float(row.get("ctr", 0))
-        metric.position = float(row.get("position", 0))
+    insert_metric_rows(db, SearchConsoleMetric, page_metrics)
 
     # Query-level data is replaced only for the imported date range. This keeps
     # retries idempotent while avoiding a database lookup for every query row.
@@ -130,7 +145,7 @@ async def sync_search_console(
         )
     )
     query_matched = 0
-    metrics: list[SearchConsoleQueryMetric] = []
+    metrics: list[dict[str, object]] = []
     for row in query_rows:
         keys = row.get("keys", [])
         if len(keys) < 3:
@@ -145,23 +160,25 @@ async def sync_search_console(
         url_id = url_map.get(normalized)
         query_matched += int(url_id is not None)
         metrics.append(
-            SearchConsoleQueryMetric(
-                website_id=website_id,
-                url_id=url_id,
-                date=metric_date,
-                query=query,
-                page_url=page_url,
-                clicks=float(row.get("clicks", 0)),
-                impressions=int(row.get("impressions", 0)),
-                ctr=float(row.get("ctr", 0)),
-                position=float(row.get("position", 0)),
-            )
+            {
+                "website_id": website_id,
+                "url_id": url_id,
+                "date": metric_date,
+                "query": query,
+                "page_url": page_url,
+                "clicks": float(row.get("clicks", 0)),
+                "impressions": int(row.get("impressions", 0)),
+                "ctr": float(row.get("ctr", 0)),
+                "position": float(row.get("position", 0)),
+            }
         )
-    db.add_all(metrics)
+    insert_metric_rows(db, SearchConsoleQueryMetric, metrics)
 
     now = datetime.now(UTC)
     mapping.status = "active"
     mapping.last_synced_at = now
+    database_duration_ms = round((time.perf_counter() - database_started) * 1000)
+    duration_ms = round((time.perf_counter() - sync_started) * 1000)
     mapping.settings = {
         **mapping.settings,
         "last_import_start": start_date.isoformat(),
@@ -170,6 +187,10 @@ async def sync_search_console(
         "last_import_matched": matched,
         "last_query_import_rows": len(metrics),
         "last_query_import_matched": query_matched,
+        "last_import_duration_ms": duration_ms,
+        "last_api_duration_ms": api_duration_ms,
+        "last_database_duration_ms": database_duration_ms,
+        "last_error": None,
     }
     connection.last_synced_at = now
     db.commit()
@@ -183,4 +204,7 @@ async def sync_search_console(
         "query_rows": len(metrics),
         "query_matched_urls": query_matched,
         "query_unmatched_urls": len(metrics) - query_matched,
+        "duration_ms": duration_ms,
+        "api_duration_ms": api_duration_ms,
+        "database_duration_ms": database_duration_ms,
     }

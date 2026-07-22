@@ -72,6 +72,12 @@ en aparte tabbladen voor URL's, issues, wijzigingen, interne links en vacatures.
 bevat lifecycle, Google for Jobs-status, datums, sollicitatiegegevens, interne links en actieve
 bevindingen, maar geen technische database-ID's. Bestanden staan in een gedeeld volume.
 
+Google-imports halen onafhankelijke rapporten gelijktijdig op. GSC vervangt pagina- en
+zoektermmetrics voor het geïmporteerde datumbereik transactioneel; GA4 doet hetzelfde voor
+landingspagina-, event- en landingspagina-eventmetrics. Inserts worden in batches van maximaal
+5.000 mappings uitgevoerd. Iedere synchronisatie bewaart totale, API- en databaseduur zodat
+productieverschillen meetbaar blijven.
+
 ## Crawl-diepte
 
 Een volledige sitecrawl start op de genormaliseerde basis-URL met diepte 0 en verwerkt interne

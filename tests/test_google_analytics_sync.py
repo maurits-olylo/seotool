@@ -22,6 +22,9 @@ def _row(dimensions: list[str], metrics: list[str]) -> dict[str, object]:
 
 
 def test_ga4_sync_stores_key_events_per_landing_page(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    active_reports = 0
+    maximum_active_reports = 0
+
     async def fake_token(*args, **kwargs):  # type: ignore[no-untyped-def]
         return "token"
 
@@ -34,13 +37,20 @@ def test_ga4_sync_stores_key_events_per_landing_page(monkeypatch) -> None:  # ty
         dimensions,
         metrics,  # type: ignore[no-untyped-def]
     ):
+        nonlocal active_reports, maximum_active_reports
+        active_reports += 1
+        maximum_active_reports = max(maximum_active_reports, active_reports)
+        await asyncio.sleep(0)
         if dimensions == ["date", "landingPagePlusQueryString"]:
-            return [_row(["20260615", "/offerte"], ["200", "180"])]
-        if dimensions == ["date", "eventName"]:
-            return [_row(["20260615", "offer_request"], ["12"])]
-        if dimensions == ["date", "landingPagePlusQueryString", "eventName"]:
-            return [_row(["20260615", "/offerte", "offer_request"], ["12"])]
-        raise AssertionError(f"Unexpected GA4 dimensions: {dimensions}")
+            result = [_row(["20260615", "/offerte"], ["200", "180"])]
+        elif dimensions == ["date", "eventName"]:
+            result = [_row(["20260615", "offer_request"], ["12"])]
+        elif dimensions == ["date", "landingPagePlusQueryString", "eventName"]:
+            result = [_row(["20260615", "/offerte", "offer_request"], ["12"])]
+        else:
+            raise AssertionError(f"Unexpected GA4 dimensions: {dimensions}")
+        active_reports -= 1
+        return result
 
     monkeypatch.setattr(google_analytics, "get_google_access_token", fake_token)
     monkeypatch.setattr(google_analytics, "_run_ga_report", fake_report)
@@ -87,3 +97,5 @@ def test_ga4_sync_stores_key_events_per_landing_page(monkeypatch) -> None:  # ty
         assert metric.event_name == "offer_request"
         assert metric.key_events == 12
         assert mapping.settings["last_import_landing_event_rows"] == 1
+        assert mapping.settings["last_import_duration_ms"] >= 0
+        assert maximum_active_reports == 3

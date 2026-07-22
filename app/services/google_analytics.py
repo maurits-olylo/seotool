@@ -1,3 +1,5 @@
+import asyncio
+import time
 from datetime import UTC, date, datetime, timedelta
 from urllib.parse import urljoin
 from uuid import UUID
@@ -16,6 +18,7 @@ from app.models.integrations import (
 )
 from app.models.website import Website
 from app.services.google_integrations import get_google_access_token
+from app.services.metric_storage import insert_metric_rows
 from app.services.url_normalization import InvalidUrlError, normalize_url
 
 ORGANIC_SEARCH_FILTER = {
@@ -65,6 +68,7 @@ async def _run_ga_report(
 async def sync_google_analytics(
     db: Session, website_id: UUID, days: int | None = None
 ) -> dict[str, object]:
+    sync_started = time.perf_counter()
     website = db.get(Website, website_id)
     mapping = db.scalar(
         select(WebsiteIntegration).where(
@@ -95,39 +99,44 @@ async def sync_google_analytics(
     endpoint = f"https://analyticsdata.googleapis.com/v1beta/properties/{property_id}:runReport"
     async with httpx.AsyncClient(timeout=60) as http:
         try:
-            response_rows = await _run_ga_report(
-                http,
-                endpoint,
-                token,
-                start_date,
-                end_date,
-                ["date", "landingPagePlusQueryString"],
-                ["sessions", "activeUsers"],
+            api_started = time.perf_counter()
+            response_rows, event_rows, landing_event_rows = await asyncio.gather(
+                _run_ga_report(
+                    http,
+                    endpoint,
+                    token,
+                    start_date,
+                    end_date,
+                    ["date", "landingPagePlusQueryString"],
+                    ["sessions", "activeUsers"],
+                ),
+                _run_ga_report(
+                    http,
+                    endpoint,
+                    token,
+                    start_date,
+                    end_date,
+                    ["date", "eventName"],
+                    ["keyEvents"],
+                ),
+                _run_ga_report(
+                    http,
+                    endpoint,
+                    token,
+                    start_date,
+                    end_date,
+                    ["date", "landingPagePlusQueryString", "eventName"],
+                    ["keyEvents"],
+                ),
             )
-            event_rows = await _run_ga_report(
-                http,
-                endpoint,
-                token,
-                start_date,
-                end_date,
-                ["date", "eventName"],
-                ["keyEvents"],
-            )
-            landing_event_rows = await _run_ga_report(
-                http,
-                endpoint,
-                token,
-                start_date,
-                end_date,
-                ["date", "landingPagePlusQueryString", "eventName"],
-                ["keyEvents"],
-            )
+            api_duration_ms = round((time.perf_counter() - api_started) * 1000)
         except ValueError:
             mapping.status = "error"
             mapping.settings = {**mapping.settings, "last_error": "GA4 import failed"}
             db.commit()
             raise
 
+    database_started = time.perf_counter()
     db.execute(
         delete(GoogleAnalyticsMetric).where(
             GoogleAnalyticsMetric.website_id == website_id,
@@ -156,6 +165,7 @@ async def sync_google_analytics(
     }
     matched = 0
     imported = 0
+    metric_rows: list[dict[str, object]] = []
     for row in response_rows:
         dimensions = row.get("dimensionValues", [])
         metrics = row.get("metricValues", [])
@@ -172,20 +182,22 @@ async def sync_google_analytics(
             normalized = page_url
         url_id = url_map.get(normalized)
         matched += int(url_id is not None)
-        db.add(
-            GoogleAnalyticsMetric(
-                website_id=website_id,
-                date=metric_date,
-                landing_page=landing_page,
-                url_id=url_id,
-                sessions=int(float(metrics[0].get("value", 0))),
-                active_users=int(float(metrics[1].get("value", 0))),
-                key_events=0,
-            )
+        metric_rows.append(
+            {
+                "website_id": website_id,
+                "date": metric_date,
+                "landing_page": landing_page,
+                "url_id": url_id,
+                "sessions": int(float(metrics[0].get("value", 0))),
+                "active_users": int(float(metrics[1].get("value", 0))),
+                "key_events": 0,
+            }
         )
         imported += 1
+    insert_metric_rows(db, GoogleAnalyticsMetric, metric_rows)
 
     imported_events = 0
+    event_metric_rows: list[dict[str, object]] = []
     for row in event_rows:
         dimensions = row.get("dimensionValues", [])
         metrics = row.get("metricValues", [])
@@ -194,18 +206,20 @@ async def sync_google_analytics(
         key_events = float(metrics[0].get("value", 0))
         if key_events <= 0:
             continue
-        db.add(
-            GoogleAnalyticsEventMetric(
-                website_id=website_id,
-                date=datetime.strptime(dimensions[0]["value"], "%Y%m%d").date(),
-                event_name=str(dimensions[1]["value"]),
-                key_events=key_events,
-            )
+        event_metric_rows.append(
+            {
+                "website_id": website_id,
+                "date": datetime.strptime(dimensions[0]["value"], "%Y%m%d").date(),
+                "event_name": str(dimensions[1]["value"]),
+                "key_events": key_events,
+            }
         )
         imported_events += 1
+    insert_metric_rows(db, GoogleAnalyticsEventMetric, event_metric_rows)
 
     imported_landing_events = 0
     matched_landing_events = 0
+    landing_event_metric_rows: list[dict[str, object]] = []
     for row in landing_event_rows:
         dimensions = row.get("dimensionValues", [])
         metrics = row.get("metricValues", [])
@@ -222,21 +236,28 @@ async def sync_google_analytics(
             normalized = page_url
         url_id = url_map.get(normalized)
         matched_landing_events += int(url_id is not None)
-        db.add(
-            GoogleAnalyticsLandingPageEventMetric(
-                website_id=website_id,
-                url_id=url_id,
-                date=datetime.strptime(dimensions[0]["value"], "%Y%m%d").date(),
-                landing_page=landing_page,
-                event_name=str(dimensions[2]["value"]),
-                key_events=key_events,
-            )
+        landing_event_metric_rows.append(
+            {
+                "website_id": website_id,
+                "url_id": url_id,
+                "date": datetime.strptime(dimensions[0]["value"], "%Y%m%d").date(),
+                "landing_page": landing_page,
+                "event_name": str(dimensions[2]["value"]),
+                "key_events": key_events,
+            }
         )
         imported_landing_events += 1
+    insert_metric_rows(
+        db,
+        GoogleAnalyticsLandingPageEventMetric,
+        landing_event_metric_rows,
+    )
 
     now = datetime.now(UTC)
     mapping.status = "active"
     mapping.last_synced_at = now
+    database_duration_ms = round((time.perf_counter() - database_started) * 1000)
+    duration_ms = round((time.perf_counter() - sync_started) * 1000)
     mapping.settings = {
         **mapping.settings,
         "last_import_start": start_date.isoformat(),
@@ -246,6 +267,10 @@ async def sync_google_analytics(
         "last_import_landing_event_rows": imported_landing_events,
         "last_import_landing_event_matched": matched_landing_events,
         "last_import_matched": matched,
+        "last_import_duration_ms": duration_ms,
+        "last_api_duration_ms": api_duration_ms,
+        "last_database_duration_ms": database_duration_ms,
+        "last_error": None,
     }
     connection.last_synced_at = now
     db.commit()
@@ -259,4 +284,7 @@ async def sync_google_analytics(
         "event_rows": imported_events,
         "landing_event_rows": imported_landing_events,
         "landing_event_matched_urls": matched_landing_events,
+        "duration_ms": duration_ms,
+        "api_duration_ms": api_duration_ms,
+        "database_duration_ms": database_duration_ms,
     }

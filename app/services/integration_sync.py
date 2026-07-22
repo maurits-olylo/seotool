@@ -46,6 +46,7 @@ async def _synchronize_website_integrations(website_id: UUID, days: int | None =
                 result = await sync_search_console(db, website_id, days)
                 logger.info("search_console_sync_succeeded", website_id=str(website_id), **result)
             except Exception as exc:
+                db.rollback()
                 logger.exception("search_console_sync_failed", website_id=str(website_id))
                 errors.append(f"Search Console: {exc}")
         if "ga4" in services:
@@ -53,6 +54,7 @@ async def _synchronize_website_integrations(website_id: UUID, days: int | None =
                 result = await sync_google_analytics(db, website_id, days)
                 logger.info("ga4_sync_succeeded", website_id=str(website_id), **result)
             except Exception as exc:
+                db.rollback()
                 logger.exception("ga4_sync_failed", website_id=str(website_id))
                 errors.append(f"GA4: {exc}")
         if "bing_webmaster" in services:
@@ -60,6 +62,7 @@ async def _synchronize_website_integrations(website_id: UUID, days: int | None =
                 result = await sync_bing_webmaster(db, website_id, days)
                 logger.info("bing_sync_succeeded", website_id=str(website_id), **result)
             except Exception as exc:
+                db.rollback()
                 logger.exception("bing_sync_failed", website_id=str(website_id))
                 errors.append(f"Bing: {exc}")
         if errors:

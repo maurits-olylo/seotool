@@ -566,3 +566,17 @@ Gevolg: verschillende websites kunnen parallel voortgang boeken, data-imports bl
 meer en een extra workerstart pauzeert geen aantoonbaar actieve crawl van een andere worker. De
 primaire crawlworker luistert tijdens de overgang ook naar de oude `default`-queue, zodat reeds
 ingeplande jobs na deployment niet achterblijven; nieuwe jobs gebruiken uitsluitend hun eigen queue.
+
+## 2026-07-22 — Google-imports gebruiken parallelle rapporten en begrensde bulkinserts
+
+Context: GSC vroeg pagina- en zoektermrapporten na elkaar op en zocht voor iedere paginarij apart
+naar een bestaande metric. GA4 vroeg drie onafhankelijke rapporten sequentieel op. Vooral een eerste
+historie-import van 480 dagen was daardoor onnodig traag.
+
+Besluit: onafhankelijke GSC- en GA4-rapporten worden per bron gelijktijdig opgevraagd. Het volledige
+geïmporteerde datumbereik wordt binnen één transactie vervangen en mappings worden in batches van
+maximaal 5.000 rijen opgeslagen. Totale, API- en databaseduur worden bij de integratie vastgelegd en
+in structured logs opgenomen.
+
+Gevolg: GSC heeft geen rij-voor-rij databasequery meer, Google-netwerkwachttijd overlapt en grote
+imports gebruiken begrensde batches. Een mislukte transactie behoudt de eerder gecommitte data.

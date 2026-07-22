@@ -17,6 +17,9 @@ from app.services.search_console import sync_search_console
 
 
 def test_search_console_sync_maps_and_upserts_page_metrics(monkeypatch) -> None:
+    active_requests = 0
+    maximum_active_requests = 0
+
     class FakeResponse:
         status_code = 200
 
@@ -45,9 +48,13 @@ def test_search_console_sync_maps_and_upserts_page_metrics(monkeypatch) -> None:
             return None
 
         async def post(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            nonlocal active_requests, maximum_active_requests
+            active_requests += 1
+            maximum_active_requests = max(maximum_active_requests, active_requests)
+            await asyncio.sleep(0)
             dimensions = kwargs["json"]["dimensions"]
             if dimensions == ["date", "query", "page"]:
-                return FakeResponse(
+                response = FakeResponse(
                     [
                         {
                             "keys": [
@@ -62,7 +69,10 @@ def test_search_console_sync_maps_and_upserts_page_metrics(monkeypatch) -> None:
                         }
                     ]
                 )
-            return FakeResponse()
+            else:
+                response = FakeResponse()
+            active_requests -= 1
+            return response
 
     async def fake_token(*args, **kwargs):  # type: ignore[no-untyped-def]
         return "access-token"
@@ -108,3 +118,5 @@ def test_search_console_sync_maps_and_upserts_page_metrics(monkeypatch) -> None:
         assert query_metric.query == "example query"
         assert query_metric.url_id == url.id
         assert mapping.last_synced_at is not None
+        assert mapping.settings["last_import_duration_ms"] >= 0
+        assert maximum_active_requests == 2
