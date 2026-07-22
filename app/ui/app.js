@@ -1154,8 +1154,8 @@ function renderChanges() {
   $("#change-rows").innerHTML = rows.map((group) => {
     const url = state.urls.get(group.url_id) || "Onbekende URL";
     const parts = [...new Set(group.changes.map(changeLabel))];
-    const importance = group.changes.some((change) => change.importance === "high") ? "Hoog" : group.changes.some((change) => change.importance === "medium") ? "Middel" : "Laag";
-    return `<tr><td>${new Date(group.detected_at).toLocaleString("nl-NL")}</td><td><a class="change-url" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a></td><td><span class="change-kind">${escapeHtml(changeGroupLabel(group))}</span><small>Relevantie: ${importance}</small></td><td>${parts.length}</td><td><button class="detail-button" data-change-group-id="${group.id}">Bekijk</button></td></tr>`;
+    const importance = group.changes.some((change) => change.importance === "high") ? "high" : group.changes.some((change) => change.importance === "medium") ? "medium" : "low";
+    return `<tr><td><time datetime="${escapeHtml(group.detected_at)}">${new Date(group.detected_at).toLocaleString("nl-NL")}</time></td><td><a class="change-url" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a></td><td><div class="change-row-summary"><span class="change-kind">${escapeHtml(changeGroupLabel(group))}</span><span class="change-importance ${importance}"><small>Relevantie</small>${escapeHtml(labels[importance])}</span></div></td><td><span class="change-parts">${parts.length}</span></td><td><button class="detail-button" data-change-group-id="${group.id}">Bekijk</button></td></tr>`;
   }).join("");
   $("#change-result-count").textContent = `${state.changeFiltered.length} gebeurtenissen`;
   $("#change-page-label").textContent = `Pagina ${state.changePage} van ${pages}`;
