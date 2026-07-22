@@ -50,6 +50,31 @@ def test_issue_bulk_controls_and_client_logic_are_served(client: TestClient) -> 
     assert "Details worden geladen…" in script.text
 
 
+def test_information_architecture_and_legacy_routes_are_served(client: TestClient) -> None:
+    page = client.get("/ui/assets/index.html")
+    assert page.status_code == 200
+    for element_id in [
+        "dashboard-nav",
+        "analysis-nav",
+        "reports-nav",
+        "operations-nav",
+        "settings-nav",
+        "context-bar",
+        "profile-toggle",
+        "mobile-nav-toggle",
+    ]:
+        assert f'id="{element_id}"' in page.text
+    assert '<button id="logout"' not in page.text.split("</nav>", maxsplit=1)[0]
+
+    script = client.get("/ui/assets/app.js")
+    assert script.status_code == 200
+    assert 'actions: "analyse/acties"' in script.text
+    assert 'reports: "rapportages"' in script.text
+    assert 'operations: "crawls-exports"' in script.text
+    assert 'organisatie: "clients"' in script.text
+    assert 'rapportage: "reports"' in script.text
+
+
 def test_crud_client_and_website(client: TestClient) -> None:
     created = client.post("/api/v1/clients", json={"name": "Example"})
     assert created.status_code == 201

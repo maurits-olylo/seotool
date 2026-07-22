@@ -596,3 +596,18 @@ directe route naar Integraties. Niet-geconfigureerde koppelingen geven geen waar
 Gevolg: ontbrekende GSC-, GA4- of Bing-data wordt operationeel zichtbaar en `invalid_grant` maakt
 expliciet dat opnieuw koppelen nodig is. De onderliggende oorzaak kan vanaf de eerstvolgende fout
 worden vastgesteld zonder secrets vast te leggen.
+
+## 2026-07-22 — Navigatie volgt taken, analyse en beheercontext
+
+Context: negen gelijkwaardige sidebarlinks vermengden analyse, rapportage, operaties en beheer. De
+klant- en websitekeuze stond alleen in één paginaheader, terwijl dezelfde context voor vrijwel alle
+werkpagina's geldt.
+
+Besluit: de interface krijgt vijf hoofdgroepen: Overzicht, Analyse, Rapportages, Crawls & exports en
+Instellingen. Analyse en Instellingen tonen alleen binnen hun actieve of geopende groep subpagina's.
+Een gedeelde contextbalk bewaart de bestaande klant- en websitekeuze. De bestaande hashroutes blijven
+als compatibiliteitsalias bestaan en worden naar de nieuwe canonieke hashes vervangen.
+
+Gevolg: het dashboard bevat alleen samenvattingen en doorlinks; de volledige actielijst staat onder
+Analyse > Acties. Organisatiebeheer wordt zonder API- of datamodelwijziging als Klanten & websites en
+Team & toegang gepresenteerd. Autorisatie en alle inhoudelijke berekeningen blijven ongewijzigd.

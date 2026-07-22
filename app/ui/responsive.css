@@ -9,3 +9,18 @@ header {
 .selectors select {
   min-width: 0;
 }
+
+#actions-view table { table-layout: fixed; }
+#actions-view th, #actions-view td { padding-left: 12px; padding-right: 12px; }
+#actions-view th:nth-child(1) { width: 90px; }
+#actions-view th:nth-child(2) { width: auto; }
+#actions-view th:nth-child(3) { width: 180px; }
+#actions-view th:nth-child(4) { width: 90px; }
+#actions-view th:nth-child(5) { width: 95px; }
+#actions-view th:nth-child(6) { width: 75px; }
+#actions-view td:nth-child(2) { min-width: 0; }
+.mobile-nav-toggle { display: none; }
+
+@media (max-width: 850px) {
+  .mobile-nav-toggle { display: block; margin-left: 14px; padding: 7px 10px; border: 1px solid #ffffff2b; border-radius: 7px; background: transparent; color: #fff; font-weight: 800; }
+}

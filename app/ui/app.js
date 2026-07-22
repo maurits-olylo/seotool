@@ -13,8 +13,11 @@ const labels = {
   pause_requested: "Pauze wordt voorbereid", paused: "Gepauzeerd",
   cancel_requested: "Stop wordt voorbereid",
 };
-const state = { currentUser: null, clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
-const VIEW_HASHES = {overview: "overzicht", reports: "rapportage", insights: "inzichten", urls: "urls", changes: "wijzigingen", vacancies: "vacatures", operations: "beheer", organization: "organisatie", integrations: "integraties"};
+const state = { currentUser: null, currentView: "dashboard", clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
+const VIEW_HASHES = {dashboard: "overzicht", actions: "analyse/acties", urls: "analyse/urls", changes: "analyse/wijzigingen", insights: "analyse/inzichten", vacancies: "analyse/vacatures", reports: "rapportages", operations: "crawls-exports", clients: "instellingen/klanten-websites", team: "instellingen/team-toegang", integrations: "instellingen/integraties"};
+const LEGACY_HASHES = {rapportage: "reports", urls: "urls", wijzigingen: "changes", inzichten: "insights", vacatures: "vacancies", beheer: "operations", organisatie: "clients", integraties: "integrations", acties: "actions"};
+const ANALYSIS_VIEWS = new Set(["actions", "urls", "changes", "insights", "vacancies"]);
+const SETTINGS_VIEWS = new Set(["clients", "team", "integrations"]);
 const CLIENT_STORAGE_KEY = "seo-monitor-client-id";
 const WEBSITE_STORAGE_KEY = "seo-monitor-website-id";
 let operationsPollTimer = null;
@@ -213,26 +216,26 @@ function applyRolePermissions() {
   const canAdmin = ["superuser", "admin"].includes(state.currentUser?.role);
   const isClient = state.currentUser?.role === "client";
   $("#integrations-nav").classList.toggle("hidden", !canAdmin);
-  $("#organization-nav").classList.toggle("hidden", !canAdmin);
+  $("#settings-nav").classList.toggle("hidden", !canAdmin);
+  $("#clients-nav").classList.toggle("hidden", !canAdmin);
+  $("#team-nav").classList.toggle("hidden", !canAdmin);
   $("#crawl-operation-card").classList.toggle("hidden", !canAdmin);
-  $("#overview-nav").classList.toggle("hidden", isClient);
-  $("#insights-nav").classList.toggle("hidden", isClient);
-  for (const selector of ["#urls-nav", "#changes-nav", "#vacancies-nav", "#operations-nav"]) $(selector).classList.toggle("hidden", isClient);
+  $("#dashboard-nav").classList.toggle("hidden", isClient);
+  $("#analysis-nav").classList.toggle("hidden", isClient);
+  for (const selector of ["#actions-nav", "#urls-nav", "#changes-nav", "#insights-nav", "#vacancies-nav", "#operations-nav"]) $(selector).classList.toggle("hidden", isClient);
   $("#detail-status").classList.toggle("hidden", isClient);
   $("#save-status").classList.toggle("hidden", isClient);
   $("#client-status-label").classList.toggle("hidden", !isClient);
   $("#invitation-role").querySelector('option[value="admin"]').disabled = state.currentUser?.role !== "superuser";
   $("#current-user").textContent = state.currentUser?.email || "Technische toegang";
-  if (isClient && window.location.hash !== "#rapportage") window.location.hash = "#rapportage";
-  else if (!canAdmin && ["#organisatie", "#integraties"].includes(window.location.hash)) window.location.hash = "#overzicht";
+  $(".profile-avatar").textContent = (state.currentUser?.email || "M").slice(0, 1).toUpperCase();
+  if (isClient && !["#rapportages", "#rapportage"].includes(window.location.hash)) window.location.hash = "#rapportages";
+  else if (!canAdmin && (window.location.hash.includes("instellingen") || ["#organisatie", "#integraties"].includes(window.location.hash))) window.location.hash = "#overzicht";
 }
 
 function updateReportSelectors() {
   const isClient = state.currentUser?.role === "client";
-  const showWebsiteSelector = !isClient || state.websites.length > 1;
-  $("#client-selector-wrap").classList.toggle("hidden", isClient);
-  $("#website-selector-wrap").classList.toggle("hidden", !showWebsiteSelector);
-  $("#report-selectors").classList.toggle("hidden", isClient && !showWebsiteSelector);
+  $("#context-bar").querySelector("label:first-child").classList.toggle("hidden", isClient);
 }
 
 async function loadOrganization() {
@@ -364,7 +367,7 @@ async function loadWebsites(preferredWebsiteId = null) {
 
 async function openClient(clientId) {
   localStorage.setItem(CLIENT_STORAGE_KEY, clientId); localStorage.removeItem(WEBSITE_STORAGE_KEY);
-  $("#client-select").value = clientId; await loadWebsites(); showView("overview");
+  $("#client-select").value = clientId; await loadWebsites(); showView("dashboard");
 }
 
 async function saveClient(clientId) {
@@ -685,14 +688,15 @@ async function pollIntegrationHistory(websiteId) {
 
 function showView(view, updateHash = true) {
   if (state.currentUser?.role === "client") view = "reports";
-  const visibleView = view === "reports" ? "overview" : view;
-  for (const name of ["overview", "insights", "urls", "changes", "vacancies", "operations", "organization", "integrations"]) {
+  state.currentView = view;
+  const visibleView = view === "reports" ? "actions" : ["clients", "team"].includes(view) ? "organization" : view;
+  for (const name of ["dashboard", "actions", "insights", "urls", "changes", "vacancies", "operations", "organization", "integrations"]) {
     $(`#${name}-view`).classList.toggle("hidden", name !== visibleView);
   }
-  for (const name of Object.keys(VIEW_HASHES)) {
-    $(`#${name}-nav`).classList.toggle("nav-active", name === view);
-  }
+  updateNavigation(view);
+  $("#context-bar").classList.toggle("hidden", ["clients", "team"].includes(view));
   applyOverviewPresentation(view === "reports");
+  if (view === "dashboard") loadDashboard();
   if (view === "reports") {
     loadClientReport().catch(() => { $("#report-conclusion").textContent = "Rapportage kon niet worden geladen."; });
     loadReportSnapshots().catch(() => { $("#report-archive-list").innerHTML = "<p>Rapportagehistorie kon niet worden geladen.</p>"; });
@@ -703,7 +707,7 @@ function showView(view, updateHash = true) {
       $(selector).innerHTML = `<p class="insight-empty">Inzichten konden niet worden geladen. Probeer het later opnieuw.</p>`;
     }
   });
-  if (view === "organization") loadOrganization();
+  if (["clients", "team"].includes(view)) { applyOrganizationPresentation(view); loadOrganization(); }
   if (view === "urls") renderUrls();
   if (view === "changes") loadChanges();
   if (view === "vacancies") loadJobListings();
@@ -713,18 +717,43 @@ function showView(view, updateHash = true) {
 
 function viewFromHash() {
   const hash = window.location.hash.slice(1);
-  const view = Object.keys(VIEW_HASHES).find((name) => VIEW_HASHES[name] === hash) || "overview";
+  const view = Object.keys(VIEW_HASHES).find((name) => VIEW_HASHES[name] === hash) || LEGACY_HASHES[hash] || "dashboard";
+  if (LEGACY_HASHES[hash]) window.history.replaceState({}, "", `#${VIEW_HASHES[view]}`);
   return state.currentUser?.role === "client" ? "reports" : view;
 }
 
+function updateNavigation(view) {
+  const analysisActive = ANALYSIS_VIEWS.has(view);
+  const settingsActive = SETTINGS_VIEWS.has(view);
+  for (const name of ["dashboard", "reports", "operations"]) $(`#${name}-nav`).classList.toggle("nav-active", name === view);
+  $("#analysis-nav").classList.toggle("nav-active", analysisActive);
+  $("#settings-nav").classList.toggle("nav-active", settingsActive);
+  for (const group of ["analysis", "settings"]) {
+    const open = group === "analysis" ? analysisActive : settingsActive;
+    $(`#${group}-subnav`).classList.toggle("hidden", !open);
+    $(`#${group}-nav`).setAttribute("aria-expanded", String(open));
+  }
+  for (const name of [...ANALYSIS_VIEWS, ...SETTINGS_VIEWS]) $(`#${name}-nav`).classList.toggle("subnav-active", name === view);
+  $("#app").classList.remove("mobile-nav-open");
+  $("#mobile-nav-toggle").setAttribute("aria-expanded", "false");
+}
+
+function applyOrganizationPresentation(view) {
+  const teamMode = view === "team";
+  $("#organization-title").textContent = teamMode ? "Team & toegang" : "Klanten & websites";
+  $("#organization-intro").textContent = teamMode ? "Nodig gebruikers uit en beheer hun toegang per klant." : "Beheer klanten, websites en de eerste crawlconfiguratie.";
+  for (const selector of ["#onboarding-form", ".client-directory", "#website-form"]) $(selector).classList.toggle("hidden", teamMode);
+  for (const selector of ["#invitation-form", ".organization-members"]) $(selector).classList.toggle("hidden", !teamMode);
+}
+
 function applyOverviewPresentation(reportMode) {
-  $("#overview-eyebrow").textContent = reportMode ? "SEO-RAPPORTAGE" : "PRODUCTIE";
-  $("#overview-title").textContent = reportMode ? "Organische groei & SEO" : "Technische SEO-acties";
+  $("#overview-eyebrow").textContent = reportMode ? "SEO-RAPPORTAGE" : "ANALYSE";
+  $("#overview-title").textContent = reportMode ? "Rapportages" : "Acties";
   $("#client-report-intro").classList.toggle("hidden", !reportMode);
   $("#client-report").classList.toggle("hidden", !reportMode);
   $("#report-archive").classList.toggle("hidden", !reportMode);
   $("#summary").classList.toggle("hidden", reportMode);
-  $("#vacancy-dashboard").classList.toggle("hidden", reportMode);
+  $("#vacancy-dashboard").classList.add("hidden");
   $("#internal-action-panel").classList.toggle("hidden", reportMode);
 }
 
@@ -906,6 +935,37 @@ async function showUrl(urlId) {
   $("#url-dialog").showModal();
 }
 
+async function loadDashboard() {
+  const websiteId = $("#website-select").value;
+  if (!websiteId) { renderDashboard(); return; }
+  await Promise.all([
+    loadChanges().catch(() => {}),
+    loadOperations().catch(() => {}),
+    state.clientReport ? Promise.resolve() : loadClientReport().catch(() => {}),
+    state.jobListings.length ? Promise.resolve() : loadJobListings().catch(() => {}),
+  ]);
+  renderDashboard();
+}
+
+function renderDashboard() {
+  const activeIssues = state.issues.filter((issue) => ACTIVE_STATUSES.has(issue.status));
+  const issueCounts = {total: activeIssues.length, high: 0, medium: 0, low: 0};
+  activeIssues.forEach((issue) => { if (issueCounts[issue.severity] !== undefined) issueCounts[issue.severity] += 1; });
+  $("#dashboard-priorities").innerHTML = [["total", "Actieve acties"], ["high", "Hoge prioriteit"], ["medium", "Middel"], ["low", "Laag"]]
+    .map(([key, label]) => `<article class="card ${key}"><strong>${issueCounts[key]}</strong><span>${label}</span></article>`).join("");
+  const newIssues = activeIssues.filter((issue) => issue.status === "new");
+  const importantIssues = [...(newIssues.length ? newIssues : activeIssues)].sort((a, b) => ({high: 0, medium: 1, low: 2}[a.severity] - {high: 0, medium: 1, low: 2}[b.severity] || new Date(b.first_detected_at) - new Date(a.first_detected_at))).slice(0, 5);
+  $("#dashboard-actions").innerHTML = importantIssues.map((issue) => `<article><strong>${escapeHtml(issue.title)}</strong><small><span class="severity ${issue.severity}">${labels[issue.severity]}</span> · ${new Date(issue.first_detected_at).toLocaleDateString("nl-NL")}</small></article>`).join("") || `<p class="dashboard-empty">Geen actieve technische acties.</p>`;
+  $("#dashboard-changes").innerHTML = state.changeGroups.slice(0, 5).map((group) => `<article><strong>${escapeHtml(changeGroupLabel(group))}</strong><small>${escapeHtml(state.urls.get(group.url_id) || "Onbekende URL")} · ${new Date(group.detected_at).toLocaleDateString("nl-NL")}</small></article>`).join("") || `<p class="dashboard-empty">Geen betekenisvolle wijzigingen gevonden.</p>`;
+  const current = state.clientReport?.current || {};
+  $("#dashboard-performance").innerHTML = [[current.clicks, "GSC-klikken"], [current.sessions, "Organische sessies"], [current.key_events, "Gekwalificeerde leads"]].map(([value, label]) => `<article><strong>${Number(value || 0).toLocaleString("nl-NL")}</strong><span>${label}</span></article>`).join("");
+  const vacancies = state.jobSummary || {};
+  $("#dashboard-vacancies").innerHTML = [[vacancies.active, "Actief"], [vacancies.expiring_soon, "Loopt bijna af"], [vacancies.needs_attention, "Aandacht nodig"]].map(([value, label]) => `<article><strong>${Number(value || 0).toLocaleString("nl-NL")}</strong><span>${label}</span></article>`).join("");
+  const run = state.crawlRuns[0];
+  $("#dashboard-crawl").innerHTML = run ? `<article><strong>${labels[run.status] || run.status} · ${run.crawled_urls.toLocaleString("nl-NL")} URLs</strong><small>${new Date(run.started_at).toLocaleString("nl-NL")} · ${run.failed_urls} mislukt · ${durationLabel(run)}</small></article>` : `<p class="dashboard-empty">Nog geen crawl uitgevoerd.</p>`;
+  renderIntegrationWarning();
+}
+
 async function loadOperations() {
   const websiteId = $("#website-select").value;
   if (!websiteId || state.operationsLoading) return;
@@ -918,7 +978,6 @@ async function loadOperations() {
     const activeRun = state.crawlRuns.find((run) => ["running", "paused"].includes(run.status)) || (state.crawlRuns[0]?.status === "failed" ? state.crawlRuns[0] : null);
     state.activeCrawlJob = activeRun ? await api(`/api/v1/crawl-jobs/${activeRun.crawl_job_id}`) : null;
     state.systemStatus = await api("/api/v1/system/status").catch(() => null);
-    $("#operations-website-name").textContent = $("#website-select").selectedOptions[0]?.textContent || "de website";
     $("#operations-load-message").textContent = state.systemStatus ? "" : "De systeemstatus kon niet worden opgehaald; crawl- en exportgegevens zijn wel bijgewerkt.";
     $("#operations-load-message").classList.toggle("error", !state.systemStatus);
     renderOperations();
@@ -1263,6 +1322,7 @@ function render() {
   $("#select-page-issues").indeterminate = selectedOnPage > 0 && selectedOnPage < pageIds.length;
   renderIssueBulkBar();
   renderSuppressions();
+  if (state.currentView === "dashboard") renderDashboard();
 }
 
 function renderIssueBulkBar() {
@@ -1443,8 +1503,10 @@ async function saveIssueStatus() {
 }
 
 $("#logout").addEventListener("click", async () => { await fetch("/ui/logout", { method: "POST" }); window.location.assign("/"); });
-$("#client-select").addEventListener("change", async () => { localStorage.setItem(CLIENT_STORAGE_KEY, $("#client-select").value); localStorage.removeItem(WEBSITE_STORAGE_KEY); await loadWebsites(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); });
-$("#website-select").addEventListener("change", async () => { localStorage.setItem(WEBSITE_STORAGE_KEY, $("#website-select").value); state.selectedReportSnapshotId = null; state.consultantInsights = null; await loadIssues(); if (!$("#integrations-view").classList.contains("hidden")) await loadIntegrations(); if (!$("#insights-view").classList.contains("hidden")) await loadConsultantInsights(); if (!$("#urls-view").classList.contains("hidden")) renderUrls(); if (!$("#changes-view").classList.contains("hidden")) await loadChanges(); if (!$("#vacancies-view").classList.contains("hidden")) await loadJobListings(); if (!$("#operations-view").classList.contains("hidden")) await loadOperations(); });
+$("#profile-toggle").addEventListener("click", () => { const open = $("#profile-popover").classList.toggle("hidden") === false; $("#profile-toggle").setAttribute("aria-expanded", String(open)); });
+$("#mobile-nav-toggle").addEventListener("click", () => { const open = $("#app").classList.toggle("mobile-nav-open"); $("#mobile-nav-toggle").setAttribute("aria-expanded", String(open)); });
+$("#client-select").addEventListener("change", async () => { localStorage.setItem(CLIENT_STORAGE_KEY, $("#client-select").value); localStorage.removeItem(WEBSITE_STORAGE_KEY); state.crawlRuns = []; state.changeGroups = []; await loadWebsites(); if (state.currentView === "integrations") await loadIntegrations(); if (state.currentView === "dashboard") await loadDashboard(); });
+$("#website-select").addEventListener("change", async () => { localStorage.setItem(WEBSITE_STORAGE_KEY, $("#website-select").value); state.selectedReportSnapshotId = null; state.consultantInsights = null; state.crawlRuns = []; state.changeGroups = []; await loadIssues(); if (state.currentView === "integrations") await loadIntegrations(); if (state.currentView === "insights") await loadConsultantInsights(); if (state.currentView === "urls") renderUrls(); if (state.currentView === "changes") await loadChanges(); if (state.currentView === "vacancies") await loadJobListings(); if (state.currentView === "operations") await loadOperations(); if (state.currentView === "dashboard") await loadDashboard(); });
 for (const selector of ["#severity-filter", "#scope-filter", "#nature-filter", "#type-filter", "#impact-filter"]) $(selector).addEventListener("change", () => { state.page = 1; render(); });
 $("#status-filter").addEventListener("change", loadIssues);
 $("#search-filter").addEventListener("input", () => { state.page = 1; render(); });
@@ -1495,15 +1557,19 @@ $("#report-archive").addEventListener("click", async (event) => {
 $("#close-dialog").addEventListener("click", () => $("#issue-dialog").close());
 for (const dialog of document.querySelectorAll("dialog")) dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
 $("#save-status").addEventListener("click", saveIssueStatus);
-$("#overview-nav").addEventListener("click", () => showView("overview"));
+$("#dashboard-nav").addEventListener("click", () => showView("dashboard"));
+$("#actions-nav").addEventListener("click", () => showView("actions"));
 $("#reports-nav").addEventListener("click", () => showView("reports"));
 $("#insights-nav").addEventListener("click", () => showView("insights"));
 $("#urls-nav").addEventListener("click", () => showView("urls"));
 $("#changes-nav").addEventListener("click", () => showView("changes"));
 $("#vacancies-nav").addEventListener("click", () => showView("vacancies"));
 $("#operations-nav").addEventListener("click", () => showView("operations"));
-$("#organization-nav").addEventListener("click", () => showView("organization"));
+$("#clients-nav").addEventListener("click", () => showView("clients"));
+$("#team-nav").addEventListener("click", () => showView("team"));
 $("#integrations-nav").addEventListener("click", () => showView("integrations"));
+for (const group of ["analysis", "settings"]) $(`#${group}-nav`).addEventListener("click", () => { const subnav = $(`#${group}-subnav`); const open = subnav.classList.toggle("hidden") === false; $(`#${group}-nav`).setAttribute("aria-expanded", String(open)); });
+$(".dashboard-grid").addEventListener("click", (event) => { const button = event.target.closest("[data-dashboard-view]"); if (button) showView(button.dataset.dashboardView); });
 $("#integration-warning-action").addEventListener("click", () => showView("integrations"));
 $("#insight-period").addEventListener("change", async (event) => { state.insightDays = Number(event.target.value); await loadConsultantInsights(); });
 $("#onboarding-form").addEventListener("submit", onboardClient);
@@ -1574,6 +1640,6 @@ api("/api/v1/me").then((user) => {
     };
     $("#integration-message").textContent = integrationMessages[integrationResult] || "De koppeling is niet voltooid. Probeer opnieuw.";
     $("#integration-message").classList.remove("hidden");
-    window.history.replaceState({}, "", "/app#integraties");
+    window.history.replaceState({}, "", `/app#${VIEW_HASHES.integrations}`);
   } else showView(viewFromHash(), false);
 }).catch(() => showLogin());

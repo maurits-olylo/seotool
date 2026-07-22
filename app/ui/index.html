@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SEO Monitor</title>
   <link rel="stylesheet" href="/ui/assets/app.css">
-  <link rel="stylesheet" href="/ui/assets/responsive.css">
+  <link rel="stylesheet" href="/ui/assets/responsive.css?v=20260722-2">
   <link rel="stylesheet" href="/ui/assets/dashboard.css">
   <link rel="stylesheet" href="/ui/assets/actionable.css?v=20260718-4">
   <link rel="stylesheet" href="/ui/assets/integrations.css">
@@ -21,28 +21,40 @@
   <link rel="stylesheet" href="/ui/assets/key-events.css">
   <link rel="stylesheet" href="/ui/assets/jobs.css">
   <link rel="stylesheet" href="/ui/assets/insights.css">
+  <link rel="stylesheet" href="/ui/assets/information-architecture.css?v=20260722-1">
 </head>
 <body>
   <div id="app" class="app-shell hidden">
     <aside>
-      <div><span class="eyebrow">THACT</span><h2>SEO Monitor</h2><small id="current-user"></small></div>
-      <nav><button id="overview-nav" class="nav-active"><span id="overview-nav-label">Overzicht</span></button><button id="reports-nav">Rapportage</button><button id="insights-nav">Inzichten</button><button id="urls-nav">URLs</button><button id="changes-nav">Wijzigingen</button><button id="vacancies-nav">Vacatures</button><button id="operations-nav">Beheer</button><button id="organization-nav">Organisatie</button><button id="integrations-nav">Integraties</button></nav>
+      <div class="sidebar-brand"><span class="eyebrow">THACT</span><h2>SEO Monitor</h2></div><button id="mobile-nav-toggle" class="mobile-nav-toggle" type="button" aria-label="Navigatie openen" aria-expanded="false">Menu</button>
+      <nav class="primary-navigation" aria-label="Hoofdnavigatie">
+        <button id="dashboard-nav" class="nav-item nav-active">Overzicht</button>
+        <section class="nav-group" data-nav-group="analysis"><button id="analysis-nav" class="nav-item nav-group-toggle" type="button" aria-expanded="false">Analyse <span aria-hidden="true">⌄</span></button><div id="analysis-subnav" class="subnav hidden"><button id="actions-nav">Acties</button><button id="urls-nav">URL’s</button><button id="changes-nav">Wijzigingen</button><button id="insights-nav">Inzichten</button><button id="vacancies-nav">Vacatures</button></div></section>
+        <button id="reports-nav" class="nav-item">Rapportages</button>
+        <button id="operations-nav" class="nav-item">Crawls &amp; exports</button>
+        <section class="nav-group" data-nav-group="settings"><button id="settings-nav" class="nav-item nav-group-toggle" type="button" aria-expanded="false">Instellingen <span aria-hidden="true">⌄</span></button><div id="settings-subnav" class="subnav hidden"><button id="clients-nav">Klanten &amp; websites</button><button id="team-nav">Team &amp; toegang</button><button id="integrations-nav">Integraties</button></div></section>
+      </nav>
       <section id="report-archive" class="report-archive hidden"><span class="eyebrow">RAPPORTAGES</span><button type="button" data-report-live>Live status</button><div id="report-archive-list"></div></section>
-      <button id="logout" class="quiet">Uitloggen</button>
+      <div class="profile-menu"><button id="profile-toggle" class="profile-toggle" type="button" aria-expanded="false"><span class="profile-avatar" aria-hidden="true">M</span><span id="current-user"></span><span aria-hidden="true">⌃</span></button><div id="profile-popover" class="profile-popover hidden"><button id="logout" type="button">Uitloggen</button></div></div>
     </aside>
     <main>
-      <section id="overview-view">
-      <header>
-        <div><span id="overview-eyebrow" class="eyebrow">PRODUCTIE</span><h1 id="overview-title">Technische SEO-acties</h1><p id="client-report-intro" class="intro hidden">Organische prestaties, gerealiseerd werk en de belangrijkste vervolgstappen.</p></div>
-        <div id="report-selectors" class="selectors">
-          <label id="client-selector-wrap"><span>Klant</span><select id="client-select" aria-label="Klant"></select></label>
-          <label id="website-selector-wrap"><span>Website</span><select id="website-select" aria-label="Website"></select></label>
+      <section id="context-bar" class="context-bar"><label><span>Klant</span><select id="client-select" aria-label="Klant"></select></label><span class="context-divider" aria-hidden="true">/</span><label><span>Website</span><select id="website-select" aria-label="Website"></select></label></section>
+      <section id="dashboard-view">
+        <header><div><span class="eyebrow">OVERZICHT</span><h1>Dashboard</h1><p class="intro">De belangrijkste SEO-signalen en operationele status in één oogopslag.</p></div></header>
+        <section id="integration-warning" class="integration-warning hidden" role="alert"><div><span class="eyebrow">KOPPELING CONTROLEREN</span><strong id="integration-warning-title"></strong><p id="integration-warning-detail"></p></div><button id="integration-warning-action" class="detail-button" type="button">Naar integraties</button></section>
+        <section id="dashboard-priorities" class="cards"></section>
+        <div class="dashboard-grid">
+          <section class="panel dashboard-panel"><div class="panel-head"><div><span class="eyebrow">ACTIES</span><h2>Belangrijkste nieuwe acties</h2></div><button class="detail-button dashboard-link" data-dashboard-view="actions">Alle acties</button></div><div id="dashboard-actions" class="dashboard-list"></div></section>
+          <section class="panel dashboard-panel"><div class="panel-head"><div><span class="eyebrow">WIJZIGINGEN</span><h2>Sinds de vorige crawl</h2></div><button class="detail-button dashboard-link" data-dashboard-view="changes">Alle wijzigingen</button></div><div id="dashboard-changes" class="dashboard-list"></div></section>
+          <section class="panel dashboard-panel"><div class="panel-head"><div><span class="eyebrow">PRESTATIES</span><h2>Organische indicatoren</h2></div><button class="detail-button dashboard-link" data-dashboard-view="reports">Rapportages</button></div><div id="dashboard-performance" class="dashboard-metrics"></div></section>
+          <section class="panel dashboard-panel"><div class="panel-head"><div><span class="eyebrow">VACATURES</span><h2>Vacaturestatus</h2></div><button class="detail-button dashboard-link" data-dashboard-view="vacancies">Alle vacatures</button></div><div id="dashboard-vacancies" class="dashboard-metrics"></div></section>
+          <section class="panel dashboard-panel dashboard-crawl"><div class="panel-head"><div><span class="eyebrow">CRAWL</span><h2>Laatste crawlstatus</h2></div><button class="detail-button dashboard-link" data-dashboard-view="operations">Crawls &amp; exports</button></div><div id="dashboard-crawl" class="dashboard-list"></div></section>
         </div>
-      </header>
-      <section id="integration-warning" class="integration-warning hidden" role="alert">
-        <div><span class="eyebrow">KOPPELING CONTROLEREN</span><strong id="integration-warning-title"></strong><p id="integration-warning-detail"></p></div>
-        <button id="integration-warning-action" class="detail-button" type="button">Naar integraties</button>
       </section>
+      <section id="actions-view" class="hidden">
+      <header>
+        <div><span id="overview-eyebrow" class="eyebrow">ANALYSE</span><h1 id="overview-title">Acties</h1><p id="client-report-intro" class="intro hidden">Organische prestaties, gerealiseerd werk en de belangrijkste vervolgstappen.</p></div>
+      </header>
       <section id="client-report" class="client-report hidden">
         <nav id="report-periods" class="report-periods" aria-label="Rapportageperiode">
           <button data-report-period="month" class="active">Maand</button><button data-report-period="quarter">Kwartaal</button><button data-report-period="half_year">6 maanden</button><button data-report-period="year">Jaar</button><button data-report-period="ytd">YTD</button>
@@ -62,7 +74,7 @@
         <section class="panel report-section report-new"><div class="panel-head"><div><span class="eyebrow">NIEUW GESIGNALEERD</span><h2>Nieuwe aandachtspunten</h2></div></div><div id="report-new-issues" class="report-list report-list-grid"></div></section>
       </section>
       <section id="summary" class="cards"></section>
-      <section id="vacancy-dashboard" class="panel vacancy-dashboard">
+      <section id="vacancy-dashboard" class="panel vacancy-dashboard hidden">
         <div class="panel-head"><div><span class="eyebrow">VACATUREMONITOR</span><h2>Vacatures in beeld</h2></div><button id="open-vacancies" class="detail-button">Alle vacatures</button></div>
         <div id="vacancy-dashboard-stats" class="vacancy-dashboard-stats"></div>
       </section>
@@ -133,7 +145,7 @@
         </section>
       </section>
       <section id="operations-view" class="hidden">
-        <header><div><span class="eyebrow">OPERATIES</span><h1>Beheer</h1><p class="intro">Crawls en exports voor <strong id="operations-website-name"></strong>.</p></div></header>
+        <header><div><span class="eyebrow">OPERATIES</span><h1>Crawls &amp; exports</h1><p class="intro">Start controles, volg crawls en download resultaten.</p></div></header>
         <section class="panel system-status-panel"><div class="panel-head"><div><span class="eyebrow">SYSTEEMSTATUS</span><h2>Operationele status</h2></div><span id="system-status-summary" class="system-summary">Controleren…</span></div><div id="system-status-grid" class="system-status-grid"><article><span>API & database</span><strong>Controleren…</strong></article><article><span>Crawl-worker</span><strong>Controleren…</strong></article><article><span>Export-worker</span><strong>Controleren…</strong></article></div><p id="operations-load-message" class="operation-message"></p></section>
         <div class="operations-grid">
           <section id="crawl-operation-card" class="panel operation-card"><span class="eyebrow">CRAWLEN</span><h2>Nieuwe controle</h2><p>Een light check controleert bekende URLs. Een volledige crawl vernieuwt discovery, links, snapshots, wijzigingen en issues.</p><div class="operation-actions"><button id="start-light-check" class="primary-button">Start light check</button><button id="start-full-crawl" class="secondary-button">Start volledige crawl</button></div><div id="crawl-live-status" class="live-status hidden"><span id="crawl-live-label"></span><div id="crawl-progress-track" class="progress-track"><span></span></div><div class="operation-actions crawl-control-actions"><button id="pause-crawl" class="secondary-button">Pauzeer</button><button id="resume-crawl" class="primary-button hidden">Hervat</button><button id="cancel-crawl" class="detail-button danger">Stop</button></div></div><p id="crawl-action-message" class="operation-message"></p></section>
@@ -142,7 +154,7 @@
         <section class="panel operation-history"><div class="panel-head"><div><span class="eyebrow">HISTORIE</span><h2>Recente crawls</h2></div><button id="refresh-operations" class="detail-button">Vernieuwen</button></div><div class="table-wrap"><table class="operation-table"><thead><tr><th>Gestart</th><th>Type</th><th>Status</th><th>Ontdekt</th><th>Gecrawld</th><th>Mislukt</th><th>Duur</th></tr></thead><tbody id="crawl-run-rows"></tbody></table></div><p id="crawl-runs-empty" class="empty hidden">Voor deze website zijn nog geen crawls uitgevoerd. Start hierboven een eerste controle.</p></section>
       </section>
       <section id="organization-view" class="hidden">
-        <header><div><span class="eyebrow">BEHEER</span><h1>Organisatie</h1><p class="intro">Maak klanten compleet aan en beheer websites en toegang vanuit één overzicht.</p></div></header>
+        <header><div><span class="eyebrow">INSTELLINGEN</span><h1 id="organization-title">Klanten &amp; websites</h1><p id="organization-intro" class="intro">Beheer klanten, websites en de eerste crawlconfiguratie.</p></div></header>
         <form id="onboarding-form" class="panel onboarding-card"><div class="panel-head"><div><span class="eyebrow">ONBOARDING</span><h2>Nieuwe klant met website</h2><p>Klant, website, crawl-instellingen en de eerste volledige crawl worden samen klaargezet.</p></div><span class="onboarding-step">Klant · website · crawl</span></div><div class="onboarding-fields"><label>Klantnaam<input id="new-client-name" required maxlength="255" autocomplete="organization"></label><label>Interne referentie<input id="new-client-reference" maxlength="100" placeholder="Optioneel"></label><label>Websitenaam<input id="onboarding-website-name" required maxlength="255"></label><label>Basis-URL<input id="onboarding-website-url" type="url" required placeholder="https://www.example.nl/"></label><label>Sitemap-URL<input id="onboarding-sitemap-url" type="url" placeholder="Optioneel, bijvoorbeeld /sitemap.xml"></label><label>Maximum aantal URL's<input id="onboarding-max-urls" type="number" min="1" value="10000" required></label><label>Vertraging per verzoek (ms)<input id="onboarding-request-delay" type="number" min="0" value="200" required></label><label class="onboarding-checkbox"><input id="onboarding-respect-robots" type="checkbox" checked> Robots.txt respecteren</label></div><div class="onboarding-actions"><button class="primary-button" type="submit">Aanmaken en eerste crawl starten</button><p id="client-form-message" class="operation-message"></p></div></form>
         <section class="panel client-directory"><div class="panel-head"><div><span class="eyebrow">KLANTEN</span><h2>Klantoverzicht</h2><p>Open een klant, wijzig de naam of verwijder de klant inclusief gekoppelde gegevens.</p></div><input id="client-directory-search" type="search" placeholder="Zoek klant, website of URL" aria-label="Zoek klanten"></div><div class="client-helper">De basis-URL van een bestaande website kan hier niet worden gewijzigd. Verwijder de klant en maak deze opnieuw aan wanneer het hoofddomein onjuist is.</div><div class="table-wrap"><table class="client-directory-table"><thead><tr><th>Klant</th><th>Websites</th><th>Interne referentie</th><th>Acties</th></tr></thead><tbody id="client-rows"></tbody></table></div><p id="clients-empty" class="empty hidden">Geen klanten gevonden.</p><p id="clients-message" class="operation-message"></p></section>
         <div class="organization-grid secondary">
@@ -185,6 +197,6 @@
     <dl><div><dt>Vergeleken meetmomenten</dt><dd id="change-detail-date"></dd></div><div><dt>Mogelijke relevantie</dt><dd id="change-detail-relevance"></dd></div><div><dt>Aanbevolen controle</dt><dd id="change-detail-action"></dd></div></dl>
     <div id="change-group-details"></div>
   </dialog>
-  <script src="/ui/assets/app.js?v=20260722-1" defer></script>
+  <script src="/ui/assets/app.js?v=20260722-2" defer></script>
 </body>
 </html>
