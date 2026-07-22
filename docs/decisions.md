@@ -99,7 +99,8 @@ deployment.
 Context: directe `scp` naar NAS-paden is onbetrouwbaar gebleken.
 
 Besluit: releases worden lokaal met `git archive` gemaakt, met SHA-256 gecontroleerd en via
-`ssh ... dd of=/tmp/...` geüpload. Op de NAS wordt pas na checksumcontrole uitgepakt.
+`ssh ... dd of=/tmp/...` geüpload. SCP en Git op de NAS worden niet gebruikt. Na checksumcontrole
+wordt altijd met `sudo tar` uitgepakt, omdat de productiebestanden root-owned zijn.
 
 Gevolg: ieder deploymentadvies vermeldt volledig pakketpad, checksum, migrationstatus en alleen de
 geraakte containers.

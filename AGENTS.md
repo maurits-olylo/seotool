@@ -38,6 +38,12 @@ COMMUNICATIESTIJL
   tenzij de gebruiker een foutmelding of afwijkende uitvoer deelt.
 - Bundel samenhangende correcties in één logisch releasepakket. Maak niet voor iedere kleine
   wijziging een aparte release, behalve wanneer een directe productiestoring een losse hotfix vereist.
+- Deploy op de Synology altijd als lokaal `git archive`: upload uitsluitend via
+  `ssh ... "dd of=/tmp/<release>.tar.gz" < /tmp/<release>.tar.gz`, nooit met SCP.
+- Controleer de SHA-256 op de NAS en pak altijd uit met `sudo tar -xzf ... -C
+  /volume1/docker/seo-monitor/project`; de productiebestanden zijn root-owned.
+- Herbouw en herstart alleen de geraakte services. Maak alleen een volledige back-up wanneer een
+  migratie of andere risicovolle wijziging dat noodzakelijk maakt.
 
 CODE EN IMPLEMENTATIE
 

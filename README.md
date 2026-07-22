@@ -78,12 +78,14 @@ Maak vóór iedere productie-update een back-up. Controleer daarna `/health`, co
 
 ## Productie op Synology
 
-Gebruik beide Compose-bestanden:
+Productie-updates worden lokaal als Git-archive gemaakt, uitsluitend via SSH-streaming naar `/tmp`
+geüpload en op de NAS na checksumcontrole met `sudo tar` uitgepakt. Gebruik geen SCP en geen Git op
+de NAS. Herbouw alleen de geraakte services met beide Compose-bestanden:
 
 ```bash
-docker compose -f compose.yaml -f compose.prod.yaml build
-docker compose -f compose.yaml -f compose.prod.yaml run --rm api alembic upgrade head
-docker compose -f compose.yaml -f compose.prod.yaml up -d
+sudo tar -xzf /tmp/<release>.tar.gz -C /volume1/docker/seo-monitor/project
+sudo docker compose -f compose.yaml -f compose.prod.yaml build <geraakte-services>
+sudo docker compose -f compose.yaml -f compose.prod.yaml up -d <geraakte-services>
 ```
 
 De volledige installatie-, beveiligings-, update- en rollbackprocedure staat in
