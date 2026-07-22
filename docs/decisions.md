@@ -550,3 +550,19 @@ worden daarom niet daarnaast als 404-, broken-link- of redirectprobleem geclassi
 
 Canonicalcontrole wordt alleen uitgevoerd op bereikbare pagina's met een 200-status. Een 404-pagina
 met een canonical naar de foutpagina levert daardoor niet langer een tweede canonicalissue op.
+
+## 2026-07-22 — Crawls en data-imports krijgen afzonderlijke begrensde capaciteit
+
+Context: één lange websitecrawl of Google-import blokkeerde alle overige crawls en imports. Een
+tweede algemene worker zou bij opstart actieve jobs van de eerste worker ten onrechte als
+onderbroken kunnen pauzeren.
+
+Besluit: twee crawlworkers delen de queue `crawls`; één importworker verwerkt `integrations` en de
+bestaande exportworker blijft `exports` verwerken. Een gedeeltelijk unieke database-index begrenst
+iedere website tot één `running` crawl. Recovery beschermt crawl-ID's die door een andere live
+RQ-worker worden uitgevoerd. Twee crawlworkers vormen de veilige initiële NAS-capaciteitslimiet.
+
+Gevolg: verschillende websites kunnen parallel voortgang boeken, data-imports blokkeren geen crawl
+meer en een extra workerstart pauzeert geen aantoonbaar actieve crawl van een andere worker. De
+primaire crawlworker luistert tijdens de overgang ook naar de oude `default`-queue, zodat reeds
+ingeplande jobs na deployment niet achterblijven; nieuwe jobs gebruiken uitsluitend hun eigen queue.

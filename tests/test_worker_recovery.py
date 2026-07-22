@@ -30,7 +30,7 @@ def test_worker_restart_pauses_interrupted_crawl() -> None:
         db.commit()
         job_id = job.id
 
-    recover_interrupted_crawls()
+    recover_interrupted_crawls(active_job_ids=set())
 
     with SessionLocal() as db:
         job = db.get(CrawlJob, job_id)
@@ -65,13 +65,43 @@ def test_worker_restart_finishes_requested_cancellation() -> None:
         db.commit()
         job_id = job.id
 
-    recover_interrupted_crawls()
+    recover_interrupted_crawls(active_job_ids=set())
 
     with SessionLocal() as db:
         job = db.get(CrawlJob, job_id)
         run = db.scalar(select(CrawlRun).where(CrawlRun.crawl_job_id == job_id))
         assert job and job.status == "cancelled" and job.finished_at is not None
         assert run and run.status == "cancelled" and run.finished_at is not None
+
+
+def test_worker_restart_preserves_crawl_owned_by_other_worker() -> None:
+    with SessionLocal() as db:
+        client = Client(name="Parallel worker client")
+        website = Website(client=client, name="Parallel site", base_url="https://parallel.example/")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        job = CrawlJob(website_id=website.id, job_type="full_site_crawl", status="running")
+        db.add(job)
+        db.flush()
+        db.add(
+            CrawlRun(
+                crawl_job_id=job.id,
+                website_id=website.id,
+                crawl_type=job.job_type,
+                status="running",
+            )
+        )
+        db.commit()
+        job_id = job.id
+
+    recover_interrupted_crawls(active_job_ids={str(job_id)})
+
+    with SessionLocal() as db:
+        job = db.get(CrawlJob, job_id)
+        run = db.scalar(select(CrawlRun).where(CrawlRun.crawl_job_id == job_id))
+        assert job and job.status == "running"
+        assert run and run.status == "running"
 
 
 def test_cancellation_interrupts_post_crawl_404_analysis(monkeypatch) -> None:  # type: ignore[no-untyped-def]

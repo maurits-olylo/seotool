@@ -3,7 +3,7 @@ from typing import Any
 from redis import Redis
 from rq import Queue, Worker
 
-from app.core.queue import get_redis
+from app.core.queue import CRAWL_QUEUE, EXPORT_QUEUE, INTEGRATION_QUEUE, get_redis
 
 
 def _worker_queue_names(worker: Worker) -> set[str]:
@@ -19,7 +19,7 @@ def build_queue_status(redis: Redis | None = None) -> dict[str, Any]:
     connection.ping()
     workers = Worker.all(connection=connection)
     queues: dict[str, dict[str, int | str]] = {}
-    for name in ("default", "exports"):
+    for name in (CRAWL_QUEUE, INTEGRATION_QUEUE, EXPORT_QUEUE):
         worker_count = sum(name in _worker_queue_names(worker) for worker in workers)
         queues[name] = {
             "status": "ok" if worker_count else "unavailable",

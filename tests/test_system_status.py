@@ -22,21 +22,31 @@ def test_build_queue_status_reports_workers_and_backlog(monkeypatch) -> None:
     redis = Mock()
     monkeypatch.setattr(
         "app.services.system_status.Worker.all",
-        lambda connection: [FakeWorker("default"), FakeWorker("exports")],
+        lambda connection: [
+            FakeWorker("crawls"),
+            FakeWorker("crawls"),
+            FakeWorker("integrations"),
+            FakeWorker("exports"),
+        ],
     )
 
     class FakeQueue:
         def __init__(self, name: str, connection: object) -> None:
-            self.count = {"default": 2, "exports": 1}[name]
+            self.count = {"crawls": 2, "integrations": 3, "exports": 1}[name]
 
     monkeypatch.setattr("app.services.system_status.Queue", FakeQueue)
     result = build_queue_status(redis)
 
     redis.ping.assert_called_once()
-    assert result["queues"]["default"] == {
+    assert result["queues"]["crawls"] == {
+        "status": "ok",
+        "workers": 2,
+        "queued_jobs": 2,
+    }
+    assert result["queues"]["integrations"] == {
         "status": "ok",
         "workers": 1,
-        "queued_jobs": 2,
+        "queued_jobs": 3,
     }
     assert result["queues"]["exports"] == {
         "status": "ok",
@@ -51,7 +61,8 @@ def test_system_status_endpoint_payload(monkeypatch) -> None:
         lambda: {
             "redis": "ok",
             "queues": {
-                "default": {"status": "ok", "workers": 1, "queued_jobs": 0},
+                "crawls": {"status": "ok", "workers": 2, "queued_jobs": 0},
+                "integrations": {"status": "ok", "workers": 1, "queued_jobs": 0},
                 "exports": {"status": "ok", "workers": 1, "queued_jobs": 0},
             },
         },
@@ -68,7 +79,11 @@ def test_build_queue_status_supports_rq_queue_names_method(monkeypatch) -> None:
     redis = Mock()
     monkeypatch.setattr(
         "app.services.system_status.Worker.all",
-        lambda connection: [FakeMethodWorker("default"), FakeMethodWorker("exports")],
+        lambda connection: [
+            FakeMethodWorker("crawls"),
+            FakeMethodWorker("integrations"),
+            FakeMethodWorker("exports"),
+        ],
     )
 
     class EmptyQueue:
@@ -79,5 +94,6 @@ def test_build_queue_status_supports_rq_queue_names_method(monkeypatch) -> None:
 
     monkeypatch.setattr("app.services.system_status.Queue", EmptyQueue)
     result = build_queue_status(redis)
-    assert result["queues"]["default"]["workers"] == 1
+    assert result["queues"]["crawls"]["workers"] == 1
+    assert result["queues"]["integrations"]["workers"] == 1
     assert result["queues"]["exports"]["workers"] == 1

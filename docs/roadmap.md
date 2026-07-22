@@ -399,8 +399,8 @@ Status: gepland.
 
 ## Fase 8 — Schaalbaarheid en parallelle crawls
 
-Status: later; pas oppakken wanneer het aantal gelijktijdige klanten de enkele crawl-worker
-structureel laat vollopen.
+Status: eerste schaalbaarheidspakket lokaal geïmplementeerd; productievalidatie en verdere
+wachtrij-informatie volgen.
 
 - Laat volledige sitecrawls van verschillende websites gecontroleerd parallel draaien.
 - Behoud maximaal één actieve crawl per website en voorkom dubbele verwerking van dezelfde job.

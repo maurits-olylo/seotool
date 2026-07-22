@@ -4,6 +4,10 @@ services:
     restart: always
   worker:
     restart: always
+  crawl-worker-2:
+    restart: always
+  integration-worker:
+    restart: always
   export-worker:
     restart: always
   scheduler:

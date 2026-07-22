@@ -906,7 +906,8 @@ async function loadOperations() {
 function renderSystemStatus() {
   const status = state.systemStatus;
   const unavailable = {status: "unavailable", workers: 0, queued_jobs: 0};
-  const crawl = status?.queues?.default || unavailable;
+  const crawl = status?.queues?.crawls || unavailable;
+  const integrations = status?.queues?.integrations || unavailable;
   const exports = status?.queues?.exports || unavailable;
   const healthy = status?.status === "ok";
   $("#system-status-summary").textContent = healthy ? "Alles operationeel" : "Aandacht nodig";
@@ -914,6 +915,7 @@ function renderSystemStatus() {
   const entries = [
     ["API & database", status?.api === "ok" && status?.database === "ok", status?.database === "ok" ? "Bereikbaar" : "Database niet bereikbaar"],
     ["Crawl-worker", crawl.status === "ok", `${crawl.workers} actief · ${crawl.queued_jobs} in wachtrij`],
+    ["Data-importworker", integrations.status === "ok", `${integrations.workers} actief · ${integrations.queued_jobs} in wachtrij`],
     ["Export-worker", exports.status === "ok", `${exports.workers} actief · ${exports.queued_jobs} in wachtrij`],
   ];
   $("#system-status-grid").innerHTML = entries.map(([label, ok, detail]) => `<article><span>${label}</span><strong class="${ok ? "ok" : "degraded"}">${ok ? "Operationeel" : "Niet beschikbaar"}</strong><small>${detail}</small></article>`).join("");

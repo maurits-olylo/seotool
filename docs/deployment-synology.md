@@ -107,7 +107,8 @@ Controleer periodiek:
 
 ```bash
 docker compose -f compose.yaml -f compose.prod.yaml ps
-docker compose -f compose.yaml -f compose.prod.yaml logs --tail=200 api worker scheduler
+docker compose -f compose.yaml -f compose.prod.yaml logs --tail=200 \
+  api worker crawl-worker-2 integration-worker scheduler
 docker system df
 ```
 

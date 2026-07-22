@@ -84,7 +84,12 @@ def system_status(
         queue_status = {
             "redis": "unavailable",
             "queues": {
-                "default": {"status": "unavailable", "workers": 0, "queued_jobs": 0},
+                "crawls": {"status": "unavailable", "workers": 0, "queued_jobs": 0},
+                "integrations": {
+                    "status": "unavailable",
+                    "workers": 0,
+                    "queued_jobs": 0,
+                },
                 "exports": {"status": "unavailable", "workers": 0, "queued_jobs": 0},
             },
         }

@@ -3,12 +3,11 @@ from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import structlog
-from rq import Retry
 from sqlalchemy import delete, select
 
 from app.api.routes.reports import build_client_report
 from app.core.logging import configure_logging
-from app.core.queue import get_queue
+from app.core.queue import enqueue_crawl_job, enqueue_integration_sync
 from app.db.session import SessionLocal
 from app.models.discovery import CrawlJob
 from app.models.integrations import WebsiteIntegration
@@ -58,12 +57,7 @@ def schedule_due_jobs() -> int:
                 )
                 db.add(job)
                 db.commit()
-                get_queue().enqueue(
-                    "app.jobs.execute_crawl_job",
-                    str(job.id),
-                    retry=Retry(max=3, interval=[10, 30, 90]),
-                    job_id=str(job.id),
-                )
+                enqueue_crawl_job(str(job.id))
                 created += 1
     return created
 
@@ -109,10 +103,8 @@ def schedule_integration_syncs() -> int:
             for mapping in mappings:
                 mapping.settings = {**mapping.settings, "sync_queued_at": now.isoformat()}
             db.commit()
-            get_queue().enqueue(
-                "app.services.integration_sync.synchronize_website_integrations",
+            enqueue_integration_sync(
                 str(website_id),
-                retry=Retry(max=3, interval=[60, 300, 900]),
                 job_id=f"integration-sync-{website_id}-{now.date().isoformat()}",
             )
             created += 1

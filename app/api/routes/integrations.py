@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.queue import get_queue
+from app.core.queue import enqueue_integration_sync
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.client import Client
@@ -491,8 +491,7 @@ def synchronize_integration_history(
             },
         }
     db.commit()
-    get_queue().enqueue(
-        "app.services.integration_sync.synchronize_website_integrations",
+    enqueue_integration_sync(
         str(website_id),
         480,
         job_id=f"integration-history-{website_id}-{uuid.uuid4()}",

@@ -5,13 +5,29 @@ from rq import Worker
 from sqlalchemy import select
 
 from app.core.logging import configure_logging
-from app.core.queue import get_redis
+from app.core.queue import CRAWL_QUEUE, get_redis
 from app.db.session import SessionLocal
 from app.models.crawl import CrawlRun
 from app.models.discovery import CrawlJob
 
 
-def recover_interrupted_crawls() -> None:
+def active_crawl_job_ids() -> set[str]:
+    """Return crawl IDs currently owned by another live RQ worker."""
+    active: set[str] = set()
+    for worker in Worker.all(connection=get_redis()):
+        try:
+            current = worker.get_current_job()
+        except Exception:
+            continue
+        if current is None or current.func_name != "app.jobs.execute_crawl_job":
+            continue
+        if current.args:
+            active.add(str(current.args[0]))
+    return active
+
+
+def recover_interrupted_crawls(active_job_ids: set[str] | None = None) -> None:
+    protected = active_crawl_job_ids() if active_job_ids is None else active_job_ids
     with SessionLocal() as db:
         jobs = list(
             db.scalars(
@@ -21,6 +37,8 @@ def recover_interrupted_crawls() -> None:
             )
         )
         for job in jobs:
+            if str(job.id) in protected:
+                continue
             run = db.scalar(select(CrawlRun).where(CrawlRun.crawl_job_id == job.id))
             if job.status == "cancel_requested":
                 finished = datetime.now(UTC)
@@ -39,10 +57,14 @@ def recover_interrupted_crawls() -> None:
 
 def main() -> None:
     configure_logging()
-    queues = [name.strip() for name in os.getenv("WORKER_QUEUES", "default").split(",")]
-    if "default" in queues:
+    queues = [name.strip() for name in os.getenv("WORKER_QUEUES", CRAWL_QUEUE).split(",")]
+    if CRAWL_QUEUE in queues:
         recover_interrupted_crawls()
-    Worker(queues, connection=get_redis()).work()
+    Worker(
+        queues,
+        connection=get_redis(),
+        name=os.getenv("WORKER_NAME") or None,
+    ).work()
 
 
 if __name__ == "__main__":

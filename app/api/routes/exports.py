@@ -8,7 +8,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.queue import get_queue
+from app.core.queue import EXPORT_QUEUE, get_queue
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.exports import Export
@@ -50,7 +50,7 @@ def create_export(
     db.commit()
     db.refresh(export)
     if get_settings().app_env != "test":
-        get_queue("exports").enqueue(
+        get_queue(EXPORT_QUEUE).enqueue(
             "app.services.exports.generate_export",
             str(export.id),
             job_id=f"export-{export.id}",

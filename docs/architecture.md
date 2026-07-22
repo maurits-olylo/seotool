@@ -62,8 +62,12 @@ contextafhankelijke controle of een optionele optimalisatie is. Prioriteit blijf
 ## Jobs en exports
 
 De API en scheduler schrijven eerst een persistent `crawl_job` en plaatsen daarna alleen het ID op
-de RQ-queue. De worker voorkomt gelijktijdige crawls per website en bewaart deelresultaten per URL.
-RQ verzorgt retries met oplopende wachttijd. CSV-exporten leveren één dataset; Excel bevat metadata
+de RQ-queue `crawls`. Twee workers kunnen verschillende websites parallel verwerken. Een gedeeltelijk
+unieke database-index staat maximaal één `running` crawl per website toe. Worker-recovery laat jobs
+die aantoonbaar door een andere live RQ-worker worden verwerkt ongemoeid. GSC-, GA4- en Bing-imports
+gebruiken de afzonderlijke queue `integrations`; exports gebruiken `exports`. Hierdoor blokkeren
+langdurige data-imports geen crawls. RQ verzorgt retries met oplopende wachttijd. CSV-exporten leveren
+één dataset; Excel bevat metadata
 en aparte tabbladen voor URL's, issues, wijzigingen, interne links en vacatures. Het vacaturetabblad
 bevat lifecycle, Google for Jobs-status, datums, sollicitatiegegevens, interne links en actieve
 bevindingen, maar geen technische database-ID's. Bestanden staan in een gedeeld volume.

@@ -1,4 +1,6 @@
+import pytest
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 
 from app.db.session import SessionLocal
 from app.jobs import execute_crawl_job
@@ -8,6 +10,32 @@ from app.models.discovery import CrawlJob, Url
 from app.models.issues import Issue
 from app.models.website import Website, WebsiteSettings
 from app.services.http_crawler import CrawlError, FetchResult
+
+
+def test_database_allows_only_one_running_crawl_per_website() -> None:
+    with SessionLocal() as db:
+        client = Client(name="Parallel limit client")
+        website = Website(client=client, name="Limited parallel site", base_url="https://limit.test/")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        db.add(
+            CrawlJob(
+                website_id=website.id,
+                job_type="light_check",
+                status="running",
+            )
+        )
+        db.commit()
+        db.add(
+            CrawlJob(
+                website_id=website.id,
+                job_type="full_site_crawl",
+                status="running",
+            )
+        )
+        with pytest.raises(IntegrityError):
+            db.commit()
 
 
 def test_light_check_respects_url_limit_and_request_delay(monkeypatch) -> None:  # type: ignore[no-untyped-def]

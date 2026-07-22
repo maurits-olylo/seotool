@@ -3,12 +3,13 @@
 Platform voor het beheren van klanten en websites, periodieke crawls, wijzigingsdetectie,
 technische SEO-issues, vacaturemonitoring en CSV-/Excel-export. Excel-exporten bevatten een
 afzonderlijk vacaturetabblad met lifecycle en Google for Jobs-bevindingen. De applicatie gebruikt
-FastAPI, PostgreSQL en Redis/RQ en draait als zes losse Docker Compose-services.
+FastAPI, PostgreSQL en Redis/RQ en draait als acht losse Docker Compose-services.
 
 ## Architectuur
 
 - `api`: REST API en OpenAPI-documentatie.
-- `worker`: crawls en analyse.
+- `worker` en `crawl-worker-2`: maximaal twee websites gecontroleerd parallel crawlen.
+- `integration-worker`: GSC-, GA4- en Bing-imports op een afzonderlijke queue.
 - `export-worker`: exports op een afzonderlijke queue.
 - `scheduler`: dagelijkse sitemap/light checks en wekelijkse sitecrawls.
 - `postgres`: blijvende configuratie, URL-register, snapshots en issues.
@@ -39,7 +40,7 @@ interface persoonlijke accounts en een beveiligde sessiecookie gebruikt.
 
 ```bash
 docker compose up -d
-docker compose logs -f api worker scheduler
+docker compose logs -f api worker crawl-worker-2 integration-worker scheduler
 docker compose ps
 docker compose down
 ```

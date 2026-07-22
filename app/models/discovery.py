@@ -1,7 +1,18 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -45,6 +56,15 @@ class UrlSource(Base):
 
 class CrawlJob(UUIDTimestampMixin, Base):
     __tablename__ = "crawl_jobs"
+    __table_args__ = (
+        Index(
+            "uq_crawl_jobs_running_website",
+            "website_id",
+            unique=True,
+            postgresql_where=text("status = 'running'"),
+            sqlite_where=text("status = 'running'"),
+        ),
+    )
 
     website_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("websites.id", ondelete="CASCADE"), index=True
