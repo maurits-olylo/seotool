@@ -12,8 +12,27 @@ from app.services.oauth import (
     create_oauth_state,
     decrypt_token,
     encrypt_token,
+    oauth_error_message,
     parse_oauth_state,
 )
+
+
+def test_oauth_refresh_error_is_actionable_without_exposing_response_body() -> None:
+    class FailedRefresh:
+        @staticmethod
+        def json() -> dict[str, str]:
+            return {
+                "error": "invalid_grant",
+                "error_description": "Token has been expired or revoked",
+                "access_token": "must-not-be-stored",
+            }
+
+    message = oauth_error_message("Google", FailedRefresh())
+
+    assert message == (
+        "Google authorization is expired or revoked; reconnect required (invalid_grant)"
+    )
+    assert "must-not-be-stored" not in message
 
 
 def test_google_authorize_uses_signed_state_and_read_only_scopes(

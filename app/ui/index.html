@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="/ui/assets/integrations.css">
   <link rel="stylesheet" href="/ui/assets/oauth.css">
   <link rel="stylesheet" href="/ui/assets/properties.css">
-  <link rel="stylesheet" href="/ui/assets/urls.css">
+  <link rel="stylesheet" href="/ui/assets/urls.css?v=20260722-1">
   <link rel="stylesheet" href="/ui/assets/changes.css">
   <link rel="stylesheet" href="/ui/assets/operations.css">
   <link rel="stylesheet" href="/ui/assets/organization.css">
@@ -39,6 +39,10 @@
           <label id="website-selector-wrap"><span>Website</span><select id="website-select" aria-label="Website"></select></label>
         </div>
       </header>
+      <section id="integration-warning" class="integration-warning hidden" role="alert">
+        <div><span class="eyebrow">KOPPELING CONTROLEREN</span><strong id="integration-warning-title"></strong><p id="integration-warning-detail"></p></div>
+        <button id="integration-warning-action" class="detail-button" type="button">Naar integraties</button>
+      </section>
       <section id="client-report" class="client-report hidden">
         <nav id="report-periods" class="report-periods" aria-label="Rapportageperiode">
           <button data-report-period="month" class="active">Maand</button><button data-report-period="quarter">Kwartaal</button><button data-report-period="half_year">6 maanden</button><button data-report-period="year">Jaar</button><button data-report-period="ytd">YTD</button>
@@ -181,6 +185,6 @@
     <dl><div><dt>Vergeleken meetmomenten</dt><dd id="change-detail-date"></dd></div><div><dt>Mogelijke relevantie</dt><dd id="change-detail-relevance"></dd></div><div><dt>Aanbevolen controle</dt><dd id="change-detail-action"></dd></div></dl>
     <div id="change-group-details"></div>
   </dialog>
-  <script src="/ui/assets/app.js?v=20260718-5" defer></script>
+  <script src="/ui/assets/app.js?v=20260722-1" defer></script>
 </body>
 </html>

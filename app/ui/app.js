@@ -13,7 +13,7 @@ const labels = {
   pause_requested: "Pauze wordt voorbereid", paused: "Gepauzeerd",
   cancel_requested: "Stop wordt voorbereid",
 };
-const state = { currentUser: null, clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
+const state = { currentUser: null, clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
 const VIEW_HASHES = {overview: "overzicht", reports: "rapportage", insights: "inzichten", urls: "urls", changes: "wijzigingen", vacancies: "vacatures", operations: "beheer", organization: "organisatie", integrations: "integraties"};
 const CLIENT_STORAGE_KEY = "seo-monitor-client-id";
 const WEBSITE_STORAGE_KEY = "seo-monitor-website-id";
@@ -160,6 +160,22 @@ function renderTrendChart(months, metric) {
 function renderReportIssues(issues = [], emptyText) {
   if (!issues.length) return `<p class="report-empty">${emptyText}</p>`;
   return issues.map((issue) => `<article class="report-list-item"><div><span class="severity ${issue.severity}">${labels[issue.severity] || issue.severity}</span><span class="badge">${labels[issue.status] || issue.status}</span></div><strong>${escapeHtml(issue.title)}</strong><p>${escapeHtml(issue.recommended_action)}</p></article>`).join("");
+}
+
+function renderIntegrationWarning() {
+  const panel = $("#integration-warning");
+  const providerLabels = {google: "Google (GSC en GA4)", bing: "Bing Webmaster Tools"};
+  const serviceLabels = {search_console: "Google Search Console", ga4: "Google Analytics 4", bing_webmaster: "Bing Webmaster Tools"};
+  const connectionErrors = (state.integrationHealth.connections || []).filter((item) => item.status === "error");
+  const mappingErrors = (state.integrationHealth.mappings || []).filter((item) => item.status === "error");
+  const warnings = [
+    ...connectionErrors.map((item) => ({name: providerLabels[item.provider] || item.provider, detail: item.last_error})),
+    ...mappingErrors.map((item) => ({name: serviceLabels[item.service] || item.service, detail: item.settings?.last_error})),
+  ];
+  panel.classList.toggle("hidden", warnings.length === 0);
+  if (!warnings.length) return;
+  $("#integration-warning-title").textContent = `${warnings.map((item) => item.name).join(" en ")} ${warnings.length === 1 ? "heeft" : "hebben"} aandacht nodig`;
+  $("#integration-warning-detail").textContent = warnings.map((item) => item.detail || "De laatste synchronisatie is mislukt.").join(" · ");
 }
 
 async function loadClientReport() {
@@ -381,6 +397,7 @@ async function loadIntegrations() {
     const connection = connections.find((item) => item.provider === provider);
     const target = $(`#${provider}-status`);
     target.textContent = connection ? `${labels[connection.status] || connection.status}${connection.account_email ? ` · ${connection.account_email}` : ""}` : "Niet gekoppeld";
+    target.classList.toggle("error", connection?.status === "error");
   }
   const googleConnection = connections.find((item) => item.provider === "google" && item.status === "connected");
   const googleLink = $("#google-connect");
@@ -726,19 +743,27 @@ async function loadIssues() {
   if (!websiteId) {
     state.issues = [];
     state.suppressions = [];
+    state.integrationHealth = {connections: [], mappings: []};
     state.selectedIssueIds.clear();
     state.selectedSuppressionIds.clear();
     render();
     return;
   }
   const status = $("#status-filter").value || "active";
-  const [issues, urls, suppressions] = await Promise.all([
+  const canAdmin = ["superuser", "admin"].includes(state.currentUser?.role);
+  const clientId = $("#client-select").value;
+  const [issues, urls, suppressions, integrationHealth] = await Promise.all([
     api(`/api/v1/websites/${websiteId}/issues?status=${encodeURIComponent(status)}`),
     loadAllUrls(websiteId),
     api(`/api/v1/websites/${websiteId}/issue-suppressions`),
+    canAdmin ? Promise.all([
+      api(`/api/v1/clients/${clientId}/integrations`),
+      api(`/api/v1/websites/${websiteId}/integrations`),
+    ]).then(([connections, mappings]) => ({connections, mappings})).catch(() => ({connections: [], mappings: []})) : Promise.resolve({connections: [], mappings: []}),
   ]);
   state.issues = issues;
   state.suppressions = suppressions;
+  state.integrationHealth = integrationHealth;
   state.selectedIssueIds.clear();
   state.selectedSuppressionIds.clear();
   state.urlRecords = urls;
@@ -851,7 +876,7 @@ function renderUrls() {
     const depthLabel = url.crawl_depth_reliable ? depth : `${depth}*`;
     const issueTitle = url.active_issue_titles?.[0];
     const issueCount = url.active_issue_count || 0;
-    const issueSignal = issueTitle ? `<span class="severity ${escapeHtml(url.highest_issue_severity || "low")}">${escapeHtml(labels[url.highest_issue_severity] || url.highest_issue_severity || "Signaal")}</span><span>${escapeHtml(issueTitle)}${issueCount > 1 ? ` · +${issueCount - 1}` : ""}</span>` : "Geen actief signaal";
+    const issueSignal = issueTitle ? `<div class="url-signal"><span class="severity ${escapeHtml(url.highest_issue_severity || "low")}">${escapeHtml(labels[url.highest_issue_severity] || url.highest_issue_severity || "Signaal")}</span><span class="url-signal-title">${escapeHtml(issueTitle)}${issueCount > 1 ? ` <small>+${issueCount - 1}</small>` : ""}</span></div>` : `<span class="url-signal-empty">Geen actief signaal</span>`;
     return `<tr><td><a class="url-address" href="${escapeHtml(url.normalized_url)}" target="_blank" rel="noopener">${escapeHtml(url.normalized_url)}</a></td><td><span class="status-code">${url.current_status_code ?? "—"}</span></td><td><span class="index-state ${indexState}">${indexLabel}</span></td><td>${issueSignal}</td><td title="${escapeHtml(url.crawl_depth_context || "")}">${depthLabel}</td><td>${checked}</td><td><button class="detail-button" data-url-id="${url.id}">Bekijk</button></td></tr>`;
   }).join("");
   $("#url-result-count").textContent = `${state.urlFiltered.length} URLs`;
@@ -1206,6 +1231,7 @@ function renderGroups() {
 }
 
 function render() {
+  renderIntegrationWarning();
   renderClientReport();
   applyFilters();
   renderGroups();
@@ -1478,6 +1504,7 @@ $("#vacancies-nav").addEventListener("click", () => showView("vacancies"));
 $("#operations-nav").addEventListener("click", () => showView("operations"));
 $("#organization-nav").addEventListener("click", () => showView("organization"));
 $("#integrations-nav").addEventListener("click", () => showView("integrations"));
+$("#integration-warning-action").addEventListener("click", () => showView("integrations"));
 $("#insight-period").addEventListener("change", async (event) => { state.insightDays = Number(event.target.value); await loadConsultantInsights(); });
 $("#onboarding-form").addEventListener("submit", onboardClient);
 $("#website-form").addEventListener("submit", createWebsite);

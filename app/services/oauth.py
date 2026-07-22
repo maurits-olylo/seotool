@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 import time
+from typing import Any
 from urllib.parse import urlencode
 from uuid import UUID
 
@@ -18,6 +19,20 @@ GOOGLE_SCOPES = [
     "https://www.googleapis.com/auth/analytics.readonly",
 ]
 BING_SCOPES = ["webmaster.read"]
+
+
+def oauth_error_message(provider: str, response: Any) -> str:
+    """Return a safe, actionable OAuth error without storing tokens or response bodies."""
+    try:
+        payload = response.json()
+    except (TypeError, ValueError):
+        payload = {}
+    error = str(payload.get("error") or "").strip()
+    description = str(payload.get("error_description") or "").strip()
+    detail = ": ".join(part for part in (error, description) if part)
+    if error == "invalid_grant":
+        return f"{provider} authorization is expired or revoked; reconnect required (invalid_grant)"
+    return f"{provider} access token could not be refreshed{f' ({detail})' if detail else ''}"
 
 
 def google_is_configured() -> bool:

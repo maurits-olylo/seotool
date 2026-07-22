@@ -580,3 +580,18 @@ in structured logs opgenomen.
 
 Gevolg: GSC heeft geen rij-voor-rij databasequery meer, Google-netwerkwachttijd overlapt en grote
 imports gebruiken begrensde batches. Een mislukte transactie behoudt de eerder gecommitte data.
+
+## 2026-07-22 — Integratiestoringen worden zichtbaar en veilig diagnostisch
+
+Context: een afgewezen OAuth-vernieuwing werd alleen als generieke fout opgeslagen en was uitsluitend
+op de integratiepagina zichtbaar. Daardoor was niet te onderscheiden of opnieuw koppelen echt nodig
+was en kon ontbrekende rapportagedata ongemerkt blijven.
+
+Besluit: veilige OAuth-foutcodes worden zonder tokens of response-inhoud opgeslagen. Een verlopen,
+ingetrokken of niet-ontsleutelbaar token markeert de verbinding als fout. Beheerders zien fouten van
+de accountverbinding of websitemapping als waarschuwing bovenaan het technische overzicht, met een
+directe route naar Integraties. Niet-geconfigureerde koppelingen geven geen waarschuwing.
+
+Gevolg: ontbrekende GSC-, GA4- of Bing-data wordt operationeel zichtbaar en `invalid_grant` maakt
+expliciet dat opnieuw koppelen nodig is. De onderliggende oorzaak kan vanaf de eerstvolgende fout
+worden vastgesteld zonder secrets vast te leggen.
