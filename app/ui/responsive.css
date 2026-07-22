@@ -26,7 +26,8 @@ header {
 }
 
 @media (max-width: 520px) {
-  .profile-toggle { width: auto; }
+  .profile-menu { min-width: 0; }
+  .profile-toggle { width: auto !important; }
   .profile-toggle #current-user { display: none; }
   .profile-popover { right: 0; left: auto; min-width: 140px; }
 }
