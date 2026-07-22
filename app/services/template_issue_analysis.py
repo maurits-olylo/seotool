@@ -1,3 +1,5 @@
+import hashlib
+import json
 import re
 from collections import defaultdict
 from urllib.parse import urlsplit
@@ -19,9 +21,12 @@ CLUSTERABLE_ISSUE_TYPES = {
     "duplicate_title",
     "missing_h1",
     "missing_meta_description",
+    "multiple_broken_internal_links",
     "multiple_h1",
+    "multiple_redirected_internal_links",
     "orphan_page",
     "thin_content",
+    "cms_link_placeholder",
 }
 ACTIVE_STATUSES = {
     "new",
@@ -38,9 +43,12 @@ MINIMUM_CLUSTER_SIZE = {
     "duplicate_title": 2,
     "missing_h1": 5,
     "missing_meta_description": 5,
+    "multiple_broken_internal_links": 2,
     "multiple_h1": 5,
+    "multiple_redirected_internal_links": 2,
     "orphan_page": 5,
     "thin_content": 5,
+    "cms_link_placeholder": 2,
 }
 HIERARCHICAL_ISSUE_TYPES = {
     "deep_page",
@@ -195,6 +203,17 @@ def _cluster_key(
     if issue_type == "canonical_other_url":
         canonical = evidence.get("canonical")
         return f"canonical:{_path_family(str(canonical))}" if canonical else None
+    if issue_type == "cms_link_placeholder":
+        return f"elements:{evidence.get('element_count', 0)}:{path}"
+    if issue_type in {
+        "multiple_broken_internal_links",
+        "multiple_redirected_internal_links",
+    }:
+        targets = _component_targets(issue_type, evidence)
+        if not targets:
+            return None
+        digest = hashlib.sha256(json.dumps(targets).encode()).hexdigest()[:16]
+        return f"targets:{digest}"
     if issue_type == "thin_content":
         return f"{evidence.get('content_level', 'unknown')}:{path}"
     if issue_type == "multiple_h1":
@@ -235,9 +254,34 @@ def _append_cluster(
             "url_count": len(unique_urls),
             "urls": unique_urls,
             "sample_evidence": _compact_evidence(items[0][2]),
+            **(
+                {"shared_targets": _component_targets(issue_type, items[0][2])}
+                if issue_type
+                in {
+                    "multiple_broken_internal_links",
+                    "multiple_redirected_internal_links",
+                }
+                else {}
+            ),
         }
     )
     return True
+
+
+def _component_targets(issue_type: str, evidence: dict[str, object]) -> list[str]:
+    evidence_key, target_key = (
+        ("broken_links", "target_url")
+        if issue_type == "multiple_broken_internal_links"
+        else ("redirected_links", "redirect_url")
+    )
+    values = evidence.get(evidence_key, [])
+    return sorted(
+        {
+            str(item[target_key])
+            for item in values
+            if isinstance(item, dict) and isinstance(item.get(target_key), str)
+        }
+    )
 
 
 def _parent_cluster_key(issue_type: str, evidence: dict[str, object], url: str) -> str:

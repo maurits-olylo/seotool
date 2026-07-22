@@ -543,5 +543,10 @@ padsegment beoordeeld. Een `internally_linked_404`-doeltaak verdwijnt uit de hoo
 hetzelfde doel al voorkomt in een actieve gegroepeerde bronpaginataak; het onderliggende issue blijft
 opgeslagen en komt terug zodra de brongroep niet meer actief is.
 
+Bronpagina's met exact dezelfde set gebroken links of redirects worden als één componentcluster
+getoond. CMS-placeholders worden per URL-familie en aantal elementen gegroepeerd. Cloudflare's
+`/cdn-cgi/l/email-protection` en onverwerkte CMS-linkwaarden zijn geen navigeerbare URL-doelen en
+worden daarom niet daarnaast als 404-, broken-link- of redirectprobleem geclassificeerd.
+
 Canonicalcontrole wordt alleen uitgevoerd op bereikbare pagina's met een 200-status. Een 404-pagina
 met een canonical naar de foutpagina levert daardoor niet langer een tweede canonicalissue op.

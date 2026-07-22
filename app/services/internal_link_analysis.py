@@ -10,6 +10,7 @@ from app.models.integrations import GoogleAnalyticsMetric, SearchConsoleMetric
 from app.models.issues import Issue
 from app.services.element_locations import mark_target_elements
 from app.services.issue_engine import reconcile_issues
+from app.services.link_filtering import is_non_navigational_link_target
 from app.services.technical_checks import IssueSignal
 from app.services.url_filtering import is_probable_html_page
 from app.services.url_normalization import InvalidUrlError, normalize_url
@@ -321,6 +322,8 @@ def _redirect_links_by_source(
     result: dict[object, list[dict[str, object]]] = {}
     seen: set[tuple[object, str, str]] = set()
     for source_id, target_url, anchor_text, final_url, status_code in rows:
+        if is_non_navigational_link_target(target_url):
+            continue
         try:
             is_redirect = normalize_url(target_url) != normalize_url(final_url)
         except InvalidUrlError:

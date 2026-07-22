@@ -11,6 +11,7 @@ from app.models.discovery import Url, UrlSource
 from app.models.issues import Issue
 from app.services.element_locations import mark_target_elements
 from app.services.issue_engine import reconcile_issues
+from app.services.link_filtering import is_non_navigational_link_target
 from app.services.technical_checks import IssueSignal
 
 CONTEXTUAL_404_TYPES = {"http_404", "internally_linked_404", "sitemap_404"}
@@ -40,6 +41,17 @@ def classify_404_issues(
     )
     for url in urls:
         _check_control(check_control)
+        if is_non_navigational_link_target(url.normalized_url):
+            reconcile_issues(
+                db,
+                website_id=website_id,
+                url_id=url.id,
+                crawl_run_id=crawl_run_id,
+                snapshot_id=None,
+                signals=[],
+                checked_issue_types=CONTEXTUAL_404_TYPES,
+            )
+            continue
         incoming_links = (
             db.scalar(
                 select(func.count(UrlLink.id)).where(
@@ -79,7 +91,11 @@ def classify_404_issues(
         db,
         website_id=website_id,
         crawl_run_id=crawl_run_id,
-        urls=[url.normalized_url for url in urls],
+        urls=[
+            url.normalized_url
+            for url in urls
+            if not is_non_navigational_link_target(url.normalized_url)
+        ],
     )
     _check_control(check_control)
     _classify_source_pages(
@@ -236,6 +252,8 @@ def _classify_source_pages(
     for row_index, (source_id, target_url, anchor_text, status_code) in enumerate(rows):
         if row_index % 100 == 0:
             _check_control(check_control)
+        if is_non_navigational_link_target(target_url):
+            continue
         key = (source_id, target_url, anchor_text or "")
         if key in seen:
             continue
