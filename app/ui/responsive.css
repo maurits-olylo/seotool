@@ -20,6 +20,8 @@ header {
 #actions-view th:nth-child(6) { width: 75px; }
 #actions-view td:nth-child(2) { min-width: 0; }
 .mobile-nav-toggle { display: none; }
+.table-state td { padding: 34px 20px !important; color: var(--muted); text-align: center; font-weight: 650; }
+.table-state.error td { color: var(--red); background: #fff8f7; }
 
 @media (max-width: 850px) {
   .mobile-nav-toggle { display: block; margin-left: 14px; padding: 7px 10px; border: 1px solid #ffffff2b; border-radius: 7px; background: transparent; color: #fff; font-weight: 800; }

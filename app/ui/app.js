@@ -636,7 +636,6 @@ function renderConsultantInsights() {
   const content = data.content || [];
   const conversion = data.conversion || [];
   const conversionContext = data.conversion_context || {};
-  $("#insights-website-name").textContent = state.websites.find((item) => item.id === $("#website-select").value)?.name || "";
   $("#insight-summary").innerHTML = [
     [search.length, "Zoekkansen"],
     [content.length, "Contentvragen"],
@@ -709,8 +708,8 @@ function showView(view, updateHash = true) {
   });
   if (["clients", "team"].includes(view)) { applyOrganizationPresentation(view); loadOrganization(); }
   if (view === "urls") renderUrls();
-  if (view === "changes") loadChanges();
-  if (view === "vacancies") loadJobListings();
+  if (view === "changes") loadChanges().catch(() => renderTableState("#change-rows", 5, "Wijzigingen konden niet worden geladen. Probeer het later opnieuw.", true));
+  if (view === "vacancies") loadJobListings().catch(() => renderTableState("#vacancy-rows", 4, "Vacatures konden niet worden geladen. Probeer het later opnieuw.", true));
   if (view === "operations") { loadOperations(); startOperationsPolling(); } else stopOperationsPolling();
   if (updateHash) window.history.replaceState({}, "", `#${VIEW_HASHES[view]}`);
 }
@@ -749,7 +748,7 @@ function applyOrganizationPresentation(view) {
 function applyOverviewPresentation(reportMode) {
   $("#overview-eyebrow").textContent = reportMode ? "SEO-RAPPORTAGE" : "ANALYSE";
   $("#overview-title").textContent = reportMode ? "Rapportages" : "Acties";
-  $("#client-report-intro").classList.toggle("hidden", !reportMode);
+  $("#client-report-intro").textContent = reportMode ? "Organische prestaties, gerealiseerd werk en de belangrijkste vervolgstappen." : "Prioriteer technische SEO-acties en volg de afhandeling.";
   $("#client-report").classList.toggle("hidden", !reportMode);
   $("#report-archive").classList.toggle("hidden", !reportMode);
   $("#summary").classList.toggle("hidden", reportMode);
@@ -825,10 +824,10 @@ const issueNatureLabels = {problem: "Probleem", review: "Controleren", optimizat
 async function loadJobListings() {
   const websiteId = $("#website-select").value;
   if (!websiteId) return;
+  renderTableState("#vacancy-rows", 4, "Vacatures worden geladen…");
   const result = await api(`/api/v1/websites/${websiteId}/job-listings`);
   state.jobListings = result.job_listings || [];
   state.jobSummary = result.summary || {};
-  $("#vacancies-website-name").textContent = $("#website-select").selectedOptions[0]?.textContent || "de website";
   renderJobListings();
 }
 
@@ -896,7 +895,6 @@ function renderUrls() {
   state.urlPage = Math.min(state.urlPage, pages);
   const start = (state.urlPage - 1) * URL_PAGE_SIZE;
   const rows = state.urlFiltered.slice(start, start + URL_PAGE_SIZE);
-  $("#urls-website-name").textContent = $("#website-select").selectedOptions[0]?.textContent || "de website";
   $("#url-rows").innerHTML = rows.map((url) => {
     const indexState = urlIndexState(url);
     const indexLabel = {indexable: "Indexeerbaar", blocked: "Niet indexeerbaar", unknown: "Onbekend"}[indexState];
@@ -1165,6 +1163,7 @@ function changeLabel(change) {
 async function loadChanges() {
   const websiteId = $("#website-select").value;
   if (!websiteId) return;
+  renderTableState("#change-rows", 5, "Wijzigingen worden geladen…");
   state.changes = [];
   for (let offset = 0; ; offset += 1000) {
     const batch = await api(`/api/v1/websites/${websiteId}/changes?limit=1000&offset=${offset}`);
@@ -1178,6 +1177,10 @@ async function loadChanges() {
   if (types.includes(selected)) $("#change-type-filter").value = selected;
   state.changePage = 1;
   renderChanges();
+}
+
+function renderTableState(selector, columns, message, error = false) {
+  $(selector).innerHTML = `<tr class="table-state${error ? " error" : ""}" role="status"><td colspan="${columns}">${escapeHtml(message)}</td></tr>`;
 }
 
 function groupChanges(changes) {
@@ -1209,7 +1212,6 @@ function renderChanges() {
   state.changePage = Math.min(state.changePage, pages);
   const start = (state.changePage - 1) * CHANGE_PAGE_SIZE;
   const rows = state.changeFiltered.slice(start, start + CHANGE_PAGE_SIZE);
-  $("#changes-website-name").textContent = $("#website-select").selectedOptions[0]?.textContent || "de website";
   $("#change-rows").innerHTML = rows.map((group) => {
     const url = state.urls.get(group.url_id) || "Onbekende URL";
     const parts = [...new Set(group.changes.map(changeLabel))];
