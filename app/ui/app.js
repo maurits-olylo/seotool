@@ -1479,7 +1479,8 @@ async function showIssue(issueId) {
   $("#detail-impact").textContent = impactParts.length ? `Impact (28 dagen): ${impactParts.join(" · ")}` : "";
   $("#detail-impact").classList.toggle("hidden", !impact);
   const brokenLinks = Array.isArray(issue.evidence.broken_links) ? issue.evidence.broken_links : [];
-  $("#detail-broken-links").innerHTML = brokenLinks.map((link) => `<li><a href="${escapeHtml(link.target_url)}" target="_blank" rel="noopener">${escapeHtml(link.target_url)}</a><br><span>Ankertekst: ${escapeHtml(link.anchor_text || "(geen ankertekst)")} · status ${escapeHtml(link.status_code || 404)}</span></li>`).join("");
+  $("#broken-links-heading").textContent = `Dode doelen op deze bronpagina (${brokenLinks.length})`;
+  $("#detail-broken-links").innerHTML = brokenLinks.map((link) => `<li><span class="evidence-item-label">Doel-URL</span><a href="${escapeHtml(link.target_url)}" target="_blank" rel="noopener">${escapeHtml(link.target_url)}</a><span>Ankertekst: ${escapeHtml(link.anchor_text || "(geen ankertekst)")} · HTTP-status ${escapeHtml(link.status_code || 404)}</span></li>`).join("");
   $("#broken-links-section").classList.toggle("hidden", brokenLinks.length === 0);
   const vacancyClusters = Array.isArray(issue.evidence.clusters) ? issue.evidence.clusters : [];
   $("#detail-vacancy-clusters").innerHTML = vacancyClusters.map((cluster, index) => `<section><strong>Cluster ${index + 1}: ${escapeHtml(cluster.group_size)} vacatures</strong><p>Minimale inhoudsoverlap: ${escapeHtml(cluster.minimum_content_overlap_percent)}%</p><ul>${cluster.urls.map((url) => `<li><a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a></li>`).join("")}</ul></section>`).join("");
@@ -1487,10 +1488,86 @@ async function showIssue(issueId) {
   const urlPatterns = Array.isArray(issue.evidence.patterns) ? issue.evidence.patterns : [];
   $("#detail-url-patterns").innerHTML = urlPatterns.map((pattern) => `<section><strong>${escapeHtml(pattern.pattern)}</strong><p>${escapeHtml(pattern.url_count)} URL’s · ${pattern.pattern_type === "pagination" ? "paginering" : "parameters/filter"}</p><ul>${pattern.urls.map((url) => `<li><a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a></li>`).join("")}</ul></section>`).join("");
   $("#url-patterns-section").classList.toggle("hidden", urlPatterns.length === 0);
-  const evidence = Object.entries(issue.evidence).filter(([key]) => !["broken_links", "clusters", "patterns"].includes(key));
-  $("#detail-evidence").textContent = evidence.map(([key, value]) => `${key.replaceAll("_", " ")}: ${value}`).join("\n") || "Geen aanvullend bewijs opgeslagen.";
-  $("#detail-sources").innerHTML = issue.source_urls.map((source) => `<li><a href="${escapeHtml(source)}" target="_blank" rel="noopener">${escapeHtml(source)}</a></li>`).join("");
-  $("#source-section").classList.toggle("hidden", issue.source_urls.length === 0);
+  renderIssueEvidence(issue.evidence || {});
+  const sourceUrls = issue.source_urls || [];
+  $("#source-heading").textContent = `Bronpagina’s met dit signaal (${sourceUrls.length})`;
+  $("#detail-sources").innerHTML = sourceUrls.map((source) => `<li><a href="${escapeHtml(source)}" target="_blank" rel="noopener">${escapeHtml(source)}</a></li>`).join("");
+  $("#source-section").classList.toggle("hidden", sourceUrls.length === 0);
+}
+
+const evidenceLabels = {
+  affected_url_count: "Getroffen URL’s",
+  application_cta_active: "Sollicitatieknop actief",
+  canonical: "Canonieke URL",
+  content_level: "Inhoudsniveau",
+  count: "Aantal",
+  crawl_depth: "Crawldiepte",
+  element_count: "Betrokken elementen",
+  failed_url_count: "Mislukte URL’s",
+  group_size: "Omvang van de groep",
+  in_sitemap: "Opgenomen in sitemap",
+  incoming_internal_links: "Inkomende interne links",
+  limit: "Ingestelde limiet",
+  minimum_content_overlap_percent: "Minimale inhoudsoverlap",
+  page_count: "Betrokken pagina’s",
+  redirect_count: "Redirects",
+  response_size: "Responsgrootte",
+  source_page_count: "Unieke bronpagina’s",
+  status_code: "HTTP-status",
+  target_count: "Unieke doel-URL’s",
+  target_url: "Doel-URL",
+  url: "URL",
+  url_count: "Getroffen URL’s",
+  validThrough: "Geldig tot",
+  visible_closing_date: "Zichtbare sluitingsdatum",
+};
+const evidenceSummaryPriority = ["status_code", "source_page_count", "page_count", "url_count", "affected_url_count", "target_count", "group_size", "element_count", "incoming_internal_links", "crawl_depth"];
+const evidencePresentationKeys = new Set(["alternative_explanation", "broken_links", "clusters", "likely_cause", "patterns", "verification"]);
+
+function evidenceLabel(key) {
+  if (evidenceLabels[key]) return evidenceLabels[key];
+  return key.replaceAll("_", " ").replace(/^\w/, (character) => character.toUpperCase());
+}
+
+function evidenceValue(value) {
+  if (value === null || value === undefined || value === "") return "Niet beschikbaar";
+  if (typeof value === "boolean") return value ? "Ja" : "Nee";
+  if (typeof value === "number") return new Intl.NumberFormat("nl-NL").format(value);
+  return String(value);
+}
+
+function evidenceValueHtml(value) {
+  if (Array.isArray(value)) {
+    if (!value.length) return '<span class="evidence-empty">Geen waarden</span>';
+    return `<ul>${value.map((item) => `<li>${evidenceValueHtml(item)}</li>`).join("")}</ul>`;
+  }
+  if (value && typeof value === "object") {
+    return `<pre>${escapeHtml(JSON.stringify(value, null, 2))}</pre>`;
+  }
+  const formatted = evidenceValue(value);
+  if (typeof value === "string" && /^https?:\/\//.test(value)) {
+    return `<a href="${escapeHtml(value)}" target="_blank" rel="noopener">${escapeHtml(value)}</a>`;
+  }
+  return escapeHtml(formatted);
+}
+
+function renderIssueEvidence(rawEvidence) {
+  const entries = Object.entries(rawEvidence).filter(([key]) => !evidencePresentationKeys.has(key));
+  const entryMap = new Map(entries);
+  const summaryEntries = evidenceSummaryPriority
+    .filter((key) => entryMap.has(key) && !Array.isArray(entryMap.get(key)) && typeof entryMap.get(key) !== "object")
+    .slice(0, 4)
+    .map((key) => [key, entryMap.get(key)]);
+  if (!summaryEntries.length) {
+    summaryEntries.push(...entries.filter(([, value]) => !Array.isArray(value) && (value === null || typeof value !== "object")).slice(0, 4));
+  }
+  $("#detail-evidence-summary").innerHTML = summaryEntries.length
+    ? summaryEntries.map(([key, value]) => `<article><span>${escapeHtml(evidenceLabel(key))}</span><strong>${escapeHtml(evidenceValue(value))}</strong></article>`).join("")
+    : '<p class="evidence-empty">Geen aanvullend technisch bewijs opgeslagen.</p>';
+  $("#detail-evidence").innerHTML = entries.length
+    ? entries.map(([key, value]) => `<div><dt>${escapeHtml(evidenceLabel(key))}</dt><dd>${evidenceValueHtml(value)}</dd></div>`).join("")
+    : '<div><dd class="evidence-empty">Geen aanvullende technische details.</dd></div>';
+  $("#detail-evidence-technical").open = false;
 }
 
 async function saveIssueStatus() {

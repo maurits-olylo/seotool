@@ -94,6 +94,23 @@ def test_analysis_pages_share_consistent_states_and_labels(client: TestClient) -
     assert "Vacatures konden niet worden geladen" in script.text
 
 
+def test_issue_details_present_evidence_progressively(client: TestClient) -> None:
+    page = client.get("/ui/assets/index.html")
+    assert page.status_code == 200
+    assert 'id="detail-evidence-summary"' in page.text
+    assert 'id="detail-evidence-technical"' in page.text
+    assert "Technische details tonen" in page.text
+    assert 'id="broken-links-heading"' in page.text
+    assert 'id="source-heading"' in page.text
+
+    script = client.get("/ui/assets/app.js")
+    assert script.status_code == 200
+    assert "function renderIssueEvidence" in script.text
+    assert 'source_page_count: "Unieke bronpagina’s"' in script.text
+    assert "`Bronpagina’s met dit signaal (${sourceUrls.length})`" in script.text
+    assert "evidencePresentationKeys" in script.text
+
+
 def test_crud_client_and_website(client: TestClient) -> None:
     created = client.post("/api/v1/clients", json={"name": "Example"})
     assert created.status_code == 201
