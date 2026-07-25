@@ -19,6 +19,9 @@ def test_retention_audit_protects_current_crawls_and_issue_evidence() -> None:
         old_run, old_snapshot = _run_and_snapshot(db, website, url, "succeeded", 2024)
         latest_run, latest_snapshot = _run_and_snapshot(db, website, url, "succeeded", 2025)
         active_run, active_snapshot = _run_and_snapshot(db, website, url, "running", 2026)
+        light_run, light_snapshot = _run_and_snapshot(
+            db, website, url, "succeeded", 2027, crawl_type="light_check"
+        )
 
         db.add_all(
             [
@@ -26,6 +29,7 @@ def test_retention_audit_protects_current_crawls_and_issue_evidence() -> None:
                 _location(website, url, old_run, old_snapshot, ["missing_h1"]),
                 _location(website, url, latest_run, latest_snapshot, []),
                 _location(website, url, active_run, active_snapshot, []),
+                _location(website, url, light_run, light_snapshot, []),
             ]
         )
         db.commit()
@@ -41,10 +45,16 @@ def test_retention_audit_protects_current_crawls_and_issue_evidence() -> None:
         str(active_run_id),
     }
     assert website_result["element_locations"] == {
-        "total": 4,
-        "protected_by_current_crawl": 2,
+        "total": 5,
+        "protected_by_crawl_run": 2,
+        "protected_as_latest_url_snapshot": 1,
         "protected_as_issue_evidence": 1,
         "cleanup_candidates": 1,
+    }
+    protected_runs = website_result["protected_crawl_runs"]
+    assert {item["reasons"][0] for item in protected_runs} == {
+        "active_crawl",
+        "latest_completed_full_crawl",
     }
 
 
@@ -96,16 +106,22 @@ def _website_and_url(db: Session) -> tuple[Website, Url]:
 
 
 def _run_and_snapshot(
-    db: Session, website: Website, url: Url, status: str, year: int
+    db: Session,
+    website: Website,
+    url: Url,
+    status: str,
+    year: int,
+    *,
+    crawl_type: str = "full_site_crawl",
 ) -> tuple[CrawlRun, UrlSnapshot]:
     moment = datetime(year, 1, 1, tzinfo=UTC)
-    job = CrawlJob(website_id=website.id, job_type="full_site_crawl", status=status)
+    job = CrawlJob(website_id=website.id, job_type=crawl_type, status=status)
     db.add(job)
     db.flush()
     run = CrawlRun(
         crawl_job_id=job.id,
         website_id=website.id,
-        crawl_type="full_site_crawl",
+        crawl_type=crawl_type,
         status=status,
         started_at=moment,
         finished_at=moment if status == "succeeded" else None,

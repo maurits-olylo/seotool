@@ -615,7 +615,8 @@ Team & toegang gepresenteerd. Autorisatie en alle inhoudelijke berekeningen blij
 
 Databasegroei wordt eerst meetbaar gemaakt met `python -m app.maintenance retention-audit`.
 Dit commando wijzigt geen data. Voor elementlocaties markeert het alleen oude, probleemvrije
-locaties buiten actieve crawls en buiten de nieuwste geslaagde of gedeeltelijk geslaagde volledige
-crawl als mogelijke opruimkandidaat. Locaties met issues blijven altijd beschermd. GSC-gegevens
+locaties buiten actieve crawls, buiten de nieuwste geslaagde of gedeeltelijk geslaagde volledige
+crawl en buiten de nieuwste locatiehoudende snapshot per URL als mogelijke opruimkandidaat.
+Locaties met issues blijven altijd beschermd. GSC-gegevens
 worden uitsluitend in leeftijdsgroepen gerapporteerd. Een daadwerkelijke bewaartermijn,
 opschoning en indexwijziging volgen pas na beoordeling van de productie-uitvoer.
