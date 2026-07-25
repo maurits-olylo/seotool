@@ -1,5 +1,7 @@
 import uuid
 from datetime import date, datetime
+from hashlib import sha256
+from typing import Any, Protocol
 
 from sqlalchemy import (
     JSON,
@@ -17,6 +19,22 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
 from app.models.common import UUIDTimestampMixin
+
+
+class _ColumnDefaultContext(Protocol):
+    def get_current_parameters(self) -> dict[str, Any]: ...
+
+
+def _page_metric_dedup_key(context: _ColumnDefaultContext) -> str:
+    page_url = str(context.get_current_parameters()["page_url"])
+    return sha256(page_url.encode("utf-8")).hexdigest()
+
+
+def _query_metric_dedup_key(context: _ColumnDefaultContext) -> str:
+    parameters = context.get_current_parameters()
+    query = str(parameters["query"])
+    page_url = str(parameters["page_url"])
+    return sha256(f"{query}\0{page_url}".encode()).hexdigest()
 
 
 class IntegrationConnection(UUIDTimestampMixin, Base):
@@ -57,7 +75,14 @@ class WebsiteIntegration(UUIDTimestampMixin, Base):
 
 class SearchConsoleMetric(UUIDTimestampMixin, Base):
     __tablename__ = "search_console_metrics"
-    __table_args__ = (UniqueConstraint("website_id", "date", "page_url"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "website_id",
+            "date",
+            "dedup_key",
+            name="uq_search_console_metrics_website_date_dedup",
+        ),
+    )
 
     website_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("websites.id", ondelete="CASCADE"), index=True
@@ -67,6 +92,7 @@ class SearchConsoleMetric(UUIDTimestampMixin, Base):
     )
     date: Mapped[date] = mapped_column(Date, index=True)
     page_url: Mapped[str] = mapped_column(String(2048))
+    dedup_key: Mapped[str] = mapped_column(String(64), default=_page_metric_dedup_key)
     clicks: Mapped[float] = mapped_column(Float, default=0)
     impressions: Mapped[int] = mapped_column(Integer, default=0)
     ctr: Mapped[float] = mapped_column(Float, default=0)
@@ -77,7 +103,14 @@ class SearchConsoleQueryMetric(UUIDTimestampMixin, Base):
     """Daily Google Search Console performance by query and landing page."""
 
     __tablename__ = "search_console_query_metrics"
-    __table_args__ = (UniqueConstraint("website_id", "date", "query", "page_url"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "website_id",
+            "date",
+            "dedup_key",
+            name="uq_search_console_query_metrics_website_date_dedup",
+        ),
+    )
 
     website_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("websites.id", ondelete="CASCADE"), index=True
@@ -86,8 +119,9 @@ class SearchConsoleQueryMetric(UUIDTimestampMixin, Base):
         ForeignKey("urls.id", ondelete="SET NULL"), index=True
     )
     date: Mapped[date] = mapped_column(Date, index=True)
-    query: Mapped[str] = mapped_column(String(2048), index=True)
+    query: Mapped[str] = mapped_column(String(2048))
     page_url: Mapped[str] = mapped_column(String(2048))
+    dedup_key: Mapped[str] = mapped_column(String(64), default=_query_metric_dedup_key)
     clicks: Mapped[float] = mapped_column(Float, default=0)
     impressions: Mapped[int] = mapped_column(Integer, default=0)
     ctr: Mapped[float] = mapped_column(Float, default=0)

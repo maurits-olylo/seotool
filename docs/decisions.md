@@ -624,3 +624,10 @@ opschoning en indexwijziging volgen pas na beoordeling van de productie-uitvoer.
 De elementlocatie-opschoning vereist vervolgens een actieve, veilige maintenance-pauze en een
 expliciete `--confirm-delete`. De selectie wordt per website vastgezet en in kleine transacties
 verwijderd. GSC-data valt nadrukkelijk niet onder dit commando.
+
+## Compacte GSC-deduplicatiesleutels
+
+De unieke GSC-indexen bevatten volledige URL- en zoektermteksten en zijn daardoor groter dan nodig.
+Dagelijkse meetdata en rapportageperioden blijven ongewijzigd, maar nieuwe SHA-256-sleutels bewaken
+dezelfde uniciteit per website en datum. De losse, ongebruikte zoektermindex vervalt. Hiermee daalt
+de indexgroei zonder historische data of inhoudelijke berekeningen te wijzigen.
