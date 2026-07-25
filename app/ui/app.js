@@ -268,18 +268,31 @@ function renderClientDirectory() {
       : `<span class="client-no-website">Nog geen website</span>`;
     return `<tr><td><input class="client-name-input" data-client-id="${client.id}" value="${escapeHtml(client.name)}" maxlength="255"></td><td><div class="client-websites">${websiteMarkup}</div></td><td>${escapeHtml(client.internal_reference || "—")}</td><td><div class="client-actions"><button type="button" class="detail-button client-open" data-client-id="${client.id}">Open</button><button type="button" class="detail-button client-save" data-client-id="${client.id}">Opslaan</button><button type="button" class="detail-button danger client-delete" data-client-id="${client.id}" data-client-name="${escapeHtml(client.name)}">Verwijder</button></div></td></tr>`;
   }).join("");
+  $("#client-cards").innerHTML = clients.map((client) => {
+    const websites = websitesByClient[client.id] || [];
+    const websiteMarkup = websites.length
+      ? websites.map((website) => `<span><strong>${escapeHtml(website.name)}</strong><small>${escapeHtml(website.base_url)}</small></span>`).join("")
+      : `<span class="client-no-website">Nog geen website</span>`;
+    return `<article class="client-card"><label>Klantnaam<input class="client-name-input" data-client-id="${client.id}" value="${escapeHtml(client.name)}" maxlength="255"></label><div class="client-card-reference"><span>Interne referentie</span><strong>${escapeHtml(client.internal_reference || "—")}</strong></div><div class="client-websites">${websiteMarkup}</div><div class="client-actions"><button type="button" class="detail-button client-open" data-client-id="${client.id}">Open</button><button type="button" class="detail-button client-save" data-client-id="${client.id}">Opslaan</button><button type="button" class="detail-button danger client-delete" data-client-id="${client.id}" data-client-name="${escapeHtml(client.name)}">Verwijder</button></div></article>`;
+  }).join("");
   $("#clients-empty").classList.toggle("hidden", clients.length !== 0);
 }
 
 async function loadMembers() {
   const clientId = $("#invitation-client").value;
-  if (!clientId) { $("#member-rows").innerHTML = ""; return; }
+  if (!clientId) { $("#member-rows").innerHTML = ""; $("#member-cards").innerHTML = ""; return; }
   const members = await api(`/api/v1/clients/${clientId}/members`);
   $("#member-rows").innerHTML = members.map((member) => {
     const isSelf = member.id === state.currentUser?.id;
     const roles = [["admin","Admin"],["user","User"],["client","Client"]];
     const roleOptions = roles.map(([value, label]) => `<option value="${value}" ${member.client_role === value ? "selected" : ""}>${label}</option>`).join("");
     return `<tr><td>${escapeHtml(member.display_name || "—")}</td><td>${escapeHtml(member.email)}</td><td><select class="member-role" data-member-id="${member.id}" ${isSelf ? "disabled" : ""}>${roleOptions}</select></td><td>${member.is_active ? "Actief" : "Geblokkeerd"}</td><td><button class="member-remove detail-button" data-member-id="${member.id}" data-member-email="${escapeHtml(member.email)}" ${isSelf ? "disabled" : ""}>Verwijder</button></td></tr>`;
+  }).join("");
+  $("#member-cards").innerHTML = members.map((member) => {
+    const isSelf = member.id === state.currentUser?.id;
+    const roles = [["admin","Admin"],["user","User"],["client","Client"]];
+    const roleOptions = roles.map(([value, label]) => `<option value="${value}" ${member.client_role === value ? "selected" : ""}>${label}</option>`).join("");
+    return `<article class="member-card"><div><strong>${escapeHtml(member.display_name || member.email)}</strong><span class="member-state ${member.is_active ? "active" : "blocked"}">${member.is_active ? "Actief" : "Geblokkeerd"}</span></div><small>${escapeHtml(member.email)}</small><label>Rol<select class="member-role" data-member-id="${member.id}" ${isSelf ? "disabled" : ""}>${roleOptions}</select></label><button class="member-remove detail-button" data-member-id="${member.id}" data-member-email="${escapeHtml(member.email)}" ${isSelf ? "disabled" : ""}>Toegang verwijderen</button></article>`;
   }).join("");
   $("#members-empty").classList.toggle("hidden", members.length !== 0);
 }
@@ -370,10 +383,10 @@ async function openClient(clientId) {
   $("#client-select").value = clientId; await loadWebsites(); showView("dashboard");
 }
 
-async function saveClient(clientId) {
-  const input = $(`.client-name-input[data-client-id="${clientId}"]`); const message = $("#clients-message");
+async function saveClient(clientId, input = null) {
+  const nameInput = input || $(`.client-name-input[data-client-id="${clientId}"]`); const message = $("#clients-message");
   try {
-    await api(`/api/v1/clients/${clientId}`, {method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({name:input.value.trim()})});
+    await api(`/api/v1/clients/${clientId}`, {method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({name:nameInput.value.trim()})});
     message.classList.remove("error"); message.textContent = "Klantnaam bijgewerkt."; await loadClients(clientId); await loadOrganization();
   } catch (error) { message.classList.add("error"); message.textContent = error.message; }
 }
@@ -401,6 +414,7 @@ async function loadIntegrations() {
     const target = $(`#${provider}-status`);
     target.textContent = connection ? `${labels[connection.status] || connection.status}${connection.account_email ? ` · ${connection.account_email}` : ""}` : "Niet gekoppeld";
     target.classList.toggle("error", connection?.status === "error");
+    target.classList.toggle("connected", connection?.status === "connected");
   }
   const googleConnection = connections.find((item) => item.provider === "google" && item.status === "connected");
   const googleLink = $("#google-connect");
@@ -1666,14 +1680,19 @@ $("#onboarding-form").addEventListener("submit", onboardClient);
 $("#website-form").addEventListener("submit", createWebsite);
 $("#invitation-form").addEventListener("submit", createInvitation);
 $("#invitation-client").addEventListener("change", loadMembers);
-$("#member-rows").addEventListener("change", (event) => { const select = event.target.closest(".member-role"); if (select) updateMemberRole(select.dataset.memberId, select.value); });
-$("#member-rows").addEventListener("click", (event) => { const button = event.target.closest(".member-remove"); if (button) removeMember(button.dataset.memberId, button.dataset.memberEmail); });
+function handleMemberRoleChange(event) { const select = event.target.closest(".member-role"); if (select) updateMemberRole(select.dataset.memberId, select.value); }
+function handleMemberClick(event) { const button = event.target.closest(".member-remove"); if (button) removeMember(button.dataset.memberId, button.dataset.memberEmail); }
+for (const selector of ["#member-rows", "#member-cards"]) {
+  $(selector).addEventListener("change", handleMemberRoleChange);
+  $(selector).addEventListener("click", handleMemberClick);
+}
 $("#client-directory-search").addEventListener("input", renderClientDirectory);
-$("#client-rows").addEventListener("click", (event) => {
+function handleClientDirectoryClick(event) {
   const open = event.target.closest(".client-open"); if (open) { openClient(open.dataset.clientId); return; }
-  const save = event.target.closest(".client-save"); if (save) { saveClient(save.dataset.clientId); return; }
+  const save = event.target.closest(".client-save"); if (save) { saveClient(save.dataset.clientId, save.closest("tr, article").querySelector(".client-name-input")); return; }
   const remove = event.target.closest(".client-delete"); if (remove) deleteClient(remove.dataset.clientId, remove.dataset.clientName);
-});
+}
+for (const selector of ["#client-rows", "#client-cards"]) $(selector).addEventListener("click", handleClientDirectoryClick);
 $("#copy-invitation").addEventListener("click", async () => { await navigator.clipboard.writeText($("#invitation-link").value); $("#invitation-form-message").textContent = "Link gekopieerd."; });
 for (const selector of ["#url-status-filter", "#url-index-filter", "#url-depth-filter"]) $(selector).addEventListener("change", () => { state.urlPage = 1; renderUrls(); });
 $("#url-search").addEventListener("input", () => { state.urlPage = 1; renderUrls(); });

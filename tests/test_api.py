@@ -120,13 +120,34 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
     assert 'id="current-export-state"' in page.text
     assert 'id="crawl-run-cards"' in page.text
     assert 'class="table-wrap operation-table-wrap"' in page.text
-    assert page.text.count('class="operation-message" role="status"') == 3
+    for message_id in (
+        "operations-load-message",
+        "crawl-action-message",
+        "export-action-message",
+    ):
+        assert f'id="{message_id}" class="operation-message" role="status"' in page.text
 
     script = client.get("/ui/assets/app.js")
     assert script.status_code == 200
     assert '"#crawl-run-cards"' in script.text
     assert "crawlworker${crawl.workers === 1" in script.text
     assert "`process-status ${crawlStatus}`" in script.text
+
+
+def test_settings_and_integrations_have_responsive_states(client: TestClient) -> None:
+    page = client.get("/ui/assets/index.html")
+    assert page.status_code == 200
+    assert 'id="client-cards"' in page.text
+    assert 'id="member-cards"' in page.text
+    assert 'class="table-wrap client-directory-table-wrap"' in page.text
+    assert 'class="table-wrap member-table-wrap"' in page.text
+    assert 'id="integration-message" class="integration-message hidden" role="status"' in page.text
+
+    script = client.get("/ui/assets/app.js")
+    assert script.status_code == 200
+    assert 'for (const selector of ["#client-rows", "#client-cards"])' in script.text
+    assert 'for (const selector of ["#member-rows", "#member-cards"])' in script.text
+    assert 'target.classList.toggle("connected"' in script.text
 
 
 def test_crud_client_and_website(client: TestClient) -> None:
