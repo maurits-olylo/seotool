@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import date, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import case, func, select, true
+from sqlalchemy import case, delete, func, select, true
 from sqlalchemy.orm import Session
 
 from app.models.crawl import CrawlRun, ElementLocation
@@ -31,6 +32,13 @@ class MetricAgeAudit:
     last_90_days: int
     days_91_to_180: int
     older_than_180_days: int
+
+
+@dataclass(frozen=True)
+class ElementLocationCleanup:
+    deleted: int
+    batches: int
+    websites: dict[str, int]
 
 
 def build_retention_audit(db: Session, *, as_of: date | None = None) -> dict[str, Any]:
@@ -80,6 +88,82 @@ def build_retention_audit(db: Session, *, as_of: date | None = None) -> dict[str
         "websites": website_results,
         "totals": _sum_website_results(website_results),
     }
+
+
+def cleanup_element_locations(
+    db: Session,
+    *,
+    batch_size: int = 10_000,
+    on_batch: Callable[[str, int, int], None] | None = None,
+) -> ElementLocationCleanup:
+    """Delete audited element-location candidates in bounded transactions."""
+    if batch_size < 1 or batch_size > 50_000:
+        raise ValueError("batch_size moet tussen 1 en 50000 liggen")
+    _require_safe_maintenance(db)
+
+    protected_runs = _protected_crawl_runs(db)
+    websites = db.scalars(select(Website).order_by(Website.name, Website.id)).all()
+    deleted_by_website: dict[str, int] = {}
+    total_deleted = 0
+    batches = 0
+
+    for website in websites:
+        protected_run_ids = set(protected_runs.get(website.id, {}))
+        latest_snapshot_ids = tuple(db.scalars(_latest_location_snapshot_ids(website.id)).all())
+        issue_count = func.json_array_length(ElementLocation.issue_types)
+        last_id: UUID | None = None
+        website_deleted = 0
+
+        while True:
+            _require_safe_maintenance(db)
+            conditions = [
+                ElementLocation.website_id == website.id,
+                issue_count == 0,
+                ~ElementLocation.snapshot_id.in_(latest_snapshot_ids),
+            ]
+            if protected_run_ids:
+                conditions.append(~ElementLocation.crawl_run_id.in_(protected_run_ids))
+            if last_id is not None:
+                conditions.append(ElementLocation.id > last_id)
+            ids = tuple(
+                db.scalars(
+                    select(ElementLocation.id)
+                    .where(*conditions)
+                    .order_by(ElementLocation.id)
+                    .limit(batch_size)
+                ).all()
+            )
+            if not ids:
+                break
+
+            db.execute(delete(ElementLocation).where(ElementLocation.id.in_(ids)))
+            db.commit()
+            last_id = ids[-1]
+            batch_deleted = len(ids)
+            website_deleted += batch_deleted
+            total_deleted += batch_deleted
+            batches += 1
+            if on_batch is not None:
+                on_batch(website.name, batch_deleted, total_deleted)
+
+        deleted_by_website[website.name] = website_deleted
+
+    return ElementLocationCleanup(
+        deleted=total_deleted,
+        batches=batches,
+        websites=deleted_by_website,
+    )
+
+
+def _require_safe_maintenance(db: Session) -> None:
+    from app.services.crawl_deployment import deployment_drain_status
+
+    status = deployment_drain_status(db)
+    if not status.active or not status.safe:
+        raise RuntimeError(
+            "Elementlocaties kunnen alleen worden opgeschoond wanneer maintenance active=true "
+            "en safe=true is."
+        )
 
 
 def _protected_crawl_runs(db: Session) -> dict[UUID, dict[UUID, dict[str, Any]]]:

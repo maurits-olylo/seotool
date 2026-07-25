@@ -620,3 +620,7 @@ crawl en buiten de nieuwste locatiehoudende snapshot per URL als mogelijke oprui
 Locaties met issues blijven altijd beschermd. GSC-gegevens
 worden uitsluitend in leeftijdsgroepen gerapporteerd. Een daadwerkelijke bewaartermijn,
 opschoning en indexwijziging volgen pas na beoordeling van de productie-uitvoer.
+
+De elementlocatie-opschoning vereist vervolgens een actieve, veilige maintenance-pauze en een
+expliciete `--confirm-delete`. De selectie wordt per website vastgezet en in kleine transacties
+verwijderd. GSC-data valt nadrukkelijk niet onder dit commando.

@@ -1,6 +1,7 @@
 import argparse
 import json
 import sys
+from dataclasses import asdict
 from datetime import date
 
 from app.core.logging import configure_logging
@@ -12,7 +13,7 @@ from app.services.crawl_deployment import (
     start_deployment_drain,
     wait_for_deployment_drain,
 )
-from app.services.retention_audit import build_retention_audit
+from app.services.retention_audit import build_retention_audit, cleanup_element_locations
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -31,6 +32,16 @@ def _parser() -> argparse.ArgumentParser:
         "--as-of",
         type=date.fromisoformat,
         help="Peildatum als YYYY-MM-DD (standaard: vandaag)",
+    )
+    cleanup = commands.add_parser(
+        "cleanup-element-locations",
+        help="Verwijder veilig oude, probleemvrije elementlocaties",
+    )
+    cleanup.add_argument("--batch-size", type=int, default=10_000)
+    cleanup.add_argument(
+        "--confirm-delete",
+        action="store_true",
+        help="Verplichte expliciete bevestiging voor verwijdering",
     )
     return parser
 
@@ -65,6 +76,29 @@ def main() -> int:
         with SessionLocal() as db:
             result = build_retention_audit(db, as_of=args.as_of)
         print(json.dumps(result, indent=2, ensure_ascii=False))
+        return 0
+    if args.command == "cleanup-element-locations":
+        if not args.confirm_delete:
+            print(
+                "Gebruik --confirm-delete om de opschoning expliciet te bevestigen.",
+                file=sys.stderr,
+            )
+            return 2
+
+        def report_batch(website: str, deleted: int, total: int) -> None:
+            print(f"website={website!r} batch_deleted={deleted} total_deleted={total}", flush=True)
+
+        try:
+            with SessionLocal() as db:
+                result = cleanup_element_locations(
+                    db,
+                    batch_size=args.batch_size,
+                    on_batch=report_batch,
+                )
+        except (RuntimeError, ValueError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(json.dumps(asdict(result), indent=2, ensure_ascii=False))
         return 0
     try:
         with SessionLocal() as db:

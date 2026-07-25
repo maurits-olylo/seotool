@@ -8,7 +8,8 @@ from app.models.crawl import CrawlRun, ElementLocation, UrlSnapshot
 from app.models.discovery import CrawlJob, Url
 from app.models.integrations import SearchConsoleMetric, SearchConsoleQueryMetric
 from app.models.website import Website
-from app.services.retention_audit import build_retention_audit
+from app.services.crawl_deployment import start_deployment_drain
+from app.services.retention_audit import build_retention_audit, cleanup_element_locations
 
 SessionLocal = sessionmaker(bind=engine)
 
@@ -90,6 +91,53 @@ def test_retention_audit_reports_gsc_age_buckets_without_mutation() -> None:
         "older_than_180_days": 1,
     }
     assert remaining == 3
+
+
+def test_element_location_cleanup_requires_safe_maintenance() -> None:
+    with SessionLocal() as db:
+        _website_and_url(db)
+        db.commit()
+
+        try:
+            cleanup_element_locations(db)
+        except RuntimeError as exc:
+            assert "active=true" in str(exc)
+        else:
+            raise AssertionError("Opschoning had zonder maintenance moeten weigeren")
+
+
+def test_element_location_cleanup_deletes_only_candidates_in_batches() -> None:
+    progress: list[tuple[str, int, int]] = []
+    with SessionLocal() as db:
+        website, url = _website_and_url(db)
+        old_run, old_snapshot = _run_and_snapshot(db, website, url, "succeeded", 2024)
+        latest_run, latest_snapshot = _run_and_snapshot(db, website, url, "succeeded", 2025)
+        db.add_all(
+            [
+                _location(website, url, old_run, old_snapshot, []),
+                _location(website, url, old_run, old_snapshot, ["missing_h1"]),
+                _location(website, url, latest_run, latest_snapshot, []),
+            ]
+        )
+        db.commit()
+        status = start_deployment_drain(db)
+        assert status.safe
+
+        result = cleanup_element_locations(
+            db,
+            batch_size=1,
+            on_batch=lambda website_name, deleted, total: progress.append(
+                (website_name, deleted, total)
+            ),
+        )
+        remaining = db.query(ElementLocation).all()
+
+    assert result.deleted == 1
+    assert result.batches == 1
+    assert result.websites == {"Audit website": 1}
+    assert len(remaining) == 2
+    assert any(item.issue_types == ["missing_h1"] for item in remaining)
+    assert progress == [("Audit website", 1, 1)]
 
 
 def _website_and_url(db: Session) -> tuple[Website, Url]:
