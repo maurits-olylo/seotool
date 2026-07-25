@@ -1,5 +1,7 @@
 import argparse
+import json
 import sys
+from datetime import date
 
 from app.core.logging import configure_logging
 from app.core.queue import enqueue_crawl_job
@@ -10,6 +12,7 @@ from app.services.crawl_deployment import (
     start_deployment_drain,
     wait_for_deployment_drain,
 )
+from app.services.retention_audit import build_retention_audit
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -20,6 +23,15 @@ def _parser() -> argparse.ArgumentParser:
     pause.add_argument("--timeout", type=float, default=300.0)
     commands.add_parser("status", help="Toon de deploymentpauzestatus")
     commands.add_parser("resume-crawls", help="Hervat alleen deployment-gepauzeerde crawls")
+    audit = commands.add_parser(
+        "retention-audit",
+        help="Toon read-only bewaartermijn- en groeikandidaten",
+    )
+    audit.add_argument(
+        "--as-of",
+        type=date.fromisoformat,
+        help="Peildatum als YYYY-MM-DD (standaard: vandaag)",
+    )
     return parser
 
 
@@ -48,6 +60,11 @@ def main() -> int:
         with SessionLocal() as db:
             status = deployment_drain_status(db)
         print(_status_line(status))
+        return 0
+    if args.command == "retention-audit":
+        with SessionLocal() as db:
+            result = build_retention_audit(db, as_of=args.as_of)
+        print(json.dumps(result, indent=2, ensure_ascii=False))
         return 0
     try:
         with SessionLocal() as db:

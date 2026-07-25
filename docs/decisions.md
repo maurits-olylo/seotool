@@ -611,3 +611,11 @@ als compatibiliteitsalias bestaan en worden naar de nieuwe canonieke hashes verv
 Gevolg: het dashboard bevat alleen samenvattingen en doorlinks; de volledige actielijst staat onder
 Analyse > Acties. Organisatiebeheer wordt zonder API- of datamodelwijziging als Klanten & websites en
 Team & toegang gepresenteerd. Autorisatie en alle inhoudelijke berekeningen blijven ongewijzigd.
+## Read-only retentionaudit vóór opschoning
+
+Databasegroei wordt eerst meetbaar gemaakt met `python -m app.maintenance retention-audit`.
+Dit commando wijzigt geen data. Voor elementlocaties markeert het alleen oude, probleemvrije
+locaties buiten actieve crawls en buiten de nieuwste geslaagde of gedeeltelijk geslaagde volledige
+crawl als mogelijke opruimkandidaat. Locaties met issues blijven altijd beschermd. GSC-gegevens
+worden uitsluitend in leeftijdsgroepen gerapporteerd. Een daadwerkelijke bewaartermijn,
+opschoning en indexwijziging volgen pas na beoordeling van de productie-uitvoer.
