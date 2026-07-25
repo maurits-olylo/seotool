@@ -994,11 +994,15 @@ function renderSystemStatus() {
   const healthy = status?.status === "ok";
   $("#system-status-summary").textContent = healthy ? "Alles operationeel" : "Aandacht nodig";
   $("#system-status-summary").className = `system-summary ${healthy ? "ok" : "degraded"}`;
+  $("#crawl-capacity").textContent = crawl.status === "ok"
+    ? `${crawl.workers} crawlworker${crawl.workers === 1 ? "" : "s"} beschikbaar · ${crawl.queued_jobs} ${crawl.queued_jobs === 1 ? "taak" : "taken"} in wachtrij`
+    : "Workercapaciteit is momenteel niet beschikbaar.";
+  $("#crawl-capacity").classList.toggle("degraded", crawl.status !== "ok");
   const entries = [
     ["API & database", status?.api === "ok" && status?.database === "ok", status?.database === "ok" ? "Bereikbaar" : "Database niet bereikbaar"],
-    ["Crawl-worker", crawl.status === "ok", `${crawl.workers} actief · ${crawl.queued_jobs} in wachtrij`],
-    ["Data-importworker", integrations.status === "ok", `${integrations.workers} actief · ${integrations.queued_jobs} in wachtrij`],
-    ["Export-worker", exports.status === "ok", `${exports.workers} actief · ${exports.queued_jobs} in wachtrij`],
+    ["Crawlworkers", crawl.status === "ok", `${crawl.workers} beschikbaar · ${crawl.queued_jobs} in wachtrij`],
+    ["Data-importworker", integrations.status === "ok", `${integrations.workers} beschikbaar · ${integrations.queued_jobs} in wachtrij`],
+    ["Exportworker", exports.status === "ok", `${exports.workers} beschikbaar · ${exports.queued_jobs} in wachtrij`],
   ];
   $("#system-status-grid").innerHTML = entries.map(([label, ok, detail]) => `<article><span>${label}</span><strong class="${ok ? "ok" : "degraded"}">${ok ? "Operationeel" : "Niet beschikbaar"}</strong><small>${detail}</small></article>`).join("");
 }
@@ -1012,7 +1016,8 @@ function durationLabel(run) {
 function renderOperations() {
   renderSystemStatus();
   const runLabels = {light_check: "Light check", full_site_crawl: "Volledige crawl", fetch_sitemap: "Sitemap", full_page_analysis: "Pagina-analyse"};
-  $("#crawl-run-rows").innerHTML = state.crawlRuns.map((run) => `<tr><td>${new Date(run.started_at).toLocaleString("nl-NL")}</td><td>${runLabels[run.crawl_type] || escapeHtml(run.crawl_type)}</td><td><span class="run-status ${run.status}">${labels[run.status] || run.status}</span></td><td>${run.discovered_urls}</td><td>${run.crawled_urls}</td><td>${run.failed_urls}</td><td>${durationLabel(run)}</td></tr>`).join("");
+  $("#crawl-run-rows").innerHTML = state.crawlRuns.map((run) => `<tr><td>${new Date(run.started_at).toLocaleString("nl-NL")}</td><td>${runLabels[run.crawl_type] || escapeHtml(run.crawl_type)}</td><td><span class="run-status ${run.status}">${labels[run.status] || run.status}</span></td><td>${Number(run.discovered_urls || 0).toLocaleString("nl-NL")}</td><td>${Number(run.crawled_urls || 0).toLocaleString("nl-NL")}</td><td>${Number(run.failed_urls || 0).toLocaleString("nl-NL")}</td><td>${durationLabel(run)}</td></tr>`).join("");
+  $("#crawl-run-cards").innerHTML = state.crawlRuns.map((run) => `<article class="crawl-run-card"><div><strong>${escapeHtml(runLabels[run.crawl_type] || run.crawl_type)}</strong><span class="run-status ${run.status}">${escapeHtml(labels[run.status] || run.status)}</span></div><time datetime="${escapeHtml(run.started_at)}">${new Date(run.started_at).toLocaleString("nl-NL")}</time><dl><div><dt>Gecrawld</dt><dd>${Number(run.crawled_urls || 0).toLocaleString("nl-NL")}</dd></div><div><dt>Ontdekt</dt><dd>${Number(run.discovered_urls || 0).toLocaleString("nl-NL")}</dd></div><div><dt>Mislukt</dt><dd>${Number(run.failed_urls || 0).toLocaleString("nl-NL")}</dd></div><div><dt>Duur</dt><dd>${durationLabel(run)}</dd></div></dl></article>`).join("");
   $("#crawl-runs-empty").classList.toggle("hidden", state.crawlRuns.length !== 0);
   const activeRun = state.crawlRuns.find((run) => ["running", "paused"].includes(run.status));
   const controlledRun = activeRun || (state.crawlRuns[0]?.status === "failed" ? state.crawlRuns[0] : null);
@@ -1020,7 +1025,11 @@ function renderOperations() {
   $("#crawl-live-status").classList.toggle("hidden", !controlledRun);
   $("#start-light-check").disabled = Boolean(activeRun);
   $("#start-full-crawl").disabled = Boolean(activeRun);
-  if (controlledRun) $("#crawl-live-label").textContent = `${runLabels[controlledRun.crawl_type] || controlledRun.crawl_type} · ${labels[crawlStatus] || crawlStatus} · ${controlledRun.crawled_urls} gecrawld · ${controlledRun.failed_urls} mislukt`;
+  if (controlledRun) {
+    $("#crawl-live-state").textContent = labels[crawlStatus] || crawlStatus;
+    $("#crawl-live-state").className = `process-status ${crawlStatus}`;
+    $("#crawl-live-label").textContent = `${runLabels[controlledRun.crawl_type] || controlledRun.crawl_type} · ${Number(controlledRun.crawled_urls || 0).toLocaleString("nl-NL")} gecrawld · ${Number(controlledRun.failed_urls || 0).toLocaleString("nl-NL")} mislukt`;
+  }
   $("#crawl-progress-track").classList.toggle("hidden", crawlStatus === "paused");
   $("#pause-crawl").classList.toggle("hidden", crawlStatus !== "running");
   $("#resume-crawl").classList.toggle("hidden", !["paused", "failed"].includes(crawlStatus));
@@ -1030,6 +1039,8 @@ function renderOperations() {
   exportPanel.classList.toggle("hidden", !currentExport);
   exportButton.disabled = Boolean(currentExport);
   if (currentExport) {
+    $("#current-export-state").textContent = labels[currentExport.status] || currentExport.status;
+    $("#current-export-state").className = `process-status ${currentExport.status}`;
     $("#current-export-label").textContent = currentExport.status === "succeeded" ? "Excel-export is gereed voor download." : currentExport.status === "running" ? "Excel-export wordt opgebouwd…" : "Excel-export staat in de wachtrij…";
     $("#export-progress").classList.toggle("hidden", currentExport.status === "succeeded");
     download.classList.toggle("hidden", currentExport.status !== "succeeded");

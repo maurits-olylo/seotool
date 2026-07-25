@@ -81,7 +81,8 @@ def test_analysis_pages_share_consistent_states_and_labels(client: TestClient) -
     assert 'href="/ui/assets/analysis-consistency.css' in page.text
     assert page.text.count('<span class="eyebrow">ANALYSE</span><h1>') == 4
     assert 'class="issue-table"' in page.text
-    assert page.text.count('class="empty hidden" role="status"') == 3
+    for element_id in ["url-empty", "change-empty", "vacancy-empty"]:
+        assert f'id="{element_id}" class="empty hidden" role="status"' in page.text
     assert 'class="empty analysis-empty hidden" role="status"' in page.text
     assert 'aria-labelledby="detail-title"' in page.text
     assert 'aria-labelledby="url-detail-title"' in page.text
@@ -109,6 +110,23 @@ def test_issue_details_present_evidence_progressively(client: TestClient) -> Non
     assert 'source_page_count: "Unieke bronpagina’s"' in script.text
     assert "`Bronpagina’s met dit signaal (${sourceUrls.length})`" in script.text
     assert "evidencePresentationKeys" in script.text
+
+
+def test_operations_page_has_responsive_process_states(client: TestClient) -> None:
+    page = client.get("/ui/assets/index.html")
+    assert page.status_code == 200
+    assert 'id="crawl-capacity"' in page.text
+    assert 'id="crawl-live-state"' in page.text
+    assert 'id="current-export-state"' in page.text
+    assert 'id="crawl-run-cards"' in page.text
+    assert 'class="table-wrap operation-table-wrap"' in page.text
+    assert page.text.count('class="operation-message" role="status"') == 3
+
+    script = client.get("/ui/assets/app.js")
+    assert script.status_code == 200
+    assert '"#crawl-run-cards"' in script.text
+    assert "crawlworker${crawl.workers === 1" in script.text
+    assert "`process-status ${crawlStatus}`" in script.text
 
 
 def test_crud_client_and_website(client: TestClient) -> None:
