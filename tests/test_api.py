@@ -148,6 +148,7 @@ def test_settings_and_integrations_have_responsive_states(client: TestClient) ->
     assert 'for (const selector of ["#client-rows", "#client-cards"])' in script.text
     assert 'for (const selector of ["#member-rows", "#member-cards"])' in script.text
     assert 'target.classList.toggle("connected"' in script.text
+    assert 'connected: "Gekoppeld", error: "Fout"' in script.text
 
 
 def test_dashboard_and_reports_have_clear_drilldowns(client: TestClient) -> None:
