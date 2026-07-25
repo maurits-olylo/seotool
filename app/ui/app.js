@@ -81,6 +81,7 @@ function renderClientReport() {
   $("#report-periods").querySelectorAll("button").forEach((button) => {
     const available = availablePeriods.has(button.dataset.reportPeriod) || (!availablePeriods.size && button.dataset.reportPeriod === "month");
     button.classList.toggle("hidden", !available);
+    button.setAttribute("aria-pressed", String(button.dataset.reportPeriod === state.reportPeriod));
   });
   const conversionEvents = qualifiedEvents.events || [];
   $("#report-conversions").innerHTML = qualifiedEvents.configured
@@ -964,13 +965,16 @@ function renderDashboard() {
   const issueCounts = {total: activeIssues.length, high: 0, medium: 0, low: 0};
   activeIssues.forEach((issue) => { if (issueCounts[issue.severity] !== undefined) issueCounts[issue.severity] += 1; });
   $("#dashboard-priorities").innerHTML = [["total", "Actieve acties"], ["high", "Hoge prioriteit"], ["medium", "Middel"], ["low", "Laag"]]
-    .map(([key, label]) => `<article class="card ${key}"><strong>${issueCounts[key]}</strong><span>${label}</span></article>`).join("");
+    .map(([key, label]) => `<button type="button" class="card dashboard-priority ${key}" data-dashboard-priority="${key === "total" ? "" : key}" aria-label="${label}: ${issueCounts[key]}. Open actielijst"><strong>${issueCounts[key]}</strong><span>${label}</span><small>Bekijk acties →</small></button>`).join("");
   const newIssues = activeIssues.filter((issue) => issue.status === "new");
   const importantIssues = [...(newIssues.length ? newIssues : activeIssues)].sort((a, b) => ({high: 0, medium: 1, low: 2}[a.severity] - {high: 0, medium: 1, low: 2}[b.severity] || new Date(b.first_detected_at) - new Date(a.first_detected_at))).slice(0, 5);
   $("#dashboard-actions").innerHTML = importantIssues.map((issue) => `<article><strong>${escapeHtml(issue.title)}</strong><small><span class="severity ${issue.severity}">${labels[issue.severity]}</span> · ${new Date(issue.first_detected_at).toLocaleDateString("nl-NL")}</small></article>`).join("") || `<p class="dashboard-empty">Geen actieve technische acties.</p>`;
   $("#dashboard-changes").innerHTML = state.changeGroups.slice(0, 5).map((group) => `<article><strong>${escapeHtml(changeGroupLabel(group))}</strong><small>${escapeHtml(state.urls.get(group.url_id) || "Onbekende URL")} · ${new Date(group.detected_at).toLocaleDateString("nl-NL")}</small></article>`).join("") || `<p class="dashboard-empty">Geen betekenisvolle wijzigingen gevonden.</p>`;
   const current = state.clientReport?.current || {};
-  $("#dashboard-performance").innerHTML = [[current.clicks, "GSC-klikken"], [current.sessions, "Organische sessies"], [current.key_events, "Gekwalificeerde leads"]].map(([value, label]) => `<article><strong>${Number(value || 0).toLocaleString("nl-NL")}</strong><span>${label}</span></article>`).join("");
+  $("#dashboard-performance").innerHTML = [[current.clicks, "GSC-klikken"], [current.sessions, "Organische sessies"], [current.key_events, "Gekwalificeerde leads"]].map(([value, label]) => {
+    const available = value !== null && value !== undefined;
+    return `<article class="${available ? "" : "unavailable"}"><strong>${available ? Number(value).toLocaleString("nl-NL") : "—"}</strong><span>${label}</span>${available ? "" : "<small>Geen gekoppelde data</small>"}</article>`;
+  }).join("");
   const vacancies = state.jobSummary || {};
   $("#dashboard-vacancies").innerHTML = [[vacancies.active, "Actief"], [vacancies.expiring_soon, "Loopt bijna af"], [vacancies.needs_attention, "Aandacht nodig"]].map(([value, label]) => `<article><strong>${Number(value || 0).toLocaleString("nl-NL")}</strong><span>${label}</span></article>`).join("");
   const run = state.crawlRuns[0];
@@ -1652,7 +1656,7 @@ $("#select-suppressions").addEventListener("change", (event) => { state.selected
 $("#select-all-suppressions").addEventListener("click", () => { state.suppressions.forEach((suppression) => state.selectedSuppressionIds.add(suppression.id)); renderSuppressions(); });
 $("#restore-selected-suppressions").addEventListener("click", restoreSelectedSuppressions);
 $("#issue-groups").addEventListener("click", (event) => { const button = event.target.closest("[data-group-type]"); if (button) { $("#type-filter").value = button.dataset.groupType; state.page = 1; render(); } });
-$("#report-periods").addEventListener("click", async (event) => { const button = event.target.closest("[data-report-period]"); if (!button) return; state.reportPeriod = button.dataset.reportPeriod; $("#report-periods").querySelectorAll("button").forEach((item) => item.classList.toggle("active", item === button)); state.clientReport = null; renderClientReport(); await loadClientReport(); });
+$("#report-periods").addEventListener("click", async (event) => { const button = event.target.closest("[data-report-period]"); if (!button) return; state.reportPeriod = button.dataset.reportPeriod; $("#report-periods").querySelectorAll("button").forEach((item) => { const active = item === button; item.classList.toggle("active", active); item.setAttribute("aria-pressed", String(active)); }); state.clientReport = null; renderClientReport(); await loadClientReport(); });
 $("#report-archive").addEventListener("click", async (event) => {
   const snapshot = event.target.closest("[data-report-snapshot]");
   if (snapshot) { state.selectedReportSnapshotId = snapshot.dataset.reportSnapshot; await loadClientReport(); await loadReportSnapshots(); return; }
@@ -1674,6 +1678,14 @@ $("#team-nav").addEventListener("click", () => showView("team"));
 $("#integrations-nav").addEventListener("click", () => showView("integrations"));
 for (const group of ["analysis", "settings"]) $(`#${group}-nav`).addEventListener("click", () => { const subnav = $(`#${group}-subnav`); const open = subnav.classList.toggle("hidden") === false; $(`#${group}-nav`).setAttribute("aria-expanded", String(open)); });
 $(".dashboard-grid").addEventListener("click", (event) => { const button = event.target.closest("[data-dashboard-view]"); if (button) showView(button.dataset.dashboardView); });
+$("#dashboard-priorities").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-dashboard-priority]");
+  if (!button) return;
+  $("#severity-filter").value = button.dataset.dashboardPriority;
+  state.page = 1;
+  showView("actions");
+  render();
+});
 $("#integration-warning-action").addEventListener("click", () => showView("integrations"));
 $("#insight-period").addEventListener("change", async (event) => { state.insightDays = Number(event.target.value); await loadConsultantInsights(); });
 $("#onboarding-form").addEventListener("submit", onboardClient);

@@ -17,11 +17,11 @@
   <link rel="stylesheet" href="/ui/assets/organization.css?v=20260725-1">
   <link rel="stylesheet" href="/ui/assets/report.css">
   <link rel="stylesheet" href="/ui/assets/member-management.css">
-  <link rel="stylesheet" href="/ui/assets/report-performance.css?v=20260713-6">
+  <link rel="stylesheet" href="/ui/assets/report-performance.css?v=20260725-1">
   <link rel="stylesheet" href="/ui/assets/key-events.css">
   <link rel="stylesheet" href="/ui/assets/jobs.css">
   <link rel="stylesheet" href="/ui/assets/insights.css">
-  <link rel="stylesheet" href="/ui/assets/information-architecture.css?v=20260722-1">
+  <link rel="stylesheet" href="/ui/assets/information-architecture.css?v=20260725-1">
   <link rel="stylesheet" href="/ui/assets/analysis-consistency.css?v=20260722-1">
 </head>
 <body>
@@ -35,7 +35,6 @@
         <button id="operations-nav" class="nav-item">Crawls &amp; exports</button>
         <section class="nav-group" data-nav-group="settings"><button id="settings-nav" class="nav-item nav-group-toggle" type="button" aria-expanded="false">Instellingen <span aria-hidden="true">⌄</span></button><div id="settings-subnav" class="subnav hidden"><button id="clients-nav">Klanten &amp; websites</button><button id="team-nav">Team &amp; toegang</button><button id="integrations-nav">Integraties</button></div></section>
       </nav>
-      <section id="report-archive" class="report-archive hidden"><span class="eyebrow">RAPPORTAGES</span><button type="button" data-report-live>Live status</button><div id="report-archive-list"></div></section>
       <div class="profile-menu"><button id="profile-toggle" class="profile-toggle" type="button" aria-expanded="false"><span class="profile-avatar" aria-hidden="true">M</span><span id="current-user"></span><span aria-hidden="true">⌃</span></button><div id="profile-popover" class="profile-popover hidden"><button id="logout" type="button">Uitloggen</button></div></div>
     </aside>
     <main>
@@ -57,9 +56,12 @@
         <div><span id="overview-eyebrow" class="eyebrow">ANALYSE</span><h1 id="overview-title">Acties</h1><p id="client-report-intro" class="intro">Prioriteer technische SEO-acties en volg de afhandeling.</p></div>
       </header>
       <section id="client-report" class="client-report hidden">
-        <nav id="report-periods" class="report-periods" aria-label="Rapportageperiode">
-          <button data-report-period="month" class="active">Maand</button><button data-report-period="quarter">Kwartaal</button><button data-report-period="half_year">6 maanden</button><button data-report-period="year">Jaar</button><button data-report-period="ytd">YTD</button>
-        </nav>
+        <div class="report-controls">
+          <nav id="report-periods" class="report-periods" aria-label="Rapportageperiode">
+            <button data-report-period="month" class="active" aria-pressed="true">Maand</button><button data-report-period="quarter" aria-pressed="false">Kwartaal</button><button data-report-period="half_year" aria-pressed="false">6 maanden</button><button data-report-period="year" aria-pressed="false">Jaar</button><button data-report-period="ytd" aria-pressed="false">YTD</button>
+          </nav>
+          <details id="report-archive" class="report-archive hidden"><summary>Eerdere maandrapportages</summary><button type="button" data-report-live>Actuele rapportage</button><div id="report-archive-list"></div></details>
+        </div>
         <section class="report-hero">
           <div><span class="eyebrow">SAMENVATTING</span><h2 id="report-conclusion"></h2><p id="report-explanation"></p></div>
           <div class="report-period"><span>Meetperiode</span><strong id="report-date"></strong><small id="report-comparison"></small><small id="report-coverage"></small></div>
@@ -198,6 +200,6 @@
     <dl><div><dt>Vergeleken meetmomenten</dt><dd id="change-detail-date"></dd></div><div><dt>Mogelijke relevantie</dt><dd id="change-detail-relevance"></dd></div><div><dt>Aanbevolen controle</dt><dd id="change-detail-action"></dd></div></dl>
     <div id="change-group-details"></div>
   </dialog>
-  <script src="/ui/assets/app.js?v=20260725-2" defer></script>
+  <script src="/ui/assets/app.js?v=20260725-3" defer></script>
 </body>
 </html>

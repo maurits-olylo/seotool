@@ -150,6 +150,23 @@ def test_settings_and_integrations_have_responsive_states(client: TestClient) ->
     assert 'target.classList.toggle("connected"' in script.text
 
 
+def test_dashboard_and_reports_have_clear_drilldowns(client: TestClient) -> None:
+    page = client.get("/ui/assets/index.html")
+    assert page.status_code == 200
+    assert 'id="dashboard-priorities"' in page.text
+    assert 'class="report-controls"' in page.text
+    assert '<details id="report-archive"' in page.text
+    assert page.text.index('id="report-archive"') > page.text.index('id="client-report"')
+    assert 'data-report-period="month" class="active" aria-pressed="true"' in page.text
+
+    script = client.get("/ui/assets/app.js")
+    assert script.status_code == 200
+    assert 'data-dashboard-priority=' in script.text
+    assert '"#dashboard-priorities"' in script.text
+    assert "Geen gekoppelde data" in script.text
+    assert 'setAttribute("aria-pressed"' in script.text
+
+
 def test_crud_client_and_website(client: TestClient) -> None:
     created = client.post("/api/v1/clients", json={"name": "Example"})
     assert created.status_code == 201
