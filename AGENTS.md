@@ -38,10 +38,18 @@ COMMUNICATIESTIJL
   tenzij de gebruiker een foutmelding of afwijkende uitvoer deelt.
 - Bundel samenhangende correcties in één logisch releasepakket. Maak niet voor iedere kleine
   wijziging een aparte release, behalve wanneer een directe productiestoring een losse hotfix vereist.
-- Deploy op de Synology altijd als lokaal `git archive`: upload uitsluitend via
-  `ssh ... "dd of=/tmp/<release>.tar.gz" < /tmp/<release>.tar.gz`, nooit met SCP.
-- Controleer de SHA-256 op de NAS en pak altijd uit met `sudo tar -xzf ... -C
-  /volume1/docker/seo-monitor/project`; de productiebestanden zijn root-owned.
+- Gebruik voor iedere deployment naar de Synology uitsluitend deze route:
+  1. Maak lokaal een `git archive`.
+  2. Upload vanaf de lokale Mac uitsluitend via
+     `ssh ... "dd of=/tmp/<release>.tar.gz" < /tmp/<release>.tar.gz`.
+  3. Log daarna interactief in met `ssh thact@192.168.2.20`.
+  4. Controleer in die interactieve NAS-shell de SHA-256, pak uit met
+     `sudo tar -xzf ... -C /volume1/docker/seo-monitor/project` en voer alle
+     `sudo docker compose`-commando's daar uit.
+- Deze interactieve NAS-route is de enige toegestane deploymentroute. Gebruik nooit SCP,
+  niet-interactieve Docker-commando's via `ssh "sudo docker ..."`, absolute Docker-paden
+  in remote SSH-commando's of een ander upload- of deploymentmechanisme.
+- De productiebestanden zijn root-owned.
 - Herbouw en herstart alleen de geraakte services. Maak alleen een volledige back-up wanneer een
   migratie of andere risicovolle wijziging dat noodzakelijk maakt.
 
