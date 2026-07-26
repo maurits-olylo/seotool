@@ -140,6 +140,43 @@ Status: technisch geïmplementeerd; deployment en productievalidatie volgen.
 - Ontbrekende technische controles uit de acceptatielijst valideren.
 - Inzichten alleen bij voldoende bewijs als harde issues behandelen.
 
+### Search intent en paginafunctie
+
+Status: gepland na de huidige contextuele issue- en ruisreductie en vóór de modulaire AI-advieslaag.
+
+- Zoekintentie en paginafunctie afzonderlijk modelleren. Zoekintentie ondersteunt minimaal
+  informatief, commercieel onderzoek, transactioneel, navigerend en lokaal; paginafunctie
+  ondersteunt minimaal landingspagina, categorie/overzicht, product/dienst/vacature,
+  artikel/nieuws, contact/conversie en functionele/discoverypagina.
+- Begin met een uitlegbare classificatie op basis van URL, title, H1, hoofdcontent, schema,
+  interne ankerteksten en bestaand paginatype. Gebruik GSC-zoekopdrachten als sterkste bewijs
+  voor de werkelijk waargenomen zoekintentie.
+- Sla confidence, gebruikte bewijssignalen en analysemoment op. Zonder voldoende GSC- of
+  contentsignalen blijft de conclusie voorlopig en controlegericht.
+- Ondersteun een handmatig ingestelde verwachte intentie en paginafunctie die automatische
+  classificatie overrulen zonder de gemeten signalen te verwijderen.
+- Maak alleen bruikbare diagnoses voor een aantoonbare intentiemismatch, concurrerende URL's,
+  gemengde intentie of een ontbrekende passende landingspagina. Start deze als `review`, niet als
+  automatisch hard probleem.
+- Sluit functionele en discovery-only pagina's uit van reguliere intentacties. Gebruik geen
+  generieke intentscore.
+
+Uitvoeringsvolgorde:
+
+1. Taxonomie, handmatige verwachte intentie/paginafunctie en bewijsmodel.
+2. Automatische waargenomen intentie uit crawlgegevens en beschikbare GSC-query's.
+3. Confidence-drempels, mismatch-, cannibalisatie- en contentkansdiagnoses.
+4. Later optionele AI-verrijking voor twijfelgevallen en adviestekst; AI is geen vereiste voor de
+   feitelijke classificatie.
+
+Acceptatie:
+
+- Iedere intentieconclusie toont waarom zij is getrokken en welke bron het zwaarst weegt.
+- Een handmatige keuze blijft behouden na nieuwe analyses.
+- Pagina's zonder voldoende bewijs leveren geen harde actie op.
+- Meerdere URL's worden alleen als intentieconcurrenten getoond bij aantoonbare overlap in GSC-
+  query's of sterke inhoudelijke en structurele overeenkomst.
+
 ### Gerichte pagina-exports
 
 Status: geïmplementeerd en gedeployed; productievalidatie met een gefilterde export blijft open.
