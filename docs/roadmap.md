@@ -140,6 +140,60 @@ Status: technisch geïmplementeerd; deployment en productievalidatie volgen.
 - Ontbrekende technische controles uit de acceptatielijst valideren.
 - Inzichten alleen bij voldoende bewijs als harde issues behandelen.
 
+### Geprioriteerde ontbrekende SEO-signalen
+
+Status: gepland in onderstaande volgorde. Bestaande status-, redirect-, sitemap-, interne-link-,
+onpage-, duplicate-, thin-content-, JobPosting- en alt-tekstcontroles blijven de basis.
+
+1. **Google-indexstatus via URL Inspection**
+   - Sla indexeringsstatus, laatste Google-crawl, Google-selected canonical, opgegeven canonical,
+     robotsverdict en beschikbare rich-resultstatus op.
+   - Vergelijk Google-keuzes met crawler-, sitemap- en canonicalbewijs.
+   - Controleer belangrijke, gewijzigde en probleemverdachte URL's binnen de API-quota; geen
+     onbeperkte inspectie van het volledige URL-register.
+2. **Hreflang en internationale targeting**
+   - Valideer taal-/landcodes, self-reference, retourverwijzingen en `x-default`.
+   - Signaleer hreflangdoelen die redirecten, fouten geven, noindex zijn, robots-geblokkeerd zijn
+     of naar een andere canonical wijzen.
+   - Groepeer fouten per taalcluster of template in plaats van per losse URL.
+3. **Soft 404's**
+   - Combineer 200-status met foutteksten, vrijwel lege hoofdcontent, lege resultaten, canonical,
+     redirects en historische paginastatus.
+   - Maak alleen een hard probleem bij sterk gecombineerd bewijs; twijfelgevallen blijven review.
+4. **Canonical-integriteit**
+   - Detecteer meerdere canonicals, canonical naar foutstatus, redirect, noindex of geblokkeerde
+     URL, en canonical chains of loops.
+   - Vergelijk later met Google-selected canonical en groepeer systematische host-, protocol-,
+     slash- en templatepatronen.
+5. **Begrensde JavaScript-rendercontrole**
+   - Render alleen verdachte, belangrijke of representatieve pagina's.
+   - Vergelijk ontvangen en gerenderde content, links, canonical, robots en structured data.
+   - Signaleer lege app-shells, ontbrekende rendercontent en links zonder crawlbare `a[href]`.
+6. **Contextuele structured data buiten JobPosting**
+   - Valideer vereiste velden en zichtbare-contentovereenkomst voor daadwerkelijk herkende
+     paginatypen, zoals Product, Article, Organization, LocalBusiness, Event en VideoObject.
+   - Controleer bereikbaarheid van schema-afbeeldingen en consistentie binnen een template.
+   - Meld niet generiek dat ieder mogelijk schematype ontbreekt.
+7. **Sitemap- en robotskwaliteit**
+   - Controleer sitemap-URL's op robotsblokkade, noindex, niet-canonical status en onbereikbare
+     child-sitemaps.
+   - Beoordeel `lastmod` alleen bij aantoonbare structurele afwijking van inhoudswijzigingen.
+   - Signaleer discovery-, filter- en functionele pagina's in sitemaps als patroonreview.
+8. **Interne-linksemantiek**
+   - Detecteer lege of niet-beschrijvende ankers, intern `nofollow`, uitsluitend template- of
+     footerlinks en inconsistent ankergebruik voor belangrijke doelen.
+   - Combineer dit later met zoekintentie om concurrerende URL's en ontbrekende inhoudelijke hubs
+     te beoordelen.
+
+Uitvoeringsregel:
+
+- URL Inspection, hreflang en sterke canonicalconflicten mogen harde technische problemen
+  opleveren bij direct bewijs.
+- Soft 404, JavaScriptverschillen, structured-data-uitbreidingen, sitemapkwaliteit en
+  interne-linksemantiek beginnen contextueel en gegroepeerd.
+- Search intent en Lighthouse-aanbevelingen volgen hun eigen secties en worden niet als extra
+  generieke SEO-score toegevoegd.
+
 ### Search intent en paginafunctie
 
 Status: gepland na de huidige contextuele issue- en ruisreductie en vóór de modulaire AI-advieslaag.
@@ -176,6 +230,100 @@ Acceptatie:
 - Pagina's zonder voldoende bewijs leveren geen harde actie op.
 - Meerdere URL's worden alleen als intentieconcurrenten getoond bij aantoonbare overlap in GSC-
   query's of sterke inhoudelijke en structurele overeenkomst.
+
+### Data-gedreven opportunity-engine
+
+Status: gepland na de betrouwbare issue- en ruislaag. Eerste versie werkt zonder AI en wordt later
+verrijkt met search intent en Lighthouse-bewijs.
+
+Doel:
+
+- Herken pagina's en URL-families waar aantoonbaar zoek- of conversiepotentieel wordt beperkt door
+  één of meer samenhangende, oplosbare fricties.
+- Verhoog de prioriteit van een kans niet door issues simpel op te tellen, maar door het verband
+  tussen potentieel, blokkade, bewijskracht en verwachte inspanning uit te leggen.
+- Presenteer kansen binnen het bestaande actieplatform zonder generieke website- of SEO-score.
+
+Beoordelingsdimensies:
+
+1. **Potentieel** — GSC-impressies, positie, CTR, organisch verkeer, conversies, paginatype,
+   historische trend en handmatige belangrijkheid.
+2. **Frictie** — relevante technische, inhoudelijke, interne-link-, indexatie-, intentie- en
+   performanceproblemen die het gemeten potentieel aannemelijk beperken.
+3. **Bewijskracht** — datavolume, meetperiode, consistentie tussen bronnen, actualiteit en
+   confidence van de onderliggende signalen.
+4. **Inspanning en bereik** — kleine pagina-aanpassing, gedeelde component, templatecorrectie of
+   groter technisch project, plus het aantal geraakte waardevolle pagina's.
+
+Eerste opportunity-patronen:
+
+- Veel impressies en positie 4–15 combineren met lage CTR en aantoonbaar zwakke title- of
+  snippetinformatie.
+- Positie 11–20 combineren met passende paginafunctie, duidelijke inhoudelijke lacune en voldoende
+  bestaande vraag.
+- Organisch verkeer of conversies combineren met hoge crawldiepte of zwakke relevante interne
+  ondersteuning.
+- Een kleine templatecorrectie koppelen aan meerdere pagina's met gezamenlijk groot organisch of
+  conversiepotentieel.
+- Een prestatiedaling koppelen aan een relevante recente metadata-, canonical-, indexatie-,
+  content- of interne-linkwijziging.
+- Overlappende GSC-query's en vergelijkbare content koppelen aan een consolidatie- of
+  differentiatiekans.
+- Lighthouse-frictie later zwaarder prioriteren op pagina's met aantoonbaar verkeer, conversies of
+  zoekpotentieel.
+
+Bescherming tegen schijnkansen:
+
+- Gebruik minimale drempels voor impressies, klikken, conversies en meetduur.
+- Corrigeer waar mogelijk voor merkqueries, seizoen, paginatype, websiteomvang en bekende
+  campagnes of wijzigingen.
+- Sluit discovery-only en functionele pagina's standaard uit.
+- Respecteer handmatige belangrijkheid, suppressions, geaccepteerd risico en bewuste
+  pagina-intentie.
+- Maak geen kans wanneer de blokkade niet aannemelijk samenhangt met het gemeten potentieel.
+
+Presentatie:
+
+- Toon vier visuele deelscores van 0–100 voor potentieel, beïnvloedbare frictie, bewijskracht en
+  uitvoerbaarheid/bereik, met per score de gebruikte periode, databronnen en berekening.
+- Toon daarnaast één transparante kansscore en een prioriteitsklasse zoals `hoge kans`, `kans`,
+  `monitoren` of `onvoldoende bewijs`. Dit is geen algemene SEO-gezondheidsscore en voorspelt geen
+  percentage extra verkeer.
+- Leg per kans uit welk potentieel bestaat, welke fricties samenhangen, waarom de conclusie
+  betrouwbaar is, wie de actie kan uitvoeren en hoe resultaat wordt gecontroleerd.
+- Toon de onderliggende issues, metrics en wijzigingen als bewijs en behoud hun eigen lifecycle.
+- Groepeer kansen per pagina, URL-familie of gedeelde oorzaak en voorkom dubbele acties.
+- Visualiseer de deelscores als compacte balken en toon patronen als bewijskaarten, bijvoorbeeld
+  `CTR-kans`, `pagina-twee-kans`, `interne-link-kans`, `templatekans`, `herstelkans`,
+  `cannibalisatiekans` en `performancekans`.
+- Toon positieve en negatieve bijdragers afzonderlijk, bijvoorbeeld veel relevante impressies,
+  positie dicht bij pagina één, bestaande conversies, seizoensinvloed of onvoldoende recente data.
+- Behandel ontbrekende data als `onbekend` en niet automatisch als nul. Toon datadekking en
+  vergelijk waar mogelijk met de vorige meetperiode.
+
+Eerste uitlegbare weging:
+
+- Potentieel: 40%.
+- Beïnvloedbare frictie: 25%.
+- Bewijskracht: 20%.
+- Uitvoerbaarheid en bereik: 15%.
+- Een minimale bewijskracht begrenst de maximale kansscore en prioriteitsklasse, zodat weinig data
+  nooit tot een hoge kans kan leiden.
+- Maak gewichten en drempels centraal versioneerbaar. Bewaar per berekening de gebruikte
+  formuleversie, zodat historische scores verklaarbaar en vergelijkbaar blijven.
+
+Acceptatie:
+
+- Dezelfde kleine issue krijgt aantoonbaar verschillende prioriteit op een waardevolle en een
+  onbelangrijke pagina.
+- Iedere hoge kans bevat meetbaar potentieel en minimaal één aannemelijk beïnvloedbare frictie.
+- Een gebruiker kan zonder AI herleiden welke feiten tot de kans en prioriteitsklasse leidden.
+- Iedere deel- en totaalscore kan volledig worden teruggeleid naar genormaliseerde bronwaarden,
+  bijdragers, drempels en formuleversie.
+- Pagina's van verschillende klanten of onvergelijkbare paginatypen worden niet misleidend tegen
+  elkaar gebenchmarkt.
+- Na uitvoering kan de tool zowel het verdwijnen van de frictie als de ontwikkeling van verkeer,
+  zichtbaarheid of conversies volgen zonder direct causaliteit te claimen.
 
 ### Gerichte pagina-exports
 
@@ -354,6 +502,53 @@ bestaat. Verdere issuetype-specifieke verdieping volgt samen met nieuwe diagnose
   veranderd zijn om het probleem als opgelost te bevestigen.
 - Adviezen uitsluitend baseren op opgeslagen bewijs; onzekerheid zichtbaar houden en geen
   onbewezen AI-conclusie als feit presenteren.
+
+#### Lighthouse-aanbevelingen als uitvoerbare websiteacties
+
+Status: gepland als API-integratie en adviesbron; geen afzonderlijk SEO-score- of
+Lighthouse-dashboard.
+
+- Importeer mislukte Lighthouse-audits, betrokken bestanden en elementen, mogelijke besparing,
+  categorie en Lighthouse-versie via de PageSpeed Insights API.
+- Gebruik scores en labmetingen alleen als ondersteunend bewijs voor prioriteit en voortgang.
+  Maak niet automatisch een losse actie omdat een categorie- of auditscore onder een generieke
+  grens ligt.
+- Combineer Lighthouse-bewijs met crawlerdata, paginatype, URL-familie, templateclusters,
+  elementlocaties en bekende externe bronnen. Bepaal zo of de oorzaak bij één pagina, component,
+  template, CMS-instelling of externe dienst ligt.
+- Groepeer dezelfde audit over meerdere URL's tot één actie per waarschijnlijke oorzaak. Maak geen
+  actie per URL en audit.
+- Presenteer iedere actie in vaste, toegankelijke lagen:
+  1. wat er gebeurt en wat een bezoeker daarvan merkt;
+  2. waar de aanpassing waarschijnlijk moet plaatsvinden;
+  3. wie dit kan uitvoeren: beheerder, contentredacteur of developer;
+  4. concrete implementatiestappen voor deze website;
+  5. geraakte URL's, templates, bestanden of elementen;
+  6. controle waarmee de oplossing kan worden bevestigd.
+- Toon ruwe audit-ID's, meetwaarden, resources, selectors en Lighthouse-details pas onder
+  `Technisch bewijs`.
+- Geef alleen websitespecifieke implementatiestappen wanneer CMS, frontendpatroon of technisch
+  bewijs voldoende duidelijk is. Benoem anders welke informatie nog ontbreekt; verzin geen
+  implementatiedetails.
+- Behandel performance-, toegankelijkheids- en best-practice-aanbevelingen als verbeteracties
+  binnen het bestaande actieplatform, niet automatisch als SEO-probleem.
+
+Eerste bruikbare scope:
+
+- afbeeldingen comprimeren, correct schalen en moderne formaten gebruiken;
+- onnodige of ongebruikte JavaScript- en CSS-belasting verminderen;
+- render-blocking resources en kritieke laadvolgorde verbeteren;
+- caching, fonts en externe scripts doelgerichter configureren;
+- LCP-resource en serverreactietijd verbeteren wanneer Lighthouse voldoende oorzaakinformatie
+  levert.
+
+Acceptatie:
+
+- Een niet-technische gebruiker begrijpt wat moet veranderen en wie daarvoor nodig is.
+- Eén gedeelde templateoorzaak verschijnt als één actie met geraakte voorbeelden.
+- Iedere stap is herleidbaar tot Lighthouse- en crawlerbewijs.
+- De gebruiker kan na uitvoering gericht controleren of de oorzaak en niet alleen de score is
+  verbeterd.
 
 ### AI-ondersteunde verbetersuggesties
 
