@@ -27,7 +27,8 @@ Status: technisch in uitvoering.
 
 ### Begrensde filter-URL-discovery
 
-Status: technisch geïmplementeerd; productievalidatie volgt.
+Status: geïmplementeerd en gedeployed; discovery-only issuebeleid technisch toegevoegd en nog
+niet gedeployed.
 
 - `ignored_query_parameters` geldt voor sitemapimport, handmatige registratie en intern ontdekte
   links en afbeeldingen.
@@ -37,6 +38,13 @@ Status: technisch geïmplementeerd; productievalidatie volgt.
   varianten tellen als overgeslagen URL.
 - Bestaande URL-records die door gewijzigde parameter- of uitsluitingsinstellingen samenvallen,
   worden inactief zonder historische snapshots te verwijderen.
+- Een queryvariant die canonicaliseert naar exact hetzelfde pad zonder query blijft beschikbaar
+  als discoverypagina: status, snapshot, links en assets worden bewaard.
+- Discoverypagina's maken geen losse onpage-, element-, duplicate-, thin-content-, orphan-,
+  diepte- of bronpagina-acties. Bestaande acties doorlopen bij de volgende volledige crawl de
+  normale lifecycle naar opgelost.
+- Bereikbaarheid, sitemapconflicten, paginatiecontrole en issues op de gevonden doelpagina's
+  blijven actief.
 
 ## Operationele veiligheid — globale deployment-drain
 

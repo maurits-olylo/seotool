@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.models.crawl import UrlSnapshot
 from app.models.discovery import Url
 from app.models.issues import Issue
+from app.services.discovery_pages import is_discovery_only_snapshot
 from app.services.issue_engine import reconcile_issues
 from app.services.technical_checks import IssueSignal
 from app.services.url_normalization import InvalidUrlError, normalize_url
@@ -39,16 +40,17 @@ def detect_duplicate_content(
             .order_by(Url.normalized_url)
         )
     )
-    exact_groups = exact_duplicate_groups(rows)
+    analysis_rows = [row for row in rows if not is_discovery_only_snapshot(row[0], row[1])]
+    exact_groups = exact_duplicate_groups(analysis_rows)
     exact_members = {index for group in exact_groups for index in group}
-    near_groups = near_duplicate_groups(rows, excluded_indices=exact_members)
+    near_groups = near_duplicate_groups(analysis_rows, excluded_indices=exact_members)
 
     signals_by_index: dict[int, list[IssueSignal]] = defaultdict(list)
-    _add_duplicate_metadata_signals(rows, signals_by_index)
+    _add_duplicate_metadata_signals(analysis_rows, signals_by_index)
     for group in exact_groups:
-        urls = [rows[index][0].normalized_url for index in group]
+        urls = [analysis_rows[index][0].normalized_url for index in group]
         for index in group:
-            related = [url for url in urls if url != rows[index][0].normalized_url]
+            related = [url for url in urls if url != analysis_rows[index][0].normalized_url]
             signals_by_index[index].append(
                 IssueSignal(
                     issue_type="duplicate_content",
@@ -69,9 +71,9 @@ def detect_duplicate_content(
             )
 
     for group, scores in near_groups:
-        urls = [rows[index][0].normalized_url for index in group]
+        urls = [analysis_rows[index][0].normalized_url for index in group]
         for index in group:
-            related = [url for url in urls if url != rows[index][0].normalized_url]
+            related = [url for url in urls if url != analysis_rows[index][0].normalized_url]
             signals_by_index[index].append(
                 IssueSignal(
                     issue_type="near_duplicate_content",
@@ -96,7 +98,9 @@ def detect_duplicate_content(
             )
 
     touched: list[Issue] = []
-    for index, (url, snapshot) in enumerate(rows):
+    analysis_index = {url.id: index for index, (url, _snapshot) in enumerate(analysis_rows)}
+    for url, snapshot in rows:
+        index = analysis_index.get(url.id)
         touched.extend(
             reconcile_issues(
                 db,
@@ -104,7 +108,7 @@ def detect_duplicate_content(
                 url_id=url.id,
                 crawl_run_id=crawl_run_id,
                 snapshot_id=snapshot.id,
-                signals=signals_by_index.get(index, []),
+                signals=signals_by_index.get(index, []) if index is not None else [],
                 checked_issue_types=CONTENT_SIMILARITY_ISSUE_TYPES,
             )
         )

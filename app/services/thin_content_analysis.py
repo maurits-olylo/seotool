@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.models.crawl import UrlSnapshot
 from app.models.discovery import Url
 from app.models.issues import Issue
+from app.services.discovery_pages import is_discovery_only_snapshot
 from app.services.issue_engine import reconcile_issues
 from app.services.technical_checks import (
     THIN_CONTENT_WORD_LIMIT,
@@ -35,11 +36,7 @@ def analyze_contextual_thin_content(
             .order_by(Url.normalized_url)
         )
     )
-    comparable = [
-        (url, snapshot)
-        for url, snapshot in rows
-        if _is_comparable(url, snapshot)
-    ]
+    comparable = [(url, snapshot) for url, snapshot in rows if _is_comparable(url, snapshot)]
     site_counts = [snapshot.word_count or 0 for _url, snapshot in comparable]
     family_counts: dict[str, list[int]] = defaultdict(list)
     for url, snapshot in comparable:
@@ -127,7 +124,8 @@ def analyze_contextual_thin_content(
 def _is_nearly_empty_actionable(url: Url, snapshot: UrlSnapshot) -> bool:
     page_url = snapshot.final_url or url.normalized_url
     return bool(
-        snapshot.status_code == 200
+        not is_discovery_only_snapshot(url, snapshot)
+        and snapshot.status_code == 200
         and not snapshot.redirect_chain
         and snapshot.is_indexable is True
         and snapshot.word_count is not None
@@ -139,7 +137,8 @@ def _is_nearly_empty_actionable(url: Url, snapshot: UrlSnapshot) -> bool:
 def _is_comparable(url: Url, snapshot: UrlSnapshot) -> bool:
     page_url = snapshot.final_url or url.normalized_url
     return bool(
-        snapshot.status_code == 200
+        not is_discovery_only_snapshot(url, snapshot)
+        and snapshot.status_code == 200
         and not snapshot.redirect_chain
         and snapshot.is_indexable is True
         and snapshot.word_count is not None

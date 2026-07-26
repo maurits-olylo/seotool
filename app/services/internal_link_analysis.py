@@ -9,6 +9,7 @@ from app.models.crawl import UrlLink, UrlSnapshot
 from app.models.discovery import Url, UrlSource
 from app.models.integrations import GoogleAnalyticsMetric, SearchConsoleMetric
 from app.models.issues import Issue
+from app.services.discovery_pages import discovery_only_url_ids
 from app.services.element_locations import mark_target_elements_for_targets
 from app.services.issue_engine import reconcile_issues
 from app.services.link_filtering import is_non_navigational_link_target
@@ -28,6 +29,11 @@ MAX_WEAK_INBOUND_LINKS = 1
 
 
 def detect_orphan_pages(db: Session, *, website_id: object, crawl_run_id: object) -> list[Url]:
+    discovery_only_ids = discovery_only_url_ids(
+        db,
+        website_id=website_id,
+        crawl_run_id=crawl_run_id,
+    )
     orphan_urls = list(
         db.scalars(
             select(Url)
@@ -44,6 +50,7 @@ def detect_orphan_pages(db: Session, *, website_id: object, crawl_run_id: object
             .order_by(Url.normalized_url)
         )
     )
+    orphan_urls = [url for url in orphan_urls if url.id not in discovery_only_ids]
     for url in orphan_urls:
         reconcile_issues(
             db,
@@ -105,6 +112,11 @@ def analyze_internal_link_quality(
             .order_by(Url.normalized_url)
         )
     )
+    discovery_only_ids = discovery_only_url_ids(
+        db,
+        website_id=website_id,
+        crawl_run_id=crawl_run_id,
+    )
     inbound_counts = _inbound_link_counts(db, crawl_run_id=crawl_run_id)
     inbound_sources = _inbound_link_sources(db, crawl_run_id=crawl_run_id)
     important_urls = _important_url_ids(db, website_id=website_id)
@@ -126,6 +138,19 @@ def analyze_internal_link_quality(
     for url in urls:
         _check_control(check_control)
         signals: list[IssueSignal] = []
+        if url.id in discovery_only_ids:
+            touched.extend(
+                reconcile_issues(
+                    db,
+                    website_id=website_id,
+                    url_id=url.id,
+                    crawl_run_id=crawl_run_id,
+                    snapshot_id=None,
+                    signals=[],
+                    checked_issue_types=INTERNAL_LINK_ISSUE_TYPES,
+                )
+            )
+            continue
         inbound_count = inbound_counts.get(url.id, 0)
         if _is_internally_linked_redirect(url, inbound_count):
             signals.append(
@@ -239,6 +264,11 @@ def analyze_redirect_source_groups(
 ) -> list[Issue]:
     """Group multiple redirect links by the source page where they can be fixed together."""
     redirects_by_source = _redirect_links_by_source(db, crawl_run_id=crawl_run_id)
+    discovery_only_ids = discovery_only_url_ids(
+        db,
+        website_id=website_id,
+        crawl_run_id=crawl_run_id,
+    )
     source_ids = set(redirects_by_source)
     source_ids.update(
         db.scalars(
@@ -253,7 +283,7 @@ def analyze_redirect_source_groups(
     for source_id in source_ids:
         redirected_links = redirects_by_source.get(source_id, [])
         signals: list[IssueSignal] = []
-        if len(redirected_links) >= 2:
+        if source_id not in discovery_only_ids and len(redirected_links) >= 2:
             signals.append(
                 IssueSignal(
                     issue_type=SOURCE_REDIRECT_ISSUE_TYPE,
@@ -424,9 +454,7 @@ def _is_indexable_html_page(url: Url) -> bool:
     )
 
 
-def _deep_page_reason(
-    url: Url, *, inbound_count: int, is_important: bool
-) -> str | None:
+def _deep_page_reason(url: Url, *, inbound_count: int, is_important: bool) -> str | None:
     if not _is_indexable_html_page(url):
         return None
     depth = url.crawl_depth or 0

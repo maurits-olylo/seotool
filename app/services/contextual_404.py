@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.models.crawl import UrlLink
 from app.models.discovery import Url, UrlSource
 from app.models.issues import Issue
+from app.services.discovery_pages import discovery_only_url_ids
 from app.services.element_locations import mark_target_elements_for_targets
 from app.services.issue_engine import reconcile_issues
 from app.services.link_filtering import is_non_navigational_link_target
@@ -161,9 +162,7 @@ def _classify_url_patterns(
     signals: list[IssueSignal] = []
     if patterns:
         affected_urls = {url for pattern in patterns for url in pattern["urls"]}
-        pagination_count = sum(
-            1 for pattern in patterns if pattern["pattern_type"] == "pagination"
-        )
+        pagination_count = sum(1 for pattern in patterns if pattern["pattern_type"] == "pagination")
         numbered_series_count = sum(
             1 for pattern in patterns if pattern["pattern_type"] == "numbered_series"
         )
@@ -233,6 +232,11 @@ def _classify_source_pages(
     check_control: Callable[[], None] | None = None,
 ) -> None:
     _check_control(check_control)
+    discovery_only_ids = discovery_only_url_ids(
+        db,
+        website_id=website_id,
+        crawl_run_id=crawl_run_id,
+    )
     rows = db.execute(
         select(
             UrlLink.source_url_id,
@@ -286,7 +290,7 @@ def _classify_source_pages(
         _check_control(check_control)
         broken_links = broken_by_source.get(source_id, [])
         signals: list[IssueSignal] = []
-        if len(broken_links) >= 2:
+        if source_id not in discovery_only_ids and len(broken_links) >= 2:
             count = len(broken_links)
             signals.append(
                 IssueSignal(

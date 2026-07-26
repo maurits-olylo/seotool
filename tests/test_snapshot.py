@@ -6,6 +6,7 @@ from app.db.session import SessionLocal
 from app.models.client import Client
 from app.models.crawl import CrawlRun, ElementLocation, UrlLink
 from app.models.discovery import CrawlJob, Url
+from app.models.issues import Change, Issue
 from app.models.website import Website, WebsiteSettings
 from app.services.http_crawler import FetchResult
 from app.services.snapshot import store_fetch_result
@@ -162,3 +163,72 @@ def test_internal_discovery_applies_query_and_exclusion_settings() -> None:
             "https://example.com/search?filter=all",
         ]
         assert links[-1].target_url_id is None
+
+
+def test_discovery_only_page_keeps_links_without_page_issues_or_changes() -> None:
+    html = b"""
+    <html><head>
+      <link rel="canonical" href="https://example.com/jobs">
+    </head><body><main>
+      <a href="/jobs/vacancy-seo">SEO vacancy</a>
+      <img src="/hero.jpg">
+    </main></body></html>
+    """
+    with SessionLocal() as db:
+        client = Client(name="Discovery-only client")
+        website = Website(client=client, name="Jobs", base_url="https://example.com")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        url = Url(
+            website_id=website.id,
+            normalized_url="https://example.com/jobs?filter=seo",
+        )
+        job = CrawlJob(website_id=website.id, job_type="full_site_crawl")
+        db.add_all([url, job])
+        db.flush()
+        run = CrawlRun(
+            crawl_job_id=job.id,
+            website_id=website.id,
+            crawl_type="full_site_crawl",
+        )
+        db.add(run)
+        db.flush()
+        db.add(
+            Issue(
+                website_id=website.id,
+                url_id=url.id,
+                issue_type="missing_title",
+                category="onpage",
+                severity="medium",
+                title="Title ontbreekt",
+                description="Oud signaal",
+                recommended_action="Voeg een title toe",
+            )
+        )
+        db.flush()
+
+        store_fetch_result(
+            db,
+            url=url,
+            crawl_run_id=run.id,
+            result=FetchResult(
+                requested_url=url.normalized_url,
+                final_url=url.normalized_url,
+                status_code=200,
+                redirect_chain=[],
+                headers={"content-type": "text/html"},
+                content=html,
+                response_time_ms=4,
+            ),
+        )
+        db.flush()
+
+        targets = set(db.scalars(select(Url.normalized_url)))
+        assert "https://example.com/jobs/vacancy-seo" in targets
+        assert "https://example.com/hero.jpg" in targets
+        issues = list(db.scalars(select(Issue)))
+        assert [(issue.issue_type, issue.status) for issue in issues] == [
+            ("missing_title", "resolved")
+        ]
+        assert db.scalar(select(Change)) is None

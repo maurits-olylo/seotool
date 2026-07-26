@@ -7,6 +7,7 @@ from app.models.crawl import ElementLocation, UrlLink, UrlSnapshot
 from app.models.discovery import Url
 from app.models.issues import Change, Issue
 from app.services.change_detection import DetectedChange, compare_snapshots
+from app.services.discovery_pages import is_discovery_only_snapshot
 from app.services.element_issues import ELEMENT_ISSUE_TYPES, inspect_element_locations
 from app.services.issue_engine import reconcile_issues
 from app.services.job_listings import update_job_listing
@@ -22,14 +23,15 @@ def analyze_snapshot(db: Session, snapshot: UrlSnapshot) -> None:
     url = db.get(Url, snapshot.url_id)
     if url is None:
         raise ValueError("Snapshot URL does not exist")
+    discovery_only = is_discovery_only_snapshot(url, snapshot)
     previous = db.scalar(
         select(UrlSnapshot)
         .where(UrlSnapshot.url_id == snapshot.url_id, UrlSnapshot.id != snapshot.id)
         .order_by(UrlSnapshot.checked_at.desc())
         .limit(1)
     )
-    detected_changes = compare_snapshots(previous, snapshot)
-    if previous:
+    detected_changes = [] if discovery_only else compare_snapshots(previous, snapshot)
+    if previous and not discovery_only:
         old_links = _internal_links(db, previous)
         new_links = _internal_links(db, snapshot)
         if old_links != new_links:
@@ -56,40 +58,57 @@ def analyze_snapshot(db: Session, snapshot: UrlSnapshot) -> None:
         )
     signals = inspect_snapshot(snapshot)
     signals = _prefer_contextual_404(db, url=url, signals=signals)
-    element_locations = list(
-        db.scalars(
-            select(ElementLocation).where(ElementLocation.snapshot_id == snapshot.id)
+    if discovery_only:
+        signals = [
+            signal
+            for signal in signals
+            if signal.issue_type
+            in {
+                "http_404",
+                "http_410",
+                "http_5xx",
+                "crawl_timeout",
+                "redirect_loop",
+                "unreachable_url_target",
+                "long_redirect_chain",
+            }
+        ]
+    else:
+        element_locations = list(
+            db.scalars(select(ElementLocation).where(ElementLocation.snapshot_id == snapshot.id))
         )
-    )
-    signals.extend(inspect_element_locations(element_locations))
-    inbound_internal_links = (
-        db.scalar(
-            select(func.count(UrlLink.id)).where(
+        signals.extend(inspect_element_locations(element_locations))
+    inbound_internal_links = 0
+    application_url = None
+    if not discovery_only:
+        inbound_internal_links = (
+            db.scalar(
+                select(func.count(UrlLink.id)).where(
+                    UrlLink.crawl_run_id == snapshot.crawl_run_id,
+                    UrlLink.target_url_id == url.id,
+                    UrlLink.is_internal.is_(True),
+                )
+            )
+            or 0
+        )
+        application_url = db.scalar(
+            select(UrlLink.target_url).where(
                 UrlLink.crawl_run_id == snapshot.crawl_run_id,
-                UrlLink.target_url_id == url.id,
+                UrlLink.source_url_id == url.id,
                 UrlLink.is_internal.is_(True),
+                UrlLink.anchor_text.ilike("%solliciteer%")
+                | UrlLink.anchor_text.ilike("%reageer%")
+                | UrlLink.anchor_text.ilike("%aanmelden%"),
             )
         )
-        or 0
-    )
-    application_url = db.scalar(
-        select(UrlLink.target_url).where(
-            UrlLink.crawl_run_id == snapshot.crawl_run_id,
-            UrlLink.source_url_id == url.id,
-            UrlLink.is_internal.is_(True),
-            UrlLink.anchor_text.ilike("%solliciteer%")
-            | UrlLink.anchor_text.ilike("%reageer%")
-            | UrlLink.anchor_text.ilike("%aanmelden%"),
+        update_job_listing(
+            db,
+            url=url,
+            snapshot=snapshot,
+            inbound_internal_links=inbound_internal_links,
+            application_url=application_url,
         )
-    )
-    update_job_listing(
-        db,
-        url=url,
-        snapshot=snapshot,
-        inbound_internal_links=inbound_internal_links,
-        application_url=application_url,
-    )
-    if not snapshot.redirect_chain:
+    if not discovery_only and not snapshot.redirect_chain:
         signals.extend(
             inspect_job_posting(
                 snapshot.schema_data or [],

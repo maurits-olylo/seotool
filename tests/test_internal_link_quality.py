@@ -159,9 +159,7 @@ def test_groups_multiple_redirect_links_on_the_source_page() -> None:
         with patch(
             "app.services.internal_link_analysis.mark_target_elements_for_targets"
         ) as mark_targets:
-            analyze_internal_link_quality(
-                db, website_id=website.id, crawl_run_id=run.id
-            )
+            analyze_internal_link_quality(db, website_id=website.id, crawl_run_id=run.id)
 
         mark_targets.assert_called_once()
         assert mark_targets.call_args.kwargs["target_urls"] == {
@@ -197,9 +195,10 @@ def test_groups_multiple_redirect_links_on_the_source_page() -> None:
         )
         db.flush()
 
-        assert analyze_redirect_source_groups(
-            db, website_id=website.id, crawl_run_id=next_run.id
-        ) == []
+        assert (
+            analyze_redirect_source_groups(db, website_id=website.id, crawl_run_id=next_run.id)
+            == []
+        )
         assert grouped.status == "resolved"
 
 
@@ -211,9 +210,7 @@ def test_does_not_report_a_well_linked_page_at_depth_five() -> None:
         db.add(website)
         db.flush()
         deep = _url(db, website.id, "/well-linked-deep-page", depth=5)
-        sources = [
-            _url(db, website.id, f"/source-{number}", depth=2) for number in range(12)
-        ]
+        sources = [_url(db, website.id, f"/source-{number}", depth=2) for number in range(12)]
         run = _run(db, website.id)
         for url in (deep, *sources):
             db.add(_snapshot(url, run))
@@ -231,12 +228,34 @@ def test_does_not_report_a_well_linked_page_at_depth_five() -> None:
         )
         db.flush()
 
-        found = analyze_internal_link_quality(
-            db, website_id=website.id, crawl_run_id=run.id
-        )
+        found = analyze_internal_link_quality(db, website_id=website.id, crawl_run_id=run.id)
 
         assert all(issue.issue_type != "deep_page" for issue in found)
         assert db.scalar(select(Issue).where(Issue.issue_type == "deep_page")) is None
+
+
+def test_does_not_report_deep_discovery_only_query_variant() -> None:
+    with SessionLocal() as db:
+        client = Client(name="Discovery depth client")
+        website = Website(client=client, name="Jobs", base_url="https://example.com/")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        variant = _url(db, website.id, "/jobs?filter=seo", depth=7)
+        run = _run(db, website.id)
+        snapshot = _snapshot(variant, run)
+        snapshot.canonical = "https://example.com/jobs"
+        db.add(snapshot)
+        db.flush()
+
+        found = analyze_internal_link_quality(
+            db,
+            website_id=website.id,
+            crawl_run_id=run.id,
+        )
+
+        assert found == []
+        assert db.scalar(select(Issue)) is None
 
 
 def _url(db, website_id, path, *, depth, final_url=None):  # type: ignore[no-untyped-def]
