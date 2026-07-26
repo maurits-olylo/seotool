@@ -72,6 +72,13 @@ en aparte tabbladen voor URL's, issues, wijzigingen, interne links en vacatures.
 bevat lifecycle, Google for Jobs-status, datums, sollicitatiegegevens, interne links en actieve
 bevindingen, maar geen technische database-ID's. Bestanden staan in een gedeeld volume.
 
+De scheduler gebruikt per website admission control: een rijlock serialiseert handmatige en
+geplande starts, en zolang één crawl pending, actief of gepauzeerd is wordt geen tweede crawl
+ingepland. Een recente volledige crawl geldt ook als recente sitemap- en light-checkmeting.
+De FIFO-wachtrijpositie en actuele workercapaciteit worden bij de actieve crawljob teruggegeven.
+Een derde crawlworker is configureerbaar voor een gecontroleerde NAS-capaciteitstest, maar wordt
+niet impliciet gestart door alleen de configuratie te deployen.
+
 Google-imports halen onafhankelijke rapporten gelijktijdig op. GSC vervangt pagina- en
 zoektermmetrics voor het geïmporteerde datumbereik transactioneel; GA4 doet hetzelfde voor
 landingspagina-, event- en landingspagina-eventmetrics. Inserts worden in batches van maximaal

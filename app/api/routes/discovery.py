@@ -5,13 +5,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.queue import enqueue_crawl_job
+from app.core.queue import crawl_queue_state, enqueue_crawl_job
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.common import utc_now
 from app.models.crawl import CrawlRun, UrlLink
 from app.models.discovery import CrawlJob, Url
 from app.models.issues import Issue
+from app.models.website import Website
 from app.schemas.discovery import CrawlJobCreate, CrawlJobRead, CrawlRouteRead, UrlRead, UrlRegister
 from app.services.authorization import require_website_access
 from app.services.crawl_deployment import crawl_deployment_is_active
@@ -220,8 +221,13 @@ def create_crawl_job(
     payload: CrawlJobCreate,
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
-) -> CrawlJob:
-    website = require_website_access(db, principal, payload.website_id, admin=True)
+) -> CrawlJobRead:
+    require_website_access(db, principal, payload.website_id, admin=True)
+    website = db.scalar(
+        select(Website).where(Website.id == payload.website_id).with_for_update()
+    )
+    if website is None:
+        raise HTTPException(status_code=404, detail="Website not found")
     if crawl_deployment_is_active(db):
         raise HTTPException(
             status_code=503, detail="Crawls zijn tijdelijk gepauzeerd voor deployment"
@@ -250,7 +256,7 @@ def create_crawl_job(
     db.refresh(job)
     if get_settings().app_env != "test":
         enqueue_crawl_job(str(job.id))
-    return job
+    return _crawl_job_read(job)
 
 
 def _crawl_job_or_404(job_id: UUID, db: Session, principal: Principal) -> CrawlJob:
@@ -266,14 +272,14 @@ def pause_crawl_job(
     job_id: UUID,
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
-) -> CrawlJob:
+) -> CrawlJobRead:
     job = _crawl_job_or_404(job_id, db, principal)
     if job.status != "running":
         raise HTTPException(status_code=409, detail="Deze crawl kan niet worden gepauzeerd")
     job.status = "pause_requested"
     db.commit()
     db.refresh(job)
-    return job
+    return _crawl_job_read(job)
 
 
 @router.post("/crawl-jobs/{job_id}/resume", response_model=CrawlJobRead)
@@ -281,7 +287,7 @@ def resume_crawl_job(
     job_id: UUID,
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
-) -> CrawlJob:
+) -> CrawlJobRead:
     job = _crawl_job_or_404(job_id, db, principal)
     if crawl_deployment_is_active(db):
         raise HTTPException(
@@ -295,6 +301,19 @@ def resume_crawl_job(
         select(CrawlRun.id).where(CrawlRun.crawl_job_id == job.id)
     ):
         raise HTTPException(status_code=409, detail="Deze crawl heeft geen hervatbare voortgang")
+    db.scalar(select(Website.id).where(Website.id == job.website_id).with_for_update())
+    competing = db.scalar(
+        select(CrawlJob.id).where(
+            CrawlJob.website_id == job.website_id,
+            CrawlJob.id != job.id,
+            CrawlJob.status.in_(["pending", "running", "pause_requested", "paused"]),
+        )
+    )
+    if competing:
+        raise HTTPException(
+            status_code=409,
+            detail="Er staat al een andere crawl voor deze website",
+        )
     job.status = "pending"
     job.finished_at = None
     job.error_message = None
@@ -302,7 +321,7 @@ def resume_crawl_job(
     if get_settings().app_env != "test":
         enqueue_crawl_job(str(job.id), attempt=job.attempt_count + 1)
     db.refresh(job)
-    return job
+    return _crawl_job_read(job)
 
 
 @router.post("/crawl-jobs/{job_id}/cancel", response_model=CrawlJobRead)
@@ -310,7 +329,7 @@ def cancel_crawl_job(
     job_id: UUID,
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
-) -> CrawlJob:
+) -> CrawlJobRead:
     job = _crawl_job_or_404(job_id, db, principal)
     if job.status not in {"pending", "running", "pause_requested", "paused"}:
         raise HTTPException(status_code=409, detail="Deze crawl kan niet worden gestopt")
@@ -326,7 +345,7 @@ def cancel_crawl_job(
         job.status = "cancel_requested"
     db.commit()
     db.refresh(job)
-    return job
+    return _crawl_job_read(job)
 
 
 @router.get("/crawl-jobs/{job_id}", response_model=CrawlJobRead)
@@ -334,9 +353,46 @@ def get_crawl_job(
     job_id: UUID,
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
-) -> CrawlJob:
+) -> CrawlJobRead:
     job = db.get(CrawlJob, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Crawl job not found")
     require_website_access(db, principal, job.website_id)
-    return job
+    return _crawl_job_read(job)
+
+
+@router.get("/websites/{website_id}/crawl-jobs/active", response_model=CrawlJobRead | None)
+def get_active_crawl_job(
+    website_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> CrawlJobRead | None:
+    require_website_access(db, principal, website_id)
+    job = db.scalar(
+        select(CrawlJob)
+        .where(
+            CrawlJob.website_id == website_id,
+            CrawlJob.status.in_(
+                ["pending", "running", "pause_requested", "paused", "cancel_requested"]
+            ),
+        )
+        .order_by(CrawlJob.created_at.desc())
+        .limit(1)
+    )
+    return _crawl_job_read(job) if job else None
+
+
+def _crawl_job_read(job: CrawlJob) -> CrawlJobRead:
+    data = CrawlJobRead.model_validate(job).model_dump()
+    if get_settings().app_env != "test":
+        try:
+            queue = crawl_queue_state(str(job.id))
+        except Exception:
+            pass
+        else:
+            data.update(
+                queue_position=queue.position,
+                queue_depth=queue.queued_jobs,
+                worker_capacity=queue.workers,
+            )
+    return CrawlJobRead.model_validate(data)

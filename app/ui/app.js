@@ -987,12 +987,14 @@ async function loadOperations() {
   if (!websiteId || state.operationsLoading) return;
   state.operationsLoading = true;
   try {
-    [state.crawlRuns, state.exports] = await Promise.all([
+    [state.crawlRuns, state.exports, state.activeCrawlJob] = await Promise.all([
       api(`/api/v1/websites/${websiteId}/crawl-runs?limit=20`),
       api(`/api/v1/exports?website_id=${websiteId}&limit=20`),
+      api(`/api/v1/websites/${websiteId}/crawl-jobs/active`),
     ]);
-    const activeRun = state.crawlRuns.find((run) => ["running", "paused"].includes(run.status)) || (state.crawlRuns[0]?.status === "failed" ? state.crawlRuns[0] : null);
-    state.activeCrawlJob = activeRun ? await api(`/api/v1/crawl-jobs/${activeRun.crawl_job_id}`) : null;
+    if (!state.activeCrawlJob && state.crawlRuns[0]?.status === "failed") {
+      state.activeCrawlJob = await api(`/api/v1/crawl-jobs/${state.crawlRuns[0].crawl_job_id}`);
+    }
     state.systemStatus = await api("/api/v1/system/status").catch(() => null);
     $("#operations-load-message").textContent = state.systemStatus ? "" : "De systeemstatus kon niet worden opgehaald; crawl- en exportgegevens zijn wel bijgewerkt.";
     $("#operations-load-message").classList.toggle("error", !state.systemStatus);
@@ -1037,16 +1039,26 @@ function renderOperations() {
   $("#crawl-run-rows").innerHTML = state.crawlRuns.map((run) => `<tr><td>${new Date(run.started_at).toLocaleString("nl-NL")}</td><td>${runLabels[run.crawl_type] || escapeHtml(run.crawl_type)}</td><td><span class="run-status ${run.status}">${labels[run.status] || run.status}</span></td><td>${Number(run.discovered_urls || 0).toLocaleString("nl-NL")}</td><td>${Number(run.crawled_urls || 0).toLocaleString("nl-NL")}</td><td>${Number(run.failed_urls || 0).toLocaleString("nl-NL")}</td><td>${durationLabel(run)}</td></tr>`).join("");
   $("#crawl-run-cards").innerHTML = state.crawlRuns.map((run) => `<article class="crawl-run-card"><div><strong>${escapeHtml(runLabels[run.crawl_type] || run.crawl_type)}</strong><span class="run-status ${run.status}">${escapeHtml(labels[run.status] || run.status)}</span></div><time datetime="${escapeHtml(run.started_at)}">${new Date(run.started_at).toLocaleString("nl-NL")}</time><dl><div><dt>Gecrawld</dt><dd>${Number(run.crawled_urls || 0).toLocaleString("nl-NL")}</dd></div><div><dt>Ontdekt</dt><dd>${Number(run.discovered_urls || 0).toLocaleString("nl-NL")}</dd></div><div><dt>Mislukt</dt><dd>${Number(run.failed_urls || 0).toLocaleString("nl-NL")}</dd></div><div><dt>Duur</dt><dd>${durationLabel(run)}</dd></div></dl></article>`).join("");
   $("#crawl-runs-empty").classList.toggle("hidden", state.crawlRuns.length !== 0);
-  const activeRun = state.crawlRuns.find((run) => ["running", "paused"].includes(run.status));
-  const controlledRun = activeRun || (state.crawlRuns[0]?.status === "failed" ? state.crawlRuns[0] : null);
+  const activeRun = state.crawlRuns.find((run) => ["running", "paused", "pause_requested"].includes(run.status));
+  const activeJob = state.activeCrawlJob;
+  const pendingRun = activeJob?.status === "pending" ? {
+    crawl_type: activeJob.job_type,
+    status: "pending",
+    crawled_urls: 0,
+    failed_urls: 0,
+  } : null;
+  const controlledRun = activeRun || pendingRun || (state.crawlRuns[0]?.status === "failed" ? state.crawlRuns[0] : null);
   const crawlStatus = state.activeCrawlJob?.status || controlledRun?.status;
   $("#crawl-live-status").classList.toggle("hidden", !controlledRun);
-  $("#start-light-check").disabled = Boolean(activeRun);
-  $("#start-full-crawl").disabled = Boolean(activeRun);
+  $("#start-light-check").disabled = Boolean(activeJob);
+  $("#start-full-crawl").disabled = Boolean(activeJob);
   if (controlledRun) {
     $("#crawl-live-state").textContent = labels[crawlStatus] || crawlStatus;
     $("#crawl-live-state").className = `process-status ${crawlStatus}`;
-    $("#crawl-live-label").textContent = `${runLabels[controlledRun.crawl_type] || controlledRun.crawl_type} · ${Number(controlledRun.crawled_urls || 0).toLocaleString("nl-NL")} gecrawld · ${Number(controlledRun.failed_urls || 0).toLocaleString("nl-NL")} mislukt`;
+    const queueLabel = crawlStatus === "pending" && activeJob?.queue_position
+      ? `Wachtrijpositie ${activeJob.queue_position} van ${activeJob.queue_depth}`
+      : `${Number(controlledRun.crawled_urls || 0).toLocaleString("nl-NL")} gecrawld · ${Number(controlledRun.failed_urls || 0).toLocaleString("nl-NL")} mislukt`;
+    $("#crawl-live-label").textContent = `${runLabels[controlledRun.crawl_type] || controlledRun.crawl_type} · ${queueLabel}`;
   }
   $("#crawl-progress-track").classList.toggle("hidden", crawlStatus === "paused");
   $("#pause-crawl").classList.toggle("hidden", crawlStatus !== "running");
@@ -1079,7 +1091,8 @@ async function startCrawl(jobType) {
   button.disabled = true; message.classList.remove("error"); message.textContent = "Crawl wordt ingepland…";
   try {
     const job = await api("/api/v1/crawl-jobs", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({website_id: $("#website-select").value, job_type: jobType, settings_snapshot: {}})});
-    message.textContent = `${jobType === "light_check" ? "Light check" : "Volledige crawl"} is gestart (${job.id.slice(0, 8)}).`;
+    const queueLabel = job.queue_position ? ` · wachtrijpositie ${job.queue_position} van ${job.queue_depth}` : "";
+    message.textContent = `${jobType === "light_check" ? "Light check" : "Volledige crawl"} is ingepland (${job.id.slice(0, 8)})${queueLabel}.`;
     setTimeout(loadOperations, 2000);
   } catch (error) { message.classList.add("error"); message.textContent = error.message; button.disabled = false; }
 }

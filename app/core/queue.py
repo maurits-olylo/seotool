@@ -1,11 +1,20 @@
+from dataclasses import dataclass
+
 from redis import Redis
-from rq import Queue, Retry
+from rq import Queue, Retry, Worker
 
 from app.core.config import get_settings
 
 CRAWL_QUEUE = "crawls"
 INTEGRATION_QUEUE = "integrations"
 EXPORT_QUEUE = "exports"
+
+
+@dataclass(frozen=True)
+class CrawlQueueState:
+    position: int | None
+    queued_jobs: int
+    workers: int
 
 
 def get_redis() -> Redis:
@@ -25,6 +34,33 @@ def enqueue_crawl_job(job_id: str, *, attempt: int = 0) -> None:
         job_id=queue_job_id,
         job_timeout=21_600,
     )
+
+
+def crawl_queue_state(job_id: str) -> CrawlQueueState:
+    """Return the visible FIFO position for an initial or resumed crawl job."""
+    connection = get_redis()
+    queue = Queue(CRAWL_QUEUE, connection=connection)
+    queued_ids = queue.get_job_ids()
+    position = next(
+        (
+            index
+            for index, queued_id in enumerate(queued_ids, start=1)
+            if queued_id == job_id or queued_id.startswith(f"{job_id}-resume-")
+        ),
+        None,
+    )
+    workers = sum(
+        CRAWL_QUEUE in _worker_queue_names(worker)
+        for worker in Worker.all(connection=connection)
+    )
+    return CrawlQueueState(position=position, queued_jobs=len(queued_ids), workers=workers)
+
+
+def _worker_queue_names(worker: Worker) -> set[str]:
+    names = getattr(worker, "queue_names", [])
+    if callable(names):
+        names = names()
+    return {str(name) for name in names}
 
 
 def enqueue_integration_sync(

@@ -58,3 +58,6 @@ class CrawlJobRead(Timestamped):
     attempt_count: int
     error_message: str | None
     settings_snapshot: dict[str, object]
+    queue_position: int | None = None
+    queue_depth: int = 0
+    worker_capacity: int = 0

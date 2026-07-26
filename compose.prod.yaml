@@ -6,6 +6,8 @@ services:
     restart: always
   crawl-worker-2:
     restart: always
+  crawl-worker-3:
+    restart: always
   integration-worker:
     restart: always
   export-worker:

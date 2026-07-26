@@ -1075,6 +1075,11 @@ def test_url_registry_deduplicates_and_creates_job(client: TestClient) -> None:
     )
     assert job.status_code == 201
     assert job.json()["status"] == "pending"
+    active_job = client.get(f"/api/v1/websites/{website['id']}/crawl-jobs/active")
+    assert active_job.status_code == 200
+    assert active_job.json()["id"] == job.json()["id"]
+    assert active_job.json()["queue_position"] is None
+    assert active_job.json()["queue_depth"] == 0
 
     export = client.post(
         "/api/v1/exports",

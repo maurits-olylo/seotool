@@ -13,6 +13,16 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 - Multi-client domeinisolatie is op 2026-07-19 in productie bevestigd: `jobsatpearle.be` komt niet
   meer als actieve URL van `werkenbijgrandvision.nl` voor.
 
+## Schaalbaarheid — crawl-admission en derde worker
+
+Status: technisch in uitvoering.
+
+- Maximaal één actieve, wachtende of gepauzeerde crawl per website.
+- De scheduler maakt per cyclus hoogstens één werkelijk verschuldigde crawl per website.
+- Een volledige crawl vervangt voor dezelfde periode een losse sitemap- en light check.
+- Pending crawls blijven na refresh zichtbaar met FIFO-wachtrijpositie en workercapaciteit.
+- Een derde NAS-worker wordt pas na deployment afzonderlijk gestart en onder belasting gemeten.
+
 ## Operationele veiligheid — globale deployment-drain
 
 Status: geïmplementeerd, gedeployed en met een actieve crawl gevalideerd.
