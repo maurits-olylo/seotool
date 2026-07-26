@@ -91,3 +91,22 @@ def test_skips_malformed_ipv6_link_and_canonical_without_failing_page() -> None:
 
     assert page.canonical is None
     assert [link.target_url for link in page.links] == ["https://www.human.nl/valid"]
+
+
+def test_skips_broken_absolute_links_embedded_as_internal_paths() -> None:
+    page = extract_page(
+        """
+        <html><body><main>
+          <a href="/   http:/www.npodoc.nl/speel.program.29824238.html">Broken embedded</a>
+          <a href="http:/omroep.human.nl/speel.program.31187396.html">Broken absolute</a>
+          <a href="/articles/http-status">Valid relative</a>
+          <a href="https://external.example/page">Valid external</a>
+        </main></body></html>
+        """,
+        "https://www.human.nl/documentaires",
+    )
+
+    assert [link.target_url for link in page.links] == [
+        "https://www.human.nl/articles/http-status",
+        "https://external.example/page",
+    ]

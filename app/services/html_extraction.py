@@ -11,6 +11,10 @@ from app.services.hashing import stable_hash
 from app.services.url_normalization import InvalidUrlError, normalize_url
 
 INVALID_JSON_LD_MARKER = "_seo_monitor_invalid_json_ld"
+MALFORMED_HTTP_TARGET_RE = re.compile(
+    r"^(?:https?:/(?!/)|/+\s*https?:)",
+    re.IGNORECASE,
+)
 logger = structlog.get_logger()
 
 
@@ -426,6 +430,9 @@ def _xpath(tag: Tag) -> str | None:
 
 
 def _resolve_page_url(page_url: str, raw_url: str, *, element: str) -> str | None:
+    if MALFORMED_HTTP_TARGET_RE.match(raw_url):
+        _log_invalid_page_url(page_url, raw_url, element=element)
+        return None
     try:
         return urljoin(page_url, raw_url)
     except ValueError:
