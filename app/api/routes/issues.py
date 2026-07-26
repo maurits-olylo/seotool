@@ -703,13 +703,17 @@ def _grouped_template_issue_coverage(
         for cluster in occurrence.evidence.get("clusters", []):
             if not isinstance(cluster, dict) or not isinstance(cluster.get("issue_type"), str):
                 continue
+            cluster_issue_ids: set[UUID] = set()
             for issue_id in cluster.get("issue_ids", []):
                 if not isinstance(issue_id, str):
                     continue
                 try:
-                    grouped_issue_ids.add(UUID(issue_id))
+                    cluster_issue_ids.add(UUID(issue_id))
                 except ValueError:
                     continue
+            grouped_issue_ids.update(cluster_issue_ids)
+            if cluster_issue_ids:
+                continue
             for url in cluster.get("urls", []):
                 if isinstance(url, str):
                     types_by_url.setdefault(url, set()).add(cluster["issue_type"])

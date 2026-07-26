@@ -1341,12 +1341,16 @@ def test_issue_list_hides_only_matching_children_behind_template_review(
     website_id = UUID(website["id"])
     with SessionLocal() as db:
         url = Url(website_id=website_id, normalized_url="https://example.com/articles/one")
+        unrelated_url = Url(
+            website_id=website_id,
+            normalized_url="https://example.com/articles/renamed",
+        )
         legacy_url = Url(
             website_id=website_id,
             normalized_url="https://example.com/archive/legacy",
         )
         job = CrawlJob(website_id=website_id, job_type="full_site_crawl")
-        db.add_all([url, legacy_url, job])
+        db.add_all([url, unrelated_url, legacy_url, job])
         db.flush()
         run = CrawlRun(crawl_job_id=job.id, website_id=website_id, crawl_type="full_site_crawl")
         hidden = Issue(
@@ -1358,6 +1362,16 @@ def test_issue_list_hides_only_matching_children_behind_template_review(
             title="Diepe pagina",
             description="Templatepatroon.",
             recommended_action="Controleer de structuur.",
+        )
+        visible_same_key = Issue(
+            website_id=website_id,
+            url_id=unrelated_url.id,
+            issue_type="deep_page",
+            category="internal_links",
+            severity="low",
+            title="Los signaal op URL uit verouderd bewijs",
+            description="Dit issue valt niet onder het cluster met een ander exact issue-ID.",
+            recommended_action="Controleer dit afzonderlijk.",
         )
         visible = Issue(
             website_id=website_id,
@@ -1399,7 +1413,17 @@ def test_issue_list_hides_only_matching_children_behind_template_review(
             description="Tijdelijke backwards compatibility.",
             recommended_action="Controleer het template.",
         )
-        db.add_all([run, hidden, hidden_legacy, visible, diagnosis, legacy_diagnosis])
+        db.add_all(
+            [
+                run,
+                hidden,
+                visible_same_key,
+                hidden_legacy,
+                visible,
+                diagnosis,
+                legacy_diagnosis,
+            ]
+        )
         db.flush()
         db.add(
             IssueOccurrence(
@@ -1412,7 +1436,7 @@ def test_issue_list_hides_only_matching_children_behind_template_review(
                             "issue_ids": [str(hidden.id)],
                             # Exact issue IDs are authoritative even when URL evidence
                             # has changed or been normalized differently.
-                            "urls": ["https://example.com/articles/renamed"],
+                            "urls": [unrelated_url.normalized_url],
                         }
                     ]
                 },
@@ -1436,10 +1460,11 @@ def test_issue_list_hides_only_matching_children_behind_template_review(
 
     payload = client.get(f"/api/v1/websites/{website_id}/issues").json()
 
-    assert {item["issue_type"] for item in payload} == {
-        "http_404",
-        "deep_page_clusters",
-        "template_signal_clusters",
+    assert {item["title"] for item in payload} == {
+        "Los signaal op URL uit verouderd bewijs",
+        "Pagina geeft 404",
+        "Templateclusters",
+        "Legacy templateclusters",
     }
 
 
