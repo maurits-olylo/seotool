@@ -402,3 +402,59 @@ def test_light_check_audits_asset_without_page_fetch(monkeypatch) -> None:  # ty
     with SessionLocal() as db:
         completed = db.get(CrawlJob, job_id)
         assert completed and completed.status == "succeeded"
+
+
+def test_full_crawl_limits_query_variants_per_path(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    fetched: list[str] = []
+
+    def fake_fetch(url: str, **_: object) -> FetchResult:
+        fetched.append(url)
+        content = (
+            b"User-agent: *\nAllow: /"
+            if url.endswith("robots.txt")
+            else b"<html><body><main>Page</main></body></html>"
+        )
+        return FetchResult(
+            requested_url=url,
+            final_url=url,
+            status_code=200,
+            redirect_chain=[],
+            headers={"content-type": "text/plain" if url.endswith("robots.txt") else "text/html"},
+            content=content,
+            response_time_ms=1,
+        )
+
+    monkeypatch.setattr("app.jobs.fetch_url", fake_fetch)
+    monkeypatch.setattr("app.jobs.MAX_QUERY_VARIANTS_PER_PATH", 2)
+    with SessionLocal() as db:
+        client = Client(name="Facet limit client")
+        website = Website(client=client, name="Facet site", base_url="https://example.com/")
+        website.settings = WebsiteSettings(sitemap_urls=[], max_urls=10)
+        db.add(website)
+        db.flush()
+        db.add_all(
+            [
+                Url(
+                    website_id=website.id,
+                    normalized_url=f"https://example.com/jobs?filter={value}",
+                )
+                for value in ("a", "b", "c")
+            ]
+        )
+        job = CrawlJob(
+            website_id=website.id,
+            job_type="full_site_crawl",
+            settings_snapshot={"max_urls": 10, "respect_robots_txt": True},
+        )
+        db.add(job)
+        db.commit()
+        job_id = job.id
+
+    execute_crawl_job(str(job_id))
+
+    assert "https://example.com/jobs?filter=a" in fetched
+    assert "https://example.com/jobs?filter=b" in fetched
+    assert "https://example.com/jobs?filter=c" not in fetched
+    with SessionLocal() as db:
+        run = db.scalar(select(CrawlRun).where(CrawlRun.crawl_job_id == job_id))
+        assert run and run.skipped_urls == 1

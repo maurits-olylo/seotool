@@ -16,6 +16,8 @@ from app.models.website import Website
 from app.schemas.discovery import CrawlJobCreate, CrawlJobRead, CrawlRouteRead, UrlRead, UrlRegister
 from app.services.authorization import require_website_access
 from app.services.crawl_deployment import crawl_deployment_is_active
+from app.services.url_filtering import is_excluded_url
+from app.services.url_normalization import NormalizationOptions, normalize_url
 from app.services.url_registry import register_url
 from app.services.url_scope import is_url_in_website_scope
 
@@ -88,9 +90,7 @@ def _url_read_with_depth_context(
     return UrlRead.model_validate(data)
 
 
-def _active_issue_summaries(
-    db: Session, url_ids: list[UUID]
-) -> dict[UUID, dict[str, object]]:
+def _active_issue_summaries(db: Session, url_ids: list[UUID]) -> dict[UUID, dict[str, object]]:
     if not url_ids:
         return {}
     issues = list(
@@ -200,6 +200,14 @@ def add_url(
         allowed_subdomains=website.settings.allowed_subdomains,
     ):
         raise HTTPException(status_code=422, detail="URL valt buiten het ingestelde websitedomein")
+    normalized = normalize_url(
+        str(payload.url),
+        options=NormalizationOptions(
+            ignored_query_parameters=frozenset(website.settings.ignored_query_parameters)
+        ),
+    )
+    if is_excluded_url(normalized, website.settings.excluded_url_patterns):
+        raise HTTPException(status_code=422, detail="URL valt onder een uitgesloten URL-patroon")
     try:
         url = register_url(
             db,
@@ -223,9 +231,7 @@ def create_crawl_job(
     principal: Principal = Depends(require_api_key),
 ) -> CrawlJobRead:
     require_website_access(db, principal, payload.website_id, admin=True)
-    website = db.scalar(
-        select(Website).where(Website.id == payload.website_id).with_for_update()
-    )
+    website = db.scalar(select(Website).where(Website.id == payload.website_id).with_for_update())
     if website is None:
         raise HTTPException(status_code=404, detail="Website not found")
     if crawl_deployment_is_active(db):

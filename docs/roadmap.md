@@ -7,8 +7,8 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 ## Huidige status
 
 - Actieve ontwikkellijn: fase 6 — intelligente diagnose en UX/UI-polish.
-- Actueel releasepakket: contextafhankelijke SEO-signalen en patroonacties volgens de
-  goedgekeurde issue-audit; lokaal gereed voor volledige releasecontrole.
+- Actueel releasepakket: consistente URL-uitsluitingen en begrensde filter-URL-discovery;
+  technisch geïmplementeerd, volledige releasecontrole volgt.
 - Productie: `https://seo.thact.nl` op Synology NAS `192.168.2.20`.
 - Laatste lokale kwaliteitscontrole: 259 tests, Ruff, JavaScript-syntaxis en productie-Compose
   geslaagd.
@@ -24,6 +24,19 @@ Status: technisch in uitvoering.
 - Een volledige crawl vervangt voor dezelfde periode een losse sitemap- en light check.
 - Pending crawls blijven na refresh zichtbaar met FIFO-wachtrijpositie en workercapaciteit.
 - Een derde NAS-worker wordt pas na deployment afzonderlijk gestart en onder belasting gemeten.
+
+### Begrensde filter-URL-discovery
+
+Status: technisch geïmplementeerd; productievalidatie volgt.
+
+- `ignored_query_parameters` geldt voor sitemapimport, handmatige registratie en intern ontdekte
+  links en afbeeldingen.
+- `excluded_url_patterns` gebruikt globpatronen tegen volledige URL, pad en query en voorkomt
+  registratie en crawlen, terwijl de gevonden link als bewijs bewaard blijft.
+- Per host en pad worden maximaal 100 URL-varianten met queryparameters gecrawld; overige
+  varianten tellen als overgeslagen URL.
+- Bestaande URL-records die door gewijzigde parameter- of uitsluitingsinstellingen samenvallen,
+  worden inactief zonder historische snapshots te verwijderen.
 
 ## Operationele veiligheid — globale deployment-drain
 

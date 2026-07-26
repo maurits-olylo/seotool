@@ -166,7 +166,7 @@ def test_dashboard_and_reports_have_clear_drilldowns(client: TestClient) -> None
 
     script = client.get("/ui/assets/app.js")
     assert script.status_code == 200
-    assert 'data-dashboard-priority=' in script.text
+    assert "data-dashboard-priority=" in script.text
     assert '"#dashboard-priorities"' in script.text
     assert "Geen gekoppelde data" in script.text
     assert 'setAttribute("aria-pressed"' in script.text
@@ -1101,6 +1101,32 @@ def test_url_registry_deduplicates_and_creates_job(client: TestClient) -> None:
     assert [item["id"] for item in exports.json()] == [export.json()["id"]]
 
 
+def test_manual_url_registration_respects_excluded_patterns(client: TestClient) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Excluded discovery"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": customer["id"],
+            "name": "Excluded site",
+            "base_url": "https://example.com",
+        },
+    ).json()
+    settings = client.get(f"/api/v1/websites/{website['id']}/settings").json()
+    settings["excluded_url_patterns"] = ["/search*"]
+    updated = client.put(
+        f"/api/v1/websites/{website['id']}/settings",
+        json=settings,
+    )
+    assert updated.status_code == 200
+
+    response = client.post(
+        f"/api/v1/websites/{website['id']}/urls",
+        json={"url": "https://example.com/search?filter=jobs"},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"] == "URL valt onder een uitgesloten URL-patroon"
+
+
 def test_issue_list_hides_pagination_children_behind_series_review(client: TestClient) -> None:
     customer = client.post("/api/v1/clients", json={"name": "Pagination UI"}).json()
     website = client.post(
@@ -1357,19 +1383,13 @@ def test_issue_list_hides_only_matching_children_behind_template_review(
             description="Tijdelijke backwards compatibility.",
             recommended_action="Controleer het template.",
         )
-        db.add_all(
-            [run, hidden, hidden_legacy, visible, diagnosis, legacy_diagnosis]
-        )
+        db.add_all([run, hidden, hidden_legacy, visible, diagnosis, legacy_diagnosis])
         db.flush()
         db.add(
             IssueOccurrence(
                 issue_id=diagnosis.id,
                 crawl_run_id=run.id,
-                evidence={
-                    "clusters": [
-                        {"issue_type": "deep_page", "urls": [url.normalized_url]}
-                    ]
-                },
+                evidence={"clusters": [{"issue_type": "deep_page", "urls": [url.normalized_url]}]},
             )
         )
         db.add(
@@ -1459,9 +1479,7 @@ def test_issue_list_hides_redirect_targets_behind_source_page_group(client: Test
 
     payload = client.get(f"/api/v1/websites/{website_id}/issues").json()
 
-    assert [item["issue_type"] for item in payload] == [
-        "multiple_redirected_internal_links"
-    ]
+    assert [item["issue_type"] for item in payload] == ["multiple_redirected_internal_links"]
 
 
 def test_issue_list_hides_404_targets_behind_source_page_group(client: TestClient) -> None:
@@ -1509,9 +1527,7 @@ def test_issue_list_hides_404_targets_behind_source_page_group(client: TestClien
                 issue_id=diagnosis.id,
                 crawl_run_id=run.id,
                 evidence={
-                    "broken_links": [
-                        {"target_url": target.normalized_url, "status_code": 404}
-                    ]
+                    "broken_links": [{"target_url": target.normalized_url, "status_code": 404}]
                 },
             )
         )
@@ -1519,9 +1535,7 @@ def test_issue_list_hides_404_targets_behind_source_page_group(client: TestClien
 
     payload = client.get(f"/api/v1/websites/{website_id}/issues").json()
 
-    assert [item["issue_type"] for item in payload] == [
-        "multiple_broken_internal_links"
-    ]
+    assert [item["issue_type"] for item in payload] == ["multiple_broken_internal_links"]
 
 
 def test_running_crawl_can_pause_resume_and_cancel(client: TestClient) -> None:

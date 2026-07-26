@@ -36,7 +36,13 @@ from app.services.technical_checks import (
 )
 from app.services.template_issue_analysis import analyze_template_issue_clusters
 from app.services.thin_content_analysis import analyze_contextual_thin_content
-from app.services.url_filtering import is_probable_html_page
+from app.services.url_filtering import (
+    MAX_QUERY_VARIANTS_PER_PATH,
+    is_excluded_url,
+    is_probable_html_page,
+    query_variant_group,
+)
+from app.services.url_normalization import NormalizationOptions, normalize_url
 from app.services.url_registry import register_url
 from app.services.url_scope import is_url_in_website_scope
 
@@ -97,9 +103,7 @@ def execute_crawl_job(job_id: str) -> None:
             if job.job_type == "fetch_sitemap":
                 run.crawled_urls = sitemap_documents
                 if sitemap_documents == 0:
-                    message = (
-                        "Geen sitemap ingesteld of gevonden via robots.txt en /sitemap.xml"
-                    )
+                    message = "Geen sitemap ingesteld of gevonden via robots.txt en /sitemap.xml"
                     run.status = "failed"
                     job.status = "failed"
                     job.error_message = message
@@ -135,6 +139,9 @@ def execute_crawl_job(job_id: str) -> None:
                     .limit(int(job.settings_snapshot.get("max_urls", 10_000)))
                 )
             )
+            candidate_count = len(urls)
+            urls = _limit_query_variants(urls, website_id=website.id)
+            run.skipped_urls += candidate_count - len(urls)
             run.discovered_urls = len(urls)
             run.phase_total = len(urls)
             completed_url_ids = set(
@@ -256,6 +263,20 @@ def _import_sitemaps(db, job: CrawlJob, run: CrawlRun) -> tuple[int, int]:  # ty
                     url=item.location,
                 )
                 continue
+            normalized_item = normalize_url(
+                item.location,
+                options=NormalizationOptions(
+                    ignored_query_parameters=frozenset(website.settings.ignored_query_parameters)
+                ),
+            )
+            if is_excluded_url(normalized_item, website.settings.excluded_url_patterns):
+                logger.info(
+                    "sitemap_url_excluded",
+                    website_id=str(website.id),
+                    sitemap_url=sitemap_url,
+                    url=normalized_item,
+                )
+                continue
             registered = register_url(
                 db,
                 website_id=website.id,
@@ -310,12 +331,20 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
             .order_by(Url.normalized_url)
         )
         if is_probable_html_page(item.normalized_url)
+        and not is_excluded_url(
+            item.normalized_url,
+            website.settings.excluded_url_patterns,
+        )
     ]
-    pending = [
-        (item.id, item.crawl_depth)
-        for item in eligible_urls
-        if item.id not in visited
-    ]
+    eligible_count = len(eligible_urls)
+    eligible_urls = _limit_query_variants(eligible_urls, website_id=website.id)
+    run.skipped_urls += eligible_count - len(eligible_urls)
+    query_variant_counts: dict[tuple[str, str, str], int] = {}
+    for eligible_url in eligible_urls:
+        group = query_variant_group(eligible_url.normalized_url)
+        if group is not None:
+            query_variant_counts[group] = query_variant_counts.get(group, 0) + 1
+    pending = [(item.id, item.crawl_depth) for item in eligible_urls if item.id not in visited]
     pending_ids = {url_id for url_id, _depth in pending}
     frontier_ids = visited | pending_ids
     audited_assets = {
@@ -372,10 +401,17 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
                 .order_by(Url.normalized_url)
             )
         )
-        discovered = list(
-            {item.id: item for item in [*discovered, *discovered_by_source]}.values()
-        )
+        discovered = list({item.id: item for item in [*discovered, *discovered_by_source]}.values())
         for target in discovered:
+            group = query_variant_group(target.normalized_url)
+            is_new_frontier_url = target.id not in frontier_ids
+            if (
+                group is not None
+                and is_new_frontier_url
+                and query_variant_counts.get(group, 0) >= MAX_QUERY_VARIANTS_PER_PATH
+            ):
+                run.skipped_urls += 1
+                continue
             if not is_probable_html_page(target.normalized_url):
                 if target.id not in audited_assets:
                     _audit_asset(db, job, run, target)
@@ -388,6 +424,8 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
             ):
                 target.crawl_depth = next_depth
             frontier_ids.add(target.id)
+            if group is not None and is_new_frontier_url:
+                query_variant_counts[group] = query_variant_counts.get(group, 0) + 1
             if target.id not in visited and target.id not in pending_ids:
                 pending.append((target.id, next_depth))
                 pending_ids.add(target.id)
@@ -501,9 +539,7 @@ def _check_crawl_control(  # type: ignore[no-untyped-def]
         db.commit()
 
 
-def _set_crawl_phase(
-    db, run: CrawlRun, phase: str, *, current: int = 0, total: int = 0
-) -> None:  # type: ignore[no-untyped-def]
+def _set_crawl_phase(db, run: CrawlRun, phase: str, *, current: int = 0, total: int = 0) -> None:  # type: ignore[no-untyped-def]
     run.phase = phase
     run.phase_current = current
     run.phase_total = total
@@ -514,12 +550,56 @@ def _set_crawl_phase(
 def _deactivate_out_of_scope_urls(db, website: Website) -> None:  # type: ignore[no-untyped-def]
     known_urls = list(db.scalars(select(Url).where(Url.website_id == website.id)))
     for known_url in known_urls:
-        if not is_url_in_website_scope(
+        normalized_with_current_settings = normalize_url(
             known_url.normalized_url,
-            base_url=website.base_url,
-            allowed_subdomains=website.settings.allowed_subdomains,
+            options=NormalizationOptions(
+                ignored_query_parameters=frozenset(website.settings.ignored_query_parameters)
+            ),
+        )
+        if (
+            not is_url_in_website_scope(
+                known_url.normalized_url,
+                base_url=website.base_url,
+                allowed_subdomains=website.settings.allowed_subdomains,
+            )
+            or is_excluded_url(
+                normalized_with_current_settings,
+                website.settings.excluded_url_patterns,
+            )
+            or normalized_with_current_settings != known_url.normalized_url
         ):
             known_url.is_active = False
+
+
+def _limit_query_variants(
+    urls: list[Url],
+    *,
+    website_id: object,
+    maximum_per_path: int | None = None,
+) -> list[Url]:
+    maximum_per_path = maximum_per_path or MAX_QUERY_VARIANTS_PER_PATH
+    admitted: list[Url] = []
+    counts: dict[tuple[str, str, str], int] = {}
+    skipped = 0
+    for url in urls:
+        group = query_variant_group(url.normalized_url)
+        if group is None:
+            admitted.append(url)
+            continue
+        count = counts.get(group, 0)
+        if count >= maximum_per_path:
+            skipped += 1
+            continue
+        counts[group] = count + 1
+        admitted.append(url)
+    if skipped:
+        logger.warning(
+            "crawl_query_variants_limited",
+            website_id=str(website_id),
+            maximum_per_path=maximum_per_path,
+            skipped_urls=skipped,
+        )
+    return admitted
 
 
 def _audit_asset(db, job: CrawlJob, run: CrawlRun, url: Url) -> None:  # type: ignore[no-untyped-def]

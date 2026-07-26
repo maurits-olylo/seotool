@@ -1,5 +1,6 @@
 import pytest
 
+from app.services.url_filtering import is_excluded_url, query_variant_group
 from app.services.url_normalization import InvalidUrlError, NormalizationOptions, normalize_url
 
 
@@ -27,3 +28,19 @@ def test_rejects_unsupported_protocol() -> None:
 def test_rejects_invalid_ipv6_syntax_as_normalization_error() -> None:
     with pytest.raises(InvalidUrlError, match="syntax"):
         normalize_url("https://[invalid/path")
+
+
+def test_matches_excluded_url_globs_against_url_path_and_query() -> None:
+    url = "https://example.com/search?filter=jobs&page=2"
+    assert is_excluded_url(url, ["*/search?filter=*"])
+    assert is_excluded_url(url, ["/search*"])
+    assert not is_excluded_url(url, ["/vacatures/*"])
+
+
+def test_groups_query_variants_by_origin_and_path() -> None:
+    assert query_variant_group("https://example.com/jobs?f=1&page=2") == (
+        "https",
+        "example.com",
+        "/jobs",
+    )
+    assert query_variant_group("https://example.com/jobs") is None

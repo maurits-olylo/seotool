@@ -101,3 +101,64 @@ def test_skips_link_with_invalid_port_without_failing_snapshot() -> None:
         links = list(db.scalars(select(UrlLink)))
         assert snapshot.status_code == 200
         assert [link.target_url for link in links] == ["https://example.com/valid"]
+
+
+def test_internal_discovery_applies_query_and_exclusion_settings() -> None:
+    html = b"""
+    <html><body><main>
+      <a href="/jobs?session=one&role=seo">SEO</a>
+      <a href="/jobs?session=two&role=seo">SEO duplicate</a>
+      <a href="/search?filter=all">Excluded search</a>
+    </main></body></html>
+    """
+    with SessionLocal() as db:
+        client = Client(name="Discovery policy client")
+        website = Website(client=client, name="Policy site", base_url="https://example.com")
+        website.settings = WebsiteSettings(
+            ignored_query_parameters=["session"],
+            excluded_url_patterns=["/search*"],
+        )
+        db.add(website)
+        db.flush()
+        url = Url(website_id=website.id, normalized_url="https://example.com/page")
+        job = CrawlJob(website_id=website.id, job_type="full_site_crawl")
+        db.add_all([url, job])
+        db.flush()
+        run = CrawlRun(
+            crawl_job_id=job.id,
+            website_id=website.id,
+            crawl_type="full_site_crawl",
+        )
+        db.add(run)
+        db.flush()
+
+        store_fetch_result(
+            db,
+            url=url,
+            crawl_run_id=run.id,
+            result=FetchResult(
+                requested_url=url.normalized_url,
+                final_url=url.normalized_url,
+                status_code=200,
+                redirect_chain=[],
+                headers={"content-type": "text/html"},
+                content=html,
+                response_time_ms=4,
+            ),
+        )
+        db.flush()
+
+        registered = list(
+            db.scalars(select(Url).where(Url.website_id == website.id).order_by(Url.normalized_url))
+        )
+        assert [item.normalized_url for item in registered] == [
+            "https://example.com/jobs?role=seo",
+            "https://example.com/page",
+        ]
+        links = list(db.scalars(select(UrlLink).order_by(UrlLink.target_url)))
+        assert [link.target_url for link in links] == [
+            "https://example.com/jobs?role=seo",
+            "https://example.com/jobs?role=seo",
+            "https://example.com/search?filter=all",
+        ]
+        assert links[-1].target_url_id is None

@@ -8,7 +8,8 @@ from app.models.discovery import Url
 from app.models.website import Website
 from app.services.html_extraction import extract_page
 from app.services.http_crawler import FetchResult
-from app.services.url_normalization import InvalidUrlError, normalize_url
+from app.services.url_filtering import is_excluded_url
+from app.services.url_normalization import InvalidUrlError, NormalizationOptions, normalize_url
 from app.services.url_registry import register_url
 from app.services.url_scope import is_url_in_website_scope
 
@@ -60,16 +61,20 @@ def store_fetch_result(
     db.add(snapshot)
     db.flush()
     url.current_status_code = result.status_code
-    url.current_final_url = normalize_url(result.final_url)
+    website = db.get(Website, url.website_id)
+    settings = website.settings if website else None
+    allowed_subdomains = settings.allowed_subdomains if settings else []
+    ignored_query_parameters = (
+        frozenset(settings.ignored_query_parameters) if settings else frozenset()
+    )
+    excluded_url_patterns = settings.excluded_url_patterns if settings else []
+    normalization = NormalizationOptions(ignored_query_parameters=ignored_query_parameters)
+    url.current_final_url = normalize_url(result.final_url, options=normalization)
     url.is_indexable = is_indexable
     if page:
-        website = db.get(Website, url.website_id)
-        allowed_subdomains = (
-            website.settings.allowed_subdomains if website and website.settings else []
-        )
         for link in page.links:
             try:
-                normalized_target = normalize_url(link.target_url)
+                normalized_target = normalize_url(link.target_url, options=normalization)
             except InvalidUrlError as exc:
                 logger.warning(
                     "crawl_link_skipped_invalid_url",
@@ -89,13 +94,14 @@ def store_fetch_result(
                     allowed_subdomains=allowed_subdomains,
                 )
             )
-            if is_internal:
+            if is_internal and not is_excluded_url(normalized_target, excluded_url_patterns):
                 target = register_url(
                     db,
                     website_id=url.website_id,
                     raw_url=normalized_target,
                     source_type="internal_link",
                     source_url=url.normalized_url,
+                    ignored_query_parameters=ignored_query_parameters,
                 )
             db.add(
                 UrlLink(
@@ -109,6 +115,22 @@ def store_fetch_result(
                 )
             )
         for element in page.elements:
+            normalized_element_target = element.target_url
+            if element.target_url:
+                try:
+                    candidate = normalize_url(element.target_url, options=normalization)
+                except InvalidUrlError:
+                    candidate = None
+                if (
+                    candidate
+                    and website
+                    and is_url_in_website_scope(
+                        candidate,
+                        base_url=website.base_url,
+                        allowed_subdomains=allowed_subdomains,
+                    )
+                ):
+                    normalized_element_target = candidate
             db.add(
                 ElementLocation(
                     website_id=url.website_id,
@@ -117,7 +139,7 @@ def store_fetch_result(
                     crawl_run_id=crawl_run_id,
                     issue_types=element.issue_types,
                     element_type=element.element_type,
-                    target_url=element.target_url,
+                    target_url=normalized_element_target,
                     visible_text=element.visible_text,
                     element_id=element.element_id,
                     css_selector=element.css_selector,
@@ -133,13 +155,17 @@ def store_fetch_result(
             )
             if element.element_type == "img" and element.target_url:
                 try:
-                    normalized_image = normalize_url(element.target_url)
+                    normalized_image = normalize_url(element.target_url, options=normalization)
                 except InvalidUrlError:
                     continue
-                if website and is_url_in_website_scope(
-                    normalized_image,
-                    base_url=website.base_url,
-                    allowed_subdomains=allowed_subdomains,
+                if (
+                    website
+                    and is_url_in_website_scope(
+                        normalized_image,
+                        base_url=website.base_url,
+                        allowed_subdomains=allowed_subdomains,
+                    )
+                    and not is_excluded_url(normalized_image, excluded_url_patterns)
                 ):
                     register_url(
                         db,
@@ -147,6 +173,7 @@ def store_fetch_result(
                         raw_url=normalized_image,
                         source_type="internal_link",
                         source_url=url.normalized_url,
+                        ignored_query_parameters=ignored_query_parameters,
                     )
     from app.services.analysis import analyze_snapshot
 
