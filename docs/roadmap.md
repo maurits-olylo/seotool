@@ -194,6 +194,55 @@ Uitvoeringsregel:
 - Search intent en Lighthouse-aanbevelingen volgen hun eigen secties en worden niet als extra
   generieke SEO-score toegevoegd.
 
+### Databronnenstrategie voor volledige SEO-analyse
+
+Status: gepland als modulaire uitbreiding. Bronnen blijven herkenbaar en worden niet zonder
+methodologische onderbouwing bij elkaar opgeteld.
+
+Standaardbronnen:
+
+1. **Technische toestand**
+   - Gebruik crawler-, sitemap-, robots-, redirect-, canonical-, structured-data- en
+     interne-linkbewijs als blijvende technische basis.
+   - Voeg Google URL Inspection gericht toe voor belangrijke, gewijzigde en verdachte URL's.
+2. **Zoekprestaties**
+   - Gebruik GSC en Bing voor pagina-, zoekterm- en zichtbaarheidstrends.
+   - Presenteer gemiddelden, dekking en meetverschillen expliciet; behandel positie niet als een
+     exact ranktrackingresultaat.
+3. **Bezoekersgedrag en conversie**
+   - Ondersteun GA4 en Matomo gelijkwaardig als standaard analyticsbron; beide zijn optioneel en
+     mogen naast elkaar gekoppeld zijn.
+   - Houd definities en resultaten per bron gescheiden en laat per website een primaire bron voor
+     opportunity-prioritering kiezen.
+4. **Ervaring en performance**
+   - Combineer CrUX-velddata met begrensde Lighthouse/PageSpeed-metingen op representatieve,
+     belangrijke of probleemverdachte pagina's.
+   - Zet technische audits om in website- en templatespecifieke acties.
+
+Verdiepende bronnen:
+
+- **Bedrijfswaarde:** koppel later formulieren, calltracking, ecommerce of CRM aan landingspagina's
+  om leads, omzet en gekwalificeerde conversies mee te wegen.
+- **Googlebotgedrag:** importeer optioneel geanonimiseerde server- of CDN-logs voor werkelijk
+  crawlgedrag, crawlbudgetverspilling en bot-specifieke fouten.
+- **SERP en rankings:** gebruik een externe leverancier voor locatie-, apparaat-, SERP-feature- en
+  concurrentiedata wanneer GSC onvoldoende is.
+- **Autoriteit:** gebruik een volwaardige externe backlinkbron voor nieuwe, verloren en relevante
+  links; lege Bing-linkdata blijft onvoldoende bewijs.
+- **Contentbeheer:** koppel waar zinvol CMS-metadata zoals paginatype, eigenaar, publicatiedatum,
+  template en workflowstatus.
+- **Verticale bronnen:** maak Google Business Profile, Merchant Center en Google Ads optionele
+  modules voor respectievelijk lokale, ecommerce- en betaalde zoekcontext.
+
+Commerciële afbakening:
+
+- Crawl, GSC, Bing en GA4 of Matomo horen bij de standaardpropositie.
+- URL Inspection en een begrensde Lighthouse/CrUX-dekking horen bij inhoudelijk rijkere pakketten.
+- CRM, serverlogs, externe ranktracking, SERP- en backlinkdata zijn specialistische uitbreidingen
+  wegens implementatie-, licentie- of verwerkingskosten.
+- Prijs en capaciteit worden begrensd op unieke relevante URL's, analysefrequentie, bewaartermijn
+  en kostbare verwerking; niet op het aantal gevonden issues.
+
 ### Search intent en paginafunctie
 
 Status: gepland na de huidige contextuele issue- en ruisreductie en vóór de modulaire AI-advieslaag.
@@ -702,8 +751,9 @@ Acceptatie:
 
 ## Fase 9 — Matomo-integratie
 
-Status: later; uitsluitend oppakken nadat de Bing Webmaster Tools-integratie is hervat en
-gevalideerd.
+Status: gepland als standaard analyticskoppeling naast GA4. De Bing Webmaster Tools-integratie is
+hervat en gevalideerd, waardoor Matomo inhoudelijk ingepland kan worden zodra de huidige
+stabiliteits- en issuekwaliteitspakketten zijn afgerond.
 
 - Een Matomo-site koppelen via server-URL, `idSite` en een API-token met leestoegang.
 - API-tokens versleuteld bewaren en uitsluitend via POST versturen, nooit in URL's of logs.
@@ -711,6 +761,8 @@ gevalideerd.
 - Matomo-pagina's via genormaliseerde URL's aan het blijvende URL-register koppelen.
 - Issues en wijzigingen verrijken met verkeers- en conversie-impact, gelijkwaardig aan GA4-data.
 - Matomo naast GA4 ondersteunen; geen van beide integraties verplicht maken.
+- Per website een primaire analyticsbron voor opportunity-prioritering kiezen en cijfers van GA4
+  en Matomo nooit stilzwijgend optellen.
 
 Acceptatie:
 
