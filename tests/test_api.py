@@ -120,6 +120,7 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
     assert 'id="current-export-state"' in page.text
     assert 'id="crawl-run-cards"' in page.text
     assert 'class="table-wrap operation-table-wrap"' in page.text
+    assert "<th>Gevonden</th><th>Verwerkt</th>" in page.text
     for message_id in (
         "operations-load-message",
         "crawl-action-message",
@@ -130,6 +131,9 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
     script = client.get("/ui/assets/app.js")
     assert script.status_code == 200
     assert '"#crawl-run-cards"' in script.text
+    assert "function crawlRunMetrics" in script.text
+    assert "Sitemapbestanden verwerkt" in script.text
+    assert "URL's geïmporteerd" in script.text
     assert "crawlworker${crawl.workers === 1" in script.text
     assert "`process-status ${crawlStatus}`" in script.text
 
@@ -1156,6 +1160,128 @@ def test_issue_list_hides_pagination_children_behind_series_review(client: TestC
 
     assert [item["issue_type"] for item in payload] == ["pagination_series_review"]
     assert payload[0]["nature"] == "review"
+
+
+def test_issue_list_hides_sitemap_redirects_covered_by_pattern_review(
+    client: TestClient,
+) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Sitemap UI"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": customer["id"],
+            "name": "Sitemap site",
+            "base_url": "https://example.com",
+        },
+    ).json()
+    website_id = UUID(website["id"])
+    with SessionLocal() as db:
+        url = Url(website_id=website_id, normalized_url="https://example.com/about")
+        job = CrawlJob(website_id=website_id, job_type="full_site_crawl")
+        db.add_all([url, job])
+        db.flush()
+        run = CrawlRun(
+            crawl_job_id=job.id,
+            website_id=website_id,
+            crawl_type="full_site_crawl",
+        )
+        child = Issue(
+            website_id=website_id,
+            url_id=url.id,
+            issue_type="sitemap_redirect",
+            category="indexation",
+            severity="medium",
+            title="Sitemap-URL stuurt door",
+            description="Los URL-signaal.",
+            recommended_action="Gebruik de eind-URL.",
+        )
+        diagnosis = Issue(
+            website_id=website_id,
+            url_id=None,
+            issue_type="sitemap_redirect_patterns",
+            category="indexation",
+            severity="medium",
+            title="Vast sitemapredirectpatroon",
+            description="Gezamenlijke controle.",
+            recommended_action="Pas de sitemapgenerator aan.",
+        )
+        db.add_all([run, child, diagnosis])
+        db.flush()
+        db.add(
+            IssueOccurrence(
+                issue_id=diagnosis.id,
+                crawl_run_id=run.id,
+                evidence={"patterns": [{"urls": [url.normalized_url]}]},
+            )
+        )
+        db.commit()
+
+    payload = client.get(f"/api/v1/websites/{website_id}/issues").json()
+
+    assert [item["issue_type"] for item in payload] == ["sitemap_redirect_patterns"]
+    assert payload[0]["nature"] == "review"
+
+
+def test_issue_list_hides_server_errors_covered_by_incident_review(
+    client: TestClient,
+) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Incident UI"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": customer["id"],
+            "name": "Incident site",
+            "base_url": "https://example.com",
+        },
+    ).json()
+    website_id = UUID(website["id"])
+    with SessionLocal() as db:
+        url = Url(website_id=website_id, normalized_url="https://example.com/unavailable")
+        job = CrawlJob(website_id=website_id, job_type="full_site_crawl")
+        db.add_all([url, job])
+        db.flush()
+        run = CrawlRun(
+            crawl_job_id=job.id,
+            website_id=website_id,
+            crawl_type="full_site_crawl",
+        )
+        child = Issue(
+            website_id=website_id,
+            url_id=url.id,
+            issue_type="http_5xx",
+            category="reachability",
+            severity="critical",
+            title="Serverfout",
+            description="Los URL-signaal.",
+            recommended_action="Onderzoek de fout.",
+        )
+        diagnosis = Issue(
+            website_id=website_id,
+            url_id=None,
+            issue_type="server_error_incident",
+            category="reachability",
+            severity="high",
+            confidence="medium",
+            title="Mogelijk serverincident",
+            description="Gezamenlijke controle.",
+            recommended_action="Bevestig met een light check.",
+        )
+        db.add_all([run, child, diagnosis])
+        db.flush()
+        db.add(
+            IssueOccurrence(
+                issue_id=diagnosis.id,
+                crawl_run_id=run.id,
+                evidence={"patterns": [{"urls": [url.normalized_url]}]},
+            )
+        )
+        db.commit()
+
+    payload = client.get(f"/api/v1/websites/{website_id}/issues").json()
+
+    assert [item["issue_type"] for item in payload] == ["server_error_incident"]
+    assert payload[0]["nature"] == "review"
+    assert payload[0]["confidence"] == "medium"
 
 
 def test_issue_list_hides_only_matching_children_behind_template_review(

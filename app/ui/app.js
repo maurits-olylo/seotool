@@ -978,7 +978,8 @@ function renderDashboard() {
   const vacancies = state.jobSummary || {};
   $("#dashboard-vacancies").innerHTML = [[vacancies.active, "Actief"], [vacancies.expiring_soon, "Loopt bijna af"], [vacancies.needs_attention, "Aandacht nodig"]].map(([value, label]) => `<article><strong>${Number(value || 0).toLocaleString("nl-NL")}</strong><span>${label}</span></article>`).join("");
   const run = state.crawlRuns[0];
-  $("#dashboard-crawl").innerHTML = run ? `<article><strong>${labels[run.status] || run.status} · ${run.crawled_urls.toLocaleString("nl-NL")} URLs</strong><small>${new Date(run.started_at).toLocaleString("nl-NL")} · ${run.failed_urls} mislukt · ${durationLabel(run)}</small></article>` : `<p class="dashboard-empty">Nog geen crawl uitgevoerd.</p>`;
+  const runMetrics = run ? crawlRunMetrics(run) : null;
+  $("#dashboard-crawl").innerHTML = run ? `<article><strong>${labels[run.status] || run.status} · ${runMetrics.summary}</strong><small>${new Date(run.started_at).toLocaleString("nl-NL")} · ${run.failed_urls} mislukt · ${durationLabel(run)}</small></article>` : `<p class="dashboard-empty">Nog geen crawl uitgevoerd.</p>`;
   renderIntegrationWarning();
 }
 
@@ -1009,6 +1010,8 @@ function renderSystemStatus() {
   const status = state.systemStatus;
   const unavailable = {status: "unavailable", workers: 0, queued_jobs: 0};
   const crawl = status?.queues?.crawls || unavailable;
+  const lightCrawls = status?.queues?.crawls_light || unavailable;
+  const fullCrawls = status?.queues?.crawls_full || unavailable;
   const integrations = status?.queues?.integrations || unavailable;
   const exports = status?.queues?.exports || unavailable;
   const healthy = status?.status === "ok";
@@ -1020,7 +1023,8 @@ function renderSystemStatus() {
   $("#crawl-capacity").classList.toggle("degraded", crawl.status !== "ok");
   const entries = [
     ["API & database", status?.api === "ok" && status?.database === "ok", status?.database === "ok" ? "Bereikbaar" : "Database niet bereikbaar"],
-    ["Crawlworkers", crawl.status === "ok", `${crawl.workers} beschikbaar · ${crawl.queued_jobs} in wachtrij`],
+    ["Light checks", lightCrawls.status === "ok", `${lightCrawls.workers} worker · ${lightCrawls.queued_jobs} in wachtrij`],
+    ["Volledige crawls", fullCrawls.status === "ok", `${fullCrawls.workers} worker · ${fullCrawls.queued_jobs} in wachtrij`],
     ["Data-importworker", integrations.status === "ok", `${integrations.workers} beschikbaar · ${integrations.queued_jobs} in wachtrij`],
     ["Exportworker", exports.status === "ok", `${exports.workers} beschikbaar · ${exports.queued_jobs} in wachtrij`],
   ];
@@ -1031,6 +1035,27 @@ function durationLabel(run) {
   if (!run.finished_at) return run.status === "running" ? "Bezig" : "—";
   const seconds = Math.max(0, Math.round((new Date(run.finished_at) - new Date(run.started_at)) / 1000));
   return seconds >= 60 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : `${seconds}s`;
+}
+
+function crawlRunMetrics(run) {
+  const discovered = Number(run.discovered_urls || 0).toLocaleString("nl-NL");
+  const processed = Number(run.crawled_urls || 0).toLocaleString("nl-NL");
+  if (run.crawl_type === "fetch_sitemap") {
+    return {
+      discoveredLabel: "URL's geïmporteerd",
+      discovered,
+      processedLabel: "Sitemapbestanden verwerkt",
+      processed,
+      summary: `${discovered} URL's geïmporteerd · ${processed} sitemapbestand${Number(run.crawled_urls || 0) === 1 ? "" : "en"} verwerkt`,
+    };
+  }
+  return {
+    discoveredLabel: "URL's ontdekt",
+    discovered,
+    processedLabel: "HTML-pagina's verwerkt",
+    processed,
+    summary: `${processed} HTML-pagina's verwerkt`,
+  };
 }
 
 function crawlProgressLabel(run) {
@@ -1056,8 +1081,14 @@ function crawlProgressLabel(run) {
 function renderOperations() {
   renderSystemStatus();
   const runLabels = {light_check: "Light check", full_site_crawl: "Volledige crawl", fetch_sitemap: "Sitemap", full_page_analysis: "Pagina-analyse"};
-  $("#crawl-run-rows").innerHTML = state.crawlRuns.map((run) => `<tr><td>${new Date(run.started_at).toLocaleString("nl-NL")}</td><td>${runLabels[run.crawl_type] || escapeHtml(run.crawl_type)}</td><td><span class="run-status ${run.status}">${labels[run.status] || run.status}</span></td><td>${Number(run.discovered_urls || 0).toLocaleString("nl-NL")}</td><td>${Number(run.crawled_urls || 0).toLocaleString("nl-NL")}</td><td>${Number(run.failed_urls || 0).toLocaleString("nl-NL")}</td><td>${durationLabel(run)}</td></tr>`).join("");
-  $("#crawl-run-cards").innerHTML = state.crawlRuns.map((run) => `<article class="crawl-run-card"><div><strong>${escapeHtml(runLabels[run.crawl_type] || run.crawl_type)}</strong><span class="run-status ${run.status}">${escapeHtml(labels[run.status] || run.status)}</span></div><time datetime="${escapeHtml(run.started_at)}">${new Date(run.started_at).toLocaleString("nl-NL")}</time><dl><div><dt>Gecrawld</dt><dd>${Number(run.crawled_urls || 0).toLocaleString("nl-NL")}</dd></div><div><dt>Ontdekt</dt><dd>${Number(run.discovered_urls || 0).toLocaleString("nl-NL")}</dd></div><div><dt>Mislukt</dt><dd>${Number(run.failed_urls || 0).toLocaleString("nl-NL")}</dd></div><div><dt>Duur</dt><dd>${durationLabel(run)}</dd></div></dl></article>`).join("");
+  $("#crawl-run-rows").innerHTML = state.crawlRuns.map((run) => {
+    const metrics = crawlRunMetrics(run);
+    return `<tr><td>${new Date(run.started_at).toLocaleString("nl-NL")}</td><td>${runLabels[run.crawl_type] || escapeHtml(run.crawl_type)}</td><td><span class="run-status ${run.status}">${labels[run.status] || run.status}</span></td><td>${metrics.discovered} ${metrics.discoveredLabel.toLowerCase()}</td><td>${metrics.processed} ${metrics.processedLabel.toLowerCase()}</td><td>${Number(run.failed_urls || 0).toLocaleString("nl-NL")}</td><td>${durationLabel(run)}</td></tr>`;
+  }).join("");
+  $("#crawl-run-cards").innerHTML = state.crawlRuns.map((run) => {
+    const metrics = crawlRunMetrics(run);
+    return `<article class="crawl-run-card"><div><strong>${escapeHtml(runLabels[run.crawl_type] || run.crawl_type)}</strong><span class="run-status ${run.status}">${escapeHtml(labels[run.status] || run.status)}</span></div><time datetime="${escapeHtml(run.started_at)}">${new Date(run.started_at).toLocaleString("nl-NL")}</time><dl><div><dt>${metrics.processedLabel}</dt><dd>${metrics.processed}</dd></div><div><dt>${metrics.discoveredLabel}</dt><dd>${metrics.discovered}</dd></div><div><dt>Mislukt</dt><dd>${Number(run.failed_urls || 0).toLocaleString("nl-NL")}</dd></div><div><dt>Duur</dt><dd>${durationLabel(run)}</dd></div></dl></article>`;
+  }).join("");
   $("#crawl-runs-empty").classList.toggle("hidden", state.crawlRuns.length !== 0);
   const activeRun = state.crawlRuns.find((run) => ["running", "paused", "pause_requested"].includes(run.status));
   const activeJob = state.activeCrawlJob;

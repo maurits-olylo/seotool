@@ -18,6 +18,7 @@ ISSUE_NATURE_BY_TYPE: dict[str, IssueNature] = {
     "deep_page": "review",
     "http_410": "review",
     "important_page_few_internal_links": "review",
+    "internal_redirect_patterns": "review",
     "job_posting_identifier_collision_risk": "optimization",
     "missing_breadcrumb_schema": "optimization",
     "missing_h1": "review",
@@ -25,6 +26,8 @@ ISSUE_NATURE_BY_TYPE: dict[str, IssueNature] = {
     "near_duplicate_content": "review",
     "pagination_series_review": "review",
     "robots_txt_blocked": "review",
+    "server_error_incident": "review",
+    "sitemap_redirect_patterns": "review",
     "thin_content": "review",
     "template_signal_clusters": "review",
 }

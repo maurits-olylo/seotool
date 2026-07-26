@@ -19,6 +19,11 @@ CLUSTERABLE_ISSUE_TYPES = {
     "deep_page",
     "duplicate_meta_description",
     "duplicate_title",
+    "job_posting_location_incomplete",
+    "job_posting_missing_application",
+    "job_posting_missing_fields",
+    "job_posting_remote_location_missing",
+    "job_posting_schema_missing",
     "missing_h1",
     "missing_meta_description",
     "multiple_broken_internal_links",
@@ -41,6 +46,11 @@ MINIMUM_CLUSTER_SIZE = {
     "deep_page": 10,
     "duplicate_meta_description": 2,
     "duplicate_title": 2,
+    "job_posting_location_incomplete": 3,
+    "job_posting_missing_application": 3,
+    "job_posting_missing_fields": 3,
+    "job_posting_remote_location_missing": 3,
+    "job_posting_schema_missing": 3,
     "missing_h1": 5,
     "missing_meta_description": 5,
     "multiple_broken_internal_links": 2,
@@ -52,6 +62,11 @@ MINIMUM_CLUSTER_SIZE = {
 }
 HIERARCHICAL_ISSUE_TYPES = {
     "deep_page",
+    "job_posting_location_incomplete",
+    "job_posting_missing_application",
+    "job_posting_missing_fields",
+    "job_posting_remote_location_missing",
+    "job_posting_schema_missing",
     "missing_h1",
     "missing_meta_description",
     "multiple_h1",
@@ -205,6 +220,11 @@ def _cluster_key(
         return f"canonical:{_path_family(str(canonical))}" if canonical else None
     if issue_type == "cms_link_placeholder":
         return f"elements:{evidence.get('element_count', 0)}:{path}"
+    if issue_type == "job_posting_missing_fields":
+        fields = evidence.get("missing_fields", [])
+        if not isinstance(fields, list):
+            fields = []
+        return f"fields:{','.join(sorted(str(field) for field in fields))}:{path}"
     if issue_type in {
         "multiple_broken_internal_links",
         "multiple_redirected_internal_links",
@@ -228,6 +248,11 @@ def _compact_evidence(evidence: dict[str, object]) -> dict[str, object]:
         "content_level",
         "count",
         "crawl_depth",
+        "incoming_internal_pages",
+        "is_important",
+        "missing_fields",
+        "review_reason",
+        "source",
         "threshold",
         "value",
         "word_count",
@@ -286,6 +311,11 @@ def _component_targets(issue_type: str, evidence: dict[str, object]) -> list[str
 
 def _parent_cluster_key(issue_type: str, evidence: dict[str, object], url: str) -> str:
     path = _parent_path_family(url)
+    if issue_type == "job_posting_missing_fields":
+        fields = evidence.get("missing_fields", [])
+        if not isinstance(fields, list):
+            fields = []
+        return f"fields:{','.join(sorted(str(field) for field in fields))}:{path}"
     if issue_type == "thin_content":
         return f"{evidence.get('content_level', 'unknown')}:{path}"
     if issue_type == "multiple_h1":

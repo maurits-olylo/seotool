@@ -12,7 +12,8 @@ OUTDATED_CONTENT_AGE_DAYS = 3 * 365
 EDITORIAL_SCHEMA_TYPES = {"Article", "BlogPosting", "NewsArticle", "TechArticle"}
 FUNCTIONAL_PATH_RE = re.compile(
     r"/(?:(?:bedankt|bevestiging|confirmation|thank-you|success|succes)(?:-[^/]*)?|"
-    r"inloggen|login|uitloggen|logout|winkelwagen|cart|checkout|afrekenen)(?:/|$)",
+    r"inloggen|login|uitloggen|logout|winkelwagen|cart|checkout|afrekenen|"
+    r"contact|contacteer|nieuwsbrief|newsletter|subscribe|unsubscribe)(?:/|$)",
     re.IGNORECASE,
 )
 VARIANT_QUERY_PARAMETERS = {"c", "filter", "page", "paged", "p", "q", "search", "sort"}
@@ -186,21 +187,19 @@ def inspect_snapshot(snapshot: UrlSnapshot, *, today: date | None = None) -> lis
                 count=len(h1_values),
             )
         )
-    if _should_report_thin_content(snapshot):
+    if _should_report_nearly_empty_content(snapshot):
         word_count = snapshot.word_count or 0
-        nearly_empty = word_count < 30
         signals.append(
             _signal(
                 "thin_content",
                 "onpage",
-                "medium" if nearly_empty else "low",
-                "Nagenoeg lege pagina" if nearly_empty else "Beperkte hoofdcontent",
-                "Controleer of deze indexeerbare pagina de zoekvraag zelfstandig en volledig "
-                "beantwoordt. Een laag woordenaantal is een controlesignaal, "
-                "geen automatische fout.",
+                "medium",
+                "Nagenoeg lege pagina",
+                "Controleer of deze indexeerbare pagina bewust vrijwel geen hoofdcontent bevat. "
+                "Voeg inhoud toe, maak de pagina niet-indexeerbaar of herstel de extractie.",
                 word_count=word_count,
-                threshold=THIN_CONTENT_WORD_LIMIT,
-                content_level="nearly_empty" if nearly_empty else "limited",
+                threshold=30,
+                content_level="nearly_empty",
                 confidence="medium",
             )
         )
@@ -325,23 +324,27 @@ def _parse_schema_date(value: object) -> date | None:
         return None
 
 
-def _should_report_thin_content(snapshot: UrlSnapshot) -> bool:
+def is_functional_page_url(page_url: str) -> bool:
+    parsed = urlsplit(page_url)
+    if FUNCTIONAL_PATH_RE.search(parsed.path):
+        return True
+    query_parameters = set(parse_qs(parsed.query, keep_blank_values=True))
+    return bool(query_parameters & VARIANT_QUERY_PARAMETERS)
+
+
+def _should_report_nearly_empty_content(snapshot: UrlSnapshot) -> bool:
     if (
         snapshot.status_code != 200
         or snapshot.redirect_chain
         or snapshot.is_indexable is False
         or snapshot.word_count is None
-        or snapshot.word_count >= THIN_CONTENT_WORD_LIMIT
+        or snapshot.word_count >= 30
     ):
         return False
     page_url = snapshot.final_url or snapshot.requested_url
     if not page_url:
         return True
-    parsed = urlsplit(page_url)
-    if FUNCTIONAL_PATH_RE.search(parsed.path):
-        return False
-    query_parameters = set(parse_qs(parsed.query, keep_blank_values=True))
-    if query_parameters & VARIANT_QUERY_PARAMETERS:
+    if is_functional_page_url(page_url):
         return False
     return not bool({"SearchResultsPage"} & set(snapshot.schema_types or []))
 

@@ -223,3 +223,67 @@ def test_groups_an_exact_duplicate_pair() -> None:
         assert occurrence is not None
         assert occurrence.evidence["affected_signal_count"] == 2
         assert occurrence.evidence["clusters"][0]["cluster_key"] == "value:Gedeelde title"
+
+
+def test_groups_missing_job_schema_as_one_vacancy_template_action() -> None:
+    with SessionLocal() as db:
+        client = Client(name="Vacancy template client")
+        website = Website(
+            client=client,
+            name="Vacancy site",
+            base_url="https://jobs.example",
+        )
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        job = CrawlJob(website_id=website.id, job_type="full_site_crawl")
+        db.add(job)
+        db.flush()
+        run = CrawlRun(
+            crawl_job_id=job.id,
+            website_id=website.id,
+            crawl_type="full_site_crawl",
+        )
+        db.add(run)
+        db.flush()
+        for number in range(5):
+            url = Url(
+                website_id=website.id,
+                normalized_url=f"https://jobs.example/vacatures/rol-{number}",
+            )
+            db.add(url)
+            db.flush()
+            issue = Issue(
+                website_id=website.id,
+                url_id=url.id,
+                issue_type="job_posting_schema_missing",
+                category="structured_data",
+                severity="high",
+                title="Vacature mist JobPosting-schema",
+                description="Geen schema gevonden.",
+                recommended_action="Voeg schema toe in het vacaturetemplate.",
+            )
+            db.add(issue)
+            db.flush()
+            db.add(
+                IssueOccurrence(
+                    issue_id=issue.id,
+                    crawl_run_id=run.id,
+                    evidence={"source": "url_and_page_text"},
+                )
+            )
+        db.flush()
+
+        diagnosis = analyze_template_issue_clusters(
+            db, website_id=website.id, crawl_run_id=run.id
+        )[0]
+        db.flush()
+        occurrence = db.scalar(
+            select(IssueOccurrence).where(IssueOccurrence.issue_id == diagnosis.id)
+        )
+
+        assert occurrence is not None
+        cluster = occurrence.evidence["clusters"][0]
+        assert cluster["issue_type"] == "job_posting_schema_missing"
+        assert cluster["url_count"] == 5
+        assert cluster["sample_evidence"] == {"source": "url_and_page_text"}

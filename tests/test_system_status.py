@@ -48,6 +48,16 @@ def test_build_queue_status_reports_workers_and_backlog(monkeypatch) -> None:
         "workers": 2,
         "queued_jobs": 3,
     }
+    assert result["queues"]["crawls_light"] == {
+        "status": "ok",
+        "workers": 1,
+        "queued_jobs": 2,
+    }
+    assert result["queues"]["crawls_full"] == {
+        "status": "ok",
+        "workers": 1,
+        "queued_jobs": 1,
+    }
     assert result["queues"]["integrations"] == {
         "status": "ok",
         "workers": 1,

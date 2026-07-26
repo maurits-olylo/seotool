@@ -7,9 +7,11 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 ## Huidige status
 
 - Actieve ontwikkellijn: fase 6 — intelligente diagnose en UX/UI-polish.
-- Eerstvolgend ontwikkelitem: contextafhankelijke SEO-signalen volgens de goedgekeurde issue-audit.
+- Actueel releasepakket: contextafhankelijke SEO-signalen en patroonacties volgens de
+  goedgekeurde issue-audit; lokaal gereed voor volledige releasecontrole.
 - Productie: `https://seo.thact.nl` op Synology NAS `192.168.2.20`.
-- Laatste afgeronde kwaliteitscontrole: 193 tests en Ruff geslaagd.
+- Laatste lokale kwaliteitscontrole: 253 tests, Ruff, JavaScript-syntaxis en productie-Compose
+  geslaagd.
 - Multi-client domeinisolatie is op 2026-07-19 in productie bevestigd: `jobsatpearle.be` komt niet
   meer als actieve URL van `werkenbijgrandvision.nl` voor.
 
@@ -209,8 +211,9 @@ Acceptatie:
 
 ## Fase 6 — Intelligente diagnose en UX/UI-polish
 
-Status: in uitvoering; bronpagina's met meerdere dode interne links worden als eerste
-diagnosepatroon gegroepeerd. Verdere patroonherkenning, adviesverrijking en polish volgen.
+Status: in uitvoering; sitemapredirects, interne redirects, gelijktijdige 5xx-responses,
+vacaturetemplates, thin content en crawldiepte worden inmiddels contextueel beoordeeld.
+Productievalidatie van dit pakket volgt.
 
 ### SEO-issues en kwaliteitscontroles expliciet onderscheiden
 
@@ -258,6 +261,18 @@ Status: eerste scopeclassificatie op 2026-07-19 gedeployed en in productie geval
   defect doel waar veel pagina's naartoe linken zijn verschillende, maar gerelateerde diagnoses.
 - Bronpagina's met minimaal twee redirectlinks als één onderhoudstaak tonen; de onderliggende
   redirectdoelen blijven historisch bewaard en enkelvoudige gevallen blijven afzonderlijk zichtbaar.
+- Sitemapredirects vanaf drie URL's per aantoonbare transformatie als één configuratieactie tonen;
+  een trailing slash is daarbij geen fout, de redirectende sitemapvermelding is het signaal.
+- Interne redirects vanaf drie gelijksoortige URL-omzettingen als één component-, navigatie- of
+  migratieactie tonen; URL-gecodeerde CMS-placeholders niet als redirect classificeren.
+- Drie of meer gelijke 5xx-responses uit één crawl als mogelijk tijdelijk incident presenteren en
+  eerst met logs en een light check laten bevestigen.
+- Thin content alleen melden voor vrijwel lege indexeerbare contentpagina's of duidelijke
+  contextuele uitschieters binnen een voldoende grote URL-familie of website.
+- Diepte 4 en 5 alleen tonen voor belangrijke of zwak intern gelinkte pagina's; diepte 6 of hoger
+  blijft als uitzonderlijke structuurcontrole zichtbaar.
+- Herhaalde JobPosting-templatefouten groeperen wanneer minimaal drie vacaturepagina's hetzelfde
+  schema- of toepassingssignaal delen.
 
 ### Van diagnose naar exact handelingsadvies
 
@@ -409,8 +424,8 @@ Status: gepland.
 
 ## Fase 8 — Schaalbaarheid en parallelle crawls
 
-Status: eerste schaalbaarheidspakket lokaal geïmplementeerd; productievalidatie en verdere
-wachtrij-informatie volgen.
+Status: begrensde light- en full-crawlpools draaien in productie; afzonderlijke operationele
+wachtrij-informatie is lokaal geïmplementeerd.
 
 - Laat volledige sitecrawls van verschillende websites gecontroleerd parallel draaien.
 - Behoud maximaal één actieve crawl per website en voorkom dubbele verwerking van dezelfde job.

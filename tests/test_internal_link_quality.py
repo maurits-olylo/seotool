@@ -192,6 +192,42 @@ def test_groups_multiple_redirect_links_on_the_source_page() -> None:
         assert grouped.status == "resolved"
 
 
+def test_does_not_report_a_well_linked_page_at_depth_five() -> None:
+    with SessionLocal() as db:
+        client = Client(name="Contextual depth client")
+        website = Website(client=client, name="Depth site", base_url="https://example.com/")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        deep = _url(db, website.id, "/well-linked-deep-page", depth=5)
+        sources = [
+            _url(db, website.id, f"/source-{number}", depth=2) for number in range(12)
+        ]
+        run = _run(db, website.id)
+        for url in (deep, *sources):
+            db.add(_snapshot(url, run))
+        db.add_all(
+            UrlLink(
+                crawl_run_id=run.id,
+                source_url_id=source.id,
+                target_url=deep.normalized_url,
+                target_url_id=deep.id,
+                anchor_text="Relevante verdieping",
+                is_internal=True,
+                is_nofollow=False,
+            )
+            for source in sources
+        )
+        db.flush()
+
+        found = analyze_internal_link_quality(
+            db, website_id=website.id, crawl_run_id=run.id
+        )
+
+        assert all(issue.issue_type != "deep_page" for issue in found)
+        assert db.scalar(select(Issue).where(Issue.issue_type == "deep_page")) is None
+
+
 def _url(db, website_id, path, *, depth, final_url=None):  # type: ignore[no-untyped-def]
     normalized_url = f"https://example.com{path}"
     url = Url(

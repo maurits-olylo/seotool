@@ -119,7 +119,7 @@ def test_keeps_onpage_signals_for_indexable_page() -> None:
     assert types == {"missing_title", "missing_meta_description", "missing_h1"}
 
 
-def test_reports_limited_content_only_for_indexable_content_pages() -> None:
+def test_defers_limited_content_to_site_context_analysis() -> None:
     snapshot = UrlSnapshot(
         requested_url="https://example.com/diensten/seo",
         final_url="https://example.com/diensten/seo",
@@ -132,14 +132,8 @@ def test_reports_limited_content_only_for_indexable_content_pages() -> None:
         redirect_chain=[],
     )
 
-    signal = next(item for item in inspect_snapshot(snapshot) if item.issue_type == "thin_content")
-
-    assert signal.title == "Beperkte hoofdcontent"
-    assert signal.severity == "low"
-    assert signal.evidence == {
-        "word_count": 100,
-        "threshold": 150,
-        "content_level": "limited",
+    assert "thin_content" not in {
+        item.issue_type for item in inspect_snapshot(snapshot)
     }
 
 
@@ -160,6 +154,7 @@ def test_reports_nearly_empty_indexable_page_with_more_urgency() -> None:
     assert signal.title == "Nagenoeg lege pagina"
     assert signal.severity == "medium"
     assert signal.evidence["content_level"] == "nearly_empty"
+    assert signal.evidence["threshold"] == 30
 
 
 def test_ignores_thin_confirmation_and_filter_pages() -> None:
@@ -175,6 +170,22 @@ def test_ignores_thin_confirmation_and_filter_pages() -> None:
         UrlSnapshot(
             requested_url="https://example.com/nieuws?page=2",
             final_url="https://example.com/nieuws?page=2",
+            status_code=200,
+            word_count=10,
+            is_indexable=True,
+            redirect_chain=[],
+        ),
+        UrlSnapshot(
+            requested_url="https://example.com/contact",
+            final_url="https://example.com/contact",
+            status_code=200,
+            word_count=10,
+            is_indexable=True,
+            redirect_chain=[],
+        ),
+        UrlSnapshot(
+            requested_url="https://example.com/nieuwsbrief",
+            final_url="https://example.com/nieuwsbrief",
             status_code=200,
             word_count=10,
             is_indexable=True,

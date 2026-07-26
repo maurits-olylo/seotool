@@ -22,6 +22,7 @@ INTERNAL_LINK_ISSUE_TYPES = {
 }
 SOURCE_REDIRECT_ISSUE_TYPE = "multiple_redirected_internal_links"
 MAX_RECOMMENDED_CRAWL_DEPTH = 3
+VERY_DEEP_CRAWL_DEPTH = 6
 MAX_WEAK_INBOUND_LINKS = 1
 
 
@@ -136,7 +137,12 @@ def analyze_internal_link_quality(
                     },
                 )
             )
-        if _is_indexable_html_page(url) and (url.crawl_depth or 0) > MAX_RECOMMENDED_CRAWL_DEPTH:
+        deep_page_reason = _deep_page_reason(
+            url,
+            inbound_count=inbound_count,
+            is_important=url.id in important_urls,
+        )
+        if deep_page_reason is not None:
             signals.append(
                 IssueSignal(
                     issue_type="deep_page",
@@ -144,16 +150,20 @@ def analyze_internal_link_quality(
                     severity="low",
                     title="Pagina ligt diep in de sitestructuur",
                     description=(
-                        f"De pagina is pas na {url.crawl_depth} interne stappen bereikbaar."
+                        f"De pagina is pas na {url.crawl_depth} interne stappen bereikbaar en "
+                        f"is relevant om te beoordelen omdat {deep_page_reason}."
                     ),
                     recommended_action=(
-                        "Voeg een relevante link toe vanaf een hoger gelegen categorie-, hub- "
-                        "of navigatiepagina."
+                        "Beoordeel of de pagina dichter bij een relevante categorie, hub of "
+                        "navigatieroute hoort. Voeg alleen een extra link toe wanneer dat de "
+                        "gebruikersroute werkelijk verbetert."
                     ),
                     evidence={
                         "crawl_depth": url.crawl_depth,
                         "recommended_maximum": MAX_RECOMMENDED_CRAWL_DEPTH,
                         "incoming_internal_pages": inbound_count,
+                        "is_important": url.id in important_urls,
+                        "review_reason": deep_page_reason,
                     },
                 )
             )
@@ -397,8 +407,30 @@ def _is_indexable_html_page(url: Url) -> bool:
     )
 
 
+def _deep_page_reason(
+    url: Url, *, inbound_count: int, is_important: bool
+) -> str | None:
+    if not _is_indexable_html_page(url):
+        return None
+    depth = url.crawl_depth or 0
+    if depth <= MAX_RECOMMENDED_CRAWL_DEPTH:
+        return None
+    if is_important:
+        return "de pagina organisch of handmatig belangrijk is"
+    if depth >= VERY_DEEP_CRAWL_DEPTH:
+        return f"de crawldiepte {depth} uitzonderlijk hoog is"
+    if inbound_count <= MAX_WEAK_INBOUND_LINKS:
+        return f"slechts {inbound_count} interne bronpagina's naar de pagina linken"
+    return None
+
+
 def _is_internally_linked_redirect(url: Url, inbound_count: int) -> bool:
-    if not url.is_active or inbound_count == 0 or not url.current_final_url:
+    if (
+        not url.is_active
+        or inbound_count == 0
+        or not url.current_final_url
+        or is_non_navigational_link_target(url.normalized_url)
+    ):
         return False
     try:
         return normalize_url(url.current_final_url) != normalize_url(url.normalized_url)

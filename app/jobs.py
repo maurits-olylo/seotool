@@ -19,11 +19,14 @@ from app.services.element_locations import mark_target_elements
 from app.services.http_crawler import CrawlError, fetch_metadata, fetch_url
 from app.services.indexation_analysis import analyze_indexation_consistency
 from app.services.internal_link_analysis import analyze_internal_link_quality, detect_orphan_pages
+from app.services.internal_redirect_analysis import analyze_internal_redirect_patterns
 from app.services.issue_engine import reconcile_issues
 from app.services.job_identifier_analysis import analyze_job_identifier_risk
 from app.services.pagination_analysis import analyze_pagination_series
 from app.services.robots import RobotsRules
+from app.services.server_error_analysis import analyze_server_error_incident
 from app.services.sitemap import InvalidSitemapError, parse_sitemap
+from app.services.sitemap_redirect_analysis import analyze_sitemap_redirect_patterns
 from app.services.snapshot import store_fetch_result
 from app.services.structured_data_analysis import analyze_breadcrumb_consistency
 from app.services.technical_checks import (
@@ -32,6 +35,7 @@ from app.services.technical_checks import (
     inspect_crawl_error,
 )
 from app.services.template_issue_analysis import analyze_template_issue_clusters
+from app.services.thin_content_analysis import analyze_contextual_thin_content
 from app.services.url_filtering import is_probable_html_page
 from app.services.url_registry import register_url
 from app.services.url_scope import is_url_in_website_scope
@@ -405,7 +409,25 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
             crawl_run_id=run.id,
         )
         _check_crawl_control(db, job, run)
+        analyze_internal_redirect_patterns(
+            db,
+            website_id=website.id,
+            crawl_run_id=run.id,
+        )
+        _check_crawl_control(db, job, run)
         analyze_indexation_consistency(
+            db,
+            website_id=website.id,
+            crawl_run_id=run.id,
+        )
+        _check_crawl_control(db, job, run)
+        analyze_sitemap_redirect_patterns(
+            db,
+            website_id=website.id,
+            crawl_run_id=run.id,
+        )
+        _check_crawl_control(db, job, run)
+        analyze_server_error_incident(
             db,
             website_id=website.id,
             crawl_run_id=run.id,
@@ -430,6 +452,12 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
         )
         _check_crawl_control(db, job, run)
         analyze_pagination_series(
+            db,
+            website_id=website.id,
+            crawl_run_id=run.id,
+        )
+        _check_crawl_control(db, job, run)
+        analyze_contextual_thin_content(
             db,
             website_id=website.id,
             crawl_run_id=run.id,

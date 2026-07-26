@@ -136,6 +136,10 @@ CATEGORY_RELEVANCE = {
 }
 
 TYPE_RELEVANCE = {
+    "deep_page": (
+        "Crawldiepte is alleen relevant wanneer een belangrijke pagina, een uitzonderlijk diepe "
+        "route of een pagina met weinig interne ingangen wordt geraakt."
+    ),
     "job_posting_schema_missing": (
         "Zonder JobPosting-schema kan Google deze vacature niet betrouwbaar als vacature herkennen."
     ),
@@ -146,6 +150,10 @@ TYPE_RELEVANCE = {
         "Meerdere redirectlinks op één bronpagina zijn meestal één onderhoudstaak voor dezelfde "
         "pagina of hetzelfde gedeelde contentblok."
     ),
+    "internal_redirect_patterns": (
+        "Herhaalde interne redirectdoelen met dezelfde URL-omzetting wijzen doorgaans op één "
+        "navigatie-, component- of migratietaak."
+    ),
     "patterned_404_urls": (
         "Een terugkerend 404-patroon wijst op structurele URL-generatie en kan veel "
         "ruis veroorzaken."
@@ -153,6 +161,14 @@ TYPE_RELEVANCE = {
     "pagination_series_review": (
         "Een pagineringsreeks moet als één technisch geheel worden beoordeeld; losse metadata-, "
         "canonical- en dieptesignalen beschrijven meestal hetzelfde templategedrag."
+    ),
+    "sitemap_redirect_patterns": (
+        "Een vast sitemapredirectpatroon is één configuratieprobleem in de sitemapgenerator, "
+        "niet een afzonderlijke inhoudelijke fout op iedere URL."
+    ),
+    "server_error_incident": (
+        "Gelijktijdige serverfouten kunnen één tijdelijk beschikbaarheidsincident zijn en moeten "
+        "eerst gezamenlijk worden bevestigd."
     ),
     "template_signal_clusters": (
         "Herhaalde signalen binnen dezelfde URL-familie of metadatawaarde wijzen meestal op één "
@@ -184,6 +200,10 @@ VERIFICATION_BY_TYPE = {
     "invalid_json_ld": "Alle JSON-LD-blokken zijn leesbaar en opnieuw gevalideerd.",
     "internally_linked_404": "Geen interne bronpagina linkt nog naar dit 404-doel.",
     "internally_linked_redirect": "Interne links wijzen rechtstreeks naar de definitieve 200-URL.",
+    "internal_redirect_patterns": (
+        "De volgende volledige crawl vindt geen interne links meer naar de betrokken "
+        "redirect-URL's."
+    ),
     "multiple_redirected_internal_links": (
         "Geen interne link op de bronpagina gaat nog via een redirect."
     ),
@@ -195,6 +215,12 @@ VERIFICATION_BY_TYPE = {
     ),
     "pagination_series_review": (
         "De volgende volledige crawl vindt alleen geldige reeks-URL's en geen lege grenspagina's."
+    ),
+    "sitemap_redirect_patterns": (
+        "De volgende volledige crawl vindt de definitieve 200-URL's rechtstreeks in de sitemap."
+    ),
+    "server_error_incident": (
+        "Een nieuwe light check geeft voor alle betrokken URL's een stabiele niet-5xx-status."
     ),
     "template_signal_clusters": (
         "De volgende volledige crawl werkt ieder aangepast cluster bij zonder dezelfde "

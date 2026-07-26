@@ -91,3 +91,9 @@ def test_template_cluster_guidance_focuses_on_one_shared_review() -> None:
     assert "template" in guidance["relevance"]["text"]  # type: ignore[index]
     assert guidance["verification"] == "het signaal verdwijnt uit de URL-familie"
     assert guidance["sources"]
+
+
+def test_deep_page_guidance_explains_the_contextual_threshold() -> None:
+    guidance = build_issue_guidance(_issue("deep_page", "internal_links"), {})
+
+    assert "alleen relevant" in guidance["relevance"]["text"]  # type: ignore[index]

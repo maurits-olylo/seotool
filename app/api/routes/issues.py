@@ -35,9 +35,12 @@ from app.schemas.issues import (
 )
 from app.services.authorization import require_website_access, require_write_access
 from app.services.element_jumps import build_live_jump_url
+from app.services.internal_redirect_analysis import INTERNAL_REDIRECT_PATTERN_TYPE
 from app.services.issue_classification import issue_nature, issue_scope
 from app.services.issue_guidance import build_issue_guidance
 from app.services.pagination_analysis import PAGINATION_CHILD_ISSUE_TYPES
+from app.services.server_error_analysis import SERVER_ERROR_INCIDENT_TYPE
+from app.services.sitemap_redirect_analysis import SITEMAP_REDIRECT_PATTERN_TYPE
 from app.services.template_issue_analysis import TEMPLATE_CLUSTER_ISSUE_TYPE
 from app.services.url_normalization import InvalidUrlError, normalize_url
 
@@ -332,7 +335,16 @@ def list_issues(
         db, website_id, "pagination_series_review"
     )
     grouped_redirect_url_ids = _grouped_redirect_url_ids(db, website_id)
+    grouped_redirect_pattern_url_ids = _grouped_diagnosis_url_ids(
+        db, website_id, INTERNAL_REDIRECT_PATTERN_TYPE
+    )
     grouped_broken_url_ids = _grouped_broken_url_ids(db, website_id)
+    grouped_sitemap_redirect_url_ids = _grouped_diagnosis_url_ids(
+        db, website_id, SITEMAP_REDIRECT_PATTERN_TYPE
+    )
+    grouped_server_error_url_ids = _grouped_diagnosis_url_ids(
+        db, website_id, SERVER_ERROR_INCIDENT_TYPE
+    )
     grouped_template_issue_keys = _grouped_template_issue_keys(db, website_id)
     issues = [
         issue
@@ -351,8 +363,20 @@ def list_issues(
                 and issue.url_id in grouped_redirect_url_ids
             )
             or (
+                issue.issue_type == "internally_linked_redirect"
+                and issue.url_id in grouped_redirect_pattern_url_ids
+            )
+            or (
                 issue.issue_type == "internally_linked_404"
                 and issue.url_id in grouped_broken_url_ids
+            )
+            or (
+                issue.issue_type == "sitemap_redirect"
+                and issue.url_id in grouped_sitemap_redirect_url_ids
+            )
+            or (
+                issue.issue_type == "http_5xx"
+                and issue.url_id in grouped_server_error_url_ids
             )
             or (issue.url_id, issue.issue_type) in grouped_template_issue_keys
         )
