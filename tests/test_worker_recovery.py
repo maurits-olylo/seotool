@@ -6,7 +6,16 @@ from app.models.client import Client
 from app.models.crawl import CrawlRun
 from app.models.discovery import CrawlJob
 from app.models.website import Website, WebsiteSettings
-from app.worker import recover_interrupted_crawls
+from app.worker import recover_interrupted_crawls, worker_name
+
+
+def test_worker_name_is_unique_per_container() -> None:
+    assert worker_name("full-1", "container-a") == "full-1-container-a"
+    assert worker_name("full-1", "container-b") == "full-1-container-b"
+
+
+def test_worker_name_keeps_rq_default_without_configured_role() -> None:
+    assert worker_name("", "container-a") is None
 
 
 def test_worker_restart_pauses_interrupted_crawl() -> None:
@@ -123,7 +132,11 @@ def test_cancellation_interrupts_post_crawl_404_analysis(monkeypatch) -> None:  
     monkeypatch.setattr("app.jobs._load_robots_rules", lambda db, job: None)
 
     def request_cancel_during_analysis(
-        db, *, website_id, crawl_run_id, check_control  # type: ignore[no-untyped-def]
+        db,
+        *,
+        website_id,
+        crawl_run_id,
+        check_control,  # type: ignore[no-untyped-def]
     ) -> None:
         job = db.get(CrawlJob, job_id)
         assert job is not None

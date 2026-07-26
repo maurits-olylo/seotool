@@ -1,4 +1,5 @@
 import os
+import socket
 from datetime import UTC, datetime
 
 from rq import Worker
@@ -9,6 +10,17 @@ from app.core.queue import CRAWL_QUEUES, LIGHT_CRAWL_QUEUE, get_redis
 from app.db.session import SessionLocal
 from app.models.crawl import CrawlRun
 from app.models.discovery import CrawlJob
+
+
+def worker_name(configured_name: str | None = None, hostname: str | None = None) -> str | None:
+    """Keep the configured role recognizable while making each container registration unique."""
+    role = (
+        configured_name if configured_name is not None else os.getenv("WORKER_NAME", "")
+    ).strip()
+    if not role:
+        return None
+    container = (hostname if hostname is not None else socket.gethostname()).strip()
+    return f"{role}-{container}" if container else role
 
 
 def active_crawl_job_ids() -> set[str]:
@@ -63,7 +75,7 @@ def main() -> None:
     Worker(
         queues,
         connection=get_redis(),
-        name=os.getenv("WORKER_NAME") or None,
+        name=worker_name(),
     ).work()
 
 
