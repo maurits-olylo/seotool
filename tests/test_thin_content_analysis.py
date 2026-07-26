@@ -49,6 +49,10 @@ def test_accepts_short_functional_pages_and_site_norm() -> None:
         paths = [
             ("contact", 12),
             ("nieuwsbrief", 18),
+            ("privacyverklaring", 20),
+            ("copyright", 15),
+            ("enquete", 10),
+            ("offerte-samenstellen", 25),
             ("kort/pagina-1", 90),
             ("kort/pagina-2", 100),
             ("kort/pagina-3", 110),
@@ -72,9 +76,7 @@ def test_accepts_short_functional_pages_and_site_norm() -> None:
         )
         db.commit()
 
-        assert db.scalar(
-            select(Issue.id).where(Issue.issue_type == "thin_content")
-        ) is None
+        assert db.scalar(select(Issue.id).where(Issue.issue_type == "thin_content")) is None
 
 
 def test_preserves_nearly_empty_non_functional_page() -> None:
@@ -113,12 +115,7 @@ def test_does_not_report_content_with_unknown_indexability() -> None:
         db.add(_snapshot(url, run, 10, is_indexable=None))
         db.flush()
 
-        assert (
-            analyze_contextual_thin_content(
-                db, website_id=website.id, crawl_run_id=run.id
-            )
-            == []
-        )
+        assert analyze_contextual_thin_content(db, website_id=website.id, crawl_run_id=run.id) == []
 
 
 def _website_and_run(db):  # type: ignore[no-untyped-def]

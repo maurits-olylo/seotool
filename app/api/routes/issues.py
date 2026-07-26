@@ -345,15 +345,14 @@ def list_issues(
     grouped_server_error_url_ids = _grouped_diagnosis_url_ids(
         db, website_id, SERVER_ERROR_INCIDENT_TYPE
     )
-    grouped_template_issue_keys = _grouped_template_issue_keys(db, website_id)
+    grouped_template_issue_ids, grouped_template_issue_keys = _grouped_template_issue_coverage(
+        db, website_id
+    )
     issues = [
         issue
         for issue in issues
         if not (
-            (
-                issue.issue_type in GROUPABLE_404_ISSUE_TYPES
-                and issue.url_id in grouped_404_url_ids
-            )
+            (issue.issue_type in GROUPABLE_404_ISSUE_TYPES and issue.url_id in grouped_404_url_ids)
             or (
                 issue.issue_type in PAGINATION_CHILD_ISSUE_TYPES
                 and issue.url_id in grouped_pagination_url_ids
@@ -374,10 +373,8 @@ def list_issues(
                 issue.issue_type == "sitemap_redirect"
                 and issue.url_id in grouped_sitemap_redirect_url_ids
             )
-            or (
-                issue.issue_type == "http_5xx"
-                and issue.url_id in grouped_server_error_url_ids
-            )
+            or (issue.issue_type == "http_5xx" and issue.url_id in grouped_server_error_url_ids)
+            or issue.id in grouped_template_issue_ids
             or (issue.url_id, issue.issue_type) in grouped_template_issue_keys
         )
     ]
@@ -557,9 +554,7 @@ def _grouped_404_url_ids(db: Session, website_id: UUID) -> set[UUID]:
     return _grouped_diagnosis_url_ids(db, website_id, "patterned_404_urls")
 
 
-def _grouped_diagnosis_url_ids(
-    db: Session, website_id: UUID, issue_type: str
-) -> set[UUID]:
+def _grouped_diagnosis_url_ids(db: Session, website_id: UUID, issue_type: str) -> set[UUID]:
     diagnosis = db.scalar(
         select(Issue)
         .where(
@@ -675,20 +670,22 @@ def _grouped_broken_url_ids(db: Session, website_id: UUID) -> set[UUID]:
     )
 
 
-def _grouped_template_issue_keys(db: Session, website_id: UUID) -> set[tuple[UUID, str]]:
+def _grouped_template_issue_coverage(
+    db: Session, website_id: UUID
+) -> tuple[set[UUID], set[tuple[UUID, str]]]:
     diagnoses = list(
         db.scalars(
-        select(Issue)
-        .where(
-            Issue.website_id == website_id,
-            Issue.issue_type.in_(TEMPLATE_CLUSTER_DIAGNOSIS_TYPES),
-            Issue.status.in_(ACTIVE_ISSUE_STATUSES),
-        )
-        .order_by(Issue.last_detected_at.desc())
+            select(Issue)
+            .where(
+                Issue.website_id == website_id,
+                Issue.issue_type.in_(TEMPLATE_CLUSTER_DIAGNOSIS_TYPES),
+                Issue.status.in_(ACTIVE_ISSUE_STATUSES),
+            )
+            .order_by(Issue.last_detected_at.desc())
         )
     )
     if not diagnoses:
-        return set()
+        return set(), set()
     diagnosis_ids = {diagnosis.id for diagnosis in diagnoses}
     latest_by_issue: dict[UUID, IssueOccurrence] = {}
     for occurrence in db.scalars(
@@ -698,6 +695,7 @@ def _grouped_template_issue_keys(db: Session, website_id: UUID) -> set[tuple[UUI
     ):
         latest_by_issue.setdefault(occurrence.issue_id, occurrence)
     types_by_url: dict[str, set[str]] = {}
+    grouped_issue_ids: set[UUID] = set()
     for diagnosis in diagnoses:
         occurrence = latest_by_issue.get(diagnosis.id)
         if occurrence is None:
@@ -705,11 +703,18 @@ def _grouped_template_issue_keys(db: Session, website_id: UUID) -> set[tuple[UUI
         for cluster in occurrence.evidence.get("clusters", []):
             if not isinstance(cluster, dict) or not isinstance(cluster.get("issue_type"), str):
                 continue
+            for issue_id in cluster.get("issue_ids", []):
+                if not isinstance(issue_id, str):
+                    continue
+                try:
+                    grouped_issue_ids.add(UUID(issue_id))
+                except ValueError:
+                    continue
             for url in cluster.get("urls", []):
                 if isinstance(url, str):
                     types_by_url.setdefault(url, set()).add(cluster["issue_type"])
     if not types_by_url:
-        return set()
+        return grouped_issue_ids, set()
     urls_by_value = {
         url.normalized_url: url.id
         for url in db.scalars(
@@ -719,7 +724,7 @@ def _grouped_template_issue_keys(db: Session, website_id: UUID) -> set[tuple[UUI
             )
         )
     }
-    return {
+    return grouped_issue_ids, {
         (urls_by_value[url], issue_type)
         for url, issue_types in types_by_url.items()
         if url in urls_by_value
@@ -795,9 +800,7 @@ def _issue_elements(
             else "redirected_links"
         )
         target_key = (
-            "target_url"
-            if issue.issue_type == "multiple_broken_internal_links"
-            else "redirect_url"
+            "target_url" if issue.issue_type == "multiple_broken_internal_links" else "redirect_url"
         )
         for item in occurrence.evidence.get(evidence_key, []):
             if isinstance(item, dict) and isinstance(item.get(target_key), str):

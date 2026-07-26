@@ -67,9 +67,7 @@ def test_groups_repeated_template_signals_and_resolves_when_they_disappear() -> 
             )
         db.flush()
 
-        found = analyze_template_issue_clusters(
-            db, website_id=website.id, crawl_run_id=run.id
-        )
+        found = analyze_template_issue_clusters(db, website_id=website.id, crawl_run_id=run.id)
         db.flush()
 
         assert len(found) == 1
@@ -85,15 +83,11 @@ def test_groups_repeated_template_signals_and_resolves_when_they_disappear() -> 
         assert cluster["cluster_key"] == "/articles/item-{n}/*"
         assert cluster["sample_evidence"] == {"crawl_depth": 5}
 
-        for issue in db.scalars(
-            select(Issue).where(Issue.url_id.is_not(None))
-        ):
+        for issue in db.scalars(select(Issue).where(Issue.url_id.is_not(None))):
             issue.status = "resolved"
         db.flush()
 
-        assert analyze_template_issue_clusters(
-            db, website_id=website.id, crawl_run_id=run.id
-        ) == []
+        assert analyze_template_issue_clusters(db, website_id=website.id, crawl_run_id=run.id) == []
         assert found[0].status == "resolved"
 
 
@@ -128,9 +122,7 @@ def test_does_not_group_duplicate_metadata_without_the_shared_value() -> None:
             )
         db.flush()
 
-        assert analyze_template_issue_clusters(
-            db, website_id=website.id, crawl_run_id=run.id
-        ) == []
+        assert analyze_template_issue_clusters(db, website_id=website.id, crawl_run_id=run.id) == []
 
 
 def test_groups_small_child_families_at_the_shared_parent_level() -> None:
@@ -175,9 +167,9 @@ def test_groups_small_child_families_at_the_shared_parent_level() -> None:
             )
         db.flush()
 
-        diagnosis = analyze_template_issue_clusters(
-            db, website_id=website.id, crawl_run_id=run.id
-        )[0]
+        diagnosis = analyze_template_issue_clusters(db, website_id=website.id, crawl_run_id=run.id)[
+            0
+        ]
         db.flush()
         occurrence = db.scalar(
             select(IssueOccurrence).where(IssueOccurrence.issue_id == diagnosis.id)
@@ -226,9 +218,9 @@ def test_groups_an_exact_duplicate_pair() -> None:
             )
         db.flush()
 
-        diagnosis = analyze_template_issue_clusters(
-            db, website_id=website.id, crawl_run_id=run.id
-        )[0]
+        diagnosis = analyze_template_issue_clusters(db, website_id=website.id, crawl_run_id=run.id)[
+            0
+        ]
         db.flush()
         occurrence = db.scalar(
             select(IssueOccurrence).where(IssueOccurrence.issue_id == diagnosis.id)
@@ -289,9 +281,9 @@ def test_groups_missing_job_schema_as_one_vacancy_template_action() -> None:
             )
         db.flush()
 
-        diagnosis = analyze_template_issue_clusters(
-            db, website_id=website.id, crawl_run_id=run.id
-        )[0]
+        diagnosis = analyze_template_issue_clusters(db, website_id=website.id, crawl_run_id=run.id)[
+            0
+        ]
         db.flush()
         occurrence = db.scalar(
             select(IssueOccurrence).where(IssueOccurrence.issue_id == diagnosis.id)
@@ -301,6 +293,13 @@ def test_groups_missing_job_schema_as_one_vacancy_template_action() -> None:
         cluster = occurrence.evidence["clusters"][0]
         assert cluster["issue_type"] == "job_posting_schema_missing"
         assert cluster["url_count"] == 5
+        assert len(cluster["issue_ids"]) == 5
+        assert set(cluster["issue_ids"]) == {
+            str(issue.id)
+            for issue in db.scalars(
+                select(Issue).where(Issue.issue_type == "job_posting_schema_missing")
+            )
+        }
         assert cluster["sample_evidence"] == {"source": "url_and_page_text"}
 
 
@@ -349,9 +348,7 @@ def test_groups_an_orphan_pair_and_keeps_it_separate_from_other_types() -> None:
             )
         db.flush()
 
-        found = analyze_template_issue_clusters(
-            db, website_id=website.id, crawl_run_id=run.id
-        )
+        found = analyze_template_issue_clusters(db, website_id=website.id, crawl_run_id=run.id)
 
         assert [issue.issue_type for issue in found] == ["orphan_page_clusters"]
         assert found[0].category == "internal_links"

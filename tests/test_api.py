@@ -1405,7 +1405,17 @@ def test_issue_list_hides_only_matching_children_behind_template_review(
             IssueOccurrence(
                 issue_id=diagnosis.id,
                 crawl_run_id=run.id,
-                evidence={"clusters": [{"issue_type": "deep_page", "urls": [url.normalized_url]}]},
+                evidence={
+                    "clusters": [
+                        {
+                            "issue_type": "deep_page",
+                            "issue_ids": [str(hidden.id)],
+                            # Exact issue IDs are authoritative even when URL evidence
+                            # has changed or been normalized differently.
+                            "urls": ["https://example.com/articles/renamed"],
+                        }
+                    ]
+                },
             )
         )
         db.add(

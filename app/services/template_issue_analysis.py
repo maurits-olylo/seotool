@@ -110,17 +110,13 @@ def analyze_template_issue_clusters(
             latest_by_issue.setdefault(occurrence.issue_id, occurrence)
 
     url_ids = {issue.url_id for issue in issues if issue.url_id is not None}
-    urls_by_id = {
-        url.id: url for url in db.scalars(select(Url).where(Url.id.in_(url_ids)))
-    }
+    urls_by_id = {url.id: url for url in db.scalars(select(Url).where(Url.id.in_(url_ids)))}
     pagination_urls = _active_diagnosis_urls(
         db,
         website_id=website_id,
         issue_type="pagination_series_review",
     )
-    grouped: dict[tuple[str, str], list[tuple[Issue, Url, dict[str, object]]]] = defaultdict(
-        list
-    )
+    grouped: dict[tuple[str, str], list[tuple[Issue, Url, dict[str, object]]]] = defaultdict(list)
     for issue in issues:
         url = urls_by_id.get(issue.url_id)
         if url is None:
@@ -148,17 +144,15 @@ def analyze_template_issue_clusters(
         ):
             covered_issue_ids.update(issue.id for issue, _url, _evidence in items)
 
-    parent_groups: dict[
-        tuple[str, str], list[tuple[Issue, Url, dict[str, object]]]
-    ] = defaultdict(list)
+    parent_groups: dict[tuple[str, str], list[tuple[Issue, Url, dict[str, object]]]] = defaultdict(
+        list
+    )
     for items in grouped.values():
         for item in items:
             issue, url, evidence = item
             if issue.id in covered_issue_ids or issue.issue_type not in HIERARCHICAL_ISSUE_TYPES:
                 continue
-            parent_key = _parent_cluster_key(
-                issue.issue_type, evidence, url.normalized_url
-            )
+            parent_key = _parent_cluster_key(issue.issue_type, evidence, url.normalized_url)
             parent_groups[(issue.issue_type, parent_key)].append(item)
     for (issue_type, cluster_key), items in sorted(parent_groups.items()):
         _append_cluster(
@@ -238,9 +232,7 @@ def _highest_severity(issues: list[Issue]) -> str:
     return max(issues, key=lambda issue: rank.get(issue.severity, 0)).severity
 
 
-def _cluster_key(
-    issue_type: str, evidence: dict[str, object], url: str
-) -> str | None:
+def _cluster_key(issue_type: str, evidence: dict[str, object], url: str) -> str | None:
     path = _path_family(url)
     if issue_type in {"duplicate_title", "duplicate_meta_description"}:
         value = evidence.get("value")
@@ -307,6 +299,7 @@ def _append_cluster(
             "cluster_key": cluster_key,
             "url_count": len(unique_urls),
             "urls": unique_urls,
+            "issue_ids": sorted(str(issue.id) for issue, _url, _evidence in items),
             "sample_evidence": _compact_evidence(items[0][2]),
             **(
                 {"shared_targets": _component_targets(issue_type, items[0][2])}
@@ -354,9 +347,7 @@ def _parent_cluster_key(issue_type: str, evidence: dict[str, object], url: str) 
 
 def _path_family(value: str) -> str:
     parts = [part for part in urlsplit(value).path.strip("/").split("/") if part]
-    normalized = [
-        "{uuid}" if UUID_RE.match(part) else NUMBER_RE.sub("{n}", part) for part in parts
-    ]
+    normalized = ["{uuid}" if UUID_RE.match(part) else NUMBER_RE.sub("{n}", part) for part in parts]
     if not normalized:
         return "/"
     if len(normalized) == 1:
@@ -372,9 +363,7 @@ def _parent_path_family(value: str) -> str:
     return f"/{first}/*"
 
 
-def _active_diagnosis_urls(
-    db: Session, *, website_id: object, issue_type: str
-) -> set[str]:
+def _active_diagnosis_urls(db: Session, *, website_id: object, issue_type: str) -> set[str]:
     diagnosis = db.scalar(
         select(Issue)
         .where(
