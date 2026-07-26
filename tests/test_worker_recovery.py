@@ -1,3 +1,5 @@
+from unittest.mock import Mock
+
 from sqlalchemy import select
 
 from app.db.session import SessionLocal
@@ -6,7 +8,7 @@ from app.models.client import Client
 from app.models.crawl import CrawlRun
 from app.models.discovery import CrawlJob
 from app.models.website import Website, WebsiteSettings
-from app.worker import recover_interrupted_crawls, worker_name
+from app.worker import recover_interrupted_crawls, worker_is_registered, worker_name
 
 
 def test_worker_name_is_unique_per_container() -> None:
@@ -16,6 +18,27 @@ def test_worker_name_is_unique_per_container() -> None:
 
 def test_worker_name_keeps_rq_default_without_configured_role() -> None:
     assert worker_name("", "container-a") is None
+
+
+def test_worker_health_requires_active_registration() -> None:
+    redis = Mock()
+    redis.exists.return_value = True
+    redis.hexists.return_value = False
+
+    assert worker_is_registered(redis, name="full-1-container-a")
+    redis.exists.assert_called_once_with("rq:worker:full-1-container-a")
+    redis.hexists.assert_called_once_with("rq:worker:full-1-container-a", "death")
+
+
+def test_worker_health_rejects_missing_or_ended_registration() -> None:
+    missing = Mock()
+    missing.exists.return_value = False
+    ended = Mock()
+    ended.exists.return_value = True
+    ended.hexists.return_value = True
+
+    assert not worker_is_registered(missing, name="full-1-missing")
+    assert not worker_is_registered(ended, name="full-1-ended")
 
 
 def test_worker_restart_pauses_interrupted_crawl() -> None:

@@ -2,6 +2,7 @@ import os
 import socket
 from datetime import UTC, datetime
 
+from redis import Redis
 from rq import Worker
 from sqlalchemy import select
 
@@ -21,6 +22,20 @@ def worker_name(configured_name: str | None = None, hostname: str | None = None)
         return None
     container = (hostname if hostname is not None else socket.gethostname()).strip()
     return f"{role}-{container}" if container else role
+
+
+def worker_is_registered(
+    connection: Redis | None = None,
+    *,
+    name: str | None = None,
+) -> bool:
+    """Report healthy only after this exact worker has registered as active in RQ."""
+    registration_name = name if name is not None else worker_name()
+    if not registration_name:
+        return False
+    redis = connection if connection is not None else get_redis()
+    key = f"rq:worker:{registration_name}"
+    return bool(redis.exists(key) and not redis.hexists(key, "death"))
 
 
 def active_crawl_job_ids() -> set[str]:
