@@ -407,6 +407,7 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
             db,
             website_id=website.id,
             crawl_run_id=run.id,
+            check_control=lambda: _check_crawl_control(db, job, run),
         )
         _check_crawl_control(db, job, run)
         analyze_internal_redirect_patterns(

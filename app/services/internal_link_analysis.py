@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from datetime import date, timedelta
 
 from sqlalchemy import distinct, func, select
@@ -8,7 +9,7 @@ from app.models.crawl import UrlLink, UrlSnapshot
 from app.models.discovery import Url, UrlSource
 from app.models.integrations import GoogleAnalyticsMetric, SearchConsoleMetric
 from app.models.issues import Issue
-from app.services.element_locations import mark_target_elements
+from app.services.element_locations import mark_target_elements_for_targets
 from app.services.issue_engine import reconcile_issues
 from app.services.link_filtering import is_non_navigational_link_target
 from app.services.technical_checks import IssueSignal
@@ -85,7 +86,11 @@ def detect_orphan_pages(db: Session, *, website_id: object, crawl_run_id: object
 
 
 def analyze_internal_link_quality(
-    db: Session, *, website_id: object, crawl_run_id: object
+    db: Session,
+    *,
+    website_id: object,
+    crawl_run_id: object,
+    check_control: Callable[[], None] | None = None,
 ) -> list[Issue]:
     """Detect actionable internal-link problems after a complete site crawl."""
     urls = list(
@@ -104,18 +109,25 @@ def analyze_internal_link_quality(
     inbound_sources = _inbound_link_sources(db, crawl_run_id=crawl_run_id)
     important_urls = _important_url_ids(db, website_id=website_id)
     touched: list[Issue] = []
+    redirect_target_urls = {
+        url.normalized_url
+        for url in urls
+        if _is_internally_linked_redirect(url, inbound_counts.get(url.id, 0))
+    }
+    mark_target_elements_for_targets(
+        db,
+        crawl_run_id=crawl_run_id,
+        target_urls=redirect_target_urls,
+        issue_type="internally_linked_redirect",
+        element_types={"a", "button"},
+        check_control=check_control,
+    )
 
     for url in urls:
+        _check_control(check_control)
         signals: list[IssueSignal] = []
         inbound_count = inbound_counts.get(url.id, 0)
         if _is_internally_linked_redirect(url, inbound_count):
-            mark_target_elements(
-                db,
-                crawl_run_id=crawl_run_id,
-                target_url=url.normalized_url,
-                issue_type="internally_linked_redirect",
-                element_types={"a", "button"},
-            )
             signals.append(
                 IssueSignal(
                     issue_type="internally_linked_redirect",
@@ -215,6 +227,11 @@ def analyze_internal_link_quality(
     )
     db.commit()
     return touched
+
+
+def _check_control(check_control: Callable[[], None] | None) -> None:
+    if check_control is not None:
+        check_control()
 
 
 def analyze_redirect_source_groups(

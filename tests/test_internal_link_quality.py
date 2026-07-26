@@ -1,4 +1,5 @@
 from datetime import date
+from unittest.mock import patch
 
 from sqlalchemy import select
 
@@ -155,7 +156,17 @@ def test_groups_multiple_redirect_links_on_the_source_page() -> None:
         )
         db.flush()
 
-        analyze_internal_link_quality(db, website_id=website.id, crawl_run_id=run.id)
+        with patch(
+            "app.services.internal_link_analysis.mark_target_elements_for_targets"
+        ) as mark_targets:
+            analyze_internal_link_quality(
+                db, website_id=website.id, crawl_run_id=run.id
+            )
+
+        mark_targets.assert_called_once()
+        assert mark_targets.call_args.kwargs["target_urls"] == {
+            redirect.normalized_url for redirect in redirects
+        }
 
         grouped = db.scalar(
             select(Issue).where(Issue.issue_type == "multiple_redirected_internal_links")

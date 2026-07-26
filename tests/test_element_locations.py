@@ -257,3 +257,35 @@ def test_bulk_target_matching_preserves_url_normalization() -> None:
 
         assert updated == 1
         assert location.issue_types == ["internally_linked_404"]
+
+
+def test_bulk_target_matching_checks_control_between_bounded_batches() -> None:
+    run_id = uuid.uuid4()
+    with SessionLocal() as db:
+        locations = [
+            _location(
+                crawl_run_id=run_id,
+                target_url=f"https://example.com/target-{number}",
+                issue_types=[],
+            )
+            for number in range(3)
+        ]
+        db.add_all(locations)
+        db.commit()
+        checks: list[int] = []
+
+        updated = mark_target_elements_for_targets(
+            db,
+            crawl_run_id=run_id,
+            target_urls={location.target_url for location in locations if location.target_url},
+            issue_type="internally_linked_redirect",
+            check_control=lambda: checks.append(1),
+            batch_size=2,
+        )
+
+        assert updated == 3
+        assert len(checks) == 2
+        assert all(
+            "internally_linked_redirect" in location.issue_types
+            for location in locations
+        )
