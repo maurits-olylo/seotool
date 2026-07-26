@@ -13,7 +13,7 @@ const labels = {
   pause_requested: "Pauze wordt voorbereid", paused: "Gepauzeerd",
   cancel_requested: "Stop wordt voorbereid", connected: "Gekoppeld", error: "Fout",
 };
-const state = { currentUser: null, currentView: "dashboard", clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
+const state = { currentUser: null, currentView: "dashboard", clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, operationsRequestId: 0, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
 const VIEW_HASHES = {dashboard: "overzicht", actions: "analyse/acties", urls: "analyse/urls", changes: "analyse/wijzigingen", insights: "analyse/inzichten", vacancies: "analyse/vacatures", reports: "rapportages", operations: "crawls-exports", clients: "instellingen/klanten-websites", team: "instellingen/team-toegang", integrations: "instellingen/integraties"};
 const LEGACY_HASHES = {rapportage: "reports", urls: "urls", wijzigingen: "changes", inzichten: "insights", vacatures: "vacancies", beheer: "operations", organisatie: "clients", integraties: "integrations", acties: "actions"};
 const ANALYSIS_VIEWS = new Set(["actions", "urls", "changes", "insights", "vacancies"]);
@@ -985,25 +985,35 @@ function renderDashboard() {
 
 async function loadOperations() {
   const websiteId = $("#website-select").value;
-  if (!websiteId || state.operationsLoading) return;
+  if (!websiteId) return;
+  const requestId = ++state.operationsRequestId;
   state.operationsLoading = true;
   try {
-    [state.crawlRuns, state.exports, state.activeCrawlJob] = await Promise.all([
+    const [crawlRuns, exports, activeCrawlJob] = await Promise.all([
       api(`/api/v1/websites/${websiteId}/crawl-runs?limit=20`),
       api(`/api/v1/exports?website_id=${websiteId}&limit=20`),
       api(`/api/v1/websites/${websiteId}/crawl-jobs/active`),
     ]);
-    if (!state.activeCrawlJob && state.crawlRuns[0]?.status === "failed") {
-      state.activeCrawlJob = await api(`/api/v1/crawl-jobs/${state.crawlRuns[0].crawl_job_id}`);
+    if (requestId !== state.operationsRequestId || websiteId !== $("#website-select").value) return;
+    let currentJob = activeCrawlJob;
+    if (!currentJob && crawlRuns[0]?.status === "failed") {
+      currentJob = await api(`/api/v1/crawl-jobs/${crawlRuns[0].crawl_job_id}`);
     }
-    state.systemStatus = await api("/api/v1/system/status").catch(() => null);
+    const systemStatus = await api("/api/v1/system/status").catch(() => null);
+    if (requestId !== state.operationsRequestId || websiteId !== $("#website-select").value) return;
+    state.crawlRuns = crawlRuns;
+    state.exports = exports;
+    state.activeCrawlJob = currentJob;
+    state.systemStatus = systemStatus;
     $("#operations-load-message").textContent = state.systemStatus ? "" : "De systeemstatus kon niet worden opgehaald; crawl- en exportgegevens zijn wel bijgewerkt.";
     $("#operations-load-message").classList.toggle("error", !state.systemStatus);
     renderOperations();
   } catch (error) {
     $("#operations-load-message").textContent = `Status kon niet worden bijgewerkt: ${error.message}`;
     $("#operations-load-message").classList.add("error");
-  } finally { state.operationsLoading = false; }
+  } finally {
+    if (requestId === state.operationsRequestId) state.operationsLoading = false;
+  }
 }
 
 function renderSystemStatus() {
@@ -1678,7 +1688,7 @@ $("#logout").addEventListener("click", async () => { await fetch("/ui/logout", {
 $("#profile-toggle").addEventListener("click", () => { const open = $("#profile-popover").classList.toggle("hidden") === false; $("#profile-toggle").setAttribute("aria-expanded", String(open)); });
 $("#mobile-nav-toggle").addEventListener("click", () => { const open = $("#app").classList.toggle("mobile-nav-open"); $("#mobile-nav-toggle").setAttribute("aria-expanded", String(open)); });
 $("#client-select").addEventListener("change", async () => { localStorage.setItem(CLIENT_STORAGE_KEY, $("#client-select").value); localStorage.removeItem(WEBSITE_STORAGE_KEY); state.crawlRuns = []; state.changeGroups = []; await loadWebsites(); if (state.currentView === "integrations") await loadIntegrations(); if (state.currentView === "dashboard") await loadDashboard(); });
-$("#website-select").addEventListener("change", async () => { localStorage.setItem(WEBSITE_STORAGE_KEY, $("#website-select").value); state.selectedReportSnapshotId = null; state.consultantInsights = null; state.crawlRuns = []; state.changeGroups = []; await loadIssues(); if (state.currentView === "integrations") await loadIntegrations(); if (state.currentView === "insights") await loadConsultantInsights(); if (state.currentView === "urls") renderUrls(); if (state.currentView === "changes") await loadChanges(); if (state.currentView === "vacancies") await loadJobListings(); if (state.currentView === "operations") await loadOperations(); if (state.currentView === "dashboard") await loadDashboard(); });
+$("#website-select").addEventListener("change", async () => { localStorage.setItem(WEBSITE_STORAGE_KEY, $("#website-select").value); state.selectedReportSnapshotId = null; state.consultantInsights = null; state.operationsRequestId += 1; state.operationsLoading = false; state.crawlRuns = []; state.activeCrawlJob = null; state.exports = []; state.changeGroups = []; if (state.currentView === "operations") renderOperations(); await loadIssues(); if (state.currentView === "integrations") await loadIntegrations(); if (state.currentView === "insights") await loadConsultantInsights(); if (state.currentView === "urls") renderUrls(); if (state.currentView === "changes") await loadChanges(); if (state.currentView === "vacancies") await loadJobListings(); if (state.currentView === "operations") await loadOperations(); if (state.currentView === "dashboard") await loadDashboard(); });
 for (const selector of ["#severity-filter", "#scope-filter", "#nature-filter", "#type-filter", "#impact-filter"]) $(selector).addEventListener("change", () => { state.page = 1; render(); });
 $("#status-filter").addEventListener("change", loadIssues);
 $("#search-filter").addEventListener("input", () => { state.page = 1; render(); });
