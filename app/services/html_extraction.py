@@ -310,6 +310,11 @@ def _initial_element_issue_types(
     issues: list[str] = []
     if tag.name == "h1" and h1_count > 1:
         issues.append("multiple_h1")
+    if tag.name == "img" and not _is_ignored_image(tag):
+        if not tag.has_attr("alt"):
+            issues.append("image_alt_missing")
+        elif not _clean_text(str(tag.get("alt") or "")) and _is_unlabelled_functional_image(tag):
+            issues.append("functional_image_alt_empty")
     if tag.name in {"a", "button"}:
         form = tag.find_parent("form") if tag.name == "button" else None
         raw = _clean_text(
@@ -333,6 +338,36 @@ def _initial_element_issue_types(
         elif invalid and is_cta:
             issues.append("broken_application_cta")
     return issues
+
+
+def _is_ignored_image(tag: Tag) -> bool:
+    role = _clean_text(str(tag.get("role") or "")).lower()
+    aria_hidden = _clean_text(str(tag.get("aria-hidden") or "")).lower()
+    if role in {"none", "presentation"} or aria_hidden == "true":
+        return True
+    width = _numeric_dimension(tag.get("width"))
+    height = _numeric_dimension(tag.get("height"))
+    return width is not None and height is not None and width <= 2 and height <= 2
+
+
+def _numeric_dimension(value: object) -> int | None:
+    if value is None:
+        return None
+    match = re.match(r"^\s*(\d+)", str(value))
+    return int(match.group(1)) if match else None
+
+
+def _is_unlabelled_functional_image(tag: Tag) -> bool:
+    control = tag.find_parent(["a", "button"])
+    if control is None:
+        return False
+    if any(
+        _clean_text(str(element.get(attribute) or ""))
+        for element in (tag, control)
+        for attribute in ("aria-label", "aria-labelledby", "title")
+    ):
+        return False
+    return not bool(_clean_text(control.get_text(" ", strip=True)))
 
 
 def _text_group(tag: Tag) -> str:

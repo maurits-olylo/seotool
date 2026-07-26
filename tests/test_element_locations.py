@@ -4,6 +4,7 @@ from sqlalchemy import event, select
 
 from app.db.session import SessionLocal
 from app.models.crawl import ElementLocation
+from app.services.element_issues import inspect_element_locations
 from app.services.element_jumps import build_live_jump_url
 from app.services.element_locations import mark_target_elements_for_targets
 from app.services.html_extraction import extract_page
@@ -171,6 +172,72 @@ def test_broken_image_candidate_uses_caption_or_stable_id() -> None:
     assert image.target_url == "https://example.com/missing.jpg"
     assert image.visible_text == "Ons team"
     assert image.element_id == "team-photo"
+
+
+def test_alt_checks_distinguish_content_function_and_decoration() -> None:
+    page = extract_page(
+        """
+        <html><body><main>
+          <img src="/missing-alt.jpg">
+          <img src="/described.jpg" alt="Team tijdens een vergadering">
+          <img src="/decorative.jpg" alt="">
+          <img src="/presentation.jpg" role="presentation">
+          <img src="/hidden.jpg" aria-hidden="true">
+          <img src="/pixel.gif" width="1" height="1">
+          <a href="/product"><img src="/functional-empty.jpg" alt=""></a>
+          <a href="/contact"><img src="/labelled-empty.jpg" alt="">Contact opnemen</a>
+          <a href="/account" aria-label="Open account">
+            <img src="/aria-labelled-empty.jpg" alt="">
+          </a>
+        </main></body></html>
+        """,
+        "https://example.com/page",
+    )
+    images = {
+        item.target_url: set(item.issue_types)
+        for item in page.elements
+        if item.element_type == "img"
+    }
+
+    assert images["https://example.com/missing-alt.jpg"] == {"image_alt_missing"}
+    assert images["https://example.com/functional-empty.jpg"] == {
+        "functional_image_alt_empty"
+    }
+    for target in {
+        "https://example.com/described.jpg",
+        "https://example.com/decorative.jpg",
+        "https://example.com/presentation.jpg",
+        "https://example.com/hidden.jpg",
+        "https://example.com/pixel.gif",
+        "https://example.com/labelled-empty.jpg",
+        "https://example.com/aria-labelled-empty.jpg",
+    }:
+        assert images[target] == set()
+
+
+def test_alt_element_issues_include_exact_image_evidence() -> None:
+    missing = _location(
+        element_type="img",
+        target_url="https://example.com/missing-alt.jpg",
+        issue_types=["image_alt_missing"],
+    )
+    functional = _location(
+        element_type="img",
+        target_url="https://example.com/icon-link.svg",
+        issue_types=["functional_image_alt_empty"],
+    )
+
+    signals = inspect_element_locations([missing, functional])
+    by_type = {signal.issue_type: signal for signal in signals}
+
+    assert by_type["image_alt_missing"].evidence == {
+        "element_count": 1,
+        "image_urls": ["https://example.com/missing-alt.jpg"],
+    }
+    assert by_type["functional_image_alt_empty"].severity == "high"
+    assert by_type["functional_image_alt_empty"].evidence["image_urls"] == [
+        "https://example.com/icon-link.svg"
+    ]
 
 
 def test_marks_many_targets_with_one_filtered_select() -> None:

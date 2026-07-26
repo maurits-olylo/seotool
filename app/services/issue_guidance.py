@@ -69,6 +69,11 @@ SOURCES = {
         "Nuttige, betrouwbare content maken",
         "https://developers.google.com/search/docs/fundamentals/creating-helpful-content",
     ),
+    "image_alt": GuidanceSource(
+        "Beslisboom voor alt-teksten",
+        "https://www.w3.org/WAI/tutorials/images/decision-tree/",
+        "W3C WAI",
+    ),
     "performance": GuidanceSource(
         "Largest Contentful Paint optimaliseren",
         "https://web.dev/articles/optimize-lcp",
@@ -108,6 +113,8 @@ SOURCE_KEYS_BY_TYPE = {
     "patterned_404_urls": ("links", "http"),
     "pagination_series_review": ("canonical", "title", "snippet", "links"),
     "orphan_page": ("links",), "deep_page": ("links",),
+    "image_alt_missing": ("image_alt",),
+    "functional_image_alt_empty": ("image_alt",),
     "important_page_few_internal_links": ("links",),
     "cms_link_placeholder": ("links",),
     "thin_content": ("helpful_content",), "possibly_outdated_content": ("helpful_content",),
@@ -139,6 +146,14 @@ TYPE_RELEVANCE = {
     "deep_page": (
         "Crawldiepte is alleen relevant wanneer een belangrijke pagina, een uitzonderlijk diepe "
         "route of een pagina met weinig interne ingangen wordt geraakt."
+    ),
+    "image_alt_missing": (
+        "Een tekstalternatief maakt de inhoud of functie van een afbeelding beschikbaar voor "
+        "hulptechnologie en geeft zoekmachines aanvullende beeldcontext."
+    ),
+    "functional_image_alt_empty": (
+        "Een afbeelding die als link of knop werkt, moet een toegankelijke naam hebben zodat de "
+        "bestemming of actie begrijpelijk blijft."
     ),
     "job_posting_schema_missing": (
         "Zonder JobPosting-schema kan Google deze vacature niet betrouwbaar als vacature herkennen."
@@ -200,6 +215,13 @@ VERIFICATION_BY_TYPE = {
     "invalid_json_ld": "Alle JSON-LD-blokken zijn leesbaar en opnieuw gevalideerd.",
     "internally_linked_404": "Geen interne bronpagina linkt nog naar dit 404-doel.",
     "internally_linked_redirect": "Interne links wijzen rechtstreeks naar de definitieve 200-URL.",
+    "image_alt_missing": (
+        "De volgende crawl vindt op iedere betrokken inhoudelijke afbeelding een passend "
+        "alt-attribuut."
+    ),
+    "functional_image_alt_empty": (
+        "Iedere betrokken afbeeldingslink of -knop heeft een herkenbare toegankelijke naam."
+    ),
     "internal_redirect_patterns": (
         "De volgende volledige crawl vindt geen interne links meer naar de betrokken "
         "redirect-URL's."
@@ -230,8 +252,13 @@ VERIFICATION_BY_TYPE = {
 
 
 def build_issue_guidance(issue: Issue, evidence: dict[str, object]) -> dict[str, object]:
+    guidance_type = (
+        issue.issue_type
+        if issue.issue_type == "template_signal_clusters"
+        else issue.issue_type.removesuffix("_clusters")
+    )
     relevance = TYPE_RELEVANCE.get(
-        issue.issue_type,
+        guidance_type,
         CATEGORY_RELEVANCE.get(
             issue.category,
             "Dit signaal wijkt af van de verwachte technische of inhoudelijke toestand.",
@@ -254,12 +281,12 @@ def build_issue_guidance(issue: Issue, evidence: dict[str, object]) -> dict[str,
         verification.strip()
         if isinstance(verification, str) and verification.strip()
         else VERIFICATION_BY_TYPE.get(
-            issue.issue_type,
+            guidance_type,
             "Hetzelfde signaal is na een succesvolle volgende crawl niet meer aanwezig.",
         )
     )
     action = issue.recommended_action.strip()
-    source_keys = SOURCE_KEYS_BY_TYPE.get(issue.issue_type, ())
+    source_keys = SOURCE_KEYS_BY_TYPE.get(guidance_type, ())
     return {
         "relevance": {"text": relevance, "basis": "interpretation"},
         "likely_cause": {"text": cause.text, "basis": cause.basis} if cause else None,

@@ -7,6 +7,8 @@ ISSUE_SCOPE_BY_TYPE: dict[str, IssueScope] = {
     "broken_image": "quality",
     "deep_page": "quality",
     "job_posting_identifier_collision_risk": "quality",
+    "image_alt_missing": "quality",
+    "functional_image_alt_empty": "quality",
     "multiple_h1": "quality",
     "oversized_document": "performance",
     "oversized_image": "performance",
@@ -34,8 +36,14 @@ ISSUE_NATURE_BY_TYPE: dict[str, IssueNature] = {
 
 
 def issue_scope(issue_type: str) -> IssueScope:
-    return ISSUE_SCOPE_BY_TYPE.get(issue_type, "seo")
+    return ISSUE_SCOPE_BY_TYPE.get(_cluster_source_type(issue_type), "seo")
 
 
 def issue_nature(issue_type: str) -> IssueNature:
+    if issue_type.endswith("_clusters"):
+        return "review"
     return ISSUE_NATURE_BY_TYPE.get(issue_type, "problem")
+
+
+def _cluster_source_type(issue_type: str) -> str:
+    return issue_type.removesuffix("_clusters")

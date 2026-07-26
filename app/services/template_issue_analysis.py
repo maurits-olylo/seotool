@@ -24,6 +24,8 @@ CLUSTERABLE_ISSUE_TYPES = {
     "job_posting_missing_fields",
     "job_posting_remote_location_missing",
     "job_posting_schema_missing",
+    "image_alt_missing",
+    "functional_image_alt_empty",
     "missing_h1",
     "missing_meta_description",
     "multiple_broken_internal_links",
@@ -32,6 +34,10 @@ CLUSTERABLE_ISSUE_TYPES = {
     "orphan_page",
     "thin_content",
     "cms_link_placeholder",
+}
+TEMPLATE_CLUSTER_DIAGNOSIS_TYPES = {
+    TEMPLATE_CLUSTER_ISSUE_TYPE,
+    *(f"{issue_type}_clusters" for issue_type in CLUSTERABLE_ISSUE_TYPES),
 }
 ACTIVE_STATUSES = {
     "new",
@@ -51,12 +57,14 @@ MINIMUM_CLUSTER_SIZE = {
     "job_posting_missing_fields": 3,
     "job_posting_remote_location_missing": 3,
     "job_posting_schema_missing": 3,
+    "image_alt_missing": 2,
+    "functional_image_alt_empty": 2,
     "missing_h1": 5,
     "missing_meta_description": 5,
     "multiple_broken_internal_links": 2,
     "multiple_h1": 5,
     "multiple_redirected_internal_links": 2,
-    "orphan_page": 5,
+    "orphan_page": 2,
     "thin_content": 5,
     "cms_link_placeholder": 2,
 }
@@ -130,12 +138,10 @@ def analyze_template_issue_clusters(
         grouped[(issue.issue_type, key)].append((issue, url, evidence))
 
     clusters: list[dict[str, object]] = []
-    affected_pairs: set[tuple[str, str]] = set()
     covered_issue_ids: set[object] = set()
     for (issue_type, cluster_key), items in sorted(grouped.items()):
         if _append_cluster(
             clusters,
-            affected_pairs,
             issue_type=issue_type,
             cluster_key=cluster_key,
             items=items,
@@ -157,38 +163,53 @@ def analyze_template_issue_clusters(
     for (issue_type, cluster_key), items in sorted(parent_groups.items()):
         _append_cluster(
             clusters,
-            affected_pairs,
             issue_type=issue_type,
             cluster_key=cluster_key,
             items=items,
         )
 
     signals: list[IssueSignal] = []
-    if clusters:
+    clusters_by_type: dict[str, list[dict[str, object]]] = defaultdict(list)
+    for cluster in clusters:
+        issue_type = cluster.get("issue_type")
+        if isinstance(issue_type, str):
+            clusters_by_type[issue_type].append(cluster)
+    issues_by_type: dict[str, list[Issue]] = defaultdict(list)
+    for issue in issues:
+        issues_by_type[issue.issue_type].append(issue)
+    for source_issue_type, type_clusters in sorted(clusters_by_type.items()):
+        affected_urls = {
+            url
+            for cluster in type_clusters
+            for url in cluster.get("urls", [])
+            if isinstance(url, str)
+        }
+        sample_issue = issues_by_type[source_issue_type][0]
         signals.append(
             IssueSignal(
-                issue_type=TEMPLATE_CLUSTER_ISSUE_TYPE,
-                category="onpage",
-                severity="medium",
+                issue_type=template_cluster_diagnosis_type(source_issue_type),
+                category=sample_issue.category,
+                severity=_highest_severity(issues_by_type[source_issue_type]),
                 confidence="high",
                 title=(
-                    f"{len(affected_pairs)} URL-signalen vormen "
-                    f"{len(clusters)} herkenbare templateclusters"
+                    f"{len(affected_urls)} URL-signalen voor "
+                    f"'{sample_issue.title}' vormen {len(type_clusters)} clusters"
                 ),
                 description=(
-                    "Dezelfde signalen komen terug binnen herkenbare URL-families of gebruiken "
-                    "dezelfde metadatawaarde. Ze worden daarom als templatecontrole getoond in "
-                    "plaats van als losse taak per URL."
+                    "Dit specifieke signaal komt terug binnen herkenbare URL-families of gebruikt "
+                    "dezelfde bewijswaarde. Het wordt daarom als één gerichte templatecontrole "
+                    "getoond in plaats van als losse taak per URL."
                 ),
                 recommended_action=(
-                    "Beoordeel ieder cluster één keer op template-, component- of contenttype-"
-                    "niveau. Pas alleen aantoonbaar onbedoelde patronen centraal aan en controleer "
-                    "met een volgende volledige crawl welke URL-signalen verdwijnen."
+                    "Beoordeel de clusters voor dit issuetype op template-, component- of "
+                    "contenttypeniveau. Pas alleen aantoonbaar onbedoelde patronen centraal aan. "
+                    f"Onderliggende actie: {sample_issue.recommended_action}"
                 ),
                 evidence={
-                    "affected_signal_count": len(affected_pairs),
-                    "cluster_count": len(clusters),
-                    "clusters": clusters,
+                    "source_issue_type": source_issue_type,
+                    "affected_signal_count": len(affected_urls),
+                    "cluster_count": len(type_clusters),
+                    "clusters": type_clusters,
                     "likely_scope": "template, component of gedeeld contenttype",
                     "verification": (
                         "de volgende volledige crawl vindt het herhaalde signaal niet meer in "
@@ -204,8 +225,17 @@ def analyze_template_issue_clusters(
         crawl_run_id=crawl_run_id,
         snapshot_id=None,
         signals=signals,
-        checked_issue_types={TEMPLATE_CLUSTER_ISSUE_TYPE},
+        checked_issue_types=TEMPLATE_CLUSTER_DIAGNOSIS_TYPES,
     )
+
+
+def template_cluster_diagnosis_type(source_issue_type: str) -> str:
+    return f"{source_issue_type}_clusters"
+
+
+def _highest_severity(issues: list[Issue]) -> str:
+    rank = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+    return max(issues, key=lambda issue: rank.get(issue.severity, 0)).severity
 
 
 def _cluster_key(
@@ -250,6 +280,7 @@ def _compact_evidence(evidence: dict[str, object]) -> dict[str, object]:
         "crawl_depth",
         "incoming_internal_pages",
         "is_important",
+        "image_urls",
         "missing_fields",
         "review_reason",
         "source",
@@ -262,7 +293,6 @@ def _compact_evidence(evidence: dict[str, object]) -> dict[str, object]:
 
 def _append_cluster(
     clusters: list[dict[str, object]],
-    affected_pairs: set[tuple[str, str]],
     *,
     issue_type: str,
     cluster_key: str,
@@ -271,7 +301,6 @@ def _append_cluster(
     unique_urls = sorted({url.normalized_url for _issue, url, _evidence in items})
     if len(unique_urls) < MINIMUM_CLUSTER_SIZE[issue_type]:
         return False
-    affected_pairs.update((issue_type, url) for url in unique_urls)
     clusters.append(
         {
             "issue_type": issue_type,

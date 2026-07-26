@@ -97,3 +97,27 @@ def test_deep_page_guidance_explains_the_contextual_threshold() -> None:
     guidance = build_issue_guidance(_issue("deep_page", "internal_links"), {})
 
     assert "alleen relevant" in guidance["relevance"]["text"]  # type: ignore[index]
+
+
+def test_split_cluster_guidance_inherits_child_context() -> None:
+    guidance = build_issue_guidance(
+        _issue("deep_page_clusters", "internal_links"),
+        {"verification": "geen diepe cluster meer"},
+    )
+
+    assert "Crawldiepte" in guidance["relevance"]["text"]  # type: ignore[index]
+    assert guidance["verification"] == "geen diepe cluster meer"
+    assert guidance["sources"]
+
+
+def test_alt_guidance_uses_accessibility_context_and_source() -> None:
+    guidance = build_issue_guidance(_issue("image_alt_missing", "content"), {})
+
+    assert "hulptechnologie" in guidance["relevance"]["text"]  # type: ignore[index]
+    assert guidance["sources"] == [
+        {
+            "title": "Beslisboom voor alt-teksten",
+            "url": "https://www.w3.org/WAI/tutorials/images/decision-tree/",
+            "publisher": "W3C WAI",
+        }
+    ]

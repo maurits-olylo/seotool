@@ -7,6 +7,9 @@ def test_issue_scope_separates_non_seo_control_signals() -> None:
     assert issue_scope("multiple_h1") == "quality"
     assert issue_scope("deep_page") == "quality"
     assert issue_scope("job_posting_identifier_collision_risk") == "quality"
+    assert issue_scope("image_alt_missing") == "quality"
+    assert issue_scope("functional_image_alt_empty") == "quality"
+    assert issue_scope("image_alt_missing_clusters") == "quality"
     assert issue_scope("oversized_image") == "performance"
     assert issue_scope("oversized_document") == "performance"
     assert issue_scope("possibly_outdated_content") == "editorial"
@@ -15,6 +18,8 @@ def test_issue_scope_separates_non_seo_control_signals() -> None:
 def test_issue_nature_marks_contextual_and_optional_signals() -> None:
     assert issue_nature("deep_page") == "review"
     assert issue_nature("template_signal_clusters") == "review"
+    assert issue_nature("deep_page_clusters") == "review"
+    assert issue_scope("deep_page_clusters") == "quality"
     assert issue_nature("internal_redirect_patterns") == "review"
     assert issue_nature("server_error_incident") == "review"
     assert issue_nature("sitemap_redirect_patterns") == "review"

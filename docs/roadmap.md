@@ -10,7 +10,7 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 - Actueel releasepakket: contextafhankelijke SEO-signalen en patroonacties volgens de
   goedgekeurde issue-audit; lokaal gereed voor volledige releasecontrole.
 - Productie: `https://seo.thact.nl` op Synology NAS `192.168.2.20`.
-- Laatste lokale kwaliteitscontrole: 253 tests, Ruff, JavaScript-syntaxis en productie-Compose
+- Laatste lokale kwaliteitscontrole: 259 tests, Ruff, JavaScript-syntaxis en productie-Compose
   geslaagd.
 - Multi-client domeinisolatie is op 2026-07-19 in productie bevestigd: `jobsatpearle.be` komt niet
   meer als actieve URL van `werkenbijgrandvision.nl` voor.
@@ -273,6 +273,11 @@ Status: eerste scopeclassificatie op 2026-07-19 gedeployed en in productie geval
   blijft als uitzonderlijke structuurcontrole zichtbaar.
 - Herhaalde JobPosting-templatefouten groeperen wanneer minimaal drie vacaturepagina's hetzelfde
   schema- of toepassingssignaal delen.
+- De gecombineerde templatediagnose opsplitsen naar één gerichte clusteractie per issuetype;
+  orphan-families vanaf twee URL's groeperen en de legacy-megadiagnose via de lifecycle oplossen.
+- Ontbrekende alt-attributen als kwaliteitsprobleem tonen met exact afbeeldingselementbewijs.
+  Lege alt-teksten alleen melden bij een onbenoemde functionele afbeelding; correcte decoratieve,
+  verborgen en trackingafbeeldingen blijven stil.
 
 ### Van diagnose naar exact handelingsadvies
 

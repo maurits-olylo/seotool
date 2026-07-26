@@ -26,6 +26,18 @@ def test_groups_repeated_template_signals_and_resolves_when_they_disappear() -> 
         )
         db.add(run)
         db.flush()
+        legacy = Issue(
+            website_id=website.id,
+            url_id=None,
+            issue_type="template_signal_clusters",
+            category="onpage",
+            severity="medium",
+            title="Oude gecombineerde diagnose",
+            description="Wordt vervangen.",
+            recommended_action="Controleer alle clusters.",
+        )
+        db.add(legacy)
+        db.flush()
 
         for number in range(10):
             url = Url(
@@ -61,6 +73,8 @@ def test_groups_repeated_template_signals_and_resolves_when_they_disappear() -> 
         db.flush()
 
         assert len(found) == 1
+        assert found[0].issue_type == "deep_page_clusters"
+        assert legacy.status == "resolved"
         occurrence = db.scalar(
             select(IssueOccurrence).where(IssueOccurrence.issue_id == found[0].id)
         )
@@ -221,6 +235,7 @@ def test_groups_an_exact_duplicate_pair() -> None:
         )
 
         assert occurrence is not None
+        assert diagnosis.issue_type == "duplicate_title_clusters"
         assert occurrence.evidence["affected_signal_count"] == 2
         assert occurrence.evidence["clusters"][0]["cluster_key"] == "value:Gedeelde title"
 
@@ -287,3 +302,56 @@ def test_groups_missing_job_schema_as_one_vacancy_template_action() -> None:
         assert cluster["issue_type"] == "job_posting_schema_missing"
         assert cluster["url_count"] == 5
         assert cluster["sample_evidence"] == {"source": "url_and_page_text"}
+
+
+def test_groups_an_orphan_pair_and_keeps_it_separate_from_other_types() -> None:
+    with SessionLocal() as db:
+        client = Client(name="Orphan pair client")
+        website = Website(client=client, name="Orphan pair", base_url="https://orphan.example")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        job = CrawlJob(website_id=website.id, job_type="full_site_crawl")
+        db.add(job)
+        db.flush()
+        run = CrawlRun(
+            crawl_job_id=job.id,
+            website_id=website.id,
+            crawl_type="full_site_crawl",
+        )
+        db.add(run)
+        db.flush()
+        for number in range(2):
+            url = Url(
+                website_id=website.id,
+                normalized_url=f"https://orphan.example/programme/page-{number}",
+            )
+            db.add(url)
+            db.flush()
+            issue = Issue(
+                website_id=website.id,
+                url_id=url.id,
+                issue_type="orphan_page",
+                category="internal_links",
+                severity="medium",
+                title="Orphan page",
+                description="Niet intern bereikbaar.",
+                recommended_action="Controleer de interne route.",
+            )
+            db.add(issue)
+            db.flush()
+            db.add(
+                IssueOccurrence(
+                    issue_id=issue.id,
+                    crawl_run_id=run.id,
+                    evidence={"crawl_depth": None},
+                )
+            )
+        db.flush()
+
+        found = analyze_template_issue_clusters(
+            db, website_id=website.id, crawl_run_id=run.id
+        )
+
+        assert [issue.issue_type for issue in found] == ["orphan_page_clusters"]
+        assert found[0].category == "internal_links"

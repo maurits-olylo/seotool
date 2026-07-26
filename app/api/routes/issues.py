@@ -41,7 +41,7 @@ from app.services.issue_guidance import build_issue_guidance
 from app.services.pagination_analysis import PAGINATION_CHILD_ISSUE_TYPES
 from app.services.server_error_analysis import SERVER_ERROR_INCIDENT_TYPE
 from app.services.sitemap_redirect_analysis import SITEMAP_REDIRECT_PATTERN_TYPE
-from app.services.template_issue_analysis import TEMPLATE_CLUSTER_ISSUE_TYPE
+from app.services.template_issue_analysis import TEMPLATE_CLUSTER_DIAGNOSIS_TYPES
 from app.services.url_normalization import InvalidUrlError, normalize_url
 
 router = APIRouter(tags=["issues"])
@@ -676,33 +676,38 @@ def _grouped_broken_url_ids(db: Session, website_id: UUID) -> set[UUID]:
 
 
 def _grouped_template_issue_keys(db: Session, website_id: UUID) -> set[tuple[UUID, str]]:
-    diagnosis = db.scalar(
+    diagnoses = list(
+        db.scalars(
         select(Issue)
         .where(
             Issue.website_id == website_id,
-            Issue.issue_type == TEMPLATE_CLUSTER_ISSUE_TYPE,
+            Issue.issue_type.in_(TEMPLATE_CLUSTER_DIAGNOSIS_TYPES),
             Issue.status.in_(ACTIVE_ISSUE_STATUSES),
         )
         .order_by(Issue.last_detected_at.desc())
-        .limit(1)
+        )
     )
-    if diagnosis is None:
+    if not diagnoses:
         return set()
-    occurrence = db.scalar(
+    diagnosis_ids = {diagnosis.id for diagnosis in diagnoses}
+    latest_by_issue: dict[UUID, IssueOccurrence] = {}
+    for occurrence in db.scalars(
         select(IssueOccurrence)
-        .where(IssueOccurrence.issue_id == diagnosis.id)
-        .order_by(IssueOccurrence.detected_at.desc())
-        .limit(1)
-    )
-    if occurrence is None:
-        return set()
+        .where(IssueOccurrence.issue_id.in_(diagnosis_ids))
+        .order_by(IssueOccurrence.issue_id, IssueOccurrence.detected_at.desc())
+    ):
+        latest_by_issue.setdefault(occurrence.issue_id, occurrence)
     types_by_url: dict[str, set[str]] = {}
-    for cluster in occurrence.evidence.get("clusters", []):
-        if not isinstance(cluster, dict) or not isinstance(cluster.get("issue_type"), str):
+    for diagnosis in diagnoses:
+        occurrence = latest_by_issue.get(diagnosis.id)
+        if occurrence is None:
             continue
-        for url in cluster.get("urls", []):
-            if isinstance(url, str):
-                types_by_url.setdefault(url, set()).add(cluster["issue_type"])
+        for cluster in occurrence.evidence.get("clusters", []):
+            if not isinstance(cluster, dict) or not isinstance(cluster.get("issue_type"), str):
+                continue
+            for url in cluster.get("urls", []):
+                if isinstance(url, str):
+                    types_by_url.setdefault(url, set()).add(cluster["issue_type"])
     if not types_by_url:
         return set()
     urls_by_value = {

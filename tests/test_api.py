@@ -1299,8 +1299,12 @@ def test_issue_list_hides_only_matching_children_behind_template_review(
     website_id = UUID(website["id"])
     with SessionLocal() as db:
         url = Url(website_id=website_id, normalized_url="https://example.com/articles/one")
+        legacy_url = Url(
+            website_id=website_id,
+            normalized_url="https://example.com/archive/legacy",
+        )
         job = CrawlJob(website_id=website_id, job_type="full_site_crawl")
-        db.add_all([url, job])
+        db.add_all([url, legacy_url, job])
         db.flush()
         run = CrawlRun(crawl_job_id=job.id, website_id=website_id, crawl_type="full_site_crawl")
         hidden = Issue(
@@ -1323,17 +1327,39 @@ def test_issue_list_hides_only_matching_children_behind_template_review(
             description="Los probleem.",
             recommended_action="Herstel de pagina.",
         )
+        hidden_legacy = Issue(
+            website_id=website_id,
+            url_id=legacy_url.id,
+            issue_type="orphan_page",
+            category="internal_links",
+            severity="medium",
+            title="Orphan page",
+            description="Legacy templatepatroon.",
+            recommended_action="Controleer de structuur.",
+        )
         diagnosis = Issue(
             website_id=website_id,
             url_id=None,
-            issue_type="template_signal_clusters",
+            issue_type="deep_page_clusters",
             category="onpage",
             severity="medium",
             title="Templateclusters",
             description="Gezamenlijke controle.",
             recommended_action="Controleer het template.",
         )
-        db.add_all([run, hidden, visible, diagnosis])
+        legacy_diagnosis = Issue(
+            website_id=website_id,
+            url_id=None,
+            issue_type="template_signal_clusters",
+            category="onpage",
+            severity="medium",
+            title="Legacy templateclusters",
+            description="Tijdelijke backwards compatibility.",
+            recommended_action="Controleer het template.",
+        )
+        db.add_all(
+            [run, hidden, hidden_legacy, visible, diagnosis, legacy_diagnosis]
+        )
         db.flush()
         db.add(
             IssueOccurrence(
@@ -1346,12 +1372,27 @@ def test_issue_list_hides_only_matching_children_behind_template_review(
                 },
             )
         )
+        db.add(
+            IssueOccurrence(
+                issue_id=legacy_diagnosis.id,
+                crawl_run_id=run.id,
+                evidence={
+                    "clusters": [
+                        {
+                            "issue_type": "orphan_page",
+                            "urls": [legacy_url.normalized_url],
+                        }
+                    ]
+                },
+            )
+        )
         db.commit()
 
     payload = client.get(f"/api/v1/websites/{website_id}/issues").json()
 
     assert {item["issue_type"] for item in payload} == {
         "http_404",
+        "deep_page_clusters",
         "template_signal_clusters",
     }
 
