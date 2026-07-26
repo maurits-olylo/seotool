@@ -25,6 +25,13 @@ class CrawlRun(Base):
     discovered_urls: Mapped[int] = mapped_column(Integer, default=0)
     crawled_urls: Mapped[int] = mapped_column(Integer, default=0)
     failed_urls: Mapped[int] = mapped_column(Integer, default=0)
+    phase: Mapped[str | None] = mapped_column(String(40))
+    phase_current: Mapped[int] = mapped_column(Integer, default=0)
+    phase_total: Mapped[int] = mapped_column(Integer, default=0)
+    html_urls: Mapped[int] = mapped_column(Integer, default=0)
+    asset_urls: Mapped[int] = mapped_column(Integer, default=0)
+    skipped_urls: Mapped[int] = mapped_column(Integer, default=0)
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class UrlSnapshot(Base):

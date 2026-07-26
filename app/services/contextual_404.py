@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.models.crawl import UrlLink
 from app.models.discovery import Url, UrlSource
 from app.models.issues import Issue
-from app.services.element_locations import mark_target_elements
+from app.services.element_locations import mark_target_elements_for_targets
 from app.services.issue_engine import reconcile_issues
 from app.services.link_filtering import is_non_navigational_link_target
 from app.services.technical_checks import IssueSignal
@@ -39,6 +39,7 @@ def classify_404_issues(
             )
         )
     )
+    internally_linked_targets: set[str] = set()
     for url in urls:
         _check_control(check_control)
         if is_non_navigational_link_target(url.normalized_url):
@@ -71,13 +72,7 @@ def classify_404_issues(
         )
         signal = _signal(incoming_links=incoming_links, in_sitemap=in_sitemap is not None)
         if incoming_links:
-            mark_target_elements(
-                db,
-                crawl_run_id=crawl_run_id,
-                target_url=url.normalized_url,
-                issue_type="internally_linked_404",
-                element_types={"a", "button"},
-            )
+            internally_linked_targets.add(url.normalized_url)
         reconcile_issues(
             db,
             website_id=website_id,
@@ -87,6 +82,13 @@ def classify_404_issues(
             signals=[signal],
             checked_issue_types=CONTEXTUAL_404_TYPES,
         )
+    mark_target_elements_for_targets(
+        db,
+        crawl_run_id=crawl_run_id,
+        target_urls=internally_linked_targets,
+        issue_type="internally_linked_404",
+        element_types={"a", "button"},
+    )
     _classify_url_patterns(
         db,
         website_id=website_id,

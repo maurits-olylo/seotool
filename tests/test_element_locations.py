@@ -1,7 +1,11 @@
 import uuid
 
+from sqlalchemy import event, select
+
+from app.db.session import SessionLocal
 from app.models.crawl import ElementLocation
 from app.services.element_jumps import build_live_jump_url
+from app.services.element_locations import mark_target_elements_for_targets
 from app.services.html_extraction import extract_page
 
 
@@ -167,3 +171,89 @@ def test_broken_image_candidate_uses_caption_or_stable_id() -> None:
     assert image.target_url == "https://example.com/missing.jpg"
     assert image.visible_text == "Ons team"
     assert image.element_id == "team-photo"
+
+
+def test_marks_many_targets_with_one_filtered_select() -> None:
+    run_id = uuid.uuid4()
+    with SessionLocal() as db:
+        matching_link = _location(
+            crawl_run_id=run_id,
+            target_url="https://example.com/one",
+            issue_types=[],
+        )
+        matching_button = _location(
+            crawl_run_id=run_id,
+            target_url="https://example.com/two",
+            element_type="button",
+            issue_types=[],
+        )
+        unrelated = _location(
+            crawl_run_id=run_id,
+            target_url="https://example.com/other",
+            issue_types=[],
+        )
+        db.add_all([matching_link, matching_button, unrelated])
+        db.commit()
+        selects: list[str] = []
+
+        def capture_select(
+            _conn: object,
+            _cursor: object,
+            statement: str,
+            _parameters: object,
+            _context: object,
+            _executemany: object,
+        ) -> None:
+            if statement.lstrip().upper().startswith("SELECT"):
+                selects.append(statement)
+
+        bind = db.get_bind()
+        event.listen(bind, "before_cursor_execute", capture_select)
+        try:
+            updated = mark_target_elements_for_targets(
+                db,
+                crawl_run_id=run_id,
+                target_urls={
+                    "https://example.com/one",
+                    "https://example.com/two",
+                },
+                issue_type="internally_linked_404",
+                element_types={"a", "button"},
+            )
+        finally:
+            event.remove(bind, "before_cursor_execute", capture_select)
+
+        assert updated == 2
+        assert len(selects) == 1
+        assert "crawl_run_id" in selects[0]
+        locations = list(
+            db.scalars(
+                select(ElementLocation).where(ElementLocation.crawl_run_id == run_id)
+            )
+        )
+        by_target = {location.target_url: location.issue_types for location in locations}
+        assert by_target["https://example.com/one"] == ["internally_linked_404"]
+        assert by_target["https://example.com/two"] == ["internally_linked_404"]
+        assert by_target["https://example.com/other"] == []
+
+
+def test_bulk_target_matching_preserves_url_normalization() -> None:
+    run_id = uuid.uuid4()
+    with SessionLocal() as db:
+        location = _location(
+            crawl_run_id=run_id,
+            target_url="https://EXAMPLE.com:443/missing#fragment",
+            issue_types=[],
+        )
+        db.add(location)
+        db.commit()
+
+        updated = mark_target_elements_for_targets(
+            db,
+            crawl_run_id=run_id,
+            target_urls={"https://example.com/missing"},
+            issue_type="internally_linked_404",
+        )
+
+        assert updated == 1
+        assert location.issue_types == ["internally_linked_404"]

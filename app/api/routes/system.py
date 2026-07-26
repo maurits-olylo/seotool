@@ -60,8 +60,8 @@ def resume_crawls_after_deployment(
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if get_settings().app_env != "test":
-        for job_id, attempt in resumed:
-            enqueue_crawl_job(job_id, attempt=attempt)
+        for job_id, job_type, attempt in resumed:
+            enqueue_crawl_job(job_id, job_type=job_type, attempt=attempt)
     return {"active": False, "resumed_jobs": len(resumed)}
 
 
@@ -85,6 +85,16 @@ def system_status(
             "redis": "unavailable",
             "queues": {
                 "crawls": {"status": "unavailable", "workers": 0, "queued_jobs": 0},
+                "crawls_light": {
+                    "status": "unavailable",
+                    "workers": 0,
+                    "queued_jobs": 0,
+                },
+                "crawls_full": {
+                    "status": "unavailable",
+                    "workers": 0,
+                    "queued_jobs": 0,
+                },
                 "integrations": {
                     "status": "unavailable",
                     "workers": 0,

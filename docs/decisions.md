@@ -631,3 +631,16 @@ De unieke GSC-indexen bevatten volledige URL- en zoektermteksten en zijn daardoo
 Dagelijkse meetdata en rapportageperioden blijven ongewijzigd, maar nieuwe SHA-256-sleutels bewaken
 dezelfde uniciteit per website en datum. De losse, ongebruikte zoektermindex vervalt. Hiermee daalt
 de indexgroei zonder historische data of inhoudelijke berekeningen te wijzigen.
+
+## Begrensde crawlworkerpools
+
+Context: dagelijkse light checks en zware volledige sitecrawls deelden één FIFO-queue. Een lange
+volledige crawl kon daardoor kleine controles ophouden en extra containers per job zouden de
+NAS-capaciteit onbegrensd maken.
+
+Besluit: RQ routeert light checks, sitemapcontroles en pagina-analyses naar `crawls_light` en
+volledige sitecrawls naar `crawls_full`. Compose levert standaard één vaste worker per pool. Een
+derde, bewust niet standaard gestarte overflowworker kan beide queues verwerken. De bestaande
+database-admission blijft maximaal één actieve crawl per website afdwingen.
+
+Gevolg: beide workloadtypen hebben voorspelbare, begrensde capaciteit zonder een container per job.

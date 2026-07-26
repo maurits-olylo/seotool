@@ -106,8 +106,8 @@ def main() -> int:
     except RuntimeError as exc:
         print(str(exc), file=sys.stderr)
         return 1
-    for job_id, attempt in resumed:
-        enqueue_crawl_job(job_id, attempt=attempt)
+    for job_id, job_type, attempt in resumed:
+        enqueue_crawl_job(job_id, job_type=job_type, attempt=attempt)
     print(f"active=false resumed={len(resumed)}")
     return 0
 

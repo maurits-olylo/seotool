@@ -15,6 +15,13 @@ class CrawlRunRead(ORMModel):
     discovered_urls: int
     crawled_urls: int
     failed_urls: int
+    phase: str | None
+    phase_current: int
+    phase_total: int
+    html_urls: int
+    asset_urls: int
+    skipped_urls: int
+    heartbeat_at: datetime | None
 
 
 class UrlSnapshotRead(ORMModel):

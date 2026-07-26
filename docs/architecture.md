@@ -62,8 +62,11 @@ contextafhankelijke controle of een optionele optimalisatie is. Prioriteit blijf
 ## Jobs en exports
 
 De API en scheduler schrijven eerst een persistent `crawl_job` en plaatsen daarna alleen het ID op
-de RQ-queue `crawls`. Twee workers kunnen verschillende websites parallel verwerken. Een gedeeltelijk
-unieke database-index staat maximaal één `running` crawl per website toe. Worker-recovery laat jobs
+de passende RQ-queue. Light checks, sitemapcontroles en pagina-analyses gebruiken `crawls_light`;
+volledige sitecrawls gebruiken `crawls_full`. Eén vaste worker per queue begrenst de standaard
+NAS-capaciteit. De optionele Compose-profile `crawl-overflow` start één extra worker voor beide
+queues en staat standaard uit. Een gedeeltelijk unieke database-index staat maximaal één `running`
+crawl per website toe. Worker-recovery laat jobs
 die aantoonbaar door een andere live RQ-worker worden verwerkt ongemoeid. GSC-, GA4- en Bing-imports
 gebruiken de afzonderlijke queue `integrations`; exports gebruiken `exports`. Hierdoor blokkeren
 langdurige data-imports geen crawls. RQ verzorgt retries met oplopende wachttijd. CSV-exporten leveren

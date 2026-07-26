@@ -18,8 +18,9 @@ services:
     env_file: .env
     environment:
       # Keep legacy default jobs drainable during the first queue-split deployment.
-      WORKER_QUEUES: crawls,default
-      WORKER_NAME: crawl-1
+      # Drain pre-split crawl jobs from `crawls` during the queue transition.
+      WORKER_QUEUES: crawls_light,crawls,default
+      WORKER_NAME: light-1
     command: python -m app.worker
     volumes: ["exports_data:/app/exports"]
     depends_on:
@@ -35,8 +36,8 @@ services:
     build: .
     env_file: .env
     environment:
-      WORKER_QUEUES: crawls
-      WORKER_NAME: crawl-2
+      WORKER_QUEUES: crawls_full
+      WORKER_NAME: full-1
     command: python -m app.worker
     volumes: ["exports_data:/app/exports"]
     depends_on:
@@ -49,11 +50,12 @@ services:
       retries: 3
     restart: unless-stopped
   crawl-worker-3:
+    profiles: ["crawl-overflow"]
     build: .
     env_file: .env
     environment:
-      WORKER_QUEUES: crawls
-      WORKER_NAME: crawl-3
+      WORKER_QUEUES: crawls_light,crawls_full
+      WORKER_NAME: crawl-overflow-1
     command: python -m app.worker
     volumes: ["exports_data:/app/exports"]
     depends_on:

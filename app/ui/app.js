@@ -1033,6 +1033,26 @@ function durationLabel(run) {
   return seconds >= 60 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : `${seconds}s`;
 }
 
+function crawlProgressLabel(run) {
+  const phaseLabels = {
+    url_check: "URL-controle",
+    "404_analysis": "404-analyse",
+    internal_link_analysis: "Interne-linkanalyse",
+    finalizing: "Afronden",
+  };
+  const phase = phaseLabels[run.phase] || "Crawl voorbereiden";
+  const progress = run.phase_total > 0
+    ? ` · ${Number(run.phase_current || 0).toLocaleString("nl-NL")} van ${Number(run.phase_total).toLocaleString("nl-NL")}`
+    : "";
+  const counts = [
+    `${Number(run.html_urls || 0).toLocaleString("nl-NL")} HTML`,
+    `${Number(run.asset_urls || 0).toLocaleString("nl-NL")} assets`,
+    `${Number(run.skipped_urls || 0).toLocaleString("nl-NL")} overgeslagen`,
+    `${Number(run.failed_urls || 0).toLocaleString("nl-NL")} mislukt`,
+  ].join(" · ");
+  return `${phase}${progress} · ${counts}`;
+}
+
 function renderOperations() {
   renderSystemStatus();
   const runLabels = {light_check: "Light check", full_site_crawl: "Volledige crawl", fetch_sitemap: "Sitemap", full_page_analysis: "Pagina-analyse"};
@@ -1057,7 +1077,7 @@ function renderOperations() {
     $("#crawl-live-state").className = `process-status ${crawlStatus}`;
     const queueLabel = crawlStatus === "pending" && activeJob?.queue_position
       ? `Wachtrijpositie ${activeJob.queue_position} van ${activeJob.queue_depth}`
-      : `${Number(controlledRun.crawled_urls || 0).toLocaleString("nl-NL")} gecrawld · ${Number(controlledRun.failed_urls || 0).toLocaleString("nl-NL")} mislukt`;
+      : crawlProgressLabel(controlledRun);
     $("#crawl-live-label").textContent = `${runLabels[controlledRun.crawl_type] || controlledRun.crawl_type} · ${queueLabel}`;
   }
   $("#crawl-progress-track").classList.toggle("hidden", crawlStatus === "paused");

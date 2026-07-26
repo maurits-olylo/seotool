@@ -51,7 +51,7 @@ def test_deployment_drain_only_resumes_jobs_it_paused(client) -> None:  # type: 
         db.commit()
         assert deployment_drain_status(db).safe
         resumed = finish_deployment_drain(db)
-        assert resumed == [(str(running_id), 1)]
+        assert resumed == [(str(running_id), "full_site_crawl", 1)]
         assert db.get(CrawlJob, running_id).status == "pending"
         assert db.get(CrawlJob, manual_id).status == "paused"
         assert db.get(CrawlJob, manual_request_id).status == "paused"

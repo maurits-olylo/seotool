@@ -5,7 +5,7 @@ from rq import Worker
 from sqlalchemy import select
 
 from app.core.logging import configure_logging
-from app.core.queue import CRAWL_QUEUE, get_redis
+from app.core.queue import CRAWL_QUEUES, LIGHT_CRAWL_QUEUE, get_redis
 from app.db.session import SessionLocal
 from app.models.crawl import CrawlRun
 from app.models.discovery import CrawlJob
@@ -57,8 +57,8 @@ def recover_interrupted_crawls(active_job_ids: set[str] | None = None) -> None:
 
 def main() -> None:
     configure_logging()
-    queues = [name.strip() for name in os.getenv("WORKER_QUEUES", CRAWL_QUEUE).split(",")]
-    if CRAWL_QUEUE in queues:
+    queues = [name.strip() for name in os.getenv("WORKER_QUEUES", LIGHT_CRAWL_QUEUE).split(",")]
+    if CRAWL_QUEUES.intersection(queues):
         recover_interrupted_crawls()
     Worker(
         queues,

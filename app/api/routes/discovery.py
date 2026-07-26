@@ -255,7 +255,7 @@ def create_crawl_job(
     db.commit()
     db.refresh(job)
     if get_settings().app_env != "test":
-        enqueue_crawl_job(str(job.id))
+        enqueue_crawl_job(str(job.id), job_type=job.job_type)
     return _crawl_job_read(job)
 
 
@@ -319,7 +319,11 @@ def resume_crawl_job(
     job.error_message = None
     db.commit()
     if get_settings().app_env != "test":
-        enqueue_crawl_job(str(job.id), attempt=job.attempt_count + 1)
+        enqueue_crawl_job(
+            str(job.id),
+            job_type=job.job_type,
+            attempt=job.attempt_count + 1,
+        )
     db.refresh(job)
     return _crawl_job_read(job)
 
@@ -386,7 +390,7 @@ def _crawl_job_read(job: CrawlJob) -> CrawlJobRead:
     data = CrawlJobRead.model_validate(job).model_dump()
     if get_settings().app_env != "test":
         try:
-            queue = crawl_queue_state(str(job.id))
+            queue = crawl_queue_state(str(job.id), job_type=job.job_type)
         except Exception:
             pass
         else:

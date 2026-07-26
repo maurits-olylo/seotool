@@ -167,7 +167,11 @@ def test_job_skips_url_blocked_by_robots_and_creates_issue(monkeypatch) -> None:
         issue = db.scalar(select(Issue))
         run = db.scalar(select(CrawlRun))
         assert issue and issue.issue_type == "robots_txt_blocked"
-        assert run and run.crawled_urls == 1 and run.failed_urls == 1
+        assert run
+        assert run.crawled_urls == 1
+        assert run.html_urls == 1
+        assert run.skipped_urls == 1
+        assert run.failed_urls == 0
 
 
 def test_timeout_creates_issue_and_successful_retry_resolves_it(monkeypatch) -> None:  # type: ignore[no-untyped-def]

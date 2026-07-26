@@ -11,7 +11,10 @@ from app.scheduler import schedule_due_jobs
 
 def test_scheduler_creates_only_one_due_job_per_website(monkeypatch) -> None:
     queued: list[str] = []
-    monkeypatch.setattr("app.scheduler.enqueue_crawl_job", queued.append)
+    monkeypatch.setattr(
+        "app.scheduler.enqueue_crawl_job",
+        lambda job_id, **_kwargs: queued.append(job_id),
+    )
     with SessionLocal() as db:
         website = Website(
             client=Client(name="Scheduled client"),
@@ -34,7 +37,10 @@ def test_scheduler_creates_only_one_due_job_per_website(monkeypatch) -> None:
 
 def test_scheduler_does_not_queue_behind_active_job(monkeypatch) -> None:
     queued: list[str] = []
-    monkeypatch.setattr("app.scheduler.enqueue_crawl_job", queued.append)
+    monkeypatch.setattr(
+        "app.scheduler.enqueue_crawl_job",
+        lambda job_id, **_kwargs: queued.append(job_id),
+    )
     with SessionLocal() as db:
         website = Website(
             client=Client(name="Busy client"),
@@ -59,7 +65,10 @@ def test_scheduler_does_not_queue_behind_active_job(monkeypatch) -> None:
 
 def test_recent_full_crawl_satisfies_daily_light_and_sitemap_schedule(monkeypatch) -> None:
     queued: list[str] = []
-    monkeypatch.setattr("app.scheduler.enqueue_crawl_job", queued.append)
+    monkeypatch.setattr(
+        "app.scheduler.enqueue_crawl_job",
+        lambda job_id, **_kwargs: queued.append(job_id),
+    )
     with SessionLocal() as db:
         website = Website(
             client=Client(name="Fresh client"),

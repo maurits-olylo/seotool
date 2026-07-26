@@ -37,6 +37,7 @@ from app.services.url_registry import register_url
 from app.services.url_scope import is_url_in_website_scope
 
 logger = structlog.get_logger()
+CRAWL_HEARTBEAT_INTERVAL_SECONDS = 15
 
 
 class CrawlPaused(RuntimeError):
@@ -73,6 +74,10 @@ def execute_crawl_job(job_id: str) -> None:
             crawl_job_id=job.id, website_id=job.website_id, crawl_type=job.job_type
         )
         run.status = "running"
+        run.phase = "url_check"
+        run.phase_current = 0
+        run.phase_total = 0
+        run.heartbeat_at = utc_now()
         db.add(run)
         db.commit()
         try:
@@ -102,12 +107,14 @@ def execute_crawl_job(job_id: str) -> None:
             if job.job_type == "full_site_crawl":
                 site_crawl_complete = _crawl_full_site(db, job, run, resumed=resumed)
                 _check_crawl_control(db, job, run)
+                _set_crawl_phase(db, run, "404_analysis")
                 classify_404_issues(
                     db,
                     website_id=job.website_id,
                     crawl_run_id=run.id,
                     check_control=lambda: _check_crawl_control(db, job, run),
                 )
+                _set_crawl_phase(db, run, "finalizing")
                 run.status = (
                     "succeeded"
                     if run.failed_urls == 0 and site_crawl_complete
@@ -125,24 +132,32 @@ def execute_crawl_job(job_id: str) -> None:
                 )
             )
             run.discovered_urls = len(urls)
+            run.phase_total = len(urls)
             completed_url_ids = set(
                 db.scalars(select(UrlSnapshot.url_id).where(UrlSnapshot.crawl_run_id == run.id))
             )
             for url in urls:
                 if url.id in completed_url_ids:
+                    run.phase_current += 1
                     continue
                 _check_crawl_control(db, job, run)
                 if is_probable_html_page(url.normalized_url):
                     _crawl_one(db, job, run, url, robots=robots)
                 else:
                     _audit_asset(db, job, run, url)
+                run.phase_current += 1
+                run.heartbeat_at = utc_now()
                 _respect_request_delay(job)
+            _set_crawl_phase(db, run, "404_analysis")
             classify_404_issues(
                 db,
                 website_id=job.website_id,
                 crawl_run_id=run.id,
                 check_control=lambda: _check_crawl_control(db, job, run),
             )
+            _set_crawl_phase(db, run, "internal_link_analysis")
+            _check_crawl_control(db, job, run, force_heartbeat=True)
+            _set_crawl_phase(db, run, "finalizing")
             run.status = "succeeded" if run.failed_urls == 0 else "partially_succeeded"
             job.status = run.status
         except CrawlPaused:
@@ -306,6 +321,10 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
     }
     maximum = int(job.settings_snapshot.get("max_urls", website.settings.max_urls))
     while pending and len(visited) < maximum:
+        run.phase = "url_check"
+        run.phase_current = len(visited)
+        run.phase_total = min(maximum, len(frontier_ids))
+        run.heartbeat_at = utc_now()
         _check_crawl_control(db, job, run)
         # Process URLs reached from the root before sitemap-only and previously known
         # seeds. This preserves breadth-first crawl depth while still auditing every
@@ -372,6 +391,7 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
     run.discovered_urls = len(frontier_ids)
     complete = not pending
     if complete:
+        _set_crawl_phase(db, run, "internal_link_analysis")
         _check_crawl_control(db, job, run)
         detect_orphan_pages(
             db,
@@ -424,7 +444,9 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
     return complete
 
 
-def _check_crawl_control(db, job: CrawlJob, run: CrawlRun) -> None:  # type: ignore[no-untyped-def]
+def _check_crawl_control(  # type: ignore[no-untyped-def]
+    db, job: CrawlJob, run: CrawlRun, *, force_heartbeat: bool = False
+) -> None:
     db.refresh(job)
     if job.status == "pause_requested":
         job.status = "paused"
@@ -439,6 +461,25 @@ def _check_crawl_control(db, job: CrawlJob, run: CrawlRun) -> None:  # type: ign
         run.finished_at = finished
         db.commit()
         raise CrawlCancelled
+    now = utc_now()
+    heartbeat_due = (
+        force_heartbeat
+        or run.heartbeat_at is None
+        or (now - run.heartbeat_at).total_seconds() >= CRAWL_HEARTBEAT_INTERVAL_SECONDS
+    )
+    if heartbeat_due:
+        run.heartbeat_at = now
+        db.commit()
+
+
+def _set_crawl_phase(
+    db, run: CrawlRun, phase: str, *, current: int = 0, total: int = 0
+) -> None:  # type: ignore[no-untyped-def]
+    run.phase = phase
+    run.phase_current = current
+    run.phase_total = total
+    run.heartbeat_at = utc_now()
+    db.commit()
 
 
 def _deactivate_out_of_scope_urls(db, website: Website) -> None:  # type: ignore[no-untyped-def]
@@ -476,6 +517,7 @@ def _audit_asset(db, job: CrawlJob, run: CrawlRun, url: Url) -> None:  # type: i
         )
         db.add(snapshot)
         db.flush()
+        run.asset_urls += 1
         asset_signals = inspect_asset(result.final_url, response_size, result.status_code)
         if any(signal.issue_type == "broken_image" for signal in asset_signals):
             mark_target_elements(
@@ -504,6 +546,7 @@ def _audit_asset(db, job: CrawlJob, run: CrawlRun, url: Url) -> None:  # type: i
                 is_indexable=False,
             )
         )
+        run.failed_urls += 1
     db.commit()
 
 
@@ -553,7 +596,7 @@ def _crawl_one(  # type: ignore[no-untyped-def]
             ],
             checked_issue_types={"robots_txt_blocked"},
         )
-        run.failed_urls += 1
+        run.skipped_urls += 1
         db.commit()
         return
     try:
@@ -564,6 +607,7 @@ def _crawl_one(  # type: ignore[no-untyped-def]
         )
         store_fetch_result(db, url=url, crawl_run_id=run.id, result=result)
         run.crawled_urls += 1
+        run.html_urls += 1
         db.commit()
     except CrawlError as exc:
         snapshot = UrlSnapshot(

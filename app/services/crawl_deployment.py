@@ -105,7 +105,7 @@ def wait_for_deployment_drain(
         time.sleep(poll_seconds)
 
 
-def finish_deployment_drain(db: Session) -> list[tuple[str, int]]:
+def finish_deployment_drain(db: Session) -> list[tuple[str, str, int]]:
     control = _control(db, lock=True)
     if not control.is_active:
         return []
@@ -118,13 +118,13 @@ def finish_deployment_drain(db: Session) -> list[tuple[str, int]]:
     ]
     if waiting:
         raise RuntimeError(f"Crawls zijn nog niet veilig gepauzeerd: {', '.join(waiting)}")
-    resumed: list[tuple[str, int]] = []
+    resumed: list[tuple[str, str, int]] = []
     for job in jobs:
         if job.status == "paused":
             job.status = "pending"
             job.finished_at = None
             job.error_message = None
-            resumed.append((str(job.id), job.attempt_count + 1))
+            resumed.append((str(job.id), job.job_type, job.attempt_count + 1))
     control.is_active = False
     control.paused_job_ids = []
     control.updated_at = utc_now()

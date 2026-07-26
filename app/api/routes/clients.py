@@ -120,7 +120,7 @@ def onboard_client(
     db.refresh(website)
     db.refresh(crawl_job)
     if get_settings().app_env != "test":
-        enqueue_crawl_job(str(crawl_job.id))
+        enqueue_crawl_job(str(crawl_job.id), job_type=crawl_job.job_type)
     return {"client": client, "website": website, "crawl_job": crawl_job}
 
 

@@ -23,8 +23,8 @@ def test_build_queue_status_reports_workers_and_backlog(monkeypatch) -> None:
     monkeypatch.setattr(
         "app.services.system_status.Worker.all",
         lambda connection: [
-            FakeWorker("crawls"),
-            FakeWorker("crawls"),
+            FakeWorker("crawls_light"),
+            FakeWorker("crawls_full"),
             FakeWorker("integrations"),
             FakeWorker("exports"),
         ],
@@ -32,7 +32,12 @@ def test_build_queue_status_reports_workers_and_backlog(monkeypatch) -> None:
 
     class FakeQueue:
         def __init__(self, name: str, connection: object) -> None:
-            self.count = {"crawls": 2, "integrations": 3, "exports": 1}[name]
+            self.count = {
+                "crawls_light": 2,
+                "crawls_full": 1,
+                "integrations": 3,
+                "exports": 1,
+            }[name]
 
     monkeypatch.setattr("app.services.system_status.Queue", FakeQueue)
     result = build_queue_status(redis)
@@ -41,7 +46,7 @@ def test_build_queue_status_reports_workers_and_backlog(monkeypatch) -> None:
     assert result["queues"]["crawls"] == {
         "status": "ok",
         "workers": 2,
-        "queued_jobs": 2,
+        "queued_jobs": 3,
     }
     assert result["queues"]["integrations"] == {
         "status": "ok",
@@ -80,7 +85,7 @@ def test_build_queue_status_supports_rq_queue_names_method(monkeypatch) -> None:
     monkeypatch.setattr(
         "app.services.system_status.Worker.all",
         lambda connection: [
-            FakeMethodWorker("crawls"),
+            FakeMethodWorker("crawls_light", "crawls_full"),
             FakeMethodWorker("integrations"),
             FakeMethodWorker("exports"),
         ],

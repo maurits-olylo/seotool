@@ -5,7 +5,10 @@ from rq import Queue, Retry, Worker
 
 from app.core.config import get_settings
 
-CRAWL_QUEUE = "crawls"
+LIGHT_CRAWL_QUEUE = "crawls_light"
+FULL_CRAWL_QUEUE = "crawls_full"
+CRAWL_QUEUES = frozenset({LIGHT_CRAWL_QUEUE, FULL_CRAWL_QUEUE})
+LEGACY_CRAWL_QUEUE = "crawls"
 INTEGRATION_QUEUE = "integrations"
 EXPORT_QUEUE = "exports"
 
@@ -25,9 +28,13 @@ def get_queue(name: str) -> Queue:
     return Queue(name, connection=get_redis(), default_timeout=3600)
 
 
-def enqueue_crawl_job(job_id: str, *, attempt: int = 0) -> None:
+def crawl_queue_name(job_type: str) -> str:
+    return FULL_CRAWL_QUEUE if job_type == "full_site_crawl" else LIGHT_CRAWL_QUEUE
+
+
+def enqueue_crawl_job(job_id: str, *, job_type: str, attempt: int = 0) -> None:
     queue_job_id = job_id if attempt == 0 else f"{job_id}-resume-{attempt}"
-    get_queue(CRAWL_QUEUE).enqueue(
+    get_queue(crawl_queue_name(job_type)).enqueue(
         "app.jobs.execute_crawl_job",
         job_id,
         retry=Retry(max=3, interval=[10, 30, 90]),
@@ -36,10 +43,11 @@ def enqueue_crawl_job(job_id: str, *, attempt: int = 0) -> None:
     )
 
 
-def crawl_queue_state(job_id: str) -> CrawlQueueState:
+def crawl_queue_state(job_id: str, *, job_type: str) -> CrawlQueueState:
     """Return the visible FIFO position for an initial or resumed crawl job."""
     connection = get_redis()
-    queue = Queue(CRAWL_QUEUE, connection=connection)
+    queue_name = crawl_queue_name(job_type)
+    queue = Queue(queue_name, connection=connection)
     queued_ids = queue.get_job_ids()
     position = next(
         (
@@ -50,7 +58,7 @@ def crawl_queue_state(job_id: str) -> CrawlQueueState:
         None,
     )
     workers = sum(
-        CRAWL_QUEUE in _worker_queue_names(worker)
+        queue_name in _worker_queue_names(worker)
         for worker in Worker.all(connection=connection)
     )
     return CrawlQueueState(position=position, queued_jobs=len(queued_ids), workers=workers)

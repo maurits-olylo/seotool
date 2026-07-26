@@ -67,7 +67,7 @@ def schedule_due_jobs() -> int:
             )
             db.add(job)
             db.commit()
-            enqueue_crawl_job(str(job.id))
+            enqueue_crawl_job(str(job.id), job_type=job.job_type)
             created += 1
     return created
 

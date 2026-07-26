@@ -20,13 +20,13 @@ def test_crawl_queue_state_reports_resume_position_and_capacity(monkeypatch) -> 
     monkeypatch.setattr(
         "app.core.queue.Worker.all",
         lambda connection: [
-            FakeWorker("crawls"),
-            FakeWorker("crawls"),
+            FakeWorker("crawls_light"),
+            FakeWorker("crawls_light"),
             FakeWorker("integrations"),
         ],
     )
 
-    state = crawl_queue_state("target-job")
+    state = crawl_queue_state("target-job", job_type="light_check")
 
     assert state.position == 2
     assert state.queued_jobs == 3
