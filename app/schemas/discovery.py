@@ -44,7 +44,13 @@ class CrawlRouteRead(BaseModel):
 
 class CrawlJobCreate(BaseModel):
     website_id: UUID
-    job_type: Literal["fetch_sitemap", "light_check", "full_page_analysis", "full_site_crawl"]
+    job_type: Literal[
+        "fetch_sitemap",
+        "light_check",
+        "full_page_analysis",
+        "full_site_crawl",
+        "recalculate_issues",
+    ]
     settings_snapshot: dict[str, object] = Field(default_factory=dict)
 
 

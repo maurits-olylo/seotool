@@ -29,7 +29,11 @@ def get_queue(name: str) -> Queue:
 
 
 def crawl_queue_name(job_type: str) -> str:
-    return FULL_CRAWL_QUEUE if job_type == "full_site_crawl" else LIGHT_CRAWL_QUEUE
+    return (
+        FULL_CRAWL_QUEUE
+        if job_type in {"full_site_crawl", "recalculate_issues"}
+        else LIGHT_CRAWL_QUEUE
+    )
 
 
 def enqueue_crawl_job(job_id: str, *, job_type: str, attempt: int = 0) -> None:

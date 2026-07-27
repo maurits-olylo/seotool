@@ -1090,7 +1090,7 @@ function crawlProgressLabel(run) {
 
 function renderOperations() {
   renderSystemStatus();
-  const runLabels = {light_check: "Light check", full_site_crawl: "Volledige crawl", fetch_sitemap: "Sitemap", full_page_analysis: "Pagina-analyse"};
+  const runLabels = {light_check: "Light check", full_site_crawl: "Volledige crawl", fetch_sitemap: "Sitemap", full_page_analysis: "Pagina-analyse", recalculate_issues: "Acties herberekenen"};
   $("#crawl-run-rows").innerHTML = state.crawlRuns.map((run) => {
     const metrics = crawlRunMetrics(run);
     return `<tr><td>${new Date(run.started_at).toLocaleString("nl-NL")}</td><td>${runLabels[run.crawl_type] || escapeHtml(run.crawl_type)}</td><td><span class="run-status ${run.status}">${labels[run.status] || run.status}</span></td><td>${metrics.discovered} ${metrics.discoveredLabel.toLowerCase()}</td><td>${metrics.processed} ${metrics.processedLabel.toLowerCase()}</td><td>${Number(run.failed_urls || 0).toLocaleString("nl-NL")}</td><td>${durationLabel(run)}</td></tr>`;
@@ -1113,6 +1113,7 @@ function renderOperations() {
   $("#crawl-live-status").classList.toggle("hidden", !controlledRun);
   $("#start-light-check").disabled = Boolean(activeJob);
   $("#start-full-crawl").disabled = Boolean(activeJob);
+  $("#start-issue-recalculation").disabled = Boolean(activeJob);
   if (controlledRun) {
     $("#crawl-live-state").textContent = labels[crawlStatus] || crawlStatus;
     $("#crawl-live-state").className = `process-status ${crawlStatus}`;
@@ -1147,13 +1148,20 @@ function renderOperations() {
 
 async function startCrawl(jobType) {
   if (jobType === "full_site_crawl" && !window.confirm("Volledige crawl starten? Dit controleert de gehele website.")) return;
-  const button = jobType === "light_check" ? $("#start-light-check") : $("#start-full-crawl");
+  if (jobType === "recalculate_issues" && !window.confirm("Acties herberekenen vanuit de laatste volledige crawl? Er worden geen pagina’s opnieuw gedownload.")) return;
+  const buttons = {
+    light_check: $("#start-light-check"),
+    full_site_crawl: $("#start-full-crawl"),
+    recalculate_issues: $("#start-issue-recalculation"),
+  };
+  const button = buttons[jobType];
   const message = $("#crawl-action-message");
   button.disabled = true; message.classList.remove("error"); message.textContent = "Crawl wordt ingepland…";
   try {
     const job = await api("/api/v1/crawl-jobs", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({website_id: $("#website-select").value, job_type: jobType, settings_snapshot: {}})});
     const queueLabel = job.queue_position ? ` · wachtrijpositie ${job.queue_position} van ${job.queue_depth}` : "";
-    message.textContent = `${jobType === "light_check" ? "Light check" : "Volledige crawl"} is ingepland (${job.id.slice(0, 8)})${queueLabel}.`;
+    const jobLabel = jobType === "light_check" ? "Light check" : jobType === "recalculate_issues" ? "Herberekening" : "Volledige crawl";
+    message.textContent = `${jobLabel} is ingepland (${job.id.slice(0, 8)})${queueLabel}.`;
     setTimeout(loadOperations, 2000);
   } catch (error) { message.classList.add("error"); message.textContent = error.message; button.disabled = false; }
 }
@@ -1799,6 +1807,7 @@ $("#open-vacancies").addEventListener("click", () => openVacanciesWithFilter());
 $("#close-change-dialog").addEventListener("click", () => $("#change-dialog").close());
 $("#start-light-check").addEventListener("click", () => startCrawl("light_check"));
 $("#start-full-crawl").addEventListener("click", () => startCrawl("full_site_crawl"));
+$("#start-issue-recalculation").addEventListener("click", () => startCrawl("recalculate_issues"));
 $("#pause-crawl").addEventListener("click", () => controlCrawl("pause"));
 $("#resume-crawl").addEventListener("click", () => controlCrawl("resume"));
 $("#cancel-crawl").addEventListener("click", () => controlCrawl("cancel"));

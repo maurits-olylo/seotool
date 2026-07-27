@@ -49,6 +49,8 @@ def test_accepts_short_functional_pages_and_site_norm() -> None:
         paths = [
             ("contact", 12),
             ("nieuwsbrief", 18),
+            ("nieuwsbrieven/human-nieuwsbrief", 18),
+            ("newsletters/weekly-update", 18),
             ("privacyverklaring", 20),
             ("copyright", 15),
             ("enquete", 10),

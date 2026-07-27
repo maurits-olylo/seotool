@@ -1,11 +1,15 @@
 from unittest.mock import Mock
 
-from app.core.queue import crawl_queue_state
+from app.core.queue import FULL_CRAWL_QUEUE, crawl_queue_name, crawl_queue_state
 
 
 class FakeWorker:
     def __init__(self, *queue_names: str) -> None:
         self.queue_names = list(queue_names)
+
+
+def test_issue_recalculation_uses_bounded_full_crawl_queue() -> None:
+    assert crawl_queue_name("recalculate_issues") == FULL_CRAWL_QUEUE
 
 
 def test_crawl_queue_state_reports_resume_position_and_capacity(monkeypatch) -> None:

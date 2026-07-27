@@ -19,7 +19,12 @@ from app.services.technical_checks import (
 )
 
 
-def analyze_snapshot(db: Session, snapshot: UrlSnapshot) -> None:
+def analyze_snapshot(
+    db: Session,
+    snapshot: UrlSnapshot,
+    *,
+    detect_changes: bool = True,
+) -> None:
     url = db.get(Url, snapshot.url_id)
     if url is None:
         raise ValueError("Snapshot URL does not exist")
@@ -30,8 +35,10 @@ def analyze_snapshot(db: Session, snapshot: UrlSnapshot) -> None:
         .order_by(UrlSnapshot.checked_at.desc())
         .limit(1)
     )
-    detected_changes = [] if discovery_only else compare_snapshots(previous, snapshot)
-    if previous and not discovery_only:
+    detected_changes = (
+        [] if discovery_only or not detect_changes else compare_snapshots(previous, snapshot)
+    )
+    if previous and not discovery_only and detect_changes:
         old_links = _internal_links(db, previous)
         new_links = _internal_links(db, snapshot)
         if old_links != new_links:

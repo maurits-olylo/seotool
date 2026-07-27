@@ -11,6 +11,7 @@ from app.models.common import utc_now
 from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url, UrlSource
 from app.models.website import Website
+from app.services.analysis import analyze_snapshot
 from app.services.asset_checks import ASSET_ISSUE_TYPES, HTML_ONLY_ISSUE_TYPES, inspect_asset
 from app.services.content_similarity import detect_duplicate_content
 from app.services.contextual_404 import classify_404_issues
@@ -94,6 +95,11 @@ def execute_crawl_job(job_id: str) -> None:
             website = db.get(Website, job.website_id)
             if website is None:
                 raise RuntimeError("Website does not exist")
+            if job.job_type == "recalculate_issues":
+                _recalculate_stored_issues(db, job, run)
+                run.status = "succeeded"
+                job.status = "succeeded"
+                return
             _deactivate_out_of_scope_urls(db, website)
             db.commit()
             if job.job_type == "fetch_sitemap":
@@ -433,82 +439,96 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
     run.discovered_urls = len(frontier_ids)
     complete = not pending
     if complete:
-        _set_crawl_phase(db, run, "internal_link_analysis")
-        _check_crawl_control(db, job, run)
-        detect_orphan_pages(
-            db,
-            website_id=website.id,
-            crawl_run_id=run.id,
-        )
-        _check_crawl_control(db, job, run)
-        analyze_internal_link_quality(
-            db,
-            website_id=website.id,
-            crawl_run_id=run.id,
-            check_control=lambda: _check_crawl_control(db, job, run),
-        )
-        _check_crawl_control(db, job, run)
-        analyze_internal_redirect_patterns(
-            db,
-            website_id=website.id,
-            crawl_run_id=run.id,
-        )
-        _check_crawl_control(db, job, run)
-        analyze_indexation_consistency(
-            db,
-            website_id=website.id,
-            crawl_run_id=run.id,
-        )
-        _check_crawl_control(db, job, run)
-        analyze_sitemap_redirect_patterns(
-            db,
-            website_id=website.id,
-            crawl_run_id=run.id,
-        )
-        _check_crawl_control(db, job, run)
-        analyze_server_error_incident(
-            db,
-            website_id=website.id,
-            crawl_run_id=run.id,
-        )
-        _check_crawl_control(db, job, run)
-        analyze_breadcrumb_consistency(
-            db,
-            website_id=website.id,
-            crawl_run_id=run.id,
-        )
-        _check_crawl_control(db, job, run)
-        detect_duplicate_content(
-            db,
-            website_id=website.id,
-            crawl_run_id=run.id,
-        )
-        _check_crawl_control(db, job, run)
-        analyze_job_identifier_risk(
-            db,
-            website_id=website.id,
-            crawl_run_id=run.id,
-        )
-        _check_crawl_control(db, job, run)
-        analyze_pagination_series(
-            db,
-            website_id=website.id,
-            crawl_run_id=run.id,
-        )
-        _check_crawl_control(db, job, run)
-        analyze_contextual_thin_content(
-            db,
-            website_id=website.id,
-            crawl_run_id=run.id,
-        )
-        _check_crawl_control(db, job, run)
-        analyze_template_issue_clusters(
-            db,
-            website_id=website.id,
-            crawl_run_id=run.id,
-        )
+        _analyze_stored_site_results(db, job=job, progress_run=run, source_run=run)
     db.commit()
     return complete
+
+
+def _recalculate_stored_issues(db, job: CrawlJob, run: CrawlRun) -> None:  # type: ignore[no-untyped-def]
+    source_run = db.scalar(
+        select(CrawlRun)
+        .where(
+            CrawlRun.website_id == job.website_id,
+            CrawlRun.crawl_type == "full_site_crawl",
+            CrawlRun.status.in_(["succeeded", "partially_succeeded"]),
+        )
+        .order_by(CrawlRun.started_at.desc())
+        .limit(1)
+    )
+    if source_run is None:
+        raise RuntimeError("Geen afgeronde volledige crawl beschikbaar voor herberekening")
+    run.discovered_urls = source_run.discovered_urls
+    run.crawled_urls = source_run.crawled_urls
+    run.html_urls = source_run.html_urls
+    run.asset_urls = source_run.asset_urls
+    run.skipped_urls = source_run.skipped_urls
+    run.failed_urls = source_run.failed_urls
+    snapshots = list(
+        db.scalars(
+            select(UrlSnapshot)
+            .where(UrlSnapshot.crawl_run_id == source_run.id)
+            .order_by(UrlSnapshot.checked_at)
+        )
+    )
+    run.phase = "issue_recalculation"
+    run.phase_current = 0
+    run.phase_total = len(snapshots)
+    for index, snapshot in enumerate(snapshots, start=1):
+        analyze_snapshot(db, snapshot, detect_changes=False)
+        run.phase_current = index
+        if index % 100 == 0:
+            _check_crawl_control(db, job, run, force_heartbeat=True)
+            db.commit()
+    _analyze_stored_site_results(db, job=job, progress_run=run, source_run=source_run)
+    _set_crawl_phase(db, run, "404_analysis")
+    classify_404_issues(
+        db,
+        website_id=job.website_id,
+        crawl_run_id=source_run.id,
+        check_control=lambda: _check_crawl_control(db, job, run),
+    )
+    _set_crawl_phase(db, run, "finalizing")
+
+
+def _analyze_stored_site_results(
+    db,  # type: ignore[no-untyped-def]
+    *,
+    job: CrawlJob,
+    progress_run: CrawlRun,
+    source_run: CrawlRun,
+) -> None:
+    website_id = job.website_id
+    crawl_run_id = source_run.id
+    _set_crawl_phase(db, progress_run, "internal_link_analysis")
+    _check_crawl_control(db, job, progress_run)
+    detect_orphan_pages(db, website_id=website_id, crawl_run_id=crawl_run_id)
+    _check_crawl_control(db, job, progress_run)
+    analyze_internal_link_quality(
+        db,
+        website_id=website_id,
+        crawl_run_id=crawl_run_id,
+        check_control=lambda: _check_crawl_control(db, job, progress_run),
+    )
+    _check_crawl_control(db, job, progress_run)
+    analyze_internal_redirect_patterns(db, website_id=website_id, crawl_run_id=crawl_run_id)
+    _check_crawl_control(db, job, progress_run)
+    analyze_indexation_consistency(db, website_id=website_id, crawl_run_id=crawl_run_id)
+    _check_crawl_control(db, job, progress_run)
+    analyze_sitemap_redirect_patterns(db, website_id=website_id, crawl_run_id=crawl_run_id)
+    _check_crawl_control(db, job, progress_run)
+    analyze_server_error_incident(db, website_id=website_id, crawl_run_id=crawl_run_id)
+    _check_crawl_control(db, job, progress_run)
+    analyze_breadcrumb_consistency(db, website_id=website_id, crawl_run_id=crawl_run_id)
+    _check_crawl_control(db, job, progress_run)
+    detect_duplicate_content(db, website_id=website_id, crawl_run_id=crawl_run_id)
+    _check_crawl_control(db, job, progress_run)
+    analyze_job_identifier_risk(db, website_id=website_id, crawl_run_id=crawl_run_id)
+    _check_crawl_control(db, job, progress_run)
+    analyze_pagination_series(db, website_id=website_id, crawl_run_id=crawl_run_id)
+    _check_crawl_control(db, job, progress_run)
+    analyze_contextual_thin_content(db, website_id=website_id, crawl_run_id=crawl_run_id)
+    _check_crawl_control(db, job, progress_run)
+    analyze_template_issue_clusters(db, website_id=website_id, crawl_run_id=crawl_run_id)
 
 
 def _check_crawl_control(  # type: ignore[no-untyped-def]

@@ -13,7 +13,7 @@ EDITORIAL_SCHEMA_TYPES = {"Article", "BlogPosting", "NewsArticle", "TechArticle"
 FUNCTIONAL_PATH_RE = re.compile(
     r"/(?:(?:bedankt|bevestiging|confirmation|thank-you|success|succes)(?:-[^/]*)?|"
     r"inloggen|login|uitloggen|logout|winkelwagen|cart|checkout|afrekenen|"
-    r"contact|contacteer|nieuwsbrief|newsletter|subscribe|unsubscribe|"
+    r"contact|contacteer|nieuwsbrief|nieuwsbrieven|newsletter|newsletters|subscribe|unsubscribe|"
     r"privacy|privacyverklaring|copyright|disclaimer|cookiebeleid|cookie-policy|"
     r"algemene-voorwaarden|terms|enquete|survey|offerte-samenstellen|quote-builder)"
     r"(?:/|$)",

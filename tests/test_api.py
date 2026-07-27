@@ -117,6 +117,7 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
     assert page.status_code == 200
     assert 'id="crawl-capacity"' in page.text
     assert 'id="crawl-live-state"' in page.text
+    assert 'id="start-issue-recalculation"' in page.text
     assert 'id="current-export-state"' in page.text
     assert 'id="crawl-run-cards"' in page.text
     assert 'class="table-wrap operation-table-wrap"' in page.text
@@ -134,6 +135,7 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
     assert "function crawlRunMetrics" in script.text
     assert "Sitemapbestanden verwerkt" in script.text
     assert "URL's geïmporteerd" in script.text
+    assert 'startCrawl("recalculate_issues")' in script.text
     assert "crawlworker${crawl.workers === 1" in script.text
     assert "`process-status ${crawlStatus}`" in script.text
 
