@@ -1,0 +1,95 @@
+.crawl-failure-button {
+  padding: 2px 7px;
+  border: 1px solid #e3a49d;
+  border-radius: 999px;
+  background: #fff0ed;
+  color: var(--red);
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.crawl-failure-panel {
+  margin: 0 24px 24px;
+  padding: 18px;
+  border: 1px solid #efc3bd;
+  border-radius: 10px;
+  background: #fffafa;
+}
+
+.crawl-failure-panel .panel-head {
+  padding: 0;
+}
+
+.crawl-failure-panel h3 {
+  margin: 4px 0 0;
+}
+
+.crawl-failure-panel > p {
+  color: var(--muted);
+}
+
+.crawl-failure-list {
+  display: grid;
+  gap: 10px;
+}
+
+.crawl-failure-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.crawl-failure-item a {
+  overflow-wrap: anywhere;
+  color: var(--green);
+  font-weight: 800;
+}
+
+.crawl-failure-item p,
+.crawl-failure-item strong {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.crawl-failure-item p {
+  color: var(--muted);
+}
+
+.crawl-failure-assessment {
+  align-self: start;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.crawl-failure-assessment.action_required {
+  background: #fff0ed;
+  color: var(--red);
+}
+
+.crawl-failure-assessment.retry,
+.crawl-failure-assessment.review {
+  background: #fff6e8;
+  color: #8a4b08;
+}
+
+.crawl-failure-assessment.informational {
+  background: #eef2ef;
+  color: #52615a;
+}
+
+@media (max-width: 650px) {
+  .crawl-failure-panel {
+    margin: 0 14px 14px;
+  }
+
+  .crawl-failure-item {
+    grid-template-columns: 1fr;
+  }
+}

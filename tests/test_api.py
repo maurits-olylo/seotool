@@ -120,6 +120,7 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
     assert 'id="start-issue-recalculation"' in page.text
     assert 'id="current-export-state"' in page.text
     assert 'id="crawl-run-cards"' in page.text
+    assert 'id="crawl-failure-panel"' in page.text
     assert 'class="table-wrap operation-table-wrap"' in page.text
     assert "<th>Gevonden</th><th>Verwerkt</th>" in page.text
     for message_id in (
@@ -133,6 +134,8 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
     assert script.status_code == 200
     assert '"#crawl-run-cards"' in script.text
     assert "function crawlRunMetrics" in script.text
+    assert "function showCrawlFailures" in script.text
+    assert 'data-crawl-failures="' in script.text
     assert "Sitemapbestanden verwerkt" in script.text
     assert "URL's geïmporteerd" in script.text
     assert 'startCrawl("recalculate_issues")' in script.text
@@ -143,7 +146,7 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
 def test_operations_status_ignores_stale_website_responses(client: TestClient) -> None:
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
-    assert 'src="/ui/assets/app.js?v=20260726-1"' in page.text
+    assert 'src="/ui/assets/app.js?v=20260728-1"' in page.text
 
     script = client.get("/ui/assets/app.js")
     assert script.status_code == 200

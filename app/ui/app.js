@@ -1088,16 +1088,51 @@ function crawlProgressLabel(run) {
   return `${phase}${progress} · ${counts}`;
 }
 
+function crawlFailureButton(run) {
+  const count = Number(run.failed_urls || 0);
+  if (!count) return "0";
+  return `<button type="button" class="crawl-failure-button" data-crawl-failures="${escapeHtml(run.id)}" aria-label="Bekijk ${count} mislukte URL's">${count.toLocaleString("nl-NL")}</button>`;
+}
+
+async function showCrawlFailures(runId) {
+  const panel = $("#crawl-failure-panel");
+  panel.classList.remove("hidden");
+  $("#crawl-failure-title").textContent = "Fouten laden…";
+  $("#crawl-failure-summary").textContent = "";
+  $("#crawl-failure-list").innerHTML = "";
+  panel.scrollIntoView({behavior: "smooth", block: "nearest"});
+  try {
+    const failures = await api(`/api/v1/crawl-runs/${runId}/failures`);
+    const actionCount = failures.filter((failure) => failure.assessment === "action_required").length;
+    const retryCount = failures.filter((failure) => failure.assessment === "retry").length;
+    $("#crawl-failure-title").textContent = `${failures.length} mislukte URL${failures.length === 1 ? "" : "'s"}`;
+    $("#crawl-failure-summary").textContent = `${actionCount} actie vereist · ${retryCount} opnieuw proberen · ${failures.length - actionCount - retryCount} beoordelen of informatief`;
+    const assessmentLabels = {
+      action_required: "Actie vereist",
+      retry: "Opnieuw proberen",
+      review: "Beoordelen",
+      informational: "Geen actuele impact",
+    };
+    $("#crawl-failure-list").innerHTML = failures.map((failure) => {
+      const sources = failure.source_types.length ? failure.source_types.join(", ") : "alleen historisch bekend";
+      return `<article class="crawl-failure-item"><a href="${escapeHtml(failure.requested_url)}" target="_blank" rel="noopener">${escapeHtml(failure.requested_url)}</a><span class="crawl-failure-assessment ${escapeHtml(failure.assessment)}">${assessmentLabels[failure.assessment] || "Beoordelen"}</span><strong>${escapeHtml(failure.error_message)}</strong><p>${escapeHtml(failure.explanation)}</p><p><b>Bron:</b> ${escapeHtml(sources)} · ${Number(failure.incoming_internal_links).toLocaleString("nl-NL")} inkomende interne links</p><p><b>Aanpak:</b> ${escapeHtml(failure.recommended_action)}</p></article>`;
+    }).join("") || "<p>Voor deze crawl zijn geen mislukte URL’s opgeslagen.</p>";
+  } catch (error) {
+    $("#crawl-failure-title").textContent = "Fouten konden niet worden geladen";
+    $("#crawl-failure-summary").textContent = error.message;
+  }
+}
+
 function renderOperations() {
   renderSystemStatus();
   const runLabels = {light_check: "Light check", full_site_crawl: "Volledige crawl", fetch_sitemap: "Sitemap", full_page_analysis: "Pagina-analyse", recalculate_issues: "Acties herberekenen"};
   $("#crawl-run-rows").innerHTML = state.crawlRuns.map((run) => {
     const metrics = crawlRunMetrics(run);
-    return `<tr><td>${new Date(run.started_at).toLocaleString("nl-NL")}</td><td>${runLabels[run.crawl_type] || escapeHtml(run.crawl_type)}</td><td><span class="run-status ${run.status}">${labels[run.status] || run.status}</span></td><td>${metrics.discovered} ${metrics.discoveredLabel.toLowerCase()}</td><td>${metrics.processed} ${metrics.processedLabel.toLowerCase()}</td><td>${Number(run.failed_urls || 0).toLocaleString("nl-NL")}</td><td>${durationLabel(run)}</td></tr>`;
+    return `<tr><td>${new Date(run.started_at).toLocaleString("nl-NL")}</td><td>${runLabels[run.crawl_type] || escapeHtml(run.crawl_type)}</td><td><span class="run-status ${run.status}">${labels[run.status] || run.status}</span></td><td>${metrics.discovered} ${metrics.discoveredLabel.toLowerCase()}</td><td>${metrics.processed} ${metrics.processedLabel.toLowerCase()}</td><td>${crawlFailureButton(run)}</td><td>${durationLabel(run)}</td></tr>`;
   }).join("");
   $("#crawl-run-cards").innerHTML = state.crawlRuns.map((run) => {
     const metrics = crawlRunMetrics(run);
-    return `<article class="crawl-run-card"><div><strong>${escapeHtml(runLabels[run.crawl_type] || run.crawl_type)}</strong><span class="run-status ${run.status}">${escapeHtml(labels[run.status] || run.status)}</span></div><time datetime="${escapeHtml(run.started_at)}">${new Date(run.started_at).toLocaleString("nl-NL")}</time><dl><div><dt>${metrics.processedLabel}</dt><dd>${metrics.processed}</dd></div><div><dt>${metrics.discoveredLabel}</dt><dd>${metrics.discovered}</dd></div><div><dt>Mislukt</dt><dd>${Number(run.failed_urls || 0).toLocaleString("nl-NL")}</dd></div><div><dt>Duur</dt><dd>${durationLabel(run)}</dd></div></dl></article>`;
+    return `<article class="crawl-run-card"><div><strong>${escapeHtml(runLabels[run.crawl_type] || run.crawl_type)}</strong><span class="run-status ${run.status}">${escapeHtml(labels[run.status] || run.status)}</span></div><time datetime="${escapeHtml(run.started_at)}">${new Date(run.started_at).toLocaleString("nl-NL")}</time><dl><div><dt>${metrics.processedLabel}</dt><dd>${metrics.processed}</dd></div><div><dt>${metrics.discoveredLabel}</dt><dd>${metrics.discovered}</dd></div><div><dt>Mislukt</dt><dd>${crawlFailureButton(run)}</dd></div><div><dt>Duur</dt><dd>${durationLabel(run)}</dd></div></dl></article>`;
   }).join("");
   $("#crawl-runs-empty").classList.toggle("hidden", state.crawlRuns.length !== 0);
   const activeRun = state.crawlRuns.find((run) => ["running", "paused", "pause_requested"].includes(run.status));
@@ -1813,6 +1848,9 @@ $("#resume-crawl").addEventListener("click", () => controlCrawl("resume"));
 $("#cancel-crawl").addEventListener("click", () => controlCrawl("cancel"));
 $("#generate-excel").addEventListener("click", generateExcel);
 $("#refresh-operations").addEventListener("click", loadOperations);
+$("#crawl-run-rows").addEventListener("click", (event) => { const button = event.target.closest("[data-crawl-failures]"); if (button) showCrawlFailures(button.dataset.crawlFailures); });
+$("#crawl-run-cards").addEventListener("click", (event) => { const button = event.target.closest("[data-crawl-failures]"); if (button) showCrawlFailures(button.dataset.crawlFailures); });
+$("#close-crawl-failures").addEventListener("click", () => $("#crawl-failure-panel").classList.add("hidden"));
 $("#current-export-download").addEventListener("click", () => window.setTimeout(loadOperations, 2000));
 $("#export-urls").addEventListener("click", exportUrls);
 $("#export-changes").addEventListener("click", exportChanges);

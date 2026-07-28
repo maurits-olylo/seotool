@@ -24,6 +24,18 @@ class CrawlRunRead(ORMModel):
     heartbeat_at: datetime | None
 
 
+class CrawlFailureRead(ORMModel):
+    snapshot_id: UUID
+    url_id: UUID
+    requested_url: str
+    error_message: str
+    source_types: list[str]
+    incoming_internal_links: int
+    assessment: str
+    explanation: str
+    recommended_action: str
+
+
 class UrlSnapshotRead(ORMModel):
     id: UUID
     url_id: UUID
