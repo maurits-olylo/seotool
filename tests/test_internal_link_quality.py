@@ -11,6 +11,7 @@ from app.models.integrations import SearchConsoleMetric
 from app.models.issues import Issue, IssueOccurrence
 from app.models.website import Website, WebsiteSettings
 from app.services.internal_link_analysis import (
+    analyze_generic_anchor_text,
     analyze_internal_link_quality,
     analyze_redirect_source_groups,
 )
@@ -232,6 +233,73 @@ def test_does_not_report_a_well_linked_page_at_depth_five() -> None:
 
         assert all(issue.issue_type != "deep_page" for issue in found)
         assert db.scalar(select(Issue).where(Issue.issue_type == "deep_page")) is None
+
+
+def test_groups_generic_internal_anchor_text_for_the_website() -> None:
+    with SessionLocal() as db:
+        client = Client(name="Anchor quality client")
+        website = Website(client=client, name="Anchor site", base_url="https://example.com/")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        sources = [
+            _url(db, website.id, "/article-one", depth=1),
+            _url(db, website.id, "/article-two", depth=1),
+        ]
+        working_target = _url(db, website.id, "/working", depth=2)
+        broken_target = _url(db, website.id, "/missing", depth=2)
+        broken_target.current_status_code = 404
+        run = _run(db, website.id)
+        db.add_all(
+            [
+                UrlLink(
+                    crawl_run_id=run.id,
+                    source_url_id=sources[0].id,
+                    target_url=working_target.normalized_url,
+                    target_url_id=working_target.id,
+                    anchor_text="Lees meer",
+                    is_internal=True,
+                    is_nofollow=False,
+                ),
+                UrlLink(
+                    crawl_run_id=run.id,
+                    source_url_id=sources[1].id,
+                    target_url=broken_target.normalized_url,
+                    target_url_id=broken_target.id,
+                    anchor_text="Klik hier",
+                    is_internal=True,
+                    is_nofollow=False,
+                ),
+                UrlLink(
+                    crawl_run_id=run.id,
+                    source_url_id=sources[1].id,
+                    target_url=working_target.normalized_url,
+                    target_url_id=working_target.id,
+                    anchor_text="Lees het volledige onderzoeksrapport",
+                    is_internal=True,
+                    is_nofollow=False,
+                ),
+            ]
+        )
+        db.flush()
+
+        found = analyze_generic_anchor_text(
+            db,
+            website_id=website.id,
+            crawl_run_id=run.id,
+        )
+
+        assert len(found) == 1
+        assert found[0].issue_type == "generic_internal_anchor_text"
+        assert found[0].url_id is None
+        occurrence = db.scalar(
+            select(IssueOccurrence).where(IssueOccurrence.issue_id == found[0].id)
+        )
+        assert occurrence is not None
+        assert occurrence.evidence["affected_source_pages"] == 2
+        assert occurrence.evidence["generic_link_count"] == 2
+        assert occurrence.evidence["broken_link_count"] == 1
+        assert len(occurrence.evidence["generic_links"]) == 2
 
 
 def test_does_not_report_deep_discovery_only_query_variant() -> None:

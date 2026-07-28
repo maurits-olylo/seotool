@@ -1644,6 +1644,7 @@ async function showIssue(issueId) {
 const evidenceLabels = {
   affected_url_count: "Getroffen URL’s",
   application_cta_active: "Sollicitatieknop actief",
+  affected_source_pages: "Getroffen bronpagina’s",
   canonical: "Canonieke URL",
   content_level: "Inhoudsniveau",
   count: "Aantal",
@@ -1651,6 +1652,8 @@ const evidenceLabels = {
   element_count: "Betrokken elementen",
   failed_url_count: "Mislukte URL’s",
   group_size: "Omvang van de groep",
+  generic_link_count: "Generieke interne links",
+  broken_link_count: "Daarvan dode links",
   in_sitemap: "Opgenomen in sitemap",
   incoming_internal_links: "Inkomende interne links",
   limit: "Ingestelde limiet",
@@ -1667,7 +1670,7 @@ const evidenceLabels = {
   validThrough: "Geldig tot",
   visible_closing_date: "Zichtbare sluitingsdatum",
 };
-const evidenceSummaryPriority = ["status_code", "source_page_count", "page_count", "url_count", "affected_url_count", "target_count", "group_size", "element_count", "incoming_internal_links", "crawl_depth"];
+const evidenceSummaryPriority = ["status_code", "source_page_count", "affected_source_pages", "page_count", "url_count", "affected_url_count", "target_count", "group_size", "generic_link_count", "broken_link_count", "element_count", "incoming_internal_links", "crawl_depth"];
 const evidencePresentationKeys = new Set(["alternative_explanation", "broken_links", "clusters", "likely_cause", "patterns", "verification"]);
 
 function evidenceLabel(key) {

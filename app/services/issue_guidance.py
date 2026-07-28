@@ -116,6 +116,7 @@ SOURCE_KEYS_BY_TYPE = {
     "image_alt_missing": ("image_alt",),
     "functional_image_alt_empty": ("image_alt",),
     "important_page_few_internal_links": ("links",),
+    "generic_internal_anchor_text": ("links",),
     "cms_link_placeholder": ("links",),
     "thin_content": ("helpful_content",), "possibly_outdated_content": ("helpful_content",),
     "broken_image": ("helpful_content",),
@@ -164,6 +165,10 @@ TYPE_RELEVANCE = {
     "multiple_redirected_internal_links": (
         "Meerdere redirectlinks op één bronpagina zijn meestal één onderhoudstaak voor dezelfde "
         "pagina of hetzelfde gedeelde contentblok."
+    ),
+    "generic_internal_anchor_text": (
+        "Beschrijvende linktekst geeft zoekmachines en gebruikers van hulptechnologie context "
+        "over de bestemming voordat zij de link volgen."
     ),
     "internal_redirect_patterns": (
         "Herhaalde interne redirectdoelen met dezelfde URL-omzetting wijzen doorgaans op één "

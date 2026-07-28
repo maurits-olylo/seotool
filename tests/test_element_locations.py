@@ -99,7 +99,7 @@ def test_extracts_multiple_issue_elements_and_duplicate_context() -> None:
           <a href="/zonder-tekst"><svg></svg></a>
         </main></body></html>
         """,
-        "https://example.com/pagina",
+        "https://example.com/vacatures/seo-specialist",
     )
 
     headings = [item for item in page.elements if item.element_type == "h2"]
@@ -138,11 +138,40 @@ def test_interactive_controls_are_not_reported_as_broken_seo_links() -> None:
 
 def test_broken_application_cta_remains_actionable() -> None:
     page = extract_page(
-        '<html><body><button type="button">Solliciteer nu</button></body></html>',
-        "https://example.com/vacature",
+        """
+        <html><body><main>
+          Vacature voor redacteur
+          <button type="button">Solliciteer nu</button>
+        </main></body></html>
+        """,
+        "https://example.com/vacatures/redacteur",
     )
 
     assert "broken_application_cta" in page.elements[0].issue_types
+
+
+def test_event_registration_button_is_not_an_application_cta() -> None:
+    page = extract_page(
+        """
+        <html><body><main>
+          <h1>Netwerkevent voor ondernemers</h1>
+          <p>Meld je aan voor deze bijeenkomst.</p>
+          <button type="button">Aanmelden</button>
+        </main></body></html>
+        """,
+        "https://example.com/events/netwerkbijeenkomst",
+    )
+
+    assert all("broken_application_cta" not in item.issue_types for item in page.elements)
+
+
+def test_stored_application_cta_can_be_ignored_outside_job_context() -> None:
+    signals = inspect_element_locations(
+        [_location(issue_types=["broken_application_cta"], visible_text="Aanmelden")],
+        include_broken_application_cta=False,
+    )
+
+    assert signals == []
 
 
 def test_static_extraction_does_not_claim_dynamically_rendered_element() -> None:

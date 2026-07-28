@@ -284,6 +284,19 @@ def job_posting_identifier(value: object) -> str | None:
     return _identifier(job.get("identifier")) if job else None
 
 
+def is_job_page_context(
+    *,
+    page_url: str | None,
+    main_content: str,
+    schema_types: list[str] | None = None,
+) -> bool:
+    """Require explicit vacancy context before classifying application controls."""
+    return "JobPosting" in (schema_types or []) or _looks_like_job_detail_page(
+        page_url,
+        main_content,
+    )
+
+
 def _looks_like_job_detail_page(page_url: str | None, main_content: str) -> bool:
     if not page_url or not JOB_DETAIL_URL_RE.search(urlsplit(page_url).path):
         return False

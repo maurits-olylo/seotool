@@ -769,6 +769,12 @@ def get_issue(
                 .limit(100)
             )
         )
+    elif issue.issue_type == "generic_internal_anchor_text" and occurrence:
+        source_urls = [
+            value
+            for value in occurrence.evidence.get("source_urls", [])
+            if isinstance(value, str)
+        ][:200]
     return {
         **IssueRead.model_validate(issue).model_dump(),
         "scope": issue_scope(issue.issue_type),

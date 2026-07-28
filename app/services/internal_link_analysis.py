@@ -2,7 +2,7 @@ from collections.abc import Callable
 from datetime import date, timedelta
 
 from sqlalchemy import distinct, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.models.common import utc_now
 from app.models.crawl import UrlLink, UrlSnapshot
@@ -23,6 +23,17 @@ INTERNAL_LINK_ISSUE_TYPES = {
     "internally_linked_redirect",
 }
 SOURCE_REDIRECT_ISSUE_TYPE = "multiple_redirected_internal_links"
+GENERIC_ANCHOR_ISSUE_TYPE = "generic_internal_anchor_text"
+GENERIC_ANCHOR_TEXTS = {
+    "bekijk",
+    "click here",
+    "klik hier",
+    "learn more",
+    "lees meer",
+    "meer",
+    "more",
+    "read more",
+}
 MAX_RECOMMENDED_CRAWL_DEPTH = 3
 VERY_DEEP_CRAWL_DEPTH = 6
 MAX_WEAK_INBOUND_LINKS = 1
@@ -250,6 +261,13 @@ def analyze_internal_link_quality(
             crawl_run_id=crawl_run_id,
         )
     )
+    touched.extend(
+        analyze_generic_anchor_text(
+            db,
+            website_id=website_id,
+            crawl_run_id=crawl_run_id,
+        )
+    )
     db.commit()
     return touched
 
@@ -323,6 +341,97 @@ def analyze_redirect_source_groups(
             )
         )
     return touched
+
+
+def analyze_generic_anchor_text(
+    db: Session, *, website_id: object, crawl_run_id: object
+) -> list[Issue]:
+    """Create one site-level quality action for non-descriptive internal anchors."""
+    target = aliased(Url)
+    rows = list(
+        db.execute(
+            select(
+                Url.normalized_url,
+                UrlLink.target_url,
+                UrlLink.anchor_text,
+                target.current_status_code,
+            )
+            .join(Url, Url.id == UrlLink.source_url_id)
+            .outerjoin(target, target.id == UrlLink.target_url_id)
+            .where(
+                Url.website_id == website_id,
+                UrlLink.crawl_run_id == crawl_run_id,
+                UrlLink.is_internal.is_(True),
+            )
+            .order_by(Url.normalized_url, UrlLink.target_url)
+        )
+    )
+    generic_links: list[dict[str, object]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for source_url, target_url, anchor_text, status_code in rows:
+        normalized_anchor = " ".join((anchor_text or "").casefold().split()).strip(" .:;,-–—→")
+        key = (source_url, target_url, normalized_anchor)
+        if (
+            normalized_anchor not in GENERIC_ANCHOR_TEXTS
+            or is_non_navigational_link_target(target_url)
+            or key in seen
+        ):
+            continue
+        seen.add(key)
+        generic_links.append(
+            {
+                "source_url": source_url,
+                "target_url": target_url,
+                "anchor_text": anchor_text,
+                "status_code": status_code,
+                "target_is_broken": status_code in {404, 410},
+            }
+        )
+    source_urls = sorted({str(link["source_url"]) for link in generic_links})
+    broken_count = sum(bool(link["target_is_broken"]) for link in generic_links)
+    signals: list[IssueSignal] = []
+    if generic_links:
+        signals.append(
+            IssueSignal(
+                issue_type=GENERIC_ANCHOR_ISSUE_TYPE,
+                category="internal_links",
+                severity="low",
+                confidence="high",
+                title=(
+                    f"Niet-beschrijvende interne linkteksten op {len(source_urls)} "
+                    f"pagina{'s' if len(source_urls) != 1 else ''}"
+                ),
+                description=(
+                    "Generieke linkteksten zoals 'lees meer' beschrijven de bestemming niet. "
+                    "Dat geeft zoekmachines en gebruikers van hulptechnologie minder context."
+                ),
+                recommended_action=(
+                    "Vervang iedere generieke linktekst door een korte beschrijving van de "
+                    "bestemmingspagina. Herstel bij gemarkeerde dode links tegelijk de "
+                    "bestemming."
+                ),
+                evidence={
+                    "affected_source_pages": len(source_urls),
+                    "generic_link_count": len(generic_links),
+                    "broken_link_count": broken_count,
+                    "source_urls": source_urls[:200],
+                    "generic_links": generic_links[:500],
+                    "verification": (
+                        "alle interne links hebben een beschrijvende tekst en bereiken een "
+                        "werkende bestemming"
+                    ),
+                },
+            )
+        )
+    return reconcile_issues(
+        db,
+        website_id=website_id,
+        url_id=None,
+        crawl_run_id=crawl_run_id,
+        snapshot_id=None,
+        signals=signals,
+        checked_issue_types={GENERIC_ANCHOR_ISSUE_TYPE},
+    )
 
 
 def _inbound_link_counts(db: Session, *, crawl_run_id: object) -> dict[object, int]:

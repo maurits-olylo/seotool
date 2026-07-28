@@ -95,7 +95,7 @@ def extract_page(html: str, page_url: str) -> ExtractedPage:
 
     schema_data, schema_types = _extract_json_ld(soup)
     links = _extract_links(soup, page_url)
-    elements = _extract_elements(soup, page_url)
+    elements = _extract_elements(soup, page_url, schema_types=schema_types)
     metadata = {
         "title": title,
         "description": description,
@@ -211,7 +211,12 @@ def _extract_links(soup: BeautifulSoup, page_url: str) -> list[ExtractedLink]:
     return links
 
 
-def _extract_elements(soup: BeautifulSoup, page_url: str) -> list[ExtractedElement]:
+def _extract_elements(
+    soup: BeautifulSoup,
+    page_url: str,
+    *,
+    schema_types: list[str],
+) -> list[ExtractedElement]:
     tags = list(soup.find_all(["a", "button", "h1", "h2", "h3", "img"]))
     text_counts: dict[tuple[str, str], int] = {}
     raw_items: list[dict[str, object]] = []
@@ -251,6 +256,15 @@ def _extract_elements(soup: BeautifulSoup, page_url: str) -> list[ExtractedEleme
 
     result: list[ExtractedElement] = []
     h1_count = sum(1 for tag in tags if tag.name == "h1")
+    page_text = _clean_text(soup.get_text(" ", strip=True))
+    job_context = "JobPosting" in schema_types or bool(
+        re.search(r"/(?:vacatures?|werken-bij|jobs?|carriere)/.+", urlsplit(page_url).path, re.I)
+        and re.search(
+            r"\b(vacature|functie|solliciteer|werken bij|job opening|jobomschrijving)\b",
+            page_text,
+            re.I,
+        )
+    )
     for item in raw_items:
         tag = item["tag"]
         assert isinstance(tag, Tag)
@@ -260,6 +274,7 @@ def _extract_elements(soup: BeautifulSoup, page_url: str) -> list[ExtractedEleme
             tag,
             visible_text,
             h1_count=h1_count,
+            job_context=job_context,
         )
         text_key = (_text_group(tag), visible_text.casefold()) if visible_text else None
         result.append(
@@ -314,6 +329,7 @@ def _initial_element_issue_types(
     visible_text: str | None,
     *,
     h1_count: int,
+    job_context: bool,
 ) -> list[str]:
     issues: list[str] = []
     if tag.name == "h1" and h1_count > 1:
@@ -334,16 +350,16 @@ def _initial_element_issue_types(
         )
         placeholder = bool(re.search(r"(?:\{\{|\{%|\[\[|cms://|\$\{)", raw, re.I))
         invalid = not raw or raw == "#" or raw.lower().startswith("javascript:")
-        is_cta = bool(
+        is_application_cta = job_context and bool(
             re.search(
-                r"\b(solliciteer|reageer|aanmelden|apply|inschrijven)\b",
+                r"\b(solliciteer|reageer|apply)\b",
                 visible_text or "",
                 re.I,
             )
         )
         if placeholder:
             issues.append("cms_link_placeholder")
-        elif invalid and is_cta:
+        elif invalid and is_application_cta:
             issues.append("broken_application_cta")
     return issues
 

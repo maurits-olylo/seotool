@@ -9,7 +9,11 @@ ELEMENT_ISSUE_TYPES = {
 }
 
 
-def inspect_element_locations(locations: list[ElementLocation]) -> list[IssueSignal]:
+def inspect_element_locations(
+    locations: list[ElementLocation],
+    *,
+    include_broken_application_cta: bool = True,
+) -> list[IssueSignal]:
     signals: list[IssueSignal] = []
     definitions = {
         "cms_link_placeholder": (
@@ -50,6 +54,8 @@ def inspect_element_locations(locations: list[ElementLocation]) -> list[IssueSig
         ),
     }
     for issue_type, (severity, title, description, action) in definitions.items():
+        if issue_type == "broken_application_cta" and not include_broken_application_cta:
+            continue
         matching = [item for item in locations if issue_type in item.issue_types]
         if not matching:
             continue

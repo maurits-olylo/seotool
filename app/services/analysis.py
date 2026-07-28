@@ -11,7 +11,7 @@ from app.services.discovery_pages import is_discovery_only_snapshot
 from app.services.element_issues import ELEMENT_ISSUE_TYPES, inspect_element_locations
 from app.services.issue_engine import reconcile_issues
 from app.services.job_listings import update_job_listing
-from app.services.job_posting import inspect_job_posting
+from app.services.job_posting import inspect_job_posting, is_job_page_context
 from app.services.technical_checks import (
     SNAPSHOT_ISSUE_TYPES,
     IssueSignal,
@@ -84,7 +84,16 @@ def analyze_snapshot(
         element_locations = list(
             db.scalars(select(ElementLocation).where(ElementLocation.snapshot_id == snapshot.id))
         )
-        signals.extend(inspect_element_locations(element_locations))
+        signals.extend(
+            inspect_element_locations(
+                element_locations,
+                include_broken_application_cta=is_job_page_context(
+                    page_url=snapshot.final_url or url.normalized_url,
+                    main_content=snapshot.main_content or "",
+                    schema_types=snapshot.schema_types or [],
+                ),
+            )
+        )
     inbound_internal_links = 0
     application_url = None
     if not discovery_only:
