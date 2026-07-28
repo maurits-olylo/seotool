@@ -1146,10 +1146,12 @@ function renderOperations() {
   } : null;
   const controlledRun = activeRun || pendingRun || (state.crawlRuns[0]?.status === "failed" ? state.crawlRuns[0] : null);
   const crawlStatus = state.activeCrawlJob?.status || controlledRun?.status;
+  const hasBlockingCrawlJob = ["pending", "running", "pause_requested", "paused", "cancel_requested"]
+    .includes(state.activeCrawlJob?.status);
   $("#crawl-live-status").classList.toggle("hidden", !controlledRun);
-  $("#start-light-check").disabled = Boolean(activeJob);
-  $("#start-full-crawl").disabled = Boolean(activeJob);
-  $("#start-issue-recalculation").disabled = Boolean(activeJob);
+  $("#start-light-check").disabled = hasBlockingCrawlJob;
+  $("#start-full-crawl").disabled = hasBlockingCrawlJob;
+  $("#start-issue-recalculation").disabled = hasBlockingCrawlJob;
   if (controlledRun) {
     $("#crawl-live-state").textContent = labels[crawlStatus] || crawlStatus;
     $("#crawl-live-state").className = `process-status ${crawlStatus}`;
