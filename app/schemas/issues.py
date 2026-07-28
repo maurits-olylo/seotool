@@ -119,7 +119,7 @@ class IssueUpdate(BaseModel):
 
 class IssueBulkAction(BaseModel):
     issue_ids: list[UUID] = Field(min_length=1, max_length=1000)
-    action: Literal["resolve_and_recheck", "suppress_issue_type"]
+    action: Literal["resolve_and_recheck", "suppress_issue_type", "wont_fix"]
     comment: str | None = Field(default=None, max_length=2000)
 
 

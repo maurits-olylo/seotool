@@ -430,6 +430,10 @@ def bulk_update_issues(
             issue.status = "resolved"
             issue.resolved_at = now
             issue.verified_at = None
+        elif payload.action == "wont_fix":
+            issue.status = "accepted_risk"
+            issue.resolved_at = now
+            issue.verified_at = None
         else:
             suppression = db.scalar(
                 select(IssueSuppression).where(

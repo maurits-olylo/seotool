@@ -226,6 +226,7 @@ function applyRolePermissions() {
   for (const selector of ["#actions-nav", "#urls-nav", "#changes-nav", "#insights-nav", "#vacancies-nav", "#operations-nav"]) $(selector).classList.toggle("hidden", isClient);
   $("#detail-status").classList.toggle("hidden", isClient);
   $("#save-status").classList.toggle("hidden", isClient);
+  $("#wont-fix-issue").classList.toggle("hidden", isClient);
   $("#client-status-label").classList.toggle("hidden", !isClient);
   $("#invitation-role").querySelector('option[value="admin"]').disabled = state.currentUser?.role !== "superuser";
   $("#current-user").textContent = state.currentUser?.email || "Technische toegang";
@@ -1477,6 +1478,7 @@ function renderIssueBulkBar() {
   const selected = state.selectedIssueIds.size;
   $("#issue-selection-count").textContent = `${selected} geselecteerd`;
   $("#resolve-selected-issues").disabled = selected === 0;
+  $("#wont-fix-selected-issues").disabled = selected === 0;
   $("#suppress-selected-issues").disabled = selected === 0;
   $("#clear-issue-selection").disabled = selected === 0;
 }
@@ -1504,7 +1506,9 @@ async function runIssueBulkAction(action) {
   }
   const actionLabel = action === "suppress_issue_type"
     ? "blijvend afhandelen voor het geselecteerde issuetype"
-    : "als opgelost markeren en bij de volgende crawl opnieuw controleren";
+    : action === "wont_fix"
+      ? "afsluiten als Won’t fix (risico geaccepteerd)"
+      : "als opgelost markeren en bij de volgende crawl opnieuw controleren";
   if (!window.confirm(`${issueIds.length} issue(s) ${actionLabel}?`)) return;
   const websiteId = $("#website-select").value;
   const comment = $("#issue-bulk-comment").value.trim();
@@ -1521,7 +1525,9 @@ async function runIssueBulkAction(action) {
     await loadIssues();
     message.textContent = action === "suppress_issue_type"
       ? `${result.updated_count} issue(s) blijvend afgehandeld voor dit issuetype.`
-      : `${result.updated_count} issue(s) opgelost en klaargezet voor hercontrole.`;
+      : action === "wont_fix"
+        ? `${result.updated_count} issue(s) afgesloten als Won’t fix.`
+        : `${result.updated_count} issue(s) opgelost en klaargezet voor hercontrole.`;
   } catch (error) {
     message.classList.add("error");
     message.textContent = `Actie mislukt: ${error.message}`;
@@ -1730,6 +1736,13 @@ async function saveIssueStatus() {
   $("#issue-dialog").close(); state.selectedIssueId = null; render();
 }
 
+async function markIssueWontFix() {
+  if (!state.selectedIssueId) return;
+  if (!window.confirm("Dit issue afsluiten als Won’t fix? Het wordt geregistreerd als geaccepteerd risico.")) return;
+  $("#detail-status").value = "accepted_risk";
+  await saveIssueStatus();
+}
+
 $("#logout").addEventListener("click", async () => { await fetch("/ui/logout", { method: "POST" }); window.location.assign("/"); });
 $("#profile-toggle").addEventListener("click", () => { const open = $("#profile-popover").classList.toggle("hidden") === false; $("#profile-toggle").setAttribute("aria-expanded", String(open)); });
 $("#mobile-nav-toggle").addEventListener("click", () => { const open = $("#app").classList.toggle("mobile-nav-open"); $("#mobile-nav-toggle").setAttribute("aria-expanded", String(open)); });
@@ -1763,6 +1776,7 @@ $("#select-page-issues").addEventListener("change", (event) => {
 $("#select-filtered-issues").addEventListener("click", () => { state.filtered.forEach((issue) => state.selectedIssueIds.add(issue.id)); render(); });
 $("#clear-issue-selection").addEventListener("click", () => { state.selectedIssueIds.clear(); render(); });
 $("#resolve-selected-issues").addEventListener("click", () => runIssueBulkAction("resolve_and_recheck"));
+$("#wont-fix-selected-issues").addEventListener("click", () => runIssueBulkAction("wont_fix"));
 $("#suppress-selected-issues").addEventListener("click", () => runIssueBulkAction("suppress_issue_type"));
 $("#toggle-suppressions").addEventListener("click", (event) => {
   const show = $("#suppression-panel").classList.contains("hidden");
@@ -1785,6 +1799,7 @@ $("#report-archive").addEventListener("click", async (event) => {
 $("#close-dialog").addEventListener("click", () => $("#issue-dialog").close());
 for (const dialog of document.querySelectorAll("dialog")) dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
 $("#save-status").addEventListener("click", saveIssueStatus);
+$("#wont-fix-issue").addEventListener("click", markIssueWontFix);
 $("#dashboard-nav").addEventListener("click", () => showView("dashboard"));
 $("#actions-nav").addEventListener("click", () => showView("actions"));
 $("#reports-nav").addEventListener("click", () => showView("reports"));

@@ -37,6 +37,8 @@ def test_issue_bulk_controls_and_client_logic_are_served(client: TestClient) -> 
     assert 'id="scope-filter"' in page.text
     assert 'id="nature-filter"' in page.text
     assert 'id="resolve-selected-issues"' in page.text
+    assert 'id="wont-fix-selected-issues"' in page.text
+    assert 'id="wont-fix-issue"' in page.text
     assert 'id="suppress-selected-issues"' in page.text
     assert 'id="suppression-panel"' in page.text
     assert 'id="issue-detail-loading"' in page.text
@@ -44,6 +46,7 @@ def test_issue_bulk_controls_and_client_logic_are_served(client: TestClient) -> 
     script = client.get("/ui/assets/app.js")
     assert script.status_code == 200
     assert 'runIssueBulkAction("resolve_and_recheck")' in script.text
+    assert 'runIssueBulkAction("wont_fix")' in script.text
     assert 'runIssueBulkAction("suppress_issue_type")' in script.text
     assert "restoreSuppression" in script.text
     assert "restoreSelectedSuppressions" in script.text
@@ -792,9 +795,19 @@ def test_bulk_issue_actions_suppress_restore_and_audit(client: TestClient) -> No
             description="Test",
             recommended_action="Herstel",
         )
-        db.add_all([first, second])
+        website_wide = Issue(
+            website_id=website_id,
+            url_id=None,
+            issue_type="generic_internal_anchor_text",
+            category="internal_links",
+            severity="low",
+            title="Generieke linkteksten",
+            description="Test",
+            recommended_action="Verbeter",
+        )
+        db.add_all([first, second, website_wide])
         db.commit()
-        first_id, second_id = first.id, second.id
+        first_id, second_id, website_wide_id = first.id, second.id, website_wide.id
 
     response = client.post(
         f"/api/v1/websites/{website_id}/issues/bulk",
@@ -815,6 +828,16 @@ def test_bulk_issue_actions_suppress_restore_and_audit(client: TestClient) -> No
         json={"issue_ids": [str(second_id)], "action": "resolve_and_recheck"},
     )
     assert resolved.status_code == 200
+    wont_fix = client.post(
+        f"/api/v1/websites/{website_id}/issues/bulk",
+        json={
+            "issue_ids": [str(website_wide_id)],
+            "action": "wont_fix",
+            "comment": "Bewuste websitebrede keuze",
+        },
+    )
+    assert wont_fix.status_code == 200
+    assert wont_fix.json()["updated_count"] == 1
 
     suppressions = client.get(f"/api/v1/websites/{website_id}/issue-suppressions").json()
     assert len(suppressions) == 1
@@ -830,12 +853,13 @@ def test_bulk_issue_actions_suppress_restore_and_audit(client: TestClient) -> No
     with SessionLocal() as db:
         assert db.get(Issue, first_id).status == "new"
         assert db.get(Issue, second_id).status == "resolved"
+        assert db.get(Issue, website_wide_id).status == "accepted_risk"
         suppression = db.get(IssueSuppression, UUID(suppression_id))
         assert suppression and suppression.restored_at is not None
         activities = list(
             db.scalars(select(ActivityLog).where(ActivityLog.website_id == website_id))
         )
-        assert [item.activity_type for item in activities].count("issue_bulk_action") == 2
+        assert [item.activity_type for item in activities].count("issue_bulk_action") == 3
         assert any(item.activity_type == "issue_suppression_restored" for item in activities)
 
 

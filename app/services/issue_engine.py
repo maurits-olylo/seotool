@@ -7,7 +7,7 @@ from app.models.common import utc_now
 from app.models.issues import Issue, IssueOccurrence, IssueSuppression
 from app.services.technical_checks import IssueSignal
 
-REOPENABLE_STATUSES = {"resolved", "verified", "ignored", "accepted_risk"}
+REOPENABLE_STATUSES = {"resolved", "verified", "ignored"}
 
 
 def reconcile_issues(

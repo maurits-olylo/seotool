@@ -122,6 +122,53 @@ def test_second_clean_check_verifies_resolved_issue() -> None:
         assert issue.verified_at is not None
 
 
+def test_accepted_risk_remains_closed_when_signal_returns() -> None:
+    with SessionLocal() as db:
+        client = Client(name="Accepted risk client")
+        website = Website(client=client, name="Risk site", base_url="https://example.com")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        url = Url(website_id=website.id, normalized_url="https://example.com/page")
+        db.add(url)
+        db.flush()
+        issue = Issue(
+            website_id=website.id,
+            url_id=url.id,
+            issue_type="missing_title",
+            category="onpage",
+            severity="medium",
+            status="accepted_risk",
+            title="Title ontbreekt",
+            description="Test",
+            recommended_action="Herstel",
+        )
+        db.add(issue)
+        db.flush()
+        run, snapshot = _run(db, website.id, url.id)
+        signal = IssueSignal(
+            "missing_title",
+            "onpage",
+            "medium",
+            "Title ontbreekt",
+            "Test",
+            "Herstel",
+            {},
+        )
+
+        reconcile_issues(
+            db,
+            website_id=website.id,
+            url_id=url.id,
+            crawl_run_id=run.id,
+            snapshot_id=snapshot.id,
+            signals=[signal],
+            checked_issue_types={"missing_title"},
+        )
+
+        assert issue.status == "accepted_risk"
+
+
 def test_active_suppression_prevents_exact_issue_from_reopening() -> None:
     with SessionLocal() as db:
         client = Client(name="Suppression client")
