@@ -10,7 +10,7 @@ from app.schemas.common import ORMModel
 class ExportCreate(BaseModel):
     website_id: UUID
     export_type: Literal["urls", "technical", "changes", "issues", "links", "vacancies", "excel"]
-    item_ids: list[UUID] | None = Field(default=None, max_length=10_000)
+    item_ids: list[UUID] | None = Field(default=None, max_length=100_000)
     filters: dict[str, str] = Field(default_factory=dict, max_length=10)
 
 

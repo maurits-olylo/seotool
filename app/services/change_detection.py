@@ -1,4 +1,6 @@
 import json
+import re
+from collections import Counter
 from dataclasses import dataclass
 
 from app.models.crawl import UrlSnapshot
@@ -33,6 +35,11 @@ def compare_snapshots(previous: UrlSnapshot | None, current: UrlSnapshot) -> lis
     for field, change_type in FIELDS.items():
         old = getattr(previous, field)
         new = getattr(current, field)
+        if field == "main_content_hash" and _same_content_in_different_order(
+            previous.main_content,
+            current.main_content,
+        ):
+            continue
         if not _values_equal(field, old, new):
             changes.append(DetectedChange(change_type, field, _serialize(old), _serialize(new)))
     old_h1 = _normalized_text_list((previous.headings or {}).get("h1", []))
@@ -59,6 +66,16 @@ def _values_equal(field: str, old: object, new: object) -> bool:
     if field in NORMALIZED_TEXT_FIELDS and isinstance(old, str) and isinstance(new, str):
         return " ".join(old.split()) == " ".join(new.split())
     return old == new
+
+
+def _same_content_in_different_order(old: str | None, new: str | None) -> bool:
+    if not old or not new or old == new:
+        return False
+    return Counter(_content_tokens(old)) == Counter(_content_tokens(new))
+
+
+def _content_tokens(value: str) -> list[str]:
+    return re.findall(r"\w+|[^\w\s]", value.casefold(), flags=re.UNICODE)
 
 
 def _canonical_schema(value: list[object]) -> list[object]:

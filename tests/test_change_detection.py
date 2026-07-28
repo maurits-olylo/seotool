@@ -38,6 +38,21 @@ def test_detects_selected_snapshot_changes() -> None:
     }
 
 
+def test_ignores_main_content_when_only_the_block_order_changes() -> None:
+    previous = snapshot(
+        main_content="Product alpha € 10 Product beta € 20",
+        main_content_hash="old",
+    )
+    current = snapshot(
+        main_content="Product beta € 20 Product alpha € 10",
+        main_content_hash="new",
+    )
+
+    changes = compare_snapshots(previous, current)
+
+    assert "main_content_changed" not in {change.change_type for change in changes}
+
+
 def test_first_snapshot_is_new_url() -> None:
     assert compare_snapshots(None, snapshot())[0].change_type == "new_url"
 

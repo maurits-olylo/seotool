@@ -3,10 +3,12 @@ import json
 import sys
 from dataclasses import asdict
 from datetime import date
+from uuid import UUID
 
 from app.core.logging import configure_logging
 from app.core.queue import enqueue_crawl_job
 from app.db.session import SessionLocal
+from app.services.change_history import change_history_counts, reset_change_history
 from app.services.crawl_deployment import (
     deployment_drain_status,
     finish_deployment_drain,
@@ -39,6 +41,20 @@ def _parser() -> argparse.ArgumentParser:
     )
     cleanup.add_argument("--batch-size", type=int, default=10_000)
     cleanup.add_argument(
+        "--confirm-delete",
+        action="store_true",
+        help="Verplichte expliciete bevestiging voor verwijdering",
+    )
+    commands.add_parser(
+        "change-history-audit",
+        help="Toon read-only aantallen in de wijzigingshistorie",
+    )
+    reset_changes = commands.add_parser(
+        "reset-change-history",
+        help="Verwijder wijzigingsrecords zonder snapshots, issues of crawls te verwijderen",
+    )
+    reset_changes.add_argument("--website-id", type=UUID)
+    reset_changes.add_argument(
         "--confirm-delete",
         action="store_true",
         help="Verplichte expliciete bevestiging voor verwijdering",
@@ -76,6 +92,26 @@ def main() -> int:
         with SessionLocal() as db:
             result = build_retention_audit(db, as_of=args.as_of)
         print(json.dumps(result, indent=2, ensure_ascii=False))
+        return 0
+    if args.command == "change-history-audit":
+        with SessionLocal() as db:
+            result = change_history_counts(db)
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        return 0
+    if args.command == "reset-change-history":
+        if not args.confirm_delete:
+            print(
+                "Gebruik --confirm-delete om de verwijdering expliciet te bevestigen.",
+                file=sys.stderr,
+            )
+            return 2
+        try:
+            with SessionLocal() as db:
+                result = reset_change_history(db, website_id=args.website_id)
+        except RuntimeError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(json.dumps(asdict(result), indent=2, ensure_ascii=False))
         return 0
     if args.command == "cleanup-element-locations":
         if not args.confirm_delete:
