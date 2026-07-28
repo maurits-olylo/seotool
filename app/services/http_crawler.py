@@ -22,6 +22,7 @@ class FetchResult:
     headers: dict[str, str]
     content: bytes
     response_time_ms: int
+    response_size: int | None = None
 
 
 @dataclass(frozen=True)
@@ -76,15 +77,31 @@ def fetch_url(
                             raise CrawlError("Redirect loop detected", error_type="redirect_loop")
                         current_url = next_url
                         continue
-                    content = _read_limited(response, max_response_size)
+                    headers = {key.lower(): value for key, value in response.headers.items()}
+                    content_type = headers.get("content-type", "").split(";", 1)[0].lower()
+                    if content_type and content_type not in {
+                        "text/html",
+                        "application/xhtml+xml",
+                    }:
+                        content = b""
+                        declared_size = headers.get("content-length")
+                        response_size = (
+                            int(declared_size)
+                            if declared_size and declared_size.isdigit()
+                            else None
+                        )
+                    else:
+                        content = _read_limited(response, max_response_size)
+                        response_size = len(content)
                     return FetchResult(
                         requested_url=url,
                         final_url=str(response.url),
                         status_code=response.status_code,
                         redirect_chain=chain,
-                        headers={key.lower(): value for key, value in response.headers.items()},
+                        headers=headers,
                         content=content,
                         response_time_ms=round((time.monotonic() - started) * 1000),
+                        response_size=response_size,
                     )
             except httpx.TimeoutException as exc:
                 raise CrawlError(str(exc), error_type="timeout") from exc

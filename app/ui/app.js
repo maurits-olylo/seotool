@@ -1657,6 +1657,14 @@ const evidenceLabels = {
   crawl_depth: "Crawldiepte",
   element_count: "Betrokken elementen",
   failed_url_count: "Mislukte URL’s",
+  document_count: "Documenten",
+  oversized_document_count: "Grote documenten",
+  affected_image_count: "Afbeeldingen met aandachtspunt",
+  oversized_image_count: "Grote afbeeldingen",
+  media_file_count: "Mediabestanden",
+  large_media_count: "Grote mediabestanden",
+  embed_count: "Embeds met aandachtspunt",
+  media_markup_count: "Media-opmaakcontroles",
   group_size: "Omvang van de groep",
   generic_link_count: "Generieke interne links",
   broken_link_count: "Daarvan dode links",
@@ -1676,7 +1684,7 @@ const evidenceLabels = {
   validThrough: "Geldig tot",
   visible_closing_date: "Zichtbare sluitingsdatum",
 };
-const evidenceSummaryPriority = ["status_code", "source_page_count", "affected_source_pages", "page_count", "url_count", "affected_url_count", "target_count", "group_size", "generic_link_count", "broken_link_count", "element_count", "incoming_internal_links", "crawl_depth"];
+const evidenceSummaryPriority = ["status_code", "source_page_count", "affected_source_pages", "document_count", "oversized_document_count", "affected_image_count", "oversized_image_count", "media_file_count", "large_media_count", "embed_count", "page_count", "url_count", "affected_url_count", "target_count", "group_size", "generic_link_count", "broken_link_count", "element_count", "incoming_internal_links", "crawl_depth"];
 const evidencePresentationKeys = new Set(["alternative_explanation", "broken_links", "clusters", "likely_cause", "patterns", "verification"]);
 
 function evidenceLabel(key) {

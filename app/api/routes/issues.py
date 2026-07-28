@@ -773,7 +773,12 @@ def get_issue(
                 .limit(100)
             )
         )
-    elif issue.issue_type == "generic_internal_anchor_text" and occurrence:
+    elif issue.issue_type in {
+        "downloadable_document_inventory",
+        "generic_internal_anchor_text",
+        "image_delivery_quality",
+        "media_delivery_quality",
+    } and occurrence:
         source_urls = [
             value
             for value in occurrence.evidence.get("source_urls", [])

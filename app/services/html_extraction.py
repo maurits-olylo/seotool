@@ -217,7 +217,11 @@ def _extract_elements(
     *,
     schema_types: list[str],
 ) -> list[ExtractedElement]:
-    tags = list(soup.find_all(["a", "button", "h1", "h2", "h3", "img"]))
+    tags = list(
+        soup.find_all(
+            ["a", "button", "h1", "h2", "h3", "img", "video", "audio", "source", "iframe"]
+        )
+    )
     text_counts: dict[tuple[str, str], int] = {}
     raw_items: list[dict[str, object]] = []
     occurrences: dict[tuple[str, str, str], int] = {}
@@ -311,7 +315,7 @@ def _element_target(tag: Tag, page_url: str) -> str | None:
     raw_target: object = None
     if tag.name == "a":
         raw_target = tag.get("href")
-    elif tag.name == "img":
+    elif tag.name in {"img", "video", "audio", "source", "iframe"}:
         raw_target = tag.get("src")
     elif tag.name == "button":
         form = tag.find_parent("form")
@@ -339,6 +343,26 @@ def _initial_element_issue_types(
             issues.append("image_alt_missing")
         elif not _clean_text(str(tag.get("alt") or "")) and _is_unlabelled_functional_image(tag):
             issues.append("functional_image_alt_empty")
+        if not tag.get("width") or not tag.get("height"):
+            issues.append("image_dimensions_missing")
+        if not tag.get("srcset") and tag.find_parent("picture") is None:
+            issues.append("image_responsive_source_missing")
+    if tag.name == "video":
+        if not tag.get("poster"):
+            issues.append("video_missing_poster")
+        if _clean_text(str(tag.get("preload") or "")).lower() == "auto":
+            issues.append("video_preload_auto")
+        if tag.find("track", attrs={"kind": re.compile(r"^(captions|subtitles)$", re.I)}) is None:
+            issues.append("video_captions_missing")
+        if not tag.get("src") and tag.find("source", src=True) is None:
+            issues.append("media_source_missing")
+    if tag.name == "audio" and not tag.get("src") and tag.find("source", src=True) is None:
+        issues.append("media_source_missing")
+    if tag.name == "iframe":
+        if not _clean_text(str(tag.get("title") or "")):
+            issues.append("iframe_title_missing")
+        if _clean_text(str(tag.get("loading") or "")).lower() != "lazy":
+            issues.append("embed_not_lazy")
     if tag.name in {"a", "button"}:
         form = tag.find_parent("form") if tag.name == "button" else None
         raw = _clean_text(

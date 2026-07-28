@@ -117,6 +117,9 @@ SOURCE_KEYS_BY_TYPE = {
     "functional_image_alt_empty": ("image_alt",),
     "important_page_few_internal_links": ("links",),
     "generic_internal_anchor_text": ("links",),
+    "downloadable_document_inventory": ("helpful_content", "performance"),
+    "image_delivery_quality": ("image_alt", "performance"),
+    "media_delivery_quality": ("performance", "helpful_content"),
     "cms_link_placeholder": ("links",),
     "thin_content": ("helpful_content",), "possibly_outdated_content": ("helpful_content",),
     "broken_image": ("helpful_content",),
@@ -169,6 +172,18 @@ TYPE_RELEVANCE = {
     "generic_internal_anchor_text": (
         "Beschrijvende linktekst geeft zoekmachines en gebruikers van hulptechnologie context "
         "over de bestemming voordat zij de link volgen."
+    ),
+    "downloadable_document_inventory": (
+        "Belangrijke informatie in HTML is doorgaans beter bruikbaar, onderhoudbaar en te "
+        "sturen in zoekresultaten dan een document als enige publicatievorm."
+    ),
+    "image_delivery_quality": (
+        "Passende afmetingen en responsive bronnen beperken onnodige downloads en "
+        "layoutverschuivingen."
+    ),
+    "media_delivery_quality": (
+        "Goede media-opmaak ondersteunt laadtijd, toegankelijkheid en de herkenning van "
+        "video-inhoud door zoekmachines."
     ),
     "internal_redirect_patterns": (
         "Herhaalde interne redirectdoelen met dezelfde URL-omzetting wijzen doorgaans op één "

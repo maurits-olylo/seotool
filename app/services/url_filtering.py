@@ -7,6 +7,9 @@ MAX_QUERY_VARIANTS_PER_PATH = 100
 NON_HTML_SUFFIXES = frozenset(
     {
         ".7z",
+        ".3g2",
+        ".3gp",
+        ".aac",
         ".avi",
         ".avif",
         ".bmp",
@@ -14,6 +17,7 @@ NON_HTML_SUFFIXES = frozenset(
         ".doc",
         ".docx",
         ".eot",
+        ".flac",
         ".gif",
         ".gz",
         ".ico",
@@ -23,9 +27,15 @@ NON_HTML_SUFFIXES = frozenset(
         ".json",
         ".map",
         ".mov",
+        ".m4a",
+        ".m4v",
+        ".mkv",
         ".mp3",
         ".mp4",
         ".mpeg",
+        ".oga",
+        ".ogg",
+        ".ogv",
         ".pdf",
         ".png",
         ".ppt",
@@ -82,10 +92,31 @@ def query_variant_group(url: str) -> tuple[str, str, str] | None:
     return (parts.scheme.lower(), parts.netloc.lower(), parts.path or "/")
 
 
-def asset_kind(url: str) -> str | None:
+def asset_kind(url: str, content_type: str | None = None) -> str | None:
+    media_type = (content_type or "").split(";", 1)[0].strip().lower()
+    if media_type.startswith("image/"):
+        return "image"
+    if media_type in {
+        "application/pdf",
+        "application/msword",
+        "application/vnd.ms-excel",
+        "application/vnd.ms-powerpoint",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }:
+        return "document"
+    if media_type.startswith("video/"):
+        return "video"
+    if media_type.startswith("audio/"):
+        return "audio"
     suffix = PurePosixPath(unquote(urlsplit(url).path).lower()).suffix
     if suffix in IMAGE_SUFFIXES:
         return "image"
     if suffix in DOCUMENT_SUFFIXES:
         return "document"
+    if suffix in {".3g2", ".3gp", ".avi", ".m4v", ".mkv", ".mov", ".mp4", ".mpeg", ".ogv", ".webm"}:
+        return "video"
+    if suffix in {".aac", ".flac", ".m4a", ".mp3", ".oga", ".ogg", ".wav"}:
+        return "audio"
     return None

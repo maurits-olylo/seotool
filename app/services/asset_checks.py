@@ -26,9 +26,13 @@ HTML_ONLY_ISSUE_TYPES = {
 
 
 def inspect_asset(
-    url: str, response_size: int | None, status_code: int | None = 200
+    url: str,
+    response_size: int | None,
+    status_code: int | None = 200,
+    *,
+    content_type: str | None = None,
 ) -> list[IssueSignal]:
-    kind = asset_kind(url)
+    kind = asset_kind(url, content_type)
     if kind == "image" and status_code is not None and status_code >= 400:
         return [
             IssueSignal(
@@ -41,23 +45,4 @@ def inspect_asset(
                 evidence={"status_code": status_code},
             )
         ]
-    if response_size is None:
-        return []
-    if kind == "image" and response_size > IMAGE_SIZE_LIMIT:
-        return [_oversized_signal("image", response_size, IMAGE_SIZE_LIMIT)]
-    if kind == "document" and response_size > DOCUMENT_SIZE_LIMIT:
-        return [_oversized_signal("document", response_size, DOCUMENT_SIZE_LIMIT)]
     return []
-
-
-def _oversized_signal(kind: str, size: int, limit: int) -> IssueSignal:
-    label = "Afbeelding" if kind == "image" else "Document"
-    return IssueSignal(
-        issue_type=f"oversized_{kind}",
-        category="performance",
-        severity="medium",
-        title=f"{label} is te groot",
-        description=f"{label} is {size / 1_000_000:.1f} MB en overschrijdt de limiet.",
-        recommended_action="Comprimeer of vervang het bestand en werk verwijzende links bij.",
-        evidence={"response_size": size, "limit": limit},
-    )

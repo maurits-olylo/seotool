@@ -48,6 +48,27 @@ def test_limits_response_size() -> None:
         fetch_url("https://example.com", max_response_size=10, transport=transport)
 
 
+def test_large_non_html_response_uses_headers_without_downloading_body() -> None:
+    result = fetch_url(
+        "https://example.com/download",
+        max_response_size=10,
+        transport=httpx.MockTransport(
+            lambda _: httpx.Response(
+                200,
+                headers={
+                    "content-type": "application/pdf",
+                    "content-length": "7500000",
+                },
+                content=b"x" * 100,
+            )
+        ),
+    )
+
+    assert result.content == b""
+    assert result.response_size == 7_500_000
+    assert result.headers["content-type"] == "application/pdf"
+
+
 def test_fetch_metadata_uses_head_without_downloading_body() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "HEAD"

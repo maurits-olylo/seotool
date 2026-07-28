@@ -119,6 +119,22 @@ def test_keeps_onpage_signals_for_indexable_page() -> None:
     assert types == {"missing_title", "missing_meta_description", "missing_h1"}
 
 
+def test_does_not_apply_html_checks_to_indexable_pdf() -> None:
+    snapshot = UrlSnapshot(
+        requested_url="https://example.com/download",
+        final_url="https://example.com/download",
+        status_code=200,
+        content_type="application/pdf",
+        title=None,
+        meta_description=None,
+        headings={},
+        is_indexable=True,
+        redirect_chain=[],
+    )
+
+    assert inspect_snapshot(snapshot) == []
+
+
 def test_defers_limited_content_to_site_context_analysis() -> None:
     snapshot = UrlSnapshot(
         requested_url="https://example.com/diensten/seo",

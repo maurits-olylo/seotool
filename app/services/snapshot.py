@@ -37,7 +37,9 @@ def store_fetch_result(
         redirect_chain=result.redirect_chain,
         content_type=content_type or None,
         response_time_ms=result.response_time_ms,
-        response_size=len(result.content),
+        response_size=(
+            result.response_size if result.response_size is not None else len(result.content)
+        ),
         etag=result.headers.get("etag"),
         last_modified=result.headers.get("last-modified"),
         title=page.title if page else None,
@@ -153,7 +155,7 @@ def store_fetch_result(
                     rendered_dynamically=element.rendered_dynamically,
                 )
             )
-            if element.element_type == "img" and element.target_url:
+            if element.element_type in {"img", "video", "audio", "source"} and element.target_url:
                 try:
                     normalized_image = normalize_url(element.target_url, options=normalization)
                 except InvalidUrlError:

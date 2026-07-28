@@ -6,10 +6,13 @@ IssueNature = Literal["problem", "review", "optimization"]
 ISSUE_SCOPE_BY_TYPE: dict[str, IssueScope] = {
     "broken_image": "quality",
     "deep_page": "quality",
+    "downloadable_document_inventory": "quality",
     "job_posting_identifier_collision_risk": "quality",
     "image_alt_missing": "quality",
     "functional_image_alt_empty": "quality",
     "generic_internal_anchor_text": "quality",
+    "image_delivery_quality": "performance",
+    "media_delivery_quality": "performance",
     "multiple_h1": "quality",
     "oversized_document": "performance",
     "oversized_image": "performance",
@@ -18,10 +21,13 @@ ISSUE_SCOPE_BY_TYPE: dict[str, IssueScope] = {
 
 ISSUE_NATURE_BY_TYPE: dict[str, IssueNature] = {
     "duplicate_meta_description": "optimization",
+    "downloadable_document_inventory": "optimization",
     "deep_page": "review",
     "http_410": "review",
     "important_page_few_internal_links": "review",
     "generic_internal_anchor_text": "optimization",
+    "image_delivery_quality": "optimization",
+    "media_delivery_quality": "optimization",
     "internal_redirect_patterns": "review",
     "job_posting_identifier_collision_risk": "optimization",
     "missing_breadcrumb_schema": "optimization",

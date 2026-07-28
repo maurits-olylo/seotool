@@ -153,7 +153,10 @@ def inspect_snapshot(snapshot: UrlSnapshot, *, today: date | None = None) -> lis
         )
     if snapshot.redirect_chain:
         return signals
-    inspect_onpage = status == 200 and snapshot.is_indexable is not False
+    media_type = (snapshot.content_type or "").split(";", 1)[0].lower()
+    inspect_onpage = status == 200 and snapshot.is_indexable is not False and (
+        not media_type or media_type in {"text/html", "application/xhtml+xml"}
+    )
     if inspect_onpage and not snapshot.title:
         signals.append(
             _signal(

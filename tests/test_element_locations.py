@@ -174,6 +174,32 @@ def test_stored_application_cta_can_be_ignored_outside_job_context() -> None:
     assert signals == []
 
 
+def test_extracts_media_delivery_review_signals() -> None:
+    page = extract_page(
+        """
+        <html><body><main>
+          <img src="/hero.jpg" alt="Hero">
+          <video preload="auto" src="/intro.mp4"></video>
+          <iframe src="https://video.example/embed/1"></iframe>
+        </main></body></html>
+        """,
+        "https://example.com/page",
+    )
+
+    image = next(item for item in page.elements if item.element_type == "img")
+    video = next(item for item in page.elements if item.element_type == "video")
+    iframe = next(item for item in page.elements if item.element_type == "iframe")
+    assert {"image_dimensions_missing", "image_responsive_source_missing"} <= set(
+        image.issue_types
+    )
+    assert {
+        "video_missing_poster",
+        "video_preload_auto",
+        "video_captions_missing",
+    } <= set(video.issue_types)
+    assert {"iframe_title_missing", "embed_not_lazy"} <= set(iframe.issue_types)
+
+
 def test_static_extraction_does_not_claim_dynamically_rendered_element() -> None:
     page = extract_page(
         """
@@ -224,6 +250,7 @@ def test_alt_checks_distinguish_content_function_and_decoration() -> None:
     )
     images = {
         item.target_url: set(item.issue_types)
+        & {"image_alt_missing", "functional_image_alt_empty"}
         for item in page.elements
         if item.element_type == "img"
     }

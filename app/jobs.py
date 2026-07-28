@@ -13,6 +13,7 @@ from app.models.discovery import CrawlJob, Url, UrlSource
 from app.models.website import Website
 from app.services.analysis import analyze_snapshot
 from app.services.asset_checks import ASSET_ISSUE_TYPES, HTML_ONLY_ISSUE_TYPES, inspect_asset
+from app.services.asset_quality_analysis import analyze_asset_quality
 from app.services.content_similarity import detect_duplicate_content
 from app.services.contextual_404 import classify_404_issues
 from app.services.crawl_deployment import pause_job_if_deployment_active
@@ -528,6 +529,8 @@ def _analyze_stored_site_results(
     _check_crawl_control(db, job, progress_run)
     analyze_contextual_thin_content(db, website_id=website_id, crawl_run_id=crawl_run_id)
     _check_crawl_control(db, job, progress_run)
+    analyze_asset_quality(db, website_id=website_id, crawl_run_id=crawl_run_id)
+    _check_crawl_control(db, job, progress_run)
     analyze_template_issue_clusters(db, website_id=website_id, crawl_run_id=crawl_run_id)
 
 
@@ -647,7 +650,12 @@ def _audit_asset(db, job: CrawlJob, run: CrawlRun, url: Url) -> None:  # type: i
         db.add(snapshot)
         db.flush()
         run.asset_urls += 1
-        asset_signals = inspect_asset(result.final_url, response_size, result.status_code)
+        asset_signals = inspect_asset(
+            result.final_url,
+            response_size,
+            result.status_code,
+            content_type=result.headers.get("content-type"),
+        )
         if any(signal.issue_type == "broken_image" for signal in asset_signals):
             mark_target_elements(
                 db,
@@ -734,9 +742,27 @@ def _crawl_one(  # type: ignore[no-untyped-def]
             timeout_seconds=int(settings.get("request_timeout_seconds", 20)),
             max_response_size=int(settings.get("max_response_size", 5_000_000)),
         )
-        store_fetch_result(db, url=url, crawl_run_id=run.id, result=result)
+        snapshot = store_fetch_result(db, url=url, crawl_run_id=run.id, result=result)
         run.crawled_urls += 1
-        run.html_urls += 1
+        content_type = snapshot.content_type or ""
+        if content_type in {"text/html", "application/xhtml+xml"}:
+            run.html_urls += 1
+        else:
+            run.asset_urls += 1
+            reconcile_issues(
+                db,
+                website_id=url.website_id,
+                url_id=url.id,
+                crawl_run_id=run.id,
+                snapshot_id=snapshot.id,
+                signals=inspect_asset(
+                    result.final_url,
+                    snapshot.response_size,
+                    result.status_code,
+                    content_type=content_type,
+                ),
+                checked_issue_types=ASSET_ISSUE_TYPES | HTML_ONLY_ISSUE_TYPES,
+            )
         db.commit()
     except CrawlError as exc:
         snapshot = UrlSnapshot(
