@@ -45,6 +45,32 @@ def test_uses_complete_body_when_page_contains_multiple_article_cards() -> None:
     assert page.word_count == 7
 
 
+def test_preserves_article_header_inside_main() -> None:
+    html = """
+    <html><body>
+      <header>Site navigation that should not be counted</header>
+      <main>
+        <article>
+          <header>
+            <h1>Article title</h1>
+            <p>This complete introduction belongs to the article content.</p>
+          </header>
+          <div>Remaining article body.</div>
+        </article>
+      </main>
+      <footer>Footer links</footer>
+    </body></html>
+    """
+
+    page = extract_page(html, "https://example.com/article")
+
+    assert page.main_content == (
+        "Article title This complete introduction belongs to the article content. "
+        "Remaining article body."
+    )
+    assert page.word_count == 13
+
+
 def test_link_and_schema_hashes_ignore_order_and_external_links() -> None:
     first = extract_page(
         '<html><body><a href="/b">B</a><a href="/a">A</a>'

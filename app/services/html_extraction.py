@@ -83,9 +83,13 @@ def extract_page(html: str, page_url: str) -> ExtractedPage:
         for level in ("h1", "h2", "h3", "h4", "h5", "h6")
     }
 
-    main = soup.find("main") or soup.body or soup
+    explicit_main = soup.find("main")
+    main = explicit_main or soup.body or soup
     main_copy = BeautifulSoup(str(main), "lxml")
-    for tag in main_copy(["script", "style", "nav", "footer", "header", "aside", "noscript"]):
+    excluded_tags = ["script", "style", "nav", "footer", "aside", "noscript"]
+    if explicit_main is None:
+        excluded_tags.append("header")
+    for tag in main_copy(excluded_tags):
         tag.decompose()
     main_content = _clean_text(main_copy.get_text(" ", strip=True))
 
