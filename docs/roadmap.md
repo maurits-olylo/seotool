@@ -7,8 +7,8 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 ## Huidige status
 
 - Actieve ontwikkellijn: fase 6 — intelligente diagnose en UX/UI-polish.
-- Actueel releasepakket: consistente URL-uitsluitingen en begrensde filter-URL-discovery;
-  technisch geïmplementeerd, volledige releasecontrole volgt.
+- Actueel releasepakket: websitebrede asset- en mediakwaliteit; technisch geïmplementeerd en
+  gedeployed, productievalidatie loopt met een nieuwe volledige crawl.
 - Productie: `https://seo.thact.nl` op Synology NAS `192.168.2.20`.
 - Laatste lokale kwaliteitscontrole: 259 tests, Ruff, JavaScript-syntaxis en productie-Compose
   geslaagd.
@@ -748,6 +748,82 @@ Acceptatie:
 - Een tweede crawl voor dezelfde website blijft geblokkeerd.
 - De ingestelde globale capaciteitslimiet wordt nooit overschreden.
 - Pauzeren, deployen en hervatten werkt aantoonbaar voor meerdere actieve crawls tegelijk.
+
+### Fase 8B — Gedeelde batchverwerking binnen één websitecrawl
+
+Status: gepland na productievalidatie van asset- en mediakwaliteit en een nulmeting van crawlduur,
+NAS-belasting en databasebelasting.
+
+Doel: idle crawlworkers laten bijspringen bij een lopende grote sitecrawl, zonder de website
+onbegrensd te belasten of crawlresultaten minder betrouwbaar te maken.
+
+#### Ontwerp
+
+- Behoud één `crawl_job` en één `crawl_run` als coördinator en gezamenlijke resultaatcontainer.
+- Splits de URL-frontier op in claimbare batches van standaard 50 URL's.
+- Laat iedere beschikbare full-crawlworker atomair één batch claimen.
+- Bewaar per batch status, eigenaar, heartbeat, poging, starttijd, eindtijd en foutmelding.
+- Geef een batch automatisch opnieuw vrij wanneer de workerheartbeat verloopt.
+- Voorkom dubbele URL-verwerking met een unieke claim per crawlrun en URL.
+- Voeg nieuw ontdekte interne URL's veilig aan dezelfde frontier toe.
+- Start sitebrede analyses en issue-reconciliatie pas wanneer alle batches definitief klaar zijn.
+- Laat pauzeren, stoppen en de deployment-drain alle actieve batches coöperatief afbreken.
+- Hervat alleen onafgeronde of verlaten batches; reeds opgeslagen snapshots blijven behouden.
+
+#### Capaciteitsbeleid
+
+- Start met drie crawlworkers als veilige standaard voor grote websites.
+- Gebruik maximaal drie gelijktijdige batches voor één website.
+- Pas `concurrency` en `request_delay_ms` toe als gezamenlijke domeinlimiet, niet afzonderlijk
+  per worker.
+- Houd één globale limiet aan voor actieve batches over alle websites en verdeel capaciteit eerlijk
+  over klanten.
+- Laat light checks voorrang of gereserveerde capaciteit behouden, zodat een volledige crawl kleine
+  controles niet blokkeert.
+- Maak een vierde worker optioneel en activeer deze pas wanneer productiemetingen voldoende vrije
+  CPU, geheugen, databaseverbindingen en netwerkcapaciteit aantonen.
+
+#### Verwachte opbrengst
+
+- Drie workers leveren bij grotere crawls naar verwachting circa 1,8–2,4 keer versnelling.
+- Trage URL's blokkeren niet langer de volledige frontier.
+- Alleen een mislukte batch hoeft opnieuw te worden uitgevoerd.
+- Voortgang, vastgelopen werk en resterende tijd worden nauwkeuriger meetbaar.
+- Beschikbare capaciteit kan eerlijker over grote en kleine websites worden verdeeld.
+
+#### Belangrijkste risico's en beheersing
+
+- Overbelasting of 429-responses: centrale domeinlimiet, adaptieve vertraging en backoff.
+- Dubbele snapshots of links: atomische databaseclaims en unieke constraints.
+- Databasecontentie: begrensde batches, bulkbewerkingen en gemeten connection-poollimieten.
+- Onjuiste crawldiepte: kortste bekende afstand transactioneel bijwerken en na afloop controleren.
+- Voortijdige siteanalyse: expliciete coördinatorstatus en controle op ontbrekende actieve batches.
+- Verloren batches na workeruitval: heartbeat, claim-time-out en idempotente herverwerking.
+- Oneerlijke capaciteitsverdeling: round-robinplanning tussen websites en een limiet per website.
+
+#### Gefaseerde uitrol
+
+1. Meet de huidige crawl met één full-crawlworker: URL's per minuut, totale duur, analysetijd,
+   CPU, geheugen, databaseverbindingen, fouten en 429-responses.
+2. Implementeer batchmodel, claims, heartbeat en hervatten met twee workers; valideer dezelfde
+   snapshots, links, crawldiepte en issues als bij enkelvoudige verwerking.
+3. Activeer drie workers en stel batchgrootte en domeinlimiet af op productiegegevens.
+4. Test een vierde worker alleen als capaciteitsproef; maak deze pas standaard wanneer de extra
+   snelheidswinst opweegt tegen de hogere belasting.
+
+Acceptatie:
+
+- Twee of drie workers verwerken aantoonbaar verschillende batches van dezelfde crawlrun.
+- Geen URL krijgt binnen één crawlrun meer dan één definitieve snapshot.
+- Resultaten voor links, crawldiepte, wijzigingen en issues zijn inhoudelijk gelijk aan een
+  enkelvoudige referentiecrawl.
+- Een uitgevallen worker laat zijn batch na de claim-time-out veilig door een andere worker
+  overnemen.
+- Pauzeren, stoppen, deployment-drain en hervatten werken voor alle batches van dezelfde crawl.
+- De gezamenlijke domeinlimiet en globale NAS-capaciteitslimiet worden nooit overschreden.
+- De UI toont actieve workers, batches, verwerkingssnelheid en een realistische resterende tijd.
+- Drie workers verkorten een representatieve crawl zonder significante stijging van time-outs,
+  429-responses, 5xx-responses of databasefouten.
 
 ## Fase 9 — Matomo-integratie
 
