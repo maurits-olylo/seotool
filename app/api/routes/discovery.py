@@ -9,7 +9,7 @@ from app.core.queue import crawl_queue_state, enqueue_crawl_job
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.common import utc_now
-from app.models.crawl import CrawlRun, UrlLink
+from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url
 from app.models.issues import Issue
 from app.models.website import Website
@@ -304,7 +304,10 @@ def resume_crawl_job(
             status_code=409, detail="Alleen een gepauzeerde of mislukte crawl kan hervatten"
         )
     if job.status == "failed" and not db.scalar(
-        select(CrawlRun.id).where(CrawlRun.crawl_job_id == job.id)
+        select(UrlSnapshot.id)
+        .join(CrawlRun, CrawlRun.id == UrlSnapshot.crawl_run_id)
+        .where(CrawlRun.crawl_job_id == job.id)
+        .limit(1)
     ):
         raise HTTPException(status_code=409, detail="Deze crawl heeft geen hervatbare voortgang")
     db.scalar(select(Website.id).where(Website.id == job.website_id).with_for_update())

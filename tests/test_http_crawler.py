@@ -69,6 +69,24 @@ def test_large_non_html_response_uses_headers_without_downloading_body() -> None
     assert result.headers["content-type"] == "application/pdf"
 
 
+@pytest.mark.parametrize("content_type", ["application/xml", "text/xml"])
+def test_xml_response_body_is_available_for_sitemap_parsing(content_type: str) -> None:
+    sitemap = b'<?xml version="1.0"?><urlset></urlset>'
+    result = fetch_url(
+        "https://example.com/sitemap.xml",
+        transport=httpx.MockTransport(
+            lambda _: httpx.Response(
+                200,
+                headers={"content-type": content_type},
+                content=sitemap,
+            )
+        ),
+    )
+
+    assert result.content == sitemap
+    assert result.response_size == len(sitemap)
+
+
 def test_fetch_metadata_uses_head_without_downloading_body() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "HEAD"

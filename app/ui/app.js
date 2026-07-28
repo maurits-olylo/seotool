@@ -1158,9 +1158,12 @@ function renderOperations() {
       : crawlProgressLabel(controlledRun);
     $("#crawl-live-label").textContent = `${runLabels[controlledRun.crawl_type] || controlledRun.crawl_type} · ${queueLabel}`;
   }
-  $("#crawl-progress-track").classList.toggle("hidden", crawlStatus === "paused");
+  $("#crawl-progress-track").classList.toggle("hidden", ["paused", "failed", "cancelled"].includes(crawlStatus));
   $("#pause-crawl").classList.toggle("hidden", crawlStatus !== "running");
-  $("#resume-crawl").classList.toggle("hidden", !["paused", "failed"].includes(crawlStatus));
+  const failedRunHasProgress = crawlStatus === "failed"
+    && Number(controlledRun?.crawled_urls || 0) + Number(controlledRun?.asset_urls || 0) > 0;
+  $("#resume-crawl").classList.toggle("hidden", crawlStatus !== "paused" && !failedRunHasProgress);
+  $("#cancel-crawl").classList.toggle("hidden", ["failed", "cancelled"].includes(crawlStatus));
   $("#cancel-crawl").disabled = ["cancel_requested", "cancelled"].includes(crawlStatus);
   const currentExport = state.exports.find((item) => !item.downloaded_at && ["pending", "running", "succeeded"].includes(item.status));
   const exportPanel = $("#current-export"); const exportButton = $("#generate-excel"); const download = $("#current-export-download");

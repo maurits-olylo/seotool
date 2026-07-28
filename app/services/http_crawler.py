@@ -13,6 +13,14 @@ class CrawlError(RuntimeError):
         self.error_type = error_type
 
 
+BODY_CONTENT_TYPES = {
+    "text/html",
+    "application/xhtml+xml",
+    "application/xml",
+    "text/xml",
+}
+
+
 @dataclass(frozen=True)
 class FetchResult:
     requested_url: str
@@ -79,10 +87,7 @@ def fetch_url(
                         continue
                     headers = {key.lower(): value for key, value in response.headers.items()}
                     content_type = headers.get("content-type", "").split(";", 1)[0].lower()
-                    if content_type and content_type not in {
-                        "text/html",
-                        "application/xhtml+xml",
-                    }:
+                    if content_type and content_type not in BODY_CONTENT_TYPES:
                         content = b""
                         declared_size = headers.get("content-length")
                         response_size = (

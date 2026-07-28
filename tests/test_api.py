@@ -149,7 +149,7 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
 def test_operations_status_ignores_stale_website_responses(client: TestClient) -> None:
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
-    assert 'src="/ui/assets/app.js?v=20260728-2"' in page.text
+    assert 'src="/ui/assets/app.js?v=20260728-3"' in page.text
 
     script = client.get("/ui/assets/app.js")
     assert script.status_code == 200
@@ -1667,6 +1667,41 @@ def test_running_crawl_can_pause_resume_and_cancel(client: TestClient) -> None:
     with SessionLocal() as db:
         run = db.scalar(select(CrawlRun).where(CrawlRun.crawl_job_id == UUID(job_id)))
         assert run and run.status == "cancelled" and run.finished_at is not None
+
+
+def test_failed_crawl_without_saved_url_progress_cannot_resume(client: TestClient) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Failed crawl"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": customer["id"],
+            "name": "Failed site",
+            "base_url": "https://failed.example.com",
+        },
+    ).json()
+    created = client.post(
+        "/api/v1/crawl-jobs",
+        json={"website_id": website["id"], "job_type": "full_site_crawl"},
+    ).json()
+    job_id = created["id"]
+    with SessionLocal() as db:
+        job = db.get(CrawlJob, UUID(job_id))
+        assert job
+        job.status = "failed"
+        db.add(
+            CrawlRun(
+                crawl_job_id=job.id,
+                website_id=job.website_id,
+                crawl_type=job.job_type,
+                status="failed",
+            )
+        )
+        db.commit()
+
+    resume = client.post(f"/api/v1/crawl-jobs/{job_id}/resume")
+
+    assert resume.status_code == 409
+    assert resume.json()["detail"] == "Deze crawl heeft geen hervatbare voortgang"
 
 
 def test_url_overview_hides_inactive_out_of_scope_records_by_default(
