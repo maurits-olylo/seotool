@@ -99,7 +99,10 @@ scopeversie, URL-scope, regels, voor- en nasnapshots, resultaat, fout en timesta
 scopeplan controleert vooraf of de taak uitgevoerd is en alle vereiste URL-rollen bevat. Er wordt
 nog niets gequeued: de bestaande `light_check` verwerkt een volledige website en is daarom geen
 veilige executor voor een gerichte verificatie. De dedicated executor moet een vaste URL-ID-lijst
-afdwingen voordat enqueueing wordt geactiveerd.
+afdwingen voordat enqueueing wordt geactiveerd. Bij taakcreatie worden URL-rollen waar mogelijk
+afgeleid uit het jongste issuebewijs, de bijbehorende linkgraaf en snapshot. Een bevoegde gebruiker
+kan ontbrekende of onjuiste rollen binnen de websitescope corrigeren; iedere wijziging krijgt een
+taakevent en activity-logregel.
 
 ## Jobs en exports
 

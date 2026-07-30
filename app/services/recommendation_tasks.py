@@ -5,7 +5,9 @@ from sqlalchemy.orm import Session
 
 from app.core.security import Principal
 from app.models.common import utc_now
-from app.models.issues import ActivityLog, Issue
+from app.models.crawl import UrlLink, UrlSnapshot
+from app.models.discovery import Url
+from app.models.issues import ActivityLog, Issue, IssueOccurrence
 from app.models.recommendations import (
     RecommendationFeedback,
     RecommendationTask,
@@ -20,6 +22,9 @@ from app.services.recommendation_library import (
     get_recommendation_definition,
     recommendation_for_issue_type,
 )
+from app.services.url_normalization import InvalidUrlError, normalize_url
+from app.services.url_registry import register_url
+from app.services.url_scope import is_url_in_website_scope
 
 ACTIVE_TASK_STATUSES = {"open", "planned", "in_progress", "waiting_for_input", "implemented"}
 ALLOWED_TRANSITIONS = {
@@ -36,6 +41,11 @@ SCOPED_VERIFICATION_TYPES = {
     "repair_broken_internal_link",
     "fix_redirect_chain_or_loop",
     "correct_canonical",
+}
+VERIFICATION_URL_ROLES = {
+    "repair_broken_internal_link": {"source", "broken_target", "replacement_target"},
+    "fix_redirect_chain_or_loop": {"source", "expected_target"},
+    "correct_canonical": {"source", "expected_canonical"},
 }
 
 
@@ -104,12 +114,17 @@ def create_task_from_issue(
     db.add(task)
     db.flush()
     db.add(RecommendationTaskIssue(task_id=task.id, issue_id=issue.id))
-    if issue.url_id:
+    for url_id, role in _task_url_scope_from_issue(
+        db,
+        issue=issue,
+        verification_type=definition.key,
+        default_scope=definition.verification_scope,
+    ):
         db.add(
             RecommendationTaskUrl(
                 task_id=task.id,
-                url_id=issue.url_id,
-                role=_primary_url_role(definition.verification_scope),
+                url_id=url_id,
+                role=role,
             )
         )
     label = actor_label(db, principal)
@@ -296,12 +311,201 @@ def verification_scope_plan(
     }
 
 
+def add_task_url(
+    db: Session,
+    *,
+    task: RecommendationTask,
+    role: str,
+    raw_url: str,
+    principal: Principal,
+) -> RecommendationTaskUrl:
+    allowed_roles = VERIFICATION_URL_ROLES.get(task.recommendation_type, set())
+    if role not in allowed_roles:
+        raise RecommendationTaskError(
+            f"URL-rol {role} is niet toegestaan voor dit aanbevelingstype."
+        )
+    website = db.get(Website, task.website_id)
+    if website is None:
+        raise RecommendationTaskError("De website bestaat niet meer.")
+    try:
+        normalized = normalize_url(raw_url)
+    except InvalidUrlError as exc:
+        raise RecommendationTaskError(str(exc)) from exc
+    settings = website.settings
+    if not is_url_in_website_scope(
+        normalized,
+        base_url=website.base_url,
+        allowed_subdomains=settings.allowed_subdomains if settings else [],
+    ):
+        raise RecommendationTaskError("De URL valt buiten de toegestane websitescope.")
+    url = register_url(
+        db,
+        website_id=website.id,
+        raw_url=normalized,
+        source_type="manual",
+        source_url=f"recommendation_task:{task.id}",
+        ignored_query_parameters=frozenset(
+            settings.ignored_query_parameters if settings else []
+        ),
+    )
+    existing = db.scalar(
+        select(RecommendationTaskUrl).where(
+            RecommendationTaskUrl.task_id == task.id,
+            RecommendationTaskUrl.url_id == url.id,
+            RecommendationTaskUrl.role == role,
+        )
+    )
+    if existing:
+        raise RecommendationTaskError("Deze URL staat al met dezelfde rol in de taak.")
+    task_url = RecommendationTaskUrl(
+        task_id=task.id,
+        url_id=url.id,
+        role=role,
+        is_user_supplied=True,
+    )
+    db.add(task_url)
+    db.flush()
+    _record_scope_event(
+        db,
+        task=task,
+        principal=principal,
+        event_type="verification_scope_url_added",
+        url=url,
+        role=role,
+    )
+    db.commit()
+    db.refresh(task_url)
+    return task_url
+
+
+def remove_task_url(
+    db: Session,
+    *,
+    task: RecommendationTask,
+    task_url: RecommendationTaskUrl,
+    principal: Principal,
+) -> None:
+    url = db.get(Url, task_url.url_id)
+    role = task_url.role
+    db.delete(task_url)
+    if url:
+        _record_scope_event(
+            db,
+            task=task,
+            principal=principal,
+            event_type="verification_scope_url_removed",
+            url=url,
+            role=role,
+        )
+    db.commit()
+
+
+def _record_scope_event(
+    db: Session,
+    *,
+    task: RecommendationTask,
+    principal: Principal,
+    event_type: str,
+    url: Url,
+    role: str,
+) -> None:
+    label = actor_label(db, principal)
+    details = {"url_id": str(url.id), "url": url.normalized_url, "role": role}
+    db.add_all(
+        [
+            RecommendationTaskEvent(
+                task_id=task.id,
+                actor_user_id=principal.user_id,
+                actor_label=label,
+                event_type=event_type,
+                details=details,
+            ),
+            ActivityLog(
+                website_id=task.website_id,
+                actor=label,
+                activity_type=event_type,
+                summary=f"Verificatiescope bijgewerkt: {task.title}",
+                details={"task_id": str(task.id), **details},
+            ),
+        ]
+    )
+
+
 def _strongest_priority(first: str, second: str) -> str:
     return first if PRIORITY_RANK[first] >= PRIORITY_RANK[second] else second
 
 
 def _primary_url_role(scope: tuple[str, ...]) -> str:
     return scope[0] if scope else "changed"
+
+
+def _task_url_scope_from_issue(
+    db: Session,
+    *,
+    issue: Issue,
+    verification_type: str,
+    default_scope: tuple[str, ...],
+) -> list[tuple[UUID, str]]:
+    if issue.url_id is None:
+        return []
+    occurrence = db.scalar(
+        select(IssueOccurrence)
+        .where(IssueOccurrence.issue_id == issue.id)
+        .order_by(IssueOccurrence.detected_at.desc())
+        .limit(1)
+    )
+    scope: list[tuple[UUID, str]] = []
+    if verification_type == "repair_broken_internal_link":
+        if issue.issue_type == "multiple_broken_internal_links":
+            scope.append((issue.url_id, "source"))
+            for item in (occurrence.evidence.get("broken_links", []) if occurrence else []):
+                if isinstance(item, dict) and isinstance(item.get("target_url"), str):
+                    target = _existing_url(db, issue.website_id, item["target_url"])
+                    if target:
+                        scope.append((target.id, "broken_target"))
+        else:
+            scope.append((issue.url_id, "broken_target"))
+            if occurrence:
+                source_ids = db.scalars(
+                    select(UrlLink.source_url_id)
+                    .where(
+                        UrlLink.crawl_run_id == occurrence.crawl_run_id,
+                        UrlLink.target_url_id == issue.url_id,
+                        UrlLink.source_url_id != issue.url_id,
+                        UrlLink.is_internal.is_(True),
+                    )
+                    .distinct()
+                )
+                scope.extend((source_id, "source") for source_id in source_ids)
+    elif verification_type == "fix_redirect_chain_or_loop":
+        scope.append((issue.url_id, "source"))
+        snapshot = (
+            db.get(UrlSnapshot, occurrence.snapshot_id)
+            if occurrence and occurrence.snapshot_id
+            else None
+        )
+        if snapshot and snapshot.final_url and snapshot.final_url != snapshot.requested_url:
+            target = _existing_url(db, issue.website_id, snapshot.final_url)
+            if target:
+                scope.append((target.id, "expected_target"))
+    elif verification_type == "correct_canonical":
+        scope.append((issue.url_id, "source"))
+    else:
+        scope.append((issue.url_id, _primary_url_role(default_scope)))
+    return list(dict.fromkeys(scope))
+
+
+def _existing_url(db: Session, website_id: UUID, value: str) -> Url | None:
+    try:
+        normalized = normalize_url(value)
+    except InvalidUrlError:
+        return None
+    return db.scalar(
+        select(Url).where(
+            Url.website_id == website_id,
+            Url.normalized_url == normalized,
+        )
+    )
 
 
 def _validate_assignee(db: Session, website_id: UUID, user_id: UUID | None) -> None:

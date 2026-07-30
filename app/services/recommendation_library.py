@@ -31,7 +31,7 @@ class RecommendationDefinition:
 DEFINITIONS = (
     RecommendationDefinition(
         "repair_broken_internal_link",
-        "1",
+        "2",
         frozenset({"internally_linked_404", "multiple_broken_internal_links"}),
         "Herstel defecte interne links",
         "content",
@@ -41,7 +41,7 @@ DEFINITIONS = (
         "direct",
         ("Open de bronpagina.", "Vervang of verwijder de defecte link.", "Publiceer de wijziging."),
         ("De bronlink is crawlbaar.", "Het doel retourneert 200 en is indexeerbaar."),
-        ("source", "target"),
+        ("source", "broken_target"),
     ),
     RecommendationDefinition(
         "replace_redirected_internal_link",
@@ -97,7 +97,7 @@ DEFINITIONS = (
     ),
     RecommendationDefinition(
         "fix_redirect_chain_or_loop",
-        "1",
+        "2",
         frozenset({"redirect_loop", "long_redirect_chain"}),
         "Herstel redirectketen of redirectloop",
         "development",
@@ -107,7 +107,7 @@ DEFINITIONS = (
         "needs_technical_research",
         ("Breng de huidige redirectstappen in kaart.", "Maak een directe route naar de eind-URL."),
         ("Er is geen loop.", "De keten is direct en de eind-URL retourneert 200."),
-        ("old", "new"),
+        ("source", "expected_target"),
     ),
     RecommendationDefinition(
         "correct_indexability",
@@ -125,7 +125,7 @@ DEFINITIONS = (
     ),
     RecommendationDefinition(
         "correct_canonical",
-        "1",
+        "2",
         frozenset({"canonical_other_url", "canonical_other_url_clusters"}),
         "Corrigeer de canonical",
         "development",
@@ -138,7 +138,7 @@ DEFINITIONS = (
             "De bron bevat één bedoelde canonical.",
             "Het canonical-doel is bereikbaar en indexeerbaar.",
         ),
-        ("source", "canonical_target"),
+        ("source", "expected_canonical"),
     ),
     RecommendationDefinition(
         "add_or_correct_title",

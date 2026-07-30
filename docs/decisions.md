@@ -694,6 +694,21 @@ Gevolg: het systeem kan effort, confidence en verificatieregels verbeteren zonde
 klantdata als trainingscorpus te gebruiken. Met de huidige klantomvang wordt alleen instrumentatie
 voorbereid; globale kalibratie blijft uitgeschakeld.
 
+## 2026-07-31 — Verificatiescope komt uit bewijs en blijft handmatig corrigeerbaar
+
+Context: een gerichte controle heeft niet alleen een issue-URL nodig, maar betekenisvolle rollen
+zoals bron, defect doel of verwacht canonical-doel. Die rollen volledig laten invoeren veroorzaakt
+onnodig werk; onbekende doelen automatisch raden maakt de verificatie onbetrouwbaar.
+
+Besluit: vul alleen aantoonbare rollen uit het jongste issuebewijs, de linkgraaf en snapshots.
+Gebruik voor defecte links `source` en `broken_target`, voor redirects `source` en
+`expected_target`, en voor canonicals `source` en `expected_canonical`. Een bevoegde gebruiker kan
+rollen binnen de websitescope toevoegen of verwijderen; iedere correctie wordt gelogd. Niet
+aantoonbare gewenste doelen blijven bewust leeg.
+
+Gevolg: bekende crawlgegevens worden hergebruikt, terwijl onzekere intentie niet als feit wordt
+opgeslagen. De latere executor kan alleen starten wanneer alle verplichte rollen aanwezig zijn.
+
 ## 2026-07-30 — Routineverschuivingen op genummerde archiefpagina's zijn geen wijzigingen
 
 Context: nieuwe publicaties laten content, interne links en ItemList-achtige structured data op

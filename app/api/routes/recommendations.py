@@ -22,6 +22,8 @@ from app.schemas.recommendations import (
     RecommendationTaskDetailRead,
     RecommendationTaskRead,
     RecommendationTaskUpdate,
+    RecommendationTaskUrlCreate,
+    RecommendationTaskUrlRead,
     RecommendationVerificationPlanRead,
     RecommendationVerificationRead,
 )
@@ -29,8 +31,10 @@ from app.services.authorization import require_website_access, require_write_acc
 from app.services.recommendation_library import DEFINITIONS
 from app.services.recommendation_tasks import (
     RecommendationTaskError,
+    add_task_url,
     create_task_from_issue,
     record_feedback,
+    remove_task_url,
     update_task,
     verification_scope_plan,
 )
@@ -125,6 +129,51 @@ def get_recommendation_task(
         "urls": urls,
         "events": events,
     }
+
+
+@router.post(
+    "/recommendation-tasks/{task_id}/urls",
+    response_model=RecommendationTaskUrlRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_recommendation_task_url(
+    task_id: UUID,
+    payload: RecommendationTaskUrlCreate,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> RecommendationTaskUrl:
+    require_write_access(principal)
+    task = _task_or_404(db, task_id)
+    require_website_access(db, principal, task.website_id)
+    try:
+        return add_task_url(
+            db,
+            task=task,
+            role=payload.role,
+            raw_url=payload.url,
+            principal=principal,
+        )
+    except RecommendationTaskError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.delete(
+    "/recommendation-tasks/{task_id}/urls/{task_url_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_recommendation_task_url(
+    task_id: UUID,
+    task_url_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> None:
+    require_write_access(principal)
+    task = _task_or_404(db, task_id)
+    require_website_access(db, principal, task.website_id)
+    task_url = db.get(RecommendationTaskUrl, task_url_id)
+    if not task_url or task_url.task_id != task.id:
+        raise HTTPException(status_code=404, detail="Task URL not found")
+    remove_task_url(db, task=task, task_url=task_url, principal=principal)
 
 
 @router.patch(

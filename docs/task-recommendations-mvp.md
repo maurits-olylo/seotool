@@ -109,9 +109,11 @@ diagnosebewijs; bewijs wordt niet naar de taak gekopieerd.
 
 ### `recommendation_task_urls`
 
-Bewaar per taak de betrokken URL-ID en rol, bijvoorbeeld `source`, `target`, `old`, `new`,
-`canonical_target`, `changed` of `sample`. De gebruiker kan bij uitvoering gewijzigde URL's
-toevoegen.
+Bewaar per taak de betrokken URL-ID en een aanbevelingsspecifieke rol. Voor de eerste gerichte
+controles zijn dat `source` en `broken_target`, `source` en `expected_target`, of `source` en
+`expected_canonical`. De taakcreatie vult bekende rollen automatisch uit issuebewijs, linkgraaf en
+snapshot. Bevoegde gebruikers kunnen ontbrekende rollen binnen de ingestelde websitescope
+toevoegen of verwijderen; deze correcties zijn auditbaar.
 
 ### `recommendation_task_events`
 
@@ -125,10 +127,11 @@ Bewaar job-ID, scopeversie, voor- en nasnapshots, uitgevoerde regels, voortgang,
 foutdetails en timestamps. Verificaties gebruiken een eigen jobtype op de lichte crawlqueue en
 verversen de wekelijkse full-crawlplanning niet.
 
-Implementatiestatus: tabel, tenantbeveiligde lees-API en scopeplan zijn gereed. De eerste scope
-omvat defecte interne links, redirectketens/-loops en canonicals. Enqueueing blijft uitgeschakeld
-totdat de dedicated executor uitsluitend de vastgelegde URL-ID's verwerkt; de algemene light check
-mag hiervoor niet worden gebruikt.
+Implementatiestatus: tabel, tenantbeveiligde lees-API, scopeplan, automatische bewijsverrijking en
+beveiligde handmatige scopecorrectie zijn gereed. De eerste scope omvat defecte interne links,
+redirectketens/-loops en canonicals. Enqueueing blijft uitgeschakeld totdat de dedicated executor
+uitsluitend de vastgelegde URL-ID's verwerkt; de algemene light check mag hiervoor niet worden
+gebruikt.
 
 ### `recommendation_feedback`
 

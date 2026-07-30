@@ -7,8 +7,9 @@ from sqlalchemy.exc import IntegrityError
 from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.models.client import Client
-from app.models.discovery import Url
-from app.models.issues import ActivityLog, Issue
+from app.models.crawl import CrawlRun
+from app.models.discovery import CrawlJob, Url
+from app.models.issues import ActivityLog, Issue, IssueOccurrence
 from app.models.recommendations import (
     RecommendationFeedback,
     RecommendationTask,
@@ -148,7 +149,7 @@ def test_recommendation_task_api_lifecycle(client) -> None:  # type: ignore[no-u
     ).json()
     with SessionLocal() as db:
         website_id = UUID(website["id"])
-        url = Url(website_id=website_id, normalized_url="https://example.com/source")
+        url = Url(website_id=website_id, normalized_url="https://example.com/missing-target")
         db.add(url)
         db.flush()
         issue = Issue(
@@ -183,9 +184,10 @@ def test_recommendation_task_api_lifecycle(client) -> None:  # type: ignore[no-u
     )
     assert initial_plan.status_code == 200
     assert initial_plan.json()["supported"] is True
-    assert initial_plan.json()["required_roles"] == ["source", "target"]
-    assert initial_plan.json()["present_roles"] == ["source"]
-    assert initial_plan.json()["missing_roles"] == ["target"]
+    assert initial_plan.json()["scope_version"] == "2"
+    assert initial_plan.json()["required_roles"] == ["source", "broken_target"]
+    assert initial_plan.json()["present_roles"] == ["broken_target"]
+    assert initial_plan.json()["missing_roles"] == ["source"]
     assert initial_plan.json()["can_request"] is False
     assert "eerst als uitgevoerd" in initial_plan.json()["blocking_reason"]
     assert (
@@ -203,7 +205,7 @@ def test_recommendation_task_api_lifecycle(client) -> None:  # type: ignore[no-u
     detail = client.get(f"/api/v1/recommendation-tasks/{task_id}")
     assert detail.status_code == 200
     assert detail.json()["issue_ids"] == [str(issue_id)]
-    assert detail.json()["urls"][0]["role"] == "source"
+    assert detail.json()["urls"][0]["role"] == "broken_target"
     assert detail.json()["events"][0]["event_type"] == "created"
 
     planned = client.patch(
@@ -239,29 +241,51 @@ def test_recommendation_task_api_lifecycle(client) -> None:  # type: ignore[no-u
         f"/api/v1/recommendation-tasks/{task_id}/verification-plan"
     ).json()
     assert incomplete_plan["can_request"] is False
-    assert "target" in incomplete_plan["blocking_reason"]
-    with SessionLocal() as db:
-        target = Url(
-            website_id=website_id,
-            normalized_url="https://example.com/repaired-target",
-        )
-        db.add(target)
-        db.flush()
-        db.add(
-            RecommendationTaskUrl(
-                task_id=UUID(task_id),
-                url_id=target.id,
-                role="target",
-                is_user_supplied=True,
-            )
-        )
-        db.commit()
+    assert "source" in incomplete_plan["blocking_reason"]
+    invalid_role = client.post(
+        f"/api/v1/recommendation-tasks/{task_id}/urls",
+        json={"role": "target", "url": "https://example.com/source"},
+    )
+    assert invalid_role.status_code == 422
+    outside_scope = client.post(
+        f"/api/v1/recommendation-tasks/{task_id}/urls",
+        json={"role": "source", "url": "https://outside.example.net/source"},
+    )
+    assert outside_scope.status_code == 422
+    source_scope = client.post(
+        f"/api/v1/recommendation-tasks/{task_id}/urls",
+        json={"role": "source", "url": "https://example.com/source"},
+    )
+    assert source_scope.status_code == 201
+    assert source_scope.json()["role"] == "source"
+    assert source_scope.json()["is_user_supplied"] is True
+
+    duplicate_scope = client.post(
+        f"/api/v1/recommendation-tasks/{task_id}/urls",
+        json={"role": "source", "url": "https://example.com/source"},
+    )
+    assert duplicate_scope.status_code == 422
     complete_plan = client.get(
         f"/api/v1/recommendation-tasks/{task_id}/verification-plan"
     ).json()
     assert complete_plan["can_request"] is True
     assert complete_plan["missing_roles"] == []
     assert complete_plan["url_count"] == 2
+    removed_scope = client.delete(
+        f"/api/v1/recommendation-tasks/{task_id}/urls/{source_scope.json()['id']}"
+    )
+    assert removed_scope.status_code == 204
+    assert (
+        client.get(
+            f"/api/v1/recommendation-tasks/{task_id}/verification-plan"
+        ).json()["can_request"]
+        is False
+    )
+    restored_scope = client.post(
+        f"/api/v1/recommendation-tasks/{task_id}/urls",
+        json={"role": "source", "url": "https://example.com/source"},
+    )
+    assert restored_scope.status_code == 201
     feedback = client.post(
         f"/api/v1/recommendation-tasks/{task_id}/feedback",
         json={
@@ -333,6 +357,76 @@ def test_recommendation_task_api_lifecycle(client) -> None:  # type: ignore[no-u
     assert reopened.status_code == 200
     assert reopened.json()["close_reason"] is None
     assert reopened.json()["closed_at"] is None
+
+
+def test_grouped_broken_link_evidence_enriches_verification_scope(client) -> None:  # type: ignore[no-untyped-def]
+    customer = client.post("/api/v1/clients", json={"name": "Scope client"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": customer["id"],
+            "name": "Scope website",
+            "base_url": "https://scope.example.com",
+        },
+    ).json()
+    with SessionLocal() as db:
+        website_id = UUID(website["id"])
+        source = Url(
+            website_id=website_id,
+            normalized_url="https://scope.example.com/source",
+        )
+        target = Url(
+            website_id=website_id,
+            normalized_url="https://scope.example.com/missing",
+        )
+        db.add_all([source, target])
+        db.flush()
+        issue = Issue(
+            website_id=website_id,
+            url_id=source.id,
+            issue_type="multiple_broken_internal_links",
+            category="internal_links",
+            severity="high",
+            title="Meerdere defecte links",
+            description="De bronpagina bevat defecte links.",
+            recommended_action="Herstel de links.",
+        )
+        job = CrawlJob(
+            website_id=website_id,
+            job_type="full_site_crawl",
+            status="succeeded",
+        )
+        db.add_all([issue, job])
+        db.flush()
+        run = CrawlRun(
+            crawl_job_id=job.id,
+            website_id=website_id,
+            crawl_type="full_site_crawl",
+            status="succeeded",
+        )
+        db.add(run)
+        db.flush()
+        db.add(
+            IssueOccurrence(
+                issue_id=issue.id,
+                crawl_run_id=run.id,
+                evidence={
+                    "broken_links": [
+                        {"target_url": "https://scope.example.com/missing"}
+                    ]
+                },
+            )
+        )
+        db.commit()
+        issue_id = issue.id
+
+    created = client.post(f"/api/v1/issues/{issue_id}/recommendation-task")
+    assert created.status_code == 201
+    plan = client.get(
+        f"/api/v1/recommendation-tasks/{created.json()['id']}/verification-plan"
+    ).json()
+    assert plan["present_roles"] == ["broken_target", "source"]
+    assert plan["missing_roles"] == []
 
 
 def test_client_role_can_read_but_not_change_recommendation_tasks(client) -> None:  # type: ignore[no-untyped-def]
@@ -420,6 +514,23 @@ def test_client_role_can_read_but_not_change_recommendation_tasks(client) -> Non
         browser.patch(
             f"/api/v1/recommendation-tasks/{task_id}",
             json={"status": "planned"},
+        ).status_code
+        == 403
+    )
+    assert (
+        browser.post(
+            f"/api/v1/recommendation-tasks/{task_id}/urls",
+            json={
+                "role": "source",
+                "url": "https://readonly.example.com/source",
+            },
+        ).status_code
+        == 403
+    )
+    assert (
+        browser.delete(
+            f"/api/v1/recommendation-tasks/{task_id}/urls/"
+            "00000000-0000-0000-0000-000000000001"
         ).status_code
         == 403
     )

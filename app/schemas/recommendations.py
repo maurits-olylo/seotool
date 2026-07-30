@@ -89,6 +89,11 @@ class RecommendationTaskUrlRead(ORMModel):
     is_user_supplied: bool
 
 
+class RecommendationTaskUrlCreate(BaseModel):
+    role: str = Field(min_length=1, max_length=30)
+    url: str = Field(min_length=1, max_length=2048)
+
+
 class RecommendationTaskEventRead(ORMModel):
     id: UUID
     actor_user_id: UUID | None

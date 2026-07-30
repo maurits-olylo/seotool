@@ -691,8 +691,9 @@ Scope:
 
 1. De gebruiker markeert een taak als uitgevoerd, registreert aangepaste URL's en kiest of bevestigt
    de voorgestelde verificatiescope.
-2. De aanbevelingsbibliotheek bepaalt bron-, doel-, oude, nieuwe, canonical- en representatieve
-   template-URL's plus de uit te voeren checks.
+2. De aanbevelingsbibliotheek bepaalt de vereiste URL-rollen en vult ze waar mogelijk uit
+   issuebewijs, linkgraaf en snapshots; een bevoegde gebruiker corrigeert alleen ontbrekende of
+   onjuiste rollen binnen de websitescope.
 3. Een idempotente achtergrondjob bewaart queued/running/partially_completed/completed/failed/
    cancelled, retries, betekenisvolle voortgangsstappen en foutdetails.
 4. De crawler bewaart voor- en nasnapshot, gecontroleerde regels en uitkomst: opgelost,
@@ -731,6 +732,7 @@ Afhankelijkheden:
 Acceptatie:
 
 - Een wijziging op één pagina start geen volledige crawl.
+- Automatisch afgeleide en handmatig gecorrigeerde URL-rollen zijn tenantveilig en auditbaar.
 - De job blijft actief buiten de pagina en browsersessie en blokkeert ander werk niet.
 - Scope, voor- en nasituatie, uitgevoerde regels en conclusie zijn aan dezelfde taak gekoppeld.
 - Interne-linkverificatie controleert bron, crawlbare hoofdcontentlink, anker, doelstatus,
