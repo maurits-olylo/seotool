@@ -174,6 +174,9 @@ def list_changes(
             "current_checked_at": snapshots.get(change.current_snapshot_id).checked_at
             if snapshots.get(change.current_snapshot_id)
             else None,
+            "current_crawl_run_id": snapshots.get(change.current_snapshot_id).crawl_run_id
+            if snapshots.get(change.current_snapshot_id)
+            else None,
             **_change_context(change.change_type),
         }
         for change in changes
@@ -236,6 +239,7 @@ def get_change(
         **ChangeRead.model_validate(change).model_dump(),
         "previous_checked_at": previous.checked_at if previous else None,
         "current_checked_at": current.checked_at if current else None,
+        "current_crawl_run_id": current.crawl_run_id if current else None,
         **_change_context(change.change_type),
         "details": details,
     }

@@ -26,6 +26,13 @@ FIELDS = {
     "main_content_hash": "main_content_changed",
 }
 NORMALIZED_TEXT_FIELDS = {"title", "meta_description", "meta_robots", "x_robots_tag"}
+VOLATILE_OPENING_STATUS_RE = re.compile(
+    r"\b(?:"
+    r"geopend\s+(?:vanaf|tot)\s+\d{1,2}:\d{2}\s+uur"
+    r"|alleen\s+op\s+afspraak"
+    r")\b",
+    flags=re.IGNORECASE,
+)
 
 
 def compare_snapshots(previous: UrlSnapshot | None, current: UrlSnapshot) -> list[DetectedChange]:
@@ -35,9 +42,8 @@ def compare_snapshots(previous: UrlSnapshot | None, current: UrlSnapshot) -> lis
     for field, change_type in FIELDS.items():
         old = getattr(previous, field)
         new = getattr(current, field)
-        if field == "main_content_hash" and _same_content_in_different_order(
-            previous.main_content,
-            current.main_content,
+        if field == "main_content_hash" and _same_meaningful_content(
+            previous.main_content, current.main_content
         ):
             continue
         if not _values_equal(field, old, new):
@@ -68,10 +74,18 @@ def _values_equal(field: str, old: object, new: object) -> bool:
     return old == new
 
 
-def _same_content_in_different_order(old: str | None, new: str | None) -> bool:
+def _same_meaningful_content(old: str | None, new: str | None) -> bool:
     if not old or not new or old == new:
         return False
-    return Counter(_content_tokens(old)) == Counter(_content_tokens(new))
+    normalized_old = _normalize_volatile_content(old)
+    normalized_new = _normalize_volatile_content(new)
+    return normalized_old == normalized_new or Counter(_content_tokens(normalized_old)) == Counter(
+        _content_tokens(normalized_new)
+    )
+
+
+def _normalize_volatile_content(value: str) -> str:
+    return " ".join(VOLATILE_OPENING_STATUS_RE.sub("<opening-status>", value).split())
 
 
 def _content_tokens(value: str) -> list[str]:

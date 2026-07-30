@@ -7,13 +7,20 @@ from app.models.crawl import UrlSnapshot
 from app.models.discovery import Url
 from app.services.url_normalization import InvalidUrlError, normalize_url
 
+FUNCTIONAL_SEARCH_PATHS = {"/search", "/zoeken"}
+
 
 def is_discovery_only_page(page_url: str, canonical: str | None) -> bool:
-    """Return true for query variants consolidated to the same queryless page."""
+    """Return true for functional search pages and consolidated query variants."""
+    try:
+        page = urlsplit(normalize_url(page_url))
+    except (InvalidUrlError, ValueError):
+        return False
+    if page.path.rstrip("/").casefold() in FUNCTIONAL_SEARCH_PATHS:
+        return True
     if not canonical:
         return False
     try:
-        page = urlsplit(normalize_url(page_url))
         target = urlsplit(normalize_url(canonical))
     except (InvalidUrlError, ValueError):
         return False

@@ -34,6 +34,7 @@ class ChangeRead(ORMModel):
     is_baseline: bool = False
     previous_checked_at: datetime | None = None
     current_checked_at: datetime | None = None
+    current_crawl_run_id: UUID | None = None
     importance: str = "low"
     relevance: str = "Controleer of deze wijziging bewust is."
     review_action: str = "Vergelijk de pagina met de vorige versie."

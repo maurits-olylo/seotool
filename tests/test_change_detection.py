@@ -53,6 +53,42 @@ def test_ignores_main_content_when_only_the_block_order_changes() -> None:
     assert "main_content_changed" not in {change.change_type for change in changes}
 
 
+def test_ignores_dynamic_opening_status_in_main_content() -> None:
+    previous = snapshot(
+        main_content=(
+            "Showrooms Amstelveen Geopend vanaf 13:00 uur Meer informatie "
+            "Groningen Geopend tot 17:00 uur Maak een afspraak"
+        ),
+        main_content_hash="old",
+    )
+    current = snapshot(
+        main_content=(
+            "Showrooms Amstelveen Geopend vanaf 10:00 uur Meer informatie "
+            "Groningen Alleen op afspraak Maak een afspraak"
+        ),
+        main_content_hash="new",
+    )
+
+    changes = compare_snapshots(previous, current)
+
+    assert "main_content_changed" not in {change.change_type for change in changes}
+
+
+def test_keeps_real_showroom_content_change_beside_opening_status() -> None:
+    previous = snapshot(
+        main_content="Showroom Amstelveen Binderij 14a Geopend tot 17:00 uur",
+        main_content_hash="old",
+    )
+    current = snapshot(
+        main_content="Showroom Amstelveen Nieuw adres 10 Geopend vanaf 10:00 uur",
+        main_content_hash="new",
+    )
+
+    assert "main_content_changed" in {
+        change.change_type for change in compare_snapshots(previous, current)
+    }
+
+
 def test_first_snapshot_is_new_url() -> None:
     assert compare_snapshots(None, snapshot())[0].change_type == "new_url"
 

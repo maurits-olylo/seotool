@@ -978,7 +978,10 @@ function renderDashboard() {
   const newIssues = activeIssues.filter((issue) => issue.status === "new");
   const importantIssues = [...(newIssues.length ? newIssues : activeIssues)].sort((a, b) => ({high: 0, medium: 1, low: 2}[a.severity] - {high: 0, medium: 1, low: 2}[b.severity] || new Date(b.first_detected_at) - new Date(a.first_detected_at))).slice(0, 5);
   $("#dashboard-actions").innerHTML = importantIssues.map((issue) => `<article><strong>${escapeHtml(issue.title)}</strong><small><span class="severity ${issue.severity}">${labels[issue.severity]}</span> · ${new Date(issue.first_detected_at).toLocaleDateString("nl-NL")}</small></article>`).join("") || `<p class="dashboard-empty">Geen actieve technische acties.</p>`;
-  $("#dashboard-changes").innerHTML = state.changeGroups.slice(0, 5).map((group) => `<article><strong>${escapeHtml(changeGroupLabel(group))}</strong><small>${escapeHtml(state.urls.get(group.url_id) || "Onbekende URL")} · ${new Date(group.detected_at).toLocaleDateString("nl-NL")}</small></article>`).join("") || `<p class="dashboard-empty">Geen betekenisvolle wijzigingen gevonden.</p>`;
+  $("#dashboard-changes").innerHTML = state.changeGroups.slice(0, 5).map((group) => {
+    const target = group.incident_type === "domain_swap" ? `${group.affected_url_ids.length} geraakte URL’s` : state.urls.get(group.url_id) || "Onbekende URL";
+    return `<article><strong>${escapeHtml(changeGroupLabel(group))}</strong><small>${escapeHtml(target)} · ${new Date(group.detected_at).toLocaleDateString("nl-NL")}</small></article>`;
+  }).join("") || `<p class="dashboard-empty">Geen betekenisvolle wijzigingen gevonden.</p>`;
   const current = state.clientReport?.current || {};
   $("#dashboard-performance").innerHTML = [[current.clicks, "GSC-klikken"], [current.sessions, "Organische sessies"], [current.key_events, "Gekwalificeerde leads"]].map(([value, label]) => {
     const available = value !== null && value !== undefined;
@@ -1364,10 +1367,58 @@ function groupChanges(changes) {
     if (!groups.has(key)) groups.set(key, {id: key, url_id: change.url_id, detected_at: change.detected_at, previous_checked_at: change.previous_checked_at, current_checked_at: change.current_checked_at, changes: []});
     groups.get(key).changes.push(change);
   });
-  return [...groups.values()].sort((a, b) => new Date(b.detected_at) - new Date(a.detected_at));
+  const regularGroups = [...groups.values()];
+  const incidentGroups = new Map();
+  const retainedGroups = [];
+  regularGroups.forEach((group) => {
+    const canonical = group.changes.find((change) => change.change_type === "canonical_changed");
+    const hostSwap = canonical && canonicalHostSwap(canonical.old_value, canonical.new_value);
+    if (!hostSwap || !canonical.current_crawl_run_id) {
+      retainedGroups.push(group);
+      return;
+    }
+    const hosts = [hostSwap.oldHost, hostSwap.newHost].sort();
+    const key = `domain-swap:${canonical.current_crawl_run_id}:${hosts.join(":")}`;
+    if (!incidentGroups.has(key)) {
+      incidentGroups.set(key, {
+        id: key,
+        incident_type: "domain_swap",
+        hosts,
+        detected_at: group.detected_at,
+        previous_checked_at: group.previous_checked_at,
+        current_checked_at: group.current_checked_at,
+        changes: [],
+        affected_url_ids: new Set(),
+      });
+    }
+    const incident = incidentGroups.get(key);
+    incident.changes.push(...group.changes);
+    incident.affected_url_ids.add(group.url_id);
+    if (new Date(group.detected_at) > new Date(incident.detected_at)) incident.detected_at = group.detected_at;
+  });
+  const incidents = [...incidentGroups.values()].map((group) => ({
+    ...group,
+    affected_url_ids: [...group.affected_url_ids],
+  }));
+  return [...retainedGroups, ...incidents].sort((a, b) => new Date(b.detected_at) - new Date(a.detected_at));
+}
+
+function canonicalHostSwap(oldValue, newValue) {
+  try {
+    const oldUrl = new URL(String(oldValue || ""));
+    const newUrl = new URL(String(newValue || ""));
+    if (oldUrl.hostname === newUrl.hostname) return null;
+    if (`${oldUrl.pathname}${oldUrl.search}${oldUrl.hash}` !== `${newUrl.pathname}${newUrl.search}${newUrl.hash}`) return null;
+    return {oldHost: oldUrl.hostname, newHost: newUrl.hostname};
+  } catch (_error) {
+    return null;
+  }
 }
 
 function changeGroupLabel(group) {
+  if (group.incident_type === "domain_swap") {
+    return `Websitebrede domeinverwisseling: ${group.hosts.join(" ↔ ")} · ${group.affected_url_ids.length} URL’s`;
+  }
   const uniqueChanges = [...new Map(group.changes.map((change) => [change.change_type, change])).values()];
   if (uniqueChanges.length === 1) return changeLabel(uniqueChanges[0]);
   const priority = [
@@ -1412,10 +1463,15 @@ function renderChanges() {
   const start = (state.changePage - 1) * CHANGE_PAGE_SIZE;
   const rows = state.changeFiltered.slice(start, start + CHANGE_PAGE_SIZE);
   $("#change-rows").innerHTML = rows.map((group) => {
-    const url = state.urls.get(group.url_id) || "Onbekende URL";
+    const url = group.incident_type === "domain_swap"
+      ? `${group.affected_url_ids.length} geraakte URL’s`
+      : state.urls.get(group.url_id) || "Onbekende URL";
     const parts = [...new Set(group.changes.map(changeLabel))];
     const importance = group.changes.some((change) => change.importance === "high") ? "high" : group.changes.some((change) => change.importance === "medium") ? "medium" : "low";
-    return `<tr><td><time datetime="${escapeHtml(group.detected_at)}">${new Date(group.detected_at).toLocaleString("nl-NL")}</time></td><td><a class="change-url" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a></td><td><div class="change-row-summary"><span class="change-kind">${escapeHtml(changeGroupLabel(group))}</span><span class="change-importance ${importance}"><small>Relevantie</small>${escapeHtml(labels[importance])}</span></div></td><td><span class="change-parts">${parts.length}</span></td><td><button class="detail-button" data-change-group-id="${group.id}">Bekijk</button></td></tr>`;
+    const urlCell = group.incident_type === "domain_swap"
+      ? `<span class="change-url">${escapeHtml(url)}</span>`
+      : `<a class="change-url" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a>`;
+    return `<tr><td><time datetime="${escapeHtml(group.detected_at)}">${new Date(group.detected_at).toLocaleString("nl-NL")}</time></td><td>${urlCell}</td><td><div class="change-row-summary"><span class="change-kind">${escapeHtml(changeGroupLabel(group))}</span><span class="change-importance ${importance}"><small>Relevantie</small>${escapeHtml(labels[importance])}</span></div></td><td><span class="change-parts">${parts.length}</span></td><td><button class="detail-button" data-change-group-id="${group.id}">Bekijk</button></td></tr>`;
   }).join("");
   $("#change-result-count").textContent = `${state.changeFiltered.length} gebeurtenissen`;
   $("#change-page-label").textContent = `Pagina ${state.changePage} van ${pages}`;
@@ -1434,6 +1490,22 @@ function isMeaningfulChange(change) {
 async function showChangeGroup(groupId) {
   const group = state.changeGroups.find((item) => item.id === groupId);
   if (!group) return;
+  if (group.incident_type === "domain_swap") {
+    const affectedUrls = group.affected_url_ids.map((urlId) => state.urls.get(urlId) || "Onbekende URL").sort();
+    $("#change-detail-title").textContent = "Websitebrede domeinverwisseling";
+    $("#change-detail-url").textContent = `${affectedUrls.length} geraakte URL’s`;
+    $("#change-detail-url").removeAttribute("href");
+    const previousDate = group.previous_checked_at ? new Date(group.previous_checked_at).toLocaleString("nl-NL") : "Geen eerdere meting";
+    const currentDate = group.current_checked_at ? new Date(group.current_checked_at).toLocaleString("nl-NL") : new Date(group.detected_at).toLocaleString("nl-NL");
+    $("#change-detail-date").textContent = `${previousDate} → ${currentDate}`;
+    $("#change-detail-relevance").textContent = "Canonical, structured data en interne links verwijzen bij meerdere pagina’s gelijktijdig naar een ander domein. Dit wijst op een tenant-, cache- of hostconfiguratie-incident.";
+    $("#change-detail-action").textContent = `Controleer de host- en cacheconfiguratie tussen ${group.hosts.join(" en ")}. Bevestig daarna met een nieuwe crawl dat alle pagina’s stabiel het juiste domein gebruiken.`;
+    $("#change-detail-summary").textContent = `${group.changes.length} onderliggende wijzigingen op ${affectedUrls.length} URL’s zijn samengevoegd tot één incident.`;
+    $("#change-detail-summary").classList.remove("hidden");
+    $("#change-group-details").innerHTML = `<section class="change-detail-part"><h3>Geraakte URL’s</h3><p class="change-value">${affectedUrls.map(escapeHtml).join("<br>")}</p></section>`;
+    $("#change-dialog").showModal();
+    return;
+  }
   const changes = await Promise.all(group.changes.map((change) => api(`/api/v1/changes/${change.id}`)));
   const url = state.urls.get(group.url_id) || "Onbekende URL";
   $("#change-detail-title").textContent = changeGroupLabel(group);

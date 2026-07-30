@@ -644,3 +644,22 @@ derde, bewust niet standaard gestarte overflowworker kan beide queues verwerken.
 database-admission blijft maximaal één actieve crawl per website afdwingen.
 
 Gevolg: beide workloadtypen hebben voorspelbare, begrensde capaciteit zonder een container per job.
+
+## 2026-07-30 — Wijzigingsruis wordt contextueel onderdrukt of als incident gegroepeerd
+
+Context: een schone Schipper-crawl leverde 170 wijzigingsregels op. Daarvan vormden 147 regels één
+gemengde hostwissel tussen `schipperkozijnen.nl` en `verantwoordwonen.com`, 22 regels kwamen van
+dynamische zoekresultaatpagina's en één hoofdcontentmelding bestond uitsluitend uit actuele
+openingsteksten.
+
+Besluit: functionele `/zoeken`- en `/search`-pagina's blijven als URL, snapshot en linkbewijs
+bewaard, maar leveren geen reguliere content-, link- of onpagewijzigingen. Tijdsafhankelijke
+Nederlandse openingsstatussen worden uitsluitend voor de hoofdcontentvergelijking genormaliseerd;
+andere showroominhoud blijft meetellen. Canonical-, schema- en linkwisselingen tussen dezelfde twee
+hosts en paden blijven als onderliggende records bewaard, maar worden per crawl als één
+websitebrede domeinverwisseling gepresenteerd.
+
+Gevolg: dynamische functionele inhoud verdwijnt uit de betekenisvolle wijzigingshistorie zonder
+bereikbaarheidsbewijs te verliezen. Een tenant-, cache- of hostincident blijft volledig
+controleerbaar, maar verschijnt niet als tientallen losse URL-gebeurtenissen. Echte wijzigingen in
+adressen, pagina-inhoud, canonicals of links buiten deze aantoonbare patronen blijven zichtbaar.
