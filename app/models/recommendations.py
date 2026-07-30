@@ -193,3 +193,35 @@ class RecommendationFeedback(Base):
     final_assessment: Mapped[str | None] = mapped_column(String(30))
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class RecommendationVerification(UUIDTimestampMixin, Base):
+    __tablename__ = "recommendation_verifications"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('queued', 'running', 'passed', 'likely_passed', "
+            "'manual_review', 'failed', 'error', 'cancelled')",
+            name="ck_recommendation_verification_status",
+        ),
+    )
+
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("recommendation_tasks.id", ondelete="CASCADE"), index=True
+    )
+    requested_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
+    crawl_job_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("crawl_jobs.id", ondelete="SET NULL"), unique=True, index=True
+    )
+    verification_type: Mapped[str] = mapped_column(String(100), index=True)
+    scope_version: Mapped[str] = mapped_column(String(30))
+    status: Mapped[str] = mapped_column(String(30), default="queued", index=True)
+    scope: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    rules: Mapped[list[dict[str, object]]] = mapped_column(JSON, default=list)
+    before_snapshot_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
+    after_snapshot_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
+    result: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

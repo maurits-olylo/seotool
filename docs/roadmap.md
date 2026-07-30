@@ -671,8 +671,13 @@ Acceptatie:
 
 ### Gerichte verificatiecrawls na uitvoering
 
-Status: gepland na het taakworkflowbesluit en de aanbevelingsbibliotheek. De bestaande
-Redis/RQ-infrastructuur, crawlbeveiliging, snapshots, hashes en lichte crawlqueue worden hergebruikt.
+Status: verificatiemodel en read-only scopeplan technisch geïmplementeerd; dedicated executor en
+drie eerste regels volgen. `repair_broken_internal_link`, `fix_redirect_chain_or_loop` en
+`correct_canonical` zijn als eerste scope geselecteerd. Het scopeplan blokkeert een verzoek zolang
+de taak niet uitgevoerd is of vereiste bron-, doel-, oude-, nieuwe- of canonicalrollen ontbreken.
+De bestaande Redis/RQ-infrastructuur, crawlbeveiliging, snapshots, hashes en lichte crawlqueue
+worden hergebruikt, maar de algemene `light_check` wordt niet direct gebruikt omdat die standaard
+alle actieve website-URL's verwerkt.
 Een gerichte controle start nooit impliciet een volledige websitecrawl.
 
 Doel en gebruikerswaarde:

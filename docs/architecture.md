@@ -94,6 +94,13 @@ minuten worden centraal omgezet naar een vaste effort-band. Gestructureerde sign
 taakevent en activity log opgenomen; vrije opmerkingen blijven uitsluitend op het klantgebonden
 feedbackrecord en worden niet voorbereid voor klantoverstijgende aggregatie.
 
+`recommendation_verifications` bewaart per toekomstige gerichte controle de taak, het type en de
+scopeversie, URL-scope, regels, voor- en nasnapshots, resultaat, fout en timestamps. Een read-only
+scopeplan controleert vooraf of de taak uitgevoerd is en alle vereiste URL-rollen bevat. Er wordt
+nog niets gequeued: de bestaande `light_check` verwerkt een volledige website en is daarom geen
+veilige executor voor een gerichte verificatie. De dedicated executor moet een vaste URL-ID-lijst
+afdwingen voordat enqueueing wordt geactiveerd.
+
 ## Jobs en exports
 
 De API en scheduler schrijven eerst een persistent `crawl_job` en plaatsen daarna alleen het ID op

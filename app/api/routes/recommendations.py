@@ -13,6 +13,7 @@ from app.models.recommendations import (
     RecommendationTaskEvent,
     RecommendationTaskIssue,
     RecommendationTaskUrl,
+    RecommendationVerification,
 )
 from app.schemas.recommendations import (
     RecommendationDefinitionRead,
@@ -21,6 +22,8 @@ from app.schemas.recommendations import (
     RecommendationTaskDetailRead,
     RecommendationTaskRead,
     RecommendationTaskUpdate,
+    RecommendationVerificationPlanRead,
+    RecommendationVerificationRead,
 )
 from app.services.authorization import require_website_access, require_write_access
 from app.services.recommendation_library import DEFINITIONS
@@ -29,6 +32,7 @@ from app.services.recommendation_tasks import (
     create_task_from_issue,
     record_feedback,
     update_task,
+    verification_scope_plan,
 )
 
 router = APIRouter(tags=["recommendations"])
@@ -180,6 +184,40 @@ def create_recommendation_feedback(
         return record_feedback(db, task=task, payload=payload, principal=principal)
     except RecommendationTaskError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get(
+    "/recommendation-tasks/{task_id}/verification-plan",
+    response_model=RecommendationVerificationPlanRead,
+)
+def get_recommendation_verification_plan(
+    task_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, object]:
+    task = _task_or_404(db, task_id)
+    require_website_access(db, principal, task.website_id)
+    return verification_scope_plan(db, task=task)
+
+
+@router.get(
+    "/recommendation-tasks/{task_id}/verifications",
+    response_model=list[RecommendationVerificationRead],
+)
+def list_recommendation_verifications(
+    task_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> list[RecommendationVerification]:
+    task = _task_or_404(db, task_id)
+    require_website_access(db, principal, task.website_id)
+    return list(
+        db.scalars(
+            select(RecommendationVerification)
+            .where(RecommendationVerification.task_id == task.id)
+            .order_by(RecommendationVerification.created_at.desc())
+        )
+    )
 
 
 def _task_or_404(db: Session, task_id: UUID) -> RecommendationTask:

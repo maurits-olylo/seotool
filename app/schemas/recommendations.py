@@ -168,3 +168,33 @@ class RecommendationFeedbackRead(ORMModel):
     final_assessment: FinalAssessment | None
     notes: str | None
     created_at: datetime
+
+
+class RecommendationVerificationPlanRead(BaseModel):
+    task_id: UUID
+    verification_type: str
+    scope_version: str
+    supported: bool
+    required_roles: list[str]
+    present_roles: list[str]
+    missing_roles: list[str]
+    url_count: int
+    can_request: bool
+    blocking_reason: str | None
+
+
+class RecommendationVerificationRead(Timestamped):
+    task_id: UUID
+    requested_by_user_id: UUID | None
+    crawl_job_id: UUID | None
+    verification_type: str
+    scope_version: str
+    status: str
+    scope: dict[str, object]
+    rules: list[dict[str, object]]
+    before_snapshot_ids: list[str]
+    after_snapshot_ids: list[str]
+    result: dict[str, object]
+    error_message: str | None
+    started_at: datetime | None
+    finished_at: datetime | None

@@ -15,6 +15,7 @@ from app.models.recommendations import (
     RecommendationTaskEvent,
     RecommendationTaskIssue,
     RecommendationTaskUrl,
+    RecommendationVerification,
 )
 from app.models.user import ClientMembership, User
 from app.models.website import Website, WebsiteSettings
@@ -105,6 +106,14 @@ def test_task_links_issues_urls_events_and_feedback() -> None:
                     verification_outcome="passed",
                     final_assessment="completed",
                 ),
+                RecommendationVerification(
+                    task_id=task.id,
+                    verification_type="repair_broken_internal_link",
+                    scope_version="1",
+                    status="queued",
+                    scope={"source": [str(url.id)]},
+                    rules=[{"rule": "source_link_removed_or_updated"}],
+                ),
             ]
         )
         db.commit()
@@ -114,6 +123,7 @@ def test_task_links_issues_urls_events_and_feedback() -> None:
         assert db.query(RecommendationTaskUrl).filter_by(task_id=task.id).count() == 1
         assert db.query(RecommendationTaskEvent).filter_by(task_id=task.id).count() == 1
         assert db.query(RecommendationFeedback).filter_by(task_id=task.id).count() == 1
+        assert db.query(RecommendationVerification).filter_by(task_id=task.id).count() == 1
 
 
 def test_task_constraints_reject_invalid_status_and_effort() -> None:
@@ -168,6 +178,20 @@ def test_recommendation_task_api_lifecycle(client) -> None:  # type: ignore[no-u
     assert task["priority"] == "high"
     assert task["status"] == "open"
     assert task["verification_status"] == "not_requested"
+    initial_plan = client.get(
+        f"/api/v1/recommendation-tasks/{task_id}/verification-plan"
+    )
+    assert initial_plan.status_code == 200
+    assert initial_plan.json()["supported"] is True
+    assert initial_plan.json()["required_roles"] == ["source", "target"]
+    assert initial_plan.json()["present_roles"] == ["source"]
+    assert initial_plan.json()["missing_roles"] == ["target"]
+    assert initial_plan.json()["can_request"] is False
+    assert "eerst als uitgevoerd" in initial_plan.json()["blocking_reason"]
+    assert (
+        client.get(f"/api/v1/recommendation-tasks/{task_id}/verifications").json()
+        == []
+    )
 
     duplicate = client.post(f"/api/v1/issues/{issue_id}/recommendation-task")
     assert duplicate.status_code == 409
@@ -211,6 +235,33 @@ def test_recommendation_task_api_lifecycle(client) -> None:  # type: ignore[no-u
     )
     assert implemented.status_code == 200
     assert implemented.json()["implemented_at"] is not None
+    incomplete_plan = client.get(
+        f"/api/v1/recommendation-tasks/{task_id}/verification-plan"
+    ).json()
+    assert incomplete_plan["can_request"] is False
+    assert "target" in incomplete_plan["blocking_reason"]
+    with SessionLocal() as db:
+        target = Url(
+            website_id=website_id,
+            normalized_url="https://example.com/repaired-target",
+        )
+        db.add(target)
+        db.flush()
+        db.add(
+            RecommendationTaskUrl(
+                task_id=UUID(task_id),
+                url_id=target.id,
+                role="target",
+                is_user_supplied=True,
+            )
+        )
+        db.commit()
+    complete_plan = client.get(
+        f"/api/v1/recommendation-tasks/{task_id}/verification-plan"
+    ).json()
+    assert complete_plan["can_request"] is True
+    assert complete_plan["missing_roles"] == []
+    assert complete_plan["url_count"] == 2
     feedback = client.post(
         f"/api/v1/recommendation-tasks/{task_id}/feedback",
         json={
@@ -347,6 +398,18 @@ def test_client_role_can_read_but_not_change_recommendation_tasks(client) -> Non
     assert browser.get(f"/api/v1/recommendation-tasks/{task_id}").status_code == 200
     assert (
         browser.get(f"/api/v1/recommendation-tasks/{task_id}/feedback").status_code
+        == 200
+    )
+    assert (
+        browser.get(
+            f"/api/v1/recommendation-tasks/{task_id}/verification-plan"
+        ).status_code
+        == 200
+    )
+    assert (
+        browser.get(
+            f"/api/v1/recommendation-tasks/{task_id}/verifications"
+        ).status_code
         == 200
     )
     assert (

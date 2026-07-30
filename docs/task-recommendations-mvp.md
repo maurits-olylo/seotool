@@ -125,6 +125,11 @@ Bewaar job-ID, scopeversie, voor- en nasnapshots, uitgevoerde regels, voortgang,
 foutdetails en timestamps. Verificaties gebruiken een eigen jobtype op de lichte crawlqueue en
 verversen de wekelijkse full-crawlplanning niet.
 
+Implementatiestatus: tabel, tenantbeveiligde lees-API en scopeplan zijn gereed. De eerste scope
+omvat defecte interne links, redirectketens/-loops en canonicals. Enqueueing blijft uitgeschakeld
+totdat de dedicated executor uitsluitend de vastgelegde URL-ID's verwerkt; de algemene light check
+mag hiervoor niet worden gebruikt.
+
 ### `recommendation_feedback`
 
 Klantgebonden feedback:

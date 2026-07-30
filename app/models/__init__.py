@@ -32,6 +32,7 @@ from app.models.recommendations import (
     RecommendationTaskEvent,
     RecommendationTaskIssue,
     RecommendationTaskUrl,
+    RecommendationVerification,
 )
 from app.models.reporting import MonthlyReportSnapshot
 from app.models.system import CrawlDeploymentControl
@@ -59,6 +60,7 @@ __all__ = [
     "RecommendationTaskEvent",
     "RecommendationTaskIssue",
     "RecommendationTaskUrl",
+    "RecommendationVerification",
     "IntegrationConnection",
     "BingPageMetric",
     "BingQueryMetric",

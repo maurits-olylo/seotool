@@ -16,7 +16,10 @@ from app.models.recommendations import (
 from app.models.user import ClientMembership, User
 from app.models.website import Website
 from app.schemas.recommendations import RecommendationFeedbackCreate, RecommendationTaskUpdate
-from app.services.recommendation_library import recommendation_for_issue_type
+from app.services.recommendation_library import (
+    get_recommendation_definition,
+    recommendation_for_issue_type,
+)
 
 ACTIVE_TASK_STATUSES = {"open", "planned", "in_progress", "waiting_for_input", "implemented"}
 ALLOWED_TRANSITIONS = {
@@ -29,6 +32,11 @@ ALLOWED_TRANSITIONS = {
 }
 PRIORITY_RANK = {"low": 0, "normal": 1, "high": 2, "critical": 3}
 SEVERITY_PRIORITY = {"low": "low", "medium": "normal", "high": "high"}
+SCOPED_VERIFICATION_TYPES = {
+    "repair_broken_internal_link",
+    "fix_redirect_chain_or_loop",
+    "correct_canonical",
+}
 
 
 class RecommendationTaskError(ValueError):
@@ -246,6 +254,46 @@ def record_feedback(
     db.commit()
     db.refresh(feedback)
     return feedback
+
+
+def verification_scope_plan(
+    db: Session,
+    *,
+    task: RecommendationTask,
+) -> dict[str, object]:
+    definition = get_recommendation_definition(task.recommendation_type)
+    required_roles = list(definition.verification_scope)
+    task_urls = list(
+        db.scalars(
+            select(RecommendationTaskUrl).where(
+                RecommendationTaskUrl.task_id == task.id
+            )
+        )
+    )
+    present_roles = sorted({item.role for item in task_urls})
+    missing_roles = [role for role in required_roles if role not in present_roles]
+    supported = task.recommendation_type in SCOPED_VERIFICATION_TYPES
+    blocking_reason: str | None = None
+    if not supported:
+        blocking_reason = "Voor dit aanbevelingstype is nog geen verificatieregel beschikbaar."
+    elif task.status != "implemented":
+        blocking_reason = "De taak moet eerst als uitgevoerd zijn gemarkeerd."
+    elif missing_roles:
+        blocking_reason = (
+            "De verificatiescope mist URL-rollen: " + ", ".join(missing_roles) + "."
+        )
+    return {
+        "task_id": task.id,
+        "verification_type": task.recommendation_type,
+        "scope_version": definition.version,
+        "supported": supported,
+        "required_roles": required_roles,
+        "present_roles": present_roles,
+        "missing_roles": missing_roles,
+        "url_count": len(task_urls),
+        "can_request": blocking_reason is None,
+        "blocking_reason": blocking_reason,
+    }
 
 
 def _strongest_priority(first: str, second: str) -> str:
