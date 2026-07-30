@@ -1,6 +1,10 @@
+from uuid import UUID
+
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
 
+from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.models.client import Client
 from app.models.discovery import Url
@@ -12,6 +16,7 @@ from app.models.recommendations import (
     RecommendationTaskIssue,
     RecommendationTaskUrl,
 )
+from app.models.user import ClientMembership, User
 from app.models.website import Website, WebsiteSettings
 from app.services.recommendation_library import (
     DEFINITIONS,
@@ -119,3 +124,188 @@ def test_task_constraints_reject_invalid_status_and_effort() -> None:
         task.effort_max_minutes = 30
         with pytest.raises(IntegrityError):
             db.commit()
+
+
+def test_recommendation_task_api_lifecycle(client) -> None:  # type: ignore[no-untyped-def]
+    customer = client.post("/api/v1/clients", json={"name": "Task API client"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": customer["id"],
+            "name": "Task API website",
+            "base_url": "https://example.com",
+        },
+    ).json()
+    with SessionLocal() as db:
+        website_id = UUID(website["id"])
+        url = Url(website_id=website_id, normalized_url="https://example.com/source")
+        db.add(url)
+        db.flush()
+        issue = Issue(
+            website_id=website_id,
+            url_id=url.id,
+            issue_type="internally_linked_404",
+            category="internal_links",
+            severity="high",
+            title="Defecte interne link",
+            description="De link geeft 404.",
+            recommended_action="Vervang de link.",
+        )
+        db.add(issue)
+        db.commit()
+        issue_id = issue.id
+
+    definitions = client.get("/api/v1/recommendation-types")
+    assert definitions.status_code == 200
+    assert len(definitions.json()) == 15
+
+    created = client.post(f"/api/v1/issues/{issue_id}/recommendation-task")
+    assert created.status_code == 201
+    task = created.json()
+    task_id = task["id"]
+    assert task["recommendation_type"] == "repair_broken_internal_link"
+    assert task["primary_role"] == "content"
+    assert task["priority"] == "high"
+    assert task["status"] == "open"
+    assert task["verification_status"] == "not_requested"
+
+    duplicate = client.post(f"/api/v1/issues/{issue_id}/recommendation-task")
+    assert duplicate.status_code == 409
+
+    tasks = client.get(f"/api/v1/websites/{website['id']}/recommendation-tasks")
+    assert tasks.status_code == 200
+    assert [item["id"] for item in tasks.json()] == [task_id]
+
+    detail = client.get(f"/api/v1/recommendation-tasks/{task_id}")
+    assert detail.status_code == 200
+    assert detail.json()["issue_ids"] == [str(issue_id)]
+    assert detail.json()["urls"][0]["role"] == "source"
+    assert detail.json()["events"][0]["event_type"] == "created"
+
+    planned = client.patch(
+        f"/api/v1/recommendation-tasks/{task_id}",
+        json={"status": "planned", "comment": "In de sprint opgenomen."},
+    )
+    assert planned.status_code == 200
+    assert planned.json()["status"] == "planned"
+
+    invalid_transition = client.patch(
+        f"/api/v1/recommendation-tasks/{task_id}",
+        json={"status": "implemented"},
+    )
+    assert invalid_transition.status_code == 422
+
+    in_progress = client.patch(
+        f"/api/v1/recommendation-tasks/{task_id}",
+        json={"status": "in_progress"},
+    )
+    assert in_progress.status_code == 200
+    implemented = client.patch(
+        f"/api/v1/recommendation-tasks/{task_id}",
+        json={"status": "implemented"},
+    )
+    assert implemented.status_code == 200
+    assert implemented.json()["implemented_at"] is not None
+
+    missing_close_reason = client.patch(
+        f"/api/v1/recommendation-tasks/{task_id}",
+        json={"status": "closed"},
+    )
+    assert missing_close_reason.status_code == 422
+    closed = client.patch(
+        f"/api/v1/recommendation-tasks/{task_id}",
+        json={"status": "closed", "close_reason": "verified"},
+    )
+    assert closed.status_code == 200
+    assert closed.json()["close_reason"] == "verified"
+    assert closed.json()["closed_at"] is not None
+    assert (
+        client.get(f"/api/v1/websites/{website['id']}/recommendation-tasks").json() == []
+    )
+
+    reopen_without_comment = client.patch(
+        f"/api/v1/recommendation-tasks/{task_id}",
+        json={"status": "open"},
+    )
+    assert reopen_without_comment.status_code == 422
+    reopened = client.patch(
+        f"/api/v1/recommendation-tasks/{task_id}",
+        json={"status": "open", "comment": "Probleem kwam terug."},
+    )
+    assert reopened.status_code == 200
+    assert reopened.json()["close_reason"] is None
+    assert reopened.json()["closed_at"] is None
+
+
+def test_client_role_can_read_but_not_change_recommendation_tasks(client) -> None:  # type: ignore[no-untyped-def]
+    customer = client.post("/api/v1/clients", json={"name": "Read-only task client"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": customer["id"],
+            "name": "Read-only task website",
+            "base_url": "https://readonly.example.com",
+        },
+    ).json()
+    website_id = UUID(website["id"])
+    with SessionLocal() as db:
+        report_user = User(
+            email="task-reader@example.com",
+            role="client",
+            password_hash=hash_password("task-reader-secure-password"),
+        )
+        db.add(report_user)
+        db.flush()
+        db.add(
+            ClientMembership(
+                user_id=report_user.id,
+                client_id=UUID(customer["id"]),
+                role="client",
+            )
+        )
+        issue = Issue(
+            website_id=website_id,
+            issue_type="http_404",
+            category="reachability",
+            severity="high",
+            title="Pagina geeft 404",
+            description="De pagina is niet bereikbaar.",
+            recommended_action="Herstel of redirect de pagina.",
+        )
+        db.add(issue)
+        db.commit()
+        issue_id = issue.id
+
+    created = client.post(f"/api/v1/issues/{issue_id}/recommendation-task")
+    assert created.status_code == 201
+    task_id = created.json()["id"]
+
+    from app.main import app
+
+    browser = TestClient(app)
+    assert (
+        browser.post(
+            "/ui/login",
+            json={
+                "email": "task-reader@example.com",
+                "password": "task-reader-secure-password",
+            },
+        ).status_code
+        == 204
+    )
+    assert (
+        browser.get(f"/api/v1/websites/{website_id}/recommendation-tasks").status_code
+        == 200
+    )
+    assert browser.get(f"/api/v1/recommendation-tasks/{task_id}").status_code == 200
+    assert (
+        browser.post(f"/api/v1/issues/{issue_id}/recommendation-task").status_code
+        == 403
+    )
+    assert (
+        browser.patch(
+            f"/api/v1/recommendation-tasks/{task_id}",
+            json={"status": "planned"},
+        ).status_code
+        == 403
+    )

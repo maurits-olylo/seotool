@@ -68,6 +68,9 @@ class RecommendationTask(UUIDTimestampMixin, Base):
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), index=True
     )
+    assigned_to_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
     primary_issue_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("issues.id", ondelete="SET NULL"), index=True
     )

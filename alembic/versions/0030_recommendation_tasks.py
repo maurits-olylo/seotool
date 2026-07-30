@@ -41,6 +41,7 @@ def upgrade() -> None:
         "recommendation_tasks",
         sa.Column("website_id", sa.Uuid(), nullable=False),
         sa.Column("created_by_user_id", sa.Uuid(), nullable=True),
+        sa.Column("assigned_to_user_id", sa.Uuid(), nullable=True),
         sa.Column("primary_issue_id", sa.Uuid(), nullable=True),
         sa.Column("recommendation_type", sa.String(length=100), nullable=False),
         sa.Column("definition_version", sa.String(length=30), nullable=False),
@@ -100,6 +101,7 @@ def upgrade() -> None:
             name="ck_task_effort_range",
         ),
         sa.ForeignKeyConstraint(["created_by_user_id"], ["users.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(["assigned_to_user_id"], ["users.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["primary_issue_id"], ["issues.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["website_id"], ["websites.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
@@ -107,6 +109,7 @@ def upgrade() -> None:
     for name, column in (
         ("ix_recommendation_tasks_website_id", "website_id"),
         ("ix_recommendation_tasks_created_by_user_id", "created_by_user_id"),
+        ("ix_recommendation_tasks_assigned_to_user_id", "assigned_to_user_id"),
         ("ix_recommendation_tasks_primary_issue_id", "primary_issue_id"),
         ("ix_recommendation_tasks_recommendation_type", "recommendation_type"),
         ("ix_recommendation_tasks_category", "category"),

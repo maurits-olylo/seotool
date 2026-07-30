@@ -577,9 +577,10 @@ bestaat. Verdere issuetype-specifieke verdieping volgt samen met nieuwe diagnose
 
 ### Taakgerichte aanbevelingen en eigenaarschap
 
-Status: fundament technisch geïmplementeerd; deployment volgt. De eerste versie bevat 15
-versiebeheerde aanbevelingstypen, een gekoppelde taaklaag, issue- en URL-koppelingen,
-onveranderlijke events, klantgebonden feedback en gescheiden taak- en verificatiestatussen. API,
+Status: fundament en eerste REST-API technisch geïmplementeerd; deployment volgt. De eerste versie
+bevat 15 versiebeheerde aanbevelingstypen, taakcreatie vanuit een issue, duplicaatpreventie,
+tenantautorisatie, gecontroleerde statusovergangen, eigenaarschap, issue- en URL-koppelingen,
+onveranderlijke events, klantgebonden feedback en gescheiden taak- en verificatiestatussen. De
 interface en verificatiejobs volgen in afzonderlijke stappen. De huidige `recommended_action`,
 begeleiding, toewijzing, vervaldatum, comments en `activity_log` blijven de bestaande productbasis.
 

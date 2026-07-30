@@ -78,6 +78,12 @@ technische controle nog loopt, en kan een issue door een volgende crawl worden o
 zonder menselijke planning te overschrijven. Klantoverstijgende aggregatie is nog niet actief en
 ruwe content, URL's, queries en analyticsregels verlaten nooit hun tenant.
 
+De REST-API ontsluit de versiebeheerde typen, maakt per issue maximaal één actieve taak van
+hetzelfde type aan en biedt websiteoverzicht, detail en gecontroleerde updates. Iedere lees- en
+schrijfroute gebruikt bestaande tenantautorisatie; gebruikers met de klantrol houden alleen
+leestoegang. Statusovergangen worden centraal gevalideerd en als taakevent en globale activiteit
+vastgelegd.
+
 ## Jobs en exports
 
 De API en scheduler schrijven eerst een persistent `crawl_job` en plaatsen daarna alleen het ID op

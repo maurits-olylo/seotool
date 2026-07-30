@@ -239,7 +239,7 @@ DEFINITIONS = (
         (15, 60),
         "direct",
         ("Open de vacature en test de CTA.", "Koppel de knop aan het werkende formulier of doel."),
-        ("De sollicitatieactie is zichtbaar, bruikbaar en heeft een werkende bestemming."),
+        ("De sollicitatieactie is zichtbaar, bruikbaar en heeft een werkende bestemming.",),
         ("source", "target"),
     ),
     RecommendationDefinition(
