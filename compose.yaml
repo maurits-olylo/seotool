@@ -19,7 +19,7 @@ services:
     environment:
       # Keep legacy default jobs drainable during the first queue-split deployment.
       # Drain pre-split crawl jobs from `crawls` during the queue transition.
-      WORKER_QUEUES: crawls_light,crawls,default
+      WORKER_QUEUES: crawls_light,crawls,default,verifications
       WORKER_NAME: light-1
     command: python -m app.worker
     volumes: ["exports_data:/app/exports"]

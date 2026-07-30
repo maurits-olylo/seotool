@@ -739,3 +739,17 @@ linktaak. Een volgende issueherberekening lost eerder aangemaakte foutpositieven
 
 Gevolg: echte defecte links vanaf bereikbare pagina's blijven behouden. Zelfverwijzingen en
 navigatielinks uit 404-, 410- en serverfoutpagina's veroorzaken geen dubbele of misleidende actie.
+
+## 2026-07-31 — Gerichte verificatie gebruikt een eigen executor
+
+Context: de bestaande light check verwerkt alle actieve URL's van een website en kan daardoor niet
+veilig als controle van één uitgevoerde aanbeveling dienen.
+
+Besluit: iedere verificatie bevriest haar URL-rollen, krijgt een eigen crawltaak en crawlrun en wordt
+via een aparte queue uitgevoerd. Een database-index staat per aanbevelingstaak maximaal één actieve
+verificatie toe. Alleen noodzakelijke scope-URL's worden opgehaald; full-crawlplanning en
+issue-lifecycle worden niet bijgewerkt. De inhoudelijke conclusie staat als `outcome` in het
+resultaat, terwijl de bestaande technische verificatiestatus de workerstatus blijft tonen.
+
+Gevolg: aanvragen en retries zijn idempotent, resultaten blijven auditeerbaar en een gerichte
+controle kan nooit stilzwijgend uitgroeien tot een volledige websitecrawl.

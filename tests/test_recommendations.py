@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.models.client import Client
-from app.models.crawl import CrawlRun
+from app.models.crawl import CrawlRun, UrlSnapshot
 from app.models.discovery import CrawlJob, Url
 from app.models.issues import ActivityLog, Issue, IssueOccurrence
 from app.models.recommendations import (
@@ -20,11 +20,13 @@ from app.models.recommendations import (
 )
 from app.models.user import ClientMembership, User
 from app.models.website import Website, WebsiteSettings
+from app.services.http_crawler import FetchResult
 from app.services.recommendation_library import (
     DEFINITIONS,
     get_recommendation_definition,
     recommendation_for_issue_type,
 )
+from app.services.recommendation_verifications import execute_verification
 
 
 def _task_fixture(db):  # type: ignore[no-untyped-def]
@@ -137,7 +139,12 @@ def test_task_constraints_reject_invalid_status_and_effort() -> None:
             db.commit()
 
 
-def test_recommendation_task_api_lifecycle(client) -> None:  # type: ignore[no-untyped-def]
+def test_recommendation_task_api_lifecycle(client, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    queued: list[str] = []
+    monkeypatch.setattr(
+        "app.services.recommendation_verifications.enqueue_recommendation_verification",
+        queued.append,
+    )
     customer = client.post("/api/v1/clients", json={"name": "Task API client"}).json()
     website = client.post(
         "/api/v1/websites",
@@ -286,6 +293,16 @@ def test_recommendation_task_api_lifecycle(client) -> None:  # type: ignore[no-u
         json={"role": "source", "url": "https://example.com/source"},
     )
     assert restored_scope.status_code == 201
+    requested = client.post(
+        f"/api/v1/recommendation-tasks/{task_id}/verifications"
+    )
+    assert requested.status_code == 202
+    assert requested.json()["status"] == "queued"
+    assert queued == [requested.json()["id"]]
+    duplicate_verification = client.post(
+        f"/api/v1/recommendation-tasks/{task_id}/verifications"
+    )
+    assert duplicate_verification.status_code == 409
     feedback = client.post(
         f"/api/v1/recommendation-tasks/{task_id}/feedback",
         json={
@@ -328,7 +345,6 @@ def test_recommendation_task_api_lifecycle(client) -> None:  # type: ignore[no-u
         client.post(f"/api/v1/recommendation-tasks/{task_id}/feedback", json={}).status_code
         == 422
     )
-
     missing_close_reason = client.patch(
         f"/api/v1/recommendation-tasks/{task_id}",
         json={"status": "closed"},
@@ -358,6 +374,100 @@ def test_recommendation_task_api_lifecycle(client) -> None:  # type: ignore[no-u
     assert reopened.json()["close_reason"] is None
     assert reopened.json()["closed_at"] is None
 
+
+def test_targeted_broken_link_verification_only_fetches_selected_urls(
+    monkeypatch,
+) -> None:
+    fetched: list[str] = []
+
+    def fake_fetch(url: str, **_kwargs: object) -> FetchResult:
+        fetched.append(url)
+        return FetchResult(
+            requested_url=url,
+            final_url=url,
+            status_code=200,
+            redirect_chain=[],
+            headers={"content-type": "text/html"},
+            content=b"<html><head><title>Bron</title></head><body>Hersteld</body></html>",
+            response_time_ms=2,
+        )
+
+    monkeypatch.setattr(
+        "app.services.recommendation_verifications.fetch_url",
+        fake_fetch,
+    )
+    monkeypatch.setattr("app.jobs._load_robots_rules", lambda _db, _job: None)
+    with SessionLocal() as db:
+        website, source, _issue, task = _task_fixture(db)
+        task.status = "implemented"
+        target = Url(
+            website_id=website.id,
+            normalized_url="https://example.com/defect",
+        )
+        unrelated = Url(
+            website_id=website.id,
+            normalized_url="https://example.com/niet-in-scope",
+        )
+        db.add_all([target, unrelated])
+        db.flush()
+        db.add_all(
+            [
+                RecommendationTaskUrl(task_id=task.id, url_id=source.id, role="source"),
+                RecommendationTaskUrl(
+                    task_id=task.id,
+                    url_id=target.id,
+                    role="broken_target",
+                ),
+            ]
+        )
+        job = CrawlJob(
+            website_id=website.id,
+            job_type="recommendation_verification",
+            settings_snapshot={},
+        )
+        db.add(job)
+        db.flush()
+        verification = RecommendationVerification(
+            task_id=task.id,
+            crawl_job_id=job.id,
+            verification_type=task.recommendation_type,
+            scope_version="2",
+            scope={
+                "urls": [
+                    {
+                        "url_id": str(source.id),
+                        "role": "source",
+                        "url": source.normalized_url,
+                    },
+                    {
+                        "url_id": str(target.id),
+                        "role": "broken_target",
+                        "url": target.normalized_url,
+                    },
+                ]
+            },
+        )
+        db.add(verification)
+        db.commit()
+        verification_id = verification.id
+        interval_before = website.settings.full_crawl_interval
+
+    execute_verification(str(verification_id))
+
+    with SessionLocal() as db:
+        verification = db.get(RecommendationVerification, verification_id)
+        assert verification is not None
+        assert verification.status == "passed"
+        assert verification.result["outcome"] == "resolved"
+        assert fetched == ["https://example.com/source"]
+        assert verification.result["checked_url_ids"] == [str(source.id)]
+        run = db.query(CrawlRun).filter_by(crawl_job_id=verification.crawl_job_id).one()
+        assert run.crawl_type == "recommendation_verification"
+        assert db.query(UrlSnapshot).filter_by(crawl_run_id=run.id).count() == 1
+        assert db.get(Website, website.id).settings.full_crawl_interval == interval_before
+
+    execute_verification(str(verification_id))
+    assert fetched == ["https://example.com/source"]
 
 def test_grouped_broken_link_evidence_enriches_verification_scope(client) -> None:  # type: ignore[no-untyped-def]
     customer = client.post("/api/v1/clients", json={"name": "Scope client"}).json()

@@ -1128,6 +1128,16 @@ de NAS gebeurt via SSH-streaming met `dd`. Controleer op de NAS altijd eerst SHA
 met `sudo tar --no-same-owner` en bouw en herstart alleen geraakte services. Migrations worden alleen
 uitgevoerd wanneer een nieuw Alembic-bestand onderdeel van de release is.
 
+## Gerichte verificatiecrawls
+
+Status: lokaal gereed, nog niet gedeployed.
+
+- Dedicated executor voor defecte interne links, redirectketens/-loops en canonicals.
+- Persistente scope, regels, voor-/nasituatie, fouten, retries en conclusie.
+- Eén actieve verificatie per aanbevelingstaak; alleen beschikbaar voor uitgevoerde taken met een
+  complete en ondersteunde URL-scope.
+- Geen discovery, sitebrede issueherberekening of wijziging van de full-crawlplanning.
+
 ## Fase 11 — Volwaardige visuele issue-inspectie
 
 Status: toekomstig; laatste brede productfase na de huidige roadmap.

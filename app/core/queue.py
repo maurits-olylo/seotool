@@ -11,6 +11,7 @@ CRAWL_QUEUES = frozenset({LIGHT_CRAWL_QUEUE, FULL_CRAWL_QUEUE})
 LEGACY_CRAWL_QUEUE = "crawls"
 INTEGRATION_QUEUE = "integrations"
 EXPORT_QUEUE = "exports"
+VERIFICATION_QUEUE = "verifications"
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,16 @@ def enqueue_crawl_job(job_id: str, *, job_type: str, attempt: int = 0) -> None:
         retry=Retry(max=3, interval=[10, 30, 90]),
         job_id=queue_job_id,
         job_timeout=21_600,
+    )
+
+
+def enqueue_recommendation_verification(verification_id: str) -> None:
+    get_queue(VERIFICATION_QUEUE).enqueue(
+        "app.services.recommendation_verifications.execute_verification",
+        verification_id,
+        retry=Retry(max=3, interval=[10, 30, 90]),
+        job_id=f"recommendation-verification-{verification_id}",
+        job_timeout=3600,
     )
 
 

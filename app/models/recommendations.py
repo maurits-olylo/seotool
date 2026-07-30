@@ -7,10 +7,12 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -202,6 +204,13 @@ class RecommendationVerification(UUIDTimestampMixin, Base):
             "status IN ('queued', 'running', 'passed', 'likely_passed', "
             "'manual_review', 'failed', 'error', 'cancelled')",
             name="ck_recommendation_verification_status",
+        ),
+        Index(
+            "uq_recommendation_verifications_active_task",
+            "task_id",
+            unique=True,
+            postgresql_where=text("status IN ('queued', 'running')"),
+            sqlite_where=text("status IN ('queued', 'running')"),
         ),
     )
 

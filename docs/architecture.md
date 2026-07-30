@@ -229,3 +229,15 @@ www-variant daarvan en expliciet geconfigureerde `allowed_subdomains`. URL's van
 een gedeelde sitemap of CMS worden niet geregistreerd; eerder geregistreerde externe URL's worden
 vóór ieder crawltype gedeactiveerd en niet opnieuw gecrawld. Het standaard URL-overzicht toont alleen
 actieve URL's; historische records blijven expliciet opvraagbaar voor audit en exports.
+
+## Gerichte aanbevelingsverificaties
+
+Een uitgevoerde aanbeveling kan een aparte `recommendation_verification` starten. De API bevriest
+de URL-ID's en rollen in de verificatiescope en maakt een eigen crawltaak en crawlrun aan. De
+dedicated worker haalt alleen de URL's op die voor de regel nodig zijn; hij start geen discovery,
+sitebrede analyse of issueherberekening. HTTP-beveiliging, redirects, robotsregels, extractie en
+snapshots gebruiken dezelfde services als reguliere crawls.
+
+Regelresultaten, voor- en nasnapshot-ID's, fouten en tijden blijven bij de verificatie bewaard.
+Taakstatus, issuestatus en verificatiestatus veranderen onafhankelijk. Een gedeeltelijke of
+mislukte controle zet een geïmplementeerde taak daarom niet automatisch terug.

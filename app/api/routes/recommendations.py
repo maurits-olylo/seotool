@@ -38,6 +38,7 @@ from app.services.recommendation_tasks import (
     update_task,
     verification_scope_plan,
 )
+from app.services.recommendation_verifications import request_verification
 
 router = APIRouter(tags=["recommendations"])
 
@@ -267,6 +268,25 @@ def list_recommendation_verifications(
             .order_by(RecommendationVerification.created_at.desc())
         )
     )
+
+
+@router.post(
+    "/recommendation-tasks/{task_id}/verifications",
+    response_model=RecommendationVerificationRead,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def create_recommendation_verification(
+    task_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> RecommendationVerification:
+    require_write_access(principal)
+    task = _task_or_404(db, task_id)
+    require_website_access(db, principal, task.website_id)
+    try:
+        return request_verification(db, task=task, principal=principal)
+    except RecommendationTaskError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 def _task_or_404(db: Session, task_id: UUID) -> RecommendationTask:
