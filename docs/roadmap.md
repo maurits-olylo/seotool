@@ -572,6 +572,163 @@ bestaat. Verdere issuetype-specifieke verdieping volgt samen met nieuwe diagnose
 - Adviezen uitsluitend baseren op opgeslagen bewijs; onzekerheid zichtbaar houden en geen
   onbewezen AI-conclusie als feit presenteren.
 
+### Taakgerichte aanbevelingen en eigenaarschap
+
+Status: gepland als gefaseerde uitbreiding van de bestaande diagnose-, issue- en bulkworkflow.
+De huidige `recommended_action`, begeleiding, toewijzing, vervaldatum, comments en `activity_log`
+blijven de basis; er wordt niet zonder ontwerpbesluit een tweede concurrerend actiesysteem gebouwd.
+
+Doel en gebruikerswaarde:
+
+- Maak iedere aanbeveling uitvoerbaar voor iemand die de onderliggende SEO-analyse niet zelf heeft
+  gedaan.
+- Beantwoord in de standaardtaak wat moet veranderen, waarom, door wie, met welke stappen,
+  tijdsbandbreedte, afhankelijkheden, gereedcriteria en verificatiemethode.
+- Houd crawlerbewijs, historische vergelijking, confidence, alternatieve verklaringen en
+  databronnen beschikbaar in een aparte analyseweergave.
+
+Gefaseerde scope:
+
+1. **Aanbevelingsbibliotheek en gedeeld begrippenmodel**
+   - Inventariseer bestaande issuetypen en groepeer ze in versieerbare aanbevelingstypen.
+   - Leg per type standaardtitel, primaire en ondersteunende rollen, prioriteitsregels,
+     tijdsbandbreedte, uitvoerbaarheidsniveau, benodigde input, stappen, gereedcriteria,
+     verificatiescope en verificatieregels vast.
+   - Ondersteun minimaal contentredacteur, UX/UI-designer, webdeveloper, SEO-specialist,
+     analytics-specialist, websitebeheerder en projectmanager/beslisser.
+   - Gebruik prioriteiten kritiek, hoog, normaal en laag met een tekstuele onderbouwing; geen
+     onverklaarde totaalscore.
+2. **Taak- en analyseweergave**
+   - Toon standaard alleen taak, reden, eigenaar, prioriteit, indicatieve tijd, stappen,
+     afhankelijkheden en gereedcriteria.
+   - Toon technisch bewijs, meetperioden, gebruikte regels en hypotheses uitklapbaar.
+   - Tijd blijft een bandbreedte met confidence en schaalt aantoonbaar met URL-aantal,
+     templatebereik, CMS-kennis, benodigde input en technische complexiteit.
+3. **Uitvoering en historie**
+   - Registreer bij iedere taakstatuswijziging actor, vorige en nieuwe status, tijdstip,
+     toelichting, aangepaste URL's en gekozen verificatie.
+   - Ondersteun functioneel open, gepland, in uitvoering, wacht op input, uitgevoerd,
+     controle ingepland/actief, waarschijnlijk opgelost, handmatige controle nodig, opgelost,
+     niet opgelost en afgewezen.
+   - Behoud detectiestatus, suppressions en automatische issue-lifecycle zonder betekenisverlies.
+4. **Latere projectspecifieke instructies**
+   - Voeg uitbreidbare instructieprofielen toe voor WordPress, headless CMS, Lovable, React,
+     bekende templates en componenten.
+   - Bouw de eerste versie niet afhankelijk van volledige CMS- of repositorykennis.
+
+Niet in scope:
+
+- Websitewijzigingen automatisch publiceren.
+- AI zelfstandig ingrijpende acties laten besluiten, zoals verwijderen, samenvoegen, splitsen of
+  noindex.
+- Tijdinschattingen als garantie of algemene SEO-score presenteren.
+
+Ontwerpbesluit vóór de eerste migratie:
+
+- **Voorstel:** ontwerp aanbevelingstypen en taakworkflow samen met de bestaande issue-engine, maar
+  voer ze apart uit. Gebruik issues als diagnosebron en voeg alleen wanneer nodig een gekoppelde
+  taak-/uitvoeringslaag toe. Hiermee blijft de automatische `resolved`/`verified` lifecycle
+  gescheiden van menselijke statussen zoals `uitgevoerd` en `wacht op input`.
+- **Alternatief:** breid `issues.status` rechtstreeks uit. Dit vraagt minder tabellen, maar vermengt
+  detectie, uitvoering en verificatie en vergroot het risico op foutieve heropening of verificatie.
+- Beslismoment: na inventarisatie van aanbevelingstypen en statusovergangen, vóór datamodel en
+  Alembic-migratie.
+
+Acceptatie:
+
+- Iedere taak heeft precies één primaire uitvoerdersrol en optioneel ondersteunende rollen.
+- Een niet-specialist kan de taak uitvoeren zonder aanvullende SEO-uitleg te hoeven vragen.
+- Iedere prioriteit en tijdsbandbreedte toont de gebruikte factoren en onzekerheid.
+- Gereedcriteria zijn technisch of handmatig toetsbaar en sluiten aan op de verificatiemethode.
+- Taak- en analyseweergave gebruiken hetzelfde bewijs zonder het te dupliceren.
+- Bestaande issuehistorie, suppressions, bulkacties en automatische lifecycle blijven intact.
+
+### Gerichte verificatiecrawls na uitvoering
+
+Status: gepland na het taakworkflowbesluit en de aanbevelingsbibliotheek. De bestaande
+Redis/RQ-infrastructuur, crawlbeveiliging, snapshots, hashes en lichte crawlqueue worden hergebruikt.
+Een gerichte controle start nooit impliciet een volledige websitecrawl.
+
+Doel en gebruikerswaarde:
+
+- Controleer snel of een gemelde aanpassing live en technisch correct is door alleen noodzakelijke
+  URL's te crawlen.
+- Laat de gebruiker ondertussen andere taken openen en uitvoeren; de controle overleeft navigatie,
+  gesloten modals en beëindigde browsersessies.
+
+Scope:
+
+1. De gebruiker markeert een taak als uitgevoerd, registreert aangepaste URL's en kiest of bevestigt
+   de voorgestelde verificatiescope.
+2. De aanbevelingsbibliotheek bepaalt bron-, doel-, oude, nieuwe, canonical- en representatieve
+   template-URL's plus de uit te voeren checks.
+3. Een idempotente achtergrondjob bewaart queued/running/partially_completed/completed/failed/
+   cancelled, retries, betekenisvolle voortgangsstappen en foutdetails.
+4. De crawler bewaart voor- en nasnapshot, gecontroleerde regels en uitkomst: opgelost,
+   waarschijnlijk opgelost, gedeeltelijk opgelost, niet opgelost of handmatige controle nodig.
+5. De UI toont een globale, niet-blokkerende status, bijvoorbeeld `2 controles actief`, plus
+   stappen als URL ophalen, analyseren, doel controleren, vergelijken en resultaat opslaan.
+6. Na afronding wordt een melding in de applicatie en een auditregel aangemaakt; externe meldingen
+   blijven een latere uitbreiding.
+
+Verificatiescope:
+
+- Title, description, heading, content of schema op één pagina: aangepaste URL.
+- Interne link: bron- en doel-URL.
+- Redirect: oude en nieuwe URL.
+- Canonical: bron, canonical-doel en alleen noodzakelijke variant.
+- Template, navigatie of footer: representatieve steekproef of gerichte impactcrawl.
+- Robots, migratie of aantoonbaar sitebrede wijziging: technische sitecontrole of volledige crawl.
+
+Productgrenzen:
+
+- `Websitewijziging gecontroleerd` betekent alleen dat de eigen crawler de wijziging live ziet.
+- `Google-verwerking nog niet vast te stellen` blijft apart totdat Google-signalen beschikbaar zijn.
+- `Effectmeting nog niet beschikbaar` blijft apart totdat voldoende GSC- of analyticsdata bestaat.
+- Inhoudelijke, juridische, visuele of tone-of-voicekwaliteit kan na technische controle
+  `waarschijnlijk opgelost — handmatige controle nodig` blijven.
+
+Afhankelijkheden:
+
+- Hard: betrouwbare URL-normalisatie, snapshots/hashes, crawlqueue, issuebewijs,
+  aanbevelingstypen en tenantautorisatie.
+- Aanbevolen: taak-/activiteitshistorie en in-app notificatiemodel.
+- Kan parallel: uitbreiding van interne-linksemantiek en elementlocaties voor preciezere checks.
+- Geen harde afhankelijkheid: Matomo, zoekintentie, AI of gedeelde batchverwerking voor volledige
+  sitecrawls.
+
+Acceptatie:
+
+- Een wijziging op één pagina start geen volledige crawl.
+- De job blijft actief buiten de pagina en browsersessie en blokkeert ander werk niet.
+- Scope, voor- en nasituatie, uitgevoerde regels en conclusie zijn aan dezelfde taak gekoppeld.
+- Interne-linkverificatie controleert bron, crawlbare hoofdcontentlink, anker, doelstatus,
+  indexeerbaarheid en onverwachte canonical.
+- Redirectverificatie controleert status, directe bestemming, keten/loop, eindstatus en canonical.
+- Onzekere of gedeeltelijke uitkomsten vragen handmatige controle en worden niet automatisch
+  `opgelost`.
+- Een verificatieclaim zegt nooit dat Google de wijziging al heeft geïndexeerd.
+
+### Periodieke volledige crawls naast gerichte controles
+
+Status: bestaand gedrag behouden en na introductie van verificatiecrawls expliciet bewaken.
+
+- De scheduler plant volledige sitecrawls standaard wekelijks; website-instellingen worden later
+  de leidende configureerbare bron voor dagelijks, wekelijks, tweewekelijks, maandelijks of
+  handmatig.
+- Volledige crawls blijven nodig voor nieuwe en verdwenen URL's, externe wijzigingen,
+  sitebrede regressies, interne-linkstructuur, templates en problemen buiten actieve taken.
+- Gerichte verificaties mogen de verschuldigdheid van een volledige crawl niet verversen.
+- Een volgende volledige crawl mag een eerdere gerichte uitkomst in bredere context bevestigen of
+  heropenen zonder dubbele taak aan te maken.
+
+Acceptatie:
+
+- De standaard blijft één volledige crawl per zeven dagen.
+- Een gerichte verificatie verschuift de geplande volledige crawl niet.
+- Nieuwe problemen buiten de verificatiescope worden bij de volgende volledige crawl normaal
+  ontdekt.
+
 #### Lighthouse-aanbevelingen als uitvoerbare websiteacties
 
 Status: gepland als API-integratie en adviesbron; geen afzonderlijk SEO-score- of
@@ -900,6 +1057,36 @@ De module bewaart classificatiehistorie, inputhash, model-/prompt-/formuleversie
 signalen en analyseperiode. Query- en analyticsdata blijven in hun bestaande brontabellen en worden
 niet gedupliceerd. SERP-intentie blijft een latere provideruitbreiding tenzij dan al een betrouwbare
 SERP-bron beschikbaar is.
+
+### Effectmeting na uitgevoerde aanbevelingen
+
+Status: latere uitbreiding nadat taakstatussen, verificatiesnapshots, stabiele GSC- en
+Matomo-imports en voldoende historie beschikbaar zijn.
+
+- Vergelijk gelijkwaardige perioden vóór en na uitvoering met minimale datadrempels voor
+  vertoningen, klikken, CTR, positie, landingsbezoeken, doorstroom, events, doelen en conversies.
+- Houd implementatiecontrole, mogelijke Google-verwerking en waargenomen prestatieontwikkeling als
+  drie afzonderlijke conclusies.
+- Corrigeer of waarschuw voor positieverschil, seizoen, weekdagen, campagnes, branded verkeer,
+  meetdekking en andere gelijktijdige wijzigingen.
+- Gebruik voorzichtige formuleringen en claim geen causaliteit.
+- Koppel meetresultaten aan de taakgeschiedenis en opportunity-engine zonder oorspronkelijke
+  issues, snapshots of bronmetrics te dupliceren.
+
+Acceptatie:
+
+- Een effectvergelijking toont perioden, datadekking, relevante verschillen en onzekerheden.
+- Onvoldoende of onvergelijkbare data levert `effect nog niet vast te stellen`, niet nul effect.
+- De tool zegt nooit dat een taak een prestatieverandering heeft veroorzaakt.
+- De gebruiker kan implementatie, Google-verwerking en effect als afzonderlijke stadia volgen.
+
+Beslismomenten voor latere bundeling:
+
+- Ontwerp effectmeting samen met de opportunity-engine en zoekintentie/klantreis, maar release deze
+  apart nadat Matomo stabiel is; samen uitvoeren zou fase 10 onnodig vergroten.
+- Ontwerp externe taakmanagementkoppelingen en externe notificaties pas wanneer de interne
+  taakworkflow in productie is gevalideerd; vroegtijdig bouwen maakt externe systemen leidend voor
+  een nog veranderend statusmodel.
 
 ## Deploymentafspraak
 
