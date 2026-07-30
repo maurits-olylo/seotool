@@ -59,6 +59,25 @@ zodat historische en nieuwe issues zonder dataherschrijving dezelfde classificat
 De eveneens afgeleide `nature` maakt zichtbaar of de meting een aantoonbaar probleem, een
 contextafhankelijke controle of een optionele optimalisatie is. Prioriteit blijft daarvan losstaan.
 
+## Aanbevelingstaken
+
+Issues blijven de technische diagnosebron en behouden hun automatische lifecycle. De
+versiebeheerde aanbevelingsbibliotheek vertaalt een eerste set concrete issuetypen naar een
+taakdefinitie met primaire rol, standaardprioriteit, effort-band, stappen, gereedcriteria en
+verificatiescope.
+
+`recommendation_tasks` bewaart de menselijke uitvoering los van `issues.status`.
+`recommendation_task_issues` koppelt één taak aan een of meer diagnoses en
+`recommendation_task_urls` legt de rol van bron-, doel- of voorbeeld-URL's vast. De onveranderlijke
+`recommendation_task_events` bewaren status- en uitvoeringshistorie. `recommendation_feedback`
+registreert klantgebonden tijd, bruikbaarheid, correcties en verificatie-uitkomsten voor latere
+kalibratie.
+
+Taakstatus en verificatiestatus zijn afzonderlijk. Daardoor kan een taak uitgevoerd zijn terwijl
+technische controle nog loopt, en kan een issue door een volgende crawl worden opgelost of heropend
+zonder menselijke planning te overschrijven. Klantoverstijgende aggregatie is nog niet actief en
+ruwe content, URL's, queries en analyticsregels verlaten nooit hun tenant.
+
 ## Jobs en exports
 
 De API en scheduler schrijven eerst een persistent `crawl_job` en plaatsen daarna alleen het ID op

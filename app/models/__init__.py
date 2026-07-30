@@ -26,6 +26,13 @@ from app.models.issues import (
     IssueSuppression,
 )
 from app.models.jobs import JobListing
+from app.models.recommendations import (
+    RecommendationFeedback,
+    RecommendationTask,
+    RecommendationTaskEvent,
+    RecommendationTaskIssue,
+    RecommendationTaskUrl,
+)
 from app.models.reporting import MonthlyReportSnapshot
 from app.models.system import CrawlDeploymentControl
 from app.models.user import ClientMembership, User, UserInvitation
@@ -47,6 +54,11 @@ __all__ = [
     "IssueSuppression",
     "JobListing",
     "MonthlyReportSnapshot",
+    "RecommendationFeedback",
+    "RecommendationTask",
+    "RecommendationTaskEvent",
+    "RecommendationTaskIssue",
+    "RecommendationTaskUrl",
     "IntegrationConnection",
     "BingPageMetric",
     "BingQueryMetric",

@@ -577,9 +577,11 @@ bestaat. Verdere issuetype-specifieke verdieping volgt samen met nieuwe diagnose
 
 ### Taakgerichte aanbevelingen en eigenaarschap
 
-Status: gepland als gefaseerde uitbreiding van de bestaande diagnose-, issue- en bulkworkflow.
-De huidige `recommended_action`, begeleiding, toewijzing, vervaldatum, comments en `activity_log`
-blijven de basis; er wordt niet zonder ontwerpbesluit een tweede concurrerend actiesysteem gebouwd.
+Status: fundament technisch geïmplementeerd; deployment volgt. De eerste versie bevat 15
+versiebeheerde aanbevelingstypen, een gekoppelde taaklaag, issue- en URL-koppelingen,
+onveranderlijke events, klantgebonden feedback en gescheiden taak- en verificatiestatussen. API,
+interface en verificatiejobs volgen in afzonderlijke stappen. De huidige `recommended_action`,
+begeleiding, toewijzing, vervaldatum, comments en `activity_log` blijven de bestaande productbasis.
 
 Doel en gebruikerswaarde:
 
