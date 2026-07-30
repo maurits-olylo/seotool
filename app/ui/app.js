@@ -3,8 +3,19 @@ const ACTIVE_STATUSES = new Set(["new", "review", "accepted", "planned", "in_pro
 const PAGE_SIZE = 25;
 const URL_PAGE_SIZE = 30;
 const CHANGE_PAGE_SIZE = 30;
+const TASK_TRANSITIONS = {
+  open: ["planned", "in_progress", "closed"],
+  planned: ["in_progress", "waiting_for_input", "closed"],
+  in_progress: ["waiting_for_input", "implemented", "closed"],
+  waiting_for_input: ["planned", "in_progress", "closed"],
+  implemented: ["in_progress", "closed"],
+  closed: ["open"],
+};
+const taskStatusLabels = {open: "Open", planned: "Gepland", in_progress: "In uitvoering", waiting_for_input: "Wacht op input", implemented: "Uitgevoerd", closed: "Afgesloten"};
+const taskRoleLabels = {content: "Content", development: "Development", seo_analytics: "SEO & analytics", project_management: "Projectmanagement"};
+const closeReasonLabels = {verified: "Geverifieerd", manually_accepted: "Handmatig akkoord", rejected: "Afgewezen", superseded: "Vervangen door andere taak", no_longer_relevant: "Niet meer relevant"};
 const labels = {
-  high: "Hoog", medium: "Middel", low: "Laag", new: "Nieuw", review: "Te beoordelen",
+  critical: "Kritiek", high: "Hoog", normal: "Normaal", medium: "Middel", low: "Laag", new: "Nieuw", review: "Te beoordelen",
   accepted: "Geaccepteerd", planned: "Gepland", in_progress: "Bezig",
   waiting_for_client: "Wacht op klant", resolved: "Opgelost", verified: "Geverifieerd",
   ignored: "Genegeerd", accepted_risk: "Risico geaccepteerd",
@@ -13,7 +24,7 @@ const labels = {
   pause_requested: "Pauze wordt voorbereid", paused: "Gepauzeerd",
   cancel_requested: "Stop wordt voorbereid", connected: "Gekoppeld", error: "Fout",
 };
-const state = { currentUser: null, currentView: "dashboard", clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], changesRequestId: 0, jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], showCrawlArchive: false, activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, operationsRequestId: 0, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
+const state = { currentUser: null, currentView: "dashboard", clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], changesRequestId: 0, jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], showCrawlArchive: false, activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, operationsRequestId: 0, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, selectedRecommendationTask: null, recommendationDefinitions: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
 const VIEW_HASHES = {dashboard: "overzicht", actions: "analyse/acties", urls: "analyse/urls", changes: "analyse/wijzigingen", insights: "analyse/inzichten", vacancies: "analyse/vacatures", reports: "rapportages", operations: "crawls-exports", clients: "instellingen/klanten-websites", team: "instellingen/team-toegang", integrations: "instellingen/integraties"};
 const LEGACY_HASHES = {rapportage: "reports", urls: "urls", wijzigingen: "changes", inzichten: "insights", vacatures: "vacancies", beheer: "operations", organisatie: "clients", integraties: "integrations", acties: "actions"};
 const ANALYSIS_VIEWS = new Set(["actions", "urls", "changes", "insights", "vacancies"]);
@@ -1696,6 +1707,7 @@ async function restoreSelectedSuppressions() {
 
 async function showIssue(issueId) {
   state.selectedIssueId = issueId;
+  state.selectedRecommendationTask = null;
   const summary = state.issues.find((item) => item.id === issueId);
   $("#detail-title").textContent = summary?.title || "Issuedetail";
   const summaryUrl = summary ? issueUrl(summary) : "";
@@ -1769,6 +1781,93 @@ async function showIssue(issueId) {
   $("#source-heading").textContent = `Bronpagina’s met dit signaal (${sourceUrls.length})`;
   $("#detail-sources").innerHTML = sourceUrls.map((source) => `<li><a href="${escapeHtml(source)}" target="_blank" rel="noopener">${escapeHtml(source)}</a></li>`).join("");
   $("#source-section").classList.toggle("hidden", sourceUrls.length === 0);
+  await loadIssueRecommendation(issue);
+}
+
+async function loadIssueRecommendation(issue) {
+  const content = $("#recommendation-task-content");
+  const message = $("#recommendation-task-message");
+  content.innerHTML = '<p class="task-loading">Taakgegevens worden geladen…</p>';
+  message.textContent = "";
+  try {
+    const definitionsPromise = state.recommendationDefinitions
+      ? Promise.resolve(state.recommendationDefinitions)
+      : api("/api/v1/recommendation-types");
+    const [tasks, definitions] = await Promise.all([
+      api(`/api/v1/websites/${issue.website_id}/recommendation-tasks?status=all`),
+      definitionsPromise,
+    ]);
+    if (state.selectedIssueId !== issue.id) return;
+    state.recommendationDefinitions = definitions;
+    state.selectedRecommendationTask = tasks.find((task) => task.primary_issue_id === issue.id) || null;
+    const supported = definitions.some((definition) => definition.source_issue_types.includes(issue.issue_type));
+    renderRecommendationTask(issue, supported);
+  } catch (error) {
+    content.innerHTML = `<p class="task-loading">Taakgegevens konden niet worden geladen: ${escapeHtml(error.message)}</p>`;
+  }
+}
+
+function renderRecommendationTask(issue, supported = true) {
+  const task = state.selectedRecommendationTask;
+  const content = $("#recommendation-task-content");
+  const canWrite = state.currentUser?.role !== "client";
+  if (!task) {
+    const explanation = supported
+      ? "Maak van deze diagnose een concrete uitvoeringstaak met stappen, rol, tijdsindicatie en gereedcriteria."
+      : "Voor dit diagnosetype is nog geen gestandaardiseerde uitvoeringstaak beschikbaar.";
+    content.innerHTML = `<div class="task-empty"><p>${explanation}</p>${supported && canWrite ? '<button id="create-recommendation-task" class="primary-button" type="button">Maak uitvoeringstaak</button>' : ""}</div>`;
+    return;
+  }
+  const effort = task.effort_min_minutes === null
+    ? "Nog niet ingeschat"
+    : `${task.effort_min_minutes}–${task.effort_max_minutes} minuten · ${task.effort_confidence} zekerheid`;
+  const transitions = TASK_TRANSITIONS[task.status] || [];
+  const statusOptions = [task.status, ...transitions]
+    .map((value) => `<option value="${value}">${escapeHtml(taskStatusLabels[value] || value)}</option>`)
+    .join("");
+  const controls = canWrite
+    ? `<div class="task-controls"><label>Nieuwe taakstatus<select id="recommendation-task-status">${statusOptions}</select></label><label>Toelichting<textarea id="recommendation-task-comment" maxlength="2000" placeholder="Optioneel; verplicht bij heropenen"></textarea></label><label id="task-close-reason-label" class="task-close-reason hidden">Afsluitreden<select id="recommendation-task-close-reason">${Object.entries(closeReasonLabels).map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join("")}</select></label><button id="save-recommendation-task" class="primary-button" type="button" disabled>Taak bijwerken</button></div>`
+    : "";
+  content.innerHTML = `<article class="task-card"><header class="task-card-head"><div><h3>${escapeHtml(task.title)}</h3><p class="task-meta">${escapeHtml(taskRoleLabels[task.primary_role] || task.primary_role)} · ${escapeHtml(effort)} · prioriteit ${escapeHtml(labels[task.priority] || task.priority)}</p></div><span class="task-status">${escapeHtml(taskStatusLabels[task.status] || task.status)}</span></header><div class="task-columns"><section><h4>Stappen</h4><ol>${task.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol></section><section><h4>Gereed wanneer</h4><ul>${task.acceptance_criteria.map((criterion) => `<li>${escapeHtml(criterion)}</li>`).join("")}</ul></section></div>${controls}</article>`;
+}
+
+async function createRecommendationTask() {
+  if (!state.selectedIssueId) return;
+  const message = $("#recommendation-task-message");
+  message.textContent = "Taak wordt aangemaakt…";
+  try {
+    state.selectedRecommendationTask = await api(`/api/v1/issues/${state.selectedIssueId}/recommendation-task`, {method: "POST"});
+    renderRecommendationTask(state.issues.find((issue) => issue.id === state.selectedIssueId));
+    message.textContent = "Uitvoeringstaak aangemaakt.";
+  } catch (error) {
+    message.textContent = `Aanmaken mislukt: ${error.message}`;
+  }
+}
+
+async function saveRecommendationTask() {
+  const task = state.selectedRecommendationTask;
+  if (!task) return;
+  const status = $("#recommendation-task-status").value;
+  const comment = $("#recommendation-task-comment").value.trim();
+  const message = $("#recommendation-task-message");
+  if (task.status === "closed" && status === "open" && !comment) {
+    message.textContent = "Geef een toelichting om een afgesloten taak te heropenen.";
+    return;
+  }
+  const payload = {status, comment: comment || null};
+  if (status === "closed") payload.close_reason = $("#recommendation-task-close-reason").value;
+  message.textContent = "Taak wordt bijgewerkt…";
+  try {
+    state.selectedRecommendationTask = await api(`/api/v1/recommendation-tasks/${task.id}`, {
+      method: "PATCH",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload),
+    });
+    renderRecommendationTask(state.issues.find((issue) => issue.id === state.selectedIssueId));
+    message.textContent = "Taak bijgewerkt.";
+  } catch (error) {
+    message.textContent = `Bijwerken mislukt: ${error.message}`;
+  }
 }
 
 const evidenceLabels = {
@@ -1928,10 +2027,20 @@ $("#report-archive").addEventListener("click", async (event) => {
   if (snapshot) { state.selectedReportSnapshotId = snapshot.dataset.reportSnapshot; await loadClientReport(); await loadReportSnapshots(); return; }
   if (event.target.closest("[data-report-live]")) { state.selectedReportSnapshotId = null; await loadClientReport(); await loadReportSnapshots(); }
 });
-$("#close-dialog").addEventListener("click", () => $("#issue-dialog").close());
+$("#close-dialog").addEventListener("click", () => { $("#issue-dialog").close(); state.selectedRecommendationTask = null; });
 for (const dialog of document.querySelectorAll("dialog")) dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
 $("#save-status").addEventListener("click", saveIssueStatus);
 $("#wont-fix-issue").addEventListener("click", markIssueWontFix);
+$("#recommendation-task-content").addEventListener("click", (event) => {
+  if (event.target.closest("#create-recommendation-task")) createRecommendationTask();
+  if (event.target.closest("#save-recommendation-task")) saveRecommendationTask();
+});
+$("#recommendation-task-content").addEventListener("change", (event) => {
+  if (!event.target.closest("#recommendation-task-status")) return;
+  const status = event.target.value;
+  $("#task-close-reason-label").classList.toggle("hidden", status !== "closed");
+  $("#save-recommendation-task").disabled = status === state.selectedRecommendationTask?.status;
+});
 $("#dashboard-nav").addEventListener("click", () => showView("dashboard"));
 $("#actions-nav").addEventListener("click", () => showView("actions"));
 $("#reports-nav").addEventListener("click", () => showView("reports"));

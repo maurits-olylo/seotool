@@ -149,7 +149,9 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
 def test_operations_status_ignores_stale_website_responses(client: TestClient) -> None:
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
-    assert 'src="/ui/assets/app.js?v=20260730-1"' in page.text
+    assert 'src="/ui/assets/app.js?v=20260730-2"' in page.text
+    assert 'id="recommendation-task-section"' in page.text
+    assert 'id="recommendation-task-content"' in page.text
 
     script = client.get("/ui/assets/app.js")
     assert script.status_code == 200
@@ -165,6 +167,9 @@ def test_operations_status_ignores_stale_website_responses(client: TestClient) -
     )
     assert "state.activeCrawlJob = null;" in script.text
     assert "state.exports = [];" in script.text
+    assert "function loadIssueRecommendation" in script.text
+    assert "function createRecommendationTask" in script.text
+    assert "function saveRecommendationTask" in script.text
 
 
 def test_settings_and_integrations_have_responsive_states(client: TestClient) -> None:

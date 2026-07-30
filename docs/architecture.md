@@ -84,6 +84,11 @@ schrijfroute gebruikt bestaande tenantautorisatie; gebruikers met de klantrol ho
 leestoegang. Statusovergangen worden centraal gevalideerd en als taakevent en globale activiteit
 vastgelegd.
 
+De eerste interface-integratie staat in het bestaande issuedetail. Diagnose en technische
+onderbouwing blijven bovenaan staan; de afzonderlijke uitvoeringstaak toont rol, effort-band,
+stappen, gereedcriteria en alleen de toegestane volgende statussen. Dit voorkomt dat een menselijke
+uitvoeringsstatus de automatische issue-lifecycle overschrijft.
+
 ## Jobs en exports
 
 De API en scheduler schrijven eerst een persistent `crawl_job` en plaatsen daarna alleen het ID op
