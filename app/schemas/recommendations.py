@@ -23,6 +23,17 @@ CloseReason = Literal[
 ]
 TaskRole = Literal["content", "development", "seo_analytics", "project_management"]
 TaskPriority = Literal["critical", "high", "normal", "low"]
+EffortBand = Literal[
+    "under_15",
+    "15_30",
+    "30_60",
+    "1_2_hours",
+    "2_4_hours",
+    "4_8_hours",
+    "more_than_day",
+]
+Difficulty = Literal["easy", "expected", "hard", "blocked"]
+FinalAssessment = Literal["completed", "partially_completed", "not_completed"]
 
 
 class RecommendationDefinitionRead(BaseModel):
@@ -120,3 +131,40 @@ class RecommendationTaskUpdate(BaseModel):
         ):
             raise ValueError("effort_max_minutes must be greater than or equal to minimum")
         return self
+
+
+class RecommendationFeedbackCreate(BaseModel):
+    actual_minutes: int | None = Field(default=None, ge=0, le=100_000)
+    actual_effort_band: EffortBand | None = None
+    difficulty: Difficulty | None = None
+    instruction_helpful: bool | None = None
+    missing_input: bool | None = None
+    missing_dependency: bool | None = None
+    correction_reason: str | None = Field(default=None, max_length=100)
+    rejection_reason: str | None = Field(default=None, max_length=100)
+    final_assessment: FinalAssessment | None = None
+    notes: str | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def require_feedback(self) -> "RecommendationFeedbackCreate":
+        if not any(getattr(self, field) is not None for field in type(self).model_fields):
+            raise ValueError("at least one feedback field is required")
+        return self
+
+
+class RecommendationFeedbackRead(ORMModel):
+    id: UUID
+    task_id: UUID
+    actor_user_id: UUID | None
+    actual_minutes: int | None
+    actual_effort_band: EffortBand | None
+    difficulty: Difficulty | None
+    instruction_helpful: bool | None
+    missing_input: bool | None
+    missing_dependency: bool | None
+    correction_reason: str | None
+    rejection_reason: str | None
+    verification_outcome: str | None
+    final_assessment: FinalAssessment | None
+    notes: str | None
+    created_at: datetime

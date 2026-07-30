@@ -157,6 +157,21 @@ class RecommendationFeedback(Base):
             "actual_minutes IS NULL OR actual_minutes >= 0",
             name="ck_recommendation_feedback_actual_minutes",
         ),
+        CheckConstraint(
+            "actual_effort_band IS NULL OR actual_effort_band IN "
+            "('under_15', '15_30', '30_60', '1_2_hours', '2_4_hours', "
+            "'4_8_hours', 'more_than_day')",
+            name="ck_recommendation_feedback_effort_band",
+        ),
+        CheckConstraint(
+            "difficulty IS NULL OR difficulty IN ('easy', 'expected', 'hard', 'blocked')",
+            name="ck_recommendation_feedback_difficulty",
+        ),
+        CheckConstraint(
+            "final_assessment IS NULL OR final_assessment IN "
+            "('completed', 'partially_completed', 'not_completed')",
+            name="ck_recommendation_feedback_final_assessment",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -170,6 +185,8 @@ class RecommendationFeedback(Base):
     actual_effort_band: Mapped[str | None] = mapped_column(String(30))
     difficulty: Mapped[str | None] = mapped_column(String(20))
     instruction_helpful: Mapped[bool | None] = mapped_column(Boolean)
+    missing_input: Mapped[bool | None] = mapped_column(Boolean)
+    missing_dependency: Mapped[bool | None] = mapped_column(Boolean)
     correction_reason: Mapped[str | None] = mapped_column(String(100))
     rejection_reason: Mapped[str | None] = mapped_column(String(100))
     verification_outcome: Mapped[str | None] = mapped_column(String(30))

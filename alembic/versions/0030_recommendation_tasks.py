@@ -189,6 +189,8 @@ def upgrade() -> None:
         sa.Column("actual_effort_band", sa.String(length=30), nullable=True),
         sa.Column("difficulty", sa.String(length=20), nullable=True),
         sa.Column("instruction_helpful", sa.Boolean(), nullable=True),
+        sa.Column("missing_input", sa.Boolean(), nullable=True),
+        sa.Column("missing_dependency", sa.Boolean(), nullable=True),
         sa.Column("correction_reason", sa.String(length=100), nullable=True),
         sa.Column("rejection_reason", sa.String(length=100), nullable=True),
         sa.Column("verification_outcome", sa.String(length=30), nullable=True),
@@ -201,6 +203,21 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "actual_minutes IS NULL OR actual_minutes >= 0",
             name="ck_recommendation_feedback_actual_minutes",
+        ),
+        sa.CheckConstraint(
+            "actual_effort_band IS NULL OR actual_effort_band IN "
+            "('under_15', '15_30', '30_60', '1_2_hours', '2_4_hours', "
+            "'4_8_hours', 'more_than_day')",
+            name="ck_recommendation_feedback_effort_band",
+        ),
+        sa.CheckConstraint(
+            "difficulty IS NULL OR difficulty IN ('easy', 'expected', 'hard', 'blocked')",
+            name="ck_recommendation_feedback_difficulty",
+        ),
+        sa.CheckConstraint(
+            "final_assessment IS NULL OR final_assessment IN "
+            "('completed', 'partially_completed', 'not_completed')",
+            name="ck_recommendation_feedback_final_assessment",
         ),
     )
     op.create_index(

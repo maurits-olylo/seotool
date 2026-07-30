@@ -583,8 +583,10 @@ duplicaatpreventie, tenantautorisatie, gecontroleerde statusovergangen, eigenaar
 URL-koppelingen, onveranderlijke events, klantgebonden feedback en gescheiden taak- en
 verificatiestatussen. De issue-popup toont nu rol, tijdsindicatie, stappen, gereedcriteria en
 taakbediening zonder de diagnosestatus te vermengen. Een zelfstandig taakoverzicht en
-verificatiejobs volgen in afzonderlijke stappen. De huidige `recommended_action`, begeleiding,
-toewijzing, vervaldatum, comments en `activity_log` blijven de bestaande productbasis.
+verificatiejobs volgen in afzonderlijke stappen. Uitvoeringsfeedback voor werkelijke tijd,
+moeilijkheid, bruikbaarheid, ontbrekende input en eindbeoordeling wordt inmiddels klantgebonden
+vastgelegd. De huidige `recommended_action`, begeleiding, toewijzing, vervaldatum, comments en
+`activity_log` blijven de bestaande productbasis.
 
 Doel en gebruikerswaarde:
 
@@ -625,7 +627,9 @@ Gefaseerde scope:
    - Bouw de eerste versie niet afhankelijk van volledige CMS- of repositorykennis.
 5. **Privacyveilige kalibratie uit productiefeedback**
    - Verzamel eerst klantgebonden uitvoeringstijd, bruikbaarheid, correcties, afwijsredenen en
-     verificatie-uitkomsten.
+     verificatie-uitkomsten. De eerste gestructureerde feedbackregistratie is geïmplementeerd;
+     correcties, afwijzingen en technische verificatie worden verder uitgebreid wanneer de
+     bijbehorende workflows beschikbaar zijn.
    - Bereken later uitsluitend anonieme aggregaten bij minimaal 10 onafhankelijke klanten en 50
      beoordeelde taken, met begrensde bijdrage per klant en onderdrukking van kleine cellen.
    - Gebruik aggregaten eerst voor effort-, confidence- en verificatiekalibratie; activeer geen

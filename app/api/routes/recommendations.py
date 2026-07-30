@@ -8,6 +8,7 @@ from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.issues import Issue
 from app.models.recommendations import (
+    RecommendationFeedback,
     RecommendationTask,
     RecommendationTaskEvent,
     RecommendationTaskIssue,
@@ -15,6 +16,8 @@ from app.models.recommendations import (
 )
 from app.schemas.recommendations import (
     RecommendationDefinitionRead,
+    RecommendationFeedbackCreate,
+    RecommendationFeedbackRead,
     RecommendationTaskDetailRead,
     RecommendationTaskRead,
     RecommendationTaskUpdate,
@@ -24,6 +27,7 @@ from app.services.recommendation_library import DEFINITIONS
 from app.services.recommendation_tasks import (
     RecommendationTaskError,
     create_task_from_issue,
+    record_feedback,
     update_task,
 )
 
@@ -134,6 +138,46 @@ def patch_recommendation_task(
     require_website_access(db, principal, task.website_id)
     try:
         return update_task(db, task=task, payload=payload, principal=principal)
+    except RecommendationTaskError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get(
+    "/recommendation-tasks/{task_id}/feedback",
+    response_model=list[RecommendationFeedbackRead],
+)
+def list_recommendation_feedback(
+    task_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> list[RecommendationFeedback]:
+    task = _task_or_404(db, task_id)
+    require_website_access(db, principal, task.website_id)
+    return list(
+        db.scalars(
+            select(RecommendationFeedback)
+            .where(RecommendationFeedback.task_id == task.id)
+            .order_by(RecommendationFeedback.created_at.desc())
+        )
+    )
+
+
+@router.post(
+    "/recommendation-tasks/{task_id}/feedback",
+    response_model=RecommendationFeedbackRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_recommendation_feedback(
+    task_id: UUID,
+    payload: RecommendationFeedbackCreate,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> RecommendationFeedback:
+    require_write_access(principal)
+    task = _task_or_404(db, task_id)
+    require_website_access(db, principal, task.website_id)
+    try:
+        return record_feedback(db, task=task, payload=payload, principal=principal)
     except RecommendationTaskError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 

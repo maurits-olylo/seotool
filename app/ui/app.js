@@ -24,7 +24,7 @@ const labels = {
   pause_requested: "Pauze wordt voorbereid", paused: "Gepauzeerd",
   cancel_requested: "Stop wordt voorbereid", connected: "Gekoppeld", error: "Fout",
 };
-const state = { currentUser: null, currentView: "dashboard", clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], changesRequestId: 0, jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], showCrawlArchive: false, activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, operationsRequestId: 0, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, selectedRecommendationTask: null, recommendationDefinitions: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
+const state = { currentUser: null, currentView: "dashboard", clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], changesRequestId: 0, jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], showCrawlArchive: false, activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, operationsRequestId: 0, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, selectedRecommendationTask: null, recommendationFeedback: [], recommendationDefinitions: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
 const VIEW_HASHES = {dashboard: "overzicht", actions: "analyse/acties", urls: "analyse/urls", changes: "analyse/wijzigingen", insights: "analyse/inzichten", vacancies: "analyse/vacatures", reports: "rapportages", operations: "crawls-exports", clients: "instellingen/klanten-websites", team: "instellingen/team-toegang", integrations: "instellingen/integraties"};
 const LEGACY_HASHES = {rapportage: "reports", urls: "urls", wijzigingen: "changes", inzichten: "insights", vacatures: "vacancies", beheer: "operations", organisatie: "clients", integraties: "integrations", acties: "actions"};
 const ANALYSIS_VIEWS = new Set(["actions", "urls", "changes", "insights", "vacancies"]);
@@ -1708,6 +1708,7 @@ async function restoreSelectedSuppressions() {
 async function showIssue(issueId) {
   state.selectedIssueId = issueId;
   state.selectedRecommendationTask = null;
+  state.recommendationFeedback = [];
   const summary = state.issues.find((item) => item.id === issueId);
   $("#detail-title").textContent = summary?.title || "Issuedetail";
   const summaryUrl = summary ? issueUrl(summary) : "";
@@ -1800,6 +1801,10 @@ async function loadIssueRecommendation(issue) {
     if (state.selectedIssueId !== issue.id) return;
     state.recommendationDefinitions = definitions;
     state.selectedRecommendationTask = tasks.find((task) => task.primary_issue_id === issue.id) || null;
+    state.recommendationFeedback = state.selectedRecommendationTask
+      ? await api(`/api/v1/recommendation-tasks/${state.selectedRecommendationTask.id}/feedback`)
+      : [];
+    if (state.selectedIssueId !== issue.id) return;
     const supported = definitions.some((definition) => definition.source_issue_types.includes(issue.issue_type));
     renderRecommendationTask(issue, supported);
   } catch (error) {
@@ -1828,7 +1833,14 @@ function renderRecommendationTask(issue, supported = true) {
   const controls = canWrite
     ? `<div class="task-controls"><label>Nieuwe taakstatus<select id="recommendation-task-status">${statusOptions}</select></label><label>Toelichting<textarea id="recommendation-task-comment" maxlength="2000" placeholder="Optioneel; verplicht bij heropenen"></textarea></label><label id="task-close-reason-label" class="task-close-reason hidden">Afsluitreden<select id="recommendation-task-close-reason">${Object.entries(closeReasonLabels).map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join("")}</select></label><button id="save-recommendation-task" class="primary-button" type="button" disabled>Taak bijwerken</button></div>`
     : "";
-  content.innerHTML = `<article class="task-card"><header class="task-card-head"><div><h3>${escapeHtml(task.title)}</h3><p class="task-meta">${escapeHtml(taskRoleLabels[task.primary_role] || task.primary_role)} · ${escapeHtml(effort)} · prioriteit ${escapeHtml(labels[task.priority] || task.priority)}</p></div><span class="task-status">${escapeHtml(taskStatusLabels[task.status] || task.status)}</span></header><div class="task-columns"><section><h4>Stappen</h4><ol>${task.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol></section><section><h4>Gereed wanneer</h4><ul>${task.acceptance_criteria.map((criterion) => `<li>${escapeHtml(criterion)}</li>`).join("")}</ul></section></div>${controls}</article>`;
+  const latestFeedback = state.recommendationFeedback[0];
+  const feedbackSummary = latestFeedback
+    ? `<div class="task-feedback-summary"><strong>Laatste feedback</strong><span>${latestFeedback.actual_minutes === null ? "Geen tijd ingevuld" : `${latestFeedback.actual_minutes} minuten`} · ${escapeHtml({easy:"Makkelijker dan verwacht",expected:"Zoals verwacht",hard:"Moeilijker dan verwacht",blocked:"Geblokkeerd"}[latestFeedback.difficulty] || "Geen moeilijkheid ingevuld")} · ${new Date(latestFeedback.created_at).toLocaleDateString("nl-NL")}</span></div>`
+    : "";
+  const feedbackForm = canWrite && ["implemented", "closed"].includes(task.status)
+    ? `<form id="recommendation-feedback-form" class="task-feedback-form"><h4>Uitvoeringsfeedback</h4><p>Deze gegevens blijven klantgebonden. Vrije opmerkingen worden nooit klantoverstijgend gebruikt.</p><div class="task-feedback-fields"><label>Werkelijke tijd (minuten)<input id="feedback-actual-minutes" type="number" min="0" max="100000"></label><label>Moeilijkheid<select id="feedback-difficulty"><option value="">Niet ingevuld</option><option value="easy">Makkelijker dan verwacht</option><option value="expected">Zoals verwacht</option><option value="hard">Moeilijker dan verwacht</option><option value="blocked">Geblokkeerd</option></select></label><label>Instructie bruikbaar<select id="feedback-helpful"><option value="">Niet ingevuld</option><option value="true">Ja</option><option value="false">Nee</option></select></label><label>Eindbeoordeling<select id="feedback-assessment"><option value="completed">Voltooid</option><option value="partially_completed">Deels voltooid</option><option value="not_completed">Niet voltooid</option></select></label><label class="task-feedback-check"><input id="feedback-missing-input" type="checkbox"> Benodigde input ontbrak</label><label class="task-feedback-check"><input id="feedback-missing-dependency" type="checkbox"> Afhankelijkheid was onduidelijk</label><label class="task-feedback-notes">Toelichting<textarea id="feedback-notes" maxlength="2000" placeholder="Optioneel en alleen binnen deze klant zichtbaar"></textarea></label></div><button class="primary-button" type="submit">Feedback opslaan</button></form>`
+    : "";
+  content.innerHTML = `<article class="task-card"><header class="task-card-head"><div><h3>${escapeHtml(task.title)}</h3><p class="task-meta">${escapeHtml(taskRoleLabels[task.primary_role] || task.primary_role)} · ${escapeHtml(effort)} · prioriteit ${escapeHtml(labels[task.priority] || task.priority)}</p></div><span class="task-status">${escapeHtml(taskStatusLabels[task.status] || task.status)}</span></header><div class="task-columns"><section><h4>Stappen</h4><ol>${task.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol></section><section><h4>Gereed wanneer</h4><ul>${task.acceptance_criteria.map((criterion) => `<li>${escapeHtml(criterion)}</li>`).join("")}</ul></section></div>${controls}${feedbackSummary}${feedbackForm}</article>`;
 }
 
 async function createRecommendationTask() {
@@ -1867,6 +1879,38 @@ async function saveRecommendationTask() {
     message.textContent = "Taak bijgewerkt.";
   } catch (error) {
     message.textContent = `Bijwerken mislukt: ${error.message}`;
+  }
+}
+
+async function saveRecommendationFeedback(event) {
+  event.preventDefault();
+  const task = state.selectedRecommendationTask;
+  if (!task) return;
+  const minutes = $("#feedback-actual-minutes").value;
+  const difficulty = $("#feedback-difficulty").value;
+  const helpful = $("#feedback-helpful").value;
+  const payload = {
+    actual_minutes: minutes === "" ? null : Number(minutes),
+    difficulty: difficulty || null,
+    instruction_helpful: helpful === "" ? null : helpful === "true",
+    missing_input: $("#feedback-missing-input").checked,
+    missing_dependency: $("#feedback-missing-dependency").checked,
+    final_assessment: $("#feedback-assessment").value,
+    notes: $("#feedback-notes").value.trim() || null,
+  };
+  const message = $("#recommendation-task-message");
+  message.textContent = "Feedback wordt opgeslagen…";
+  try {
+    const feedback = await api(`/api/v1/recommendation-tasks/${task.id}/feedback`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload),
+    });
+    state.recommendationFeedback.unshift(feedback);
+    renderRecommendationTask(state.issues.find((issue) => issue.id === state.selectedIssueId));
+    message.textContent = "Feedback opgeslagen.";
+  } catch (error) {
+    message.textContent = `Opslaan mislukt: ${error.message}`;
   }
 }
 
@@ -2040,6 +2084,9 @@ $("#recommendation-task-content").addEventListener("change", (event) => {
   const status = event.target.value;
   $("#task-close-reason-label").classList.toggle("hidden", status !== "closed");
   $("#save-recommendation-task").disabled = status === state.selectedRecommendationTask?.status;
+});
+$("#recommendation-task-content").addEventListener("submit", (event) => {
+  if (event.target.closest("#recommendation-feedback-form")) saveRecommendationFeedback(event);
 });
 $("#dashboard-nav").addEventListener("click", () => showView("dashboard"));
 $("#actions-nav").addEventListener("click", () => showView("actions"));

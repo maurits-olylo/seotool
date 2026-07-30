@@ -7,6 +7,7 @@ from app.core.security import Principal
 from app.models.common import utc_now
 from app.models.issues import ActivityLog, Issue
 from app.models.recommendations import (
+    RecommendationFeedback,
     RecommendationTask,
     RecommendationTaskEvent,
     RecommendationTaskIssue,
@@ -14,7 +15,7 @@ from app.models.recommendations import (
 )
 from app.models.user import ClientMembership, User
 from app.models.website import Website
-from app.schemas.recommendations import RecommendationTaskUpdate
+from app.schemas.recommendations import RecommendationFeedbackCreate, RecommendationTaskUpdate
 from app.services.recommendation_library import recommendation_for_issue_type
 
 ACTIVE_TASK_STATUSES = {"open", "planned", "in_progress", "waiting_for_input", "implemented"}
@@ -197,6 +198,56 @@ def update_task(
     return task
 
 
+def record_feedback(
+    db: Session,
+    *,
+    task: RecommendationTask,
+    payload: RecommendationFeedbackCreate,
+    principal: Principal,
+) -> RecommendationFeedback:
+    if task.status not in {"implemented", "closed"}:
+        raise RecommendationTaskError(
+            "Feedback kan pas worden vastgelegd nadat de taak is uitgevoerd of afgesloten."
+        )
+    values = payload.model_dump()
+    if values["actual_minutes"] is not None and values["actual_effort_band"] is None:
+        values["actual_effort_band"] = _effort_band(values["actual_minutes"])
+    feedback = RecommendationFeedback(
+        task_id=task.id,
+        actor_user_id=principal.user_id,
+        **values,
+    )
+    db.add(feedback)
+    db.flush()
+    label = actor_label(db, principal)
+    structured_details = {
+        key: value
+        for key, value in values.items()
+        if key != "notes" and value is not None
+    }
+    db.add_all(
+        [
+            RecommendationTaskEvent(
+                task_id=task.id,
+                actor_user_id=principal.user_id,
+                actor_label=label,
+                event_type="feedback_recorded",
+                details=structured_details,
+            ),
+            ActivityLog(
+                website_id=task.website_id,
+                actor=label,
+                activity_type="recommendation_feedback_recorded",
+                summary=f"Uitvoeringsfeedback vastgelegd: {task.title}",
+                details={"task_id": str(task.id), **structured_details},
+            ),
+        ]
+    )
+    db.commit()
+    db.refresh(feedback)
+    return feedback
+
+
 def _strongest_priority(first: str, second: str) -> str:
     return first if PRIORITY_RANK[first] >= PRIORITY_RANK[second] else second
 
@@ -226,3 +277,19 @@ def _validate_assignee(db: Session, website_id: UUID, user_id: UUID | None) -> N
 
 def _json_value(value: object) -> object:
     return str(value) if isinstance(value, UUID) else value
+
+
+def _effort_band(minutes: int) -> str:
+    if minutes < 15:
+        return "under_15"
+    if minutes <= 30:
+        return "15_30"
+    if minutes <= 60:
+        return "30_60"
+    if minutes <= 120:
+        return "1_2_hours"
+    if minutes <= 240:
+        return "2_4_hours"
+    if minutes <= 480:
+        return "4_8_hours"
+    return "more_than_day"

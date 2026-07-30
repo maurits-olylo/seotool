@@ -89,6 +89,11 @@ onderbouwing blijven bovenaan staan; de afzonderlijke uitvoeringstaak toont rol,
 stappen, gereedcriteria en alleen de toegestane volgende statussen. Dit voorkomt dat een menselijke
 uitvoeringsstatus de automatische issue-lifecycle overschrijft.
 
+Feedback is append-only en alleen toegestaan voor uitgevoerde of afgesloten taken. Werkelijke
+minuten worden centraal omgezet naar een vaste effort-band. Gestructureerde signalen worden in het
+taakevent en activity log opgenomen; vrije opmerkingen blijven uitsluitend op het klantgebonden
+feedbackrecord en worden niet voorbereid voor klantoverstijgende aggregatie.
+
 ## Jobs en exports
 
 De API en scheduler schrijven eerst een persistent `crawl_job` en plaatsen daarna alleen het ID op

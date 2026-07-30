@@ -138,6 +138,12 @@ Klantgebonden feedback:
 - technische verificatie-uitkomst;
 - menselijke eindbeoordeling.
 
+Implementatiestatus: de eerste API- en interfaceversie registreert werkelijke minuten met
+automatisch afgeleide tijdsband, moeilijkheid, bruikbaarheid, ontbrekende input of afhankelijkheid,
+eindbeoordeling en optionele klantgebonden toelichting. Feedback is append-only en pas beschikbaar
+na uitvoering of afsluiting. Correctie-, afwijs- en verificatievelden worden geactiveerd samen met
+hun eigen workflows.
+
 ## Statusovergangen
 
 - `open` → `planned`, `in_progress` of `closed`;

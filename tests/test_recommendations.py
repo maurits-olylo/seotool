@@ -8,7 +8,7 @@ from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.models.client import Client
 from app.models.discovery import Url
-from app.models.issues import Issue
+from app.models.issues import ActivityLog, Issue
 from app.models.recommendations import (
     RecommendationFeedback,
     RecommendationTask,
@@ -99,11 +99,11 @@ def test_task_links_issues_urls_events_and_feedback() -> None:
                 RecommendationFeedback(
                     task_id=task.id,
                     actual_minutes=20,
-                    actual_effort_band="15_30_minutes",
+                    actual_effort_band="15_30",
                     difficulty="easy",
                     instruction_helpful=True,
                     verification_outcome="passed",
-                    final_assessment="verified",
+                    final_assessment="completed",
                 ),
             ]
         )
@@ -194,6 +194,11 @@ def test_recommendation_task_api_lifecycle(client) -> None:  # type: ignore[no-u
         json={"status": "implemented"},
     )
     assert invalid_transition.status_code == 422
+    premature_feedback = client.post(
+        f"/api/v1/recommendation-tasks/{task_id}/feedback",
+        json={"actual_minutes": 30},
+    )
+    assert premature_feedback.status_code == 422
 
     in_progress = client.patch(
         f"/api/v1/recommendation-tasks/{task_id}",
@@ -206,6 +211,48 @@ def test_recommendation_task_api_lifecycle(client) -> None:  # type: ignore[no-u
     )
     assert implemented.status_code == 200
     assert implemented.json()["implemented_at"] is not None
+    feedback = client.post(
+        f"/api/v1/recommendation-tasks/{task_id}/feedback",
+        json={
+            "actual_minutes": 35,
+            "actual_effort_band": "30_60",
+            "difficulty": "expected",
+            "instruction_helpful": True,
+            "missing_input": False,
+            "missing_dependency": False,
+            "final_assessment": "completed",
+            "notes": "De stappen waren duidelijk.",
+        },
+    )
+    assert feedback.status_code == 201
+    assert feedback.json()["actual_minutes"] == 35
+    assert feedback.json()["actual_effort_band"] == "30_60"
+    with SessionLocal() as db:
+        event = (
+            db.query(RecommendationTaskEvent)
+            .filter_by(task_id=UUID(task_id), event_type="feedback_recorded")
+            .one()
+        )
+        activity = (
+            db.query(ActivityLog)
+            .filter_by(
+                website_id=website_id,
+                activity_type="recommendation_feedback_recorded",
+            )
+            .one()
+        )
+        assert event.details["actual_effort_band"] == "30_60"
+        assert "notes" not in event.details
+        assert "notes" not in activity.details
+    recorded_feedback = client.get(
+        f"/api/v1/recommendation-tasks/{task_id}/feedback"
+    )
+    assert recorded_feedback.status_code == 200
+    assert [item["id"] for item in recorded_feedback.json()] == [feedback.json()["id"]]
+    assert (
+        client.post(f"/api/v1/recommendation-tasks/{task_id}/feedback", json={}).status_code
+        == 422
+    )
 
     missing_close_reason = client.patch(
         f"/api/v1/recommendation-tasks/{task_id}",
@@ -299,6 +346,10 @@ def test_client_role_can_read_but_not_change_recommendation_tasks(client) -> Non
     )
     assert browser.get(f"/api/v1/recommendation-tasks/{task_id}").status_code == 200
     assert (
+        browser.get(f"/api/v1/recommendation-tasks/{task_id}/feedback").status_code
+        == 200
+    )
+    assert (
         browser.post(f"/api/v1/issues/{issue_id}/recommendation-task").status_code
         == 403
     )
@@ -306,6 +357,13 @@ def test_client_role_can_read_but_not_change_recommendation_tasks(client) -> Non
         browser.patch(
             f"/api/v1/recommendation-tasks/{task_id}",
             json={"status": "planned"},
+        ).status_code
+        == 403
+    )
+    assert (
+        browser.post(
+            f"/api/v1/recommendation-tasks/{task_id}/feedback",
+            json={"actual_minutes": 20},
         ).status_code
         == 403
     )
