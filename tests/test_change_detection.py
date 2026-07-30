@@ -1,7 +1,11 @@
 import uuid
 
 from app.models.crawl import UrlSnapshot
-from app.services.change_detection import compare_snapshots
+from app.services.change_detection import (
+    DetectedChange,
+    compare_snapshots,
+    filter_expected_pagination_churn,
+)
 
 
 def snapshot(**values: object) -> UrlSnapshot:
@@ -152,3 +156,44 @@ def test_schema_comparison_keeps_meaningful_list_order() -> None:
     assert [item.change_type for item in compare_snapshots(previous, reordered)] == [
         "structured_data_changed"
     ]
+
+
+def test_filters_only_expected_churn_on_numbered_archive_pages() -> None:
+    changes = [
+        DetectedChange("main_content_changed", "main_content_hash", "old", "new"),
+        DetectedChange("internal_links_changed", "internal_links", "old", "new"),
+        DetectedChange("structured_data_changed", "schema_data", "old", "new"),
+        DetectedChange("canonical_changed", "canonical", "old", "new"),
+        DetectedChange("robots_changed", "meta_robots", "old", "new"),
+        DetectedChange("redirect_target_changed", "final_url", "old", "new"),
+    ]
+
+    filtered = filter_expected_pagination_churn(
+        "https://example.com/nieuws/page/27",
+        changes,
+    )
+
+    assert [change.change_type for change in filtered] == [
+        "canonical_changed",
+        "robots_changed",
+        "redirect_target_changed",
+    ]
+
+
+def test_filters_expected_churn_for_query_pagination_but_not_regular_urls() -> None:
+    changes = [
+        DetectedChange("main_content_changed", "main_content_hash", "old", "new"),
+        DetectedChange("title_changed", "title", "old", "new"),
+    ]
+
+    assert [
+        change.change_type
+        for change in filter_expected_pagination_churn(
+            "https://example.com/archive?category=seo&paged=5",
+            changes,
+        )
+    ] == ["title_changed"]
+    assert filter_expected_pagination_churn(
+        "https://example.com/archive/2026",
+        changes,
+    ) == changes

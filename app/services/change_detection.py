@@ -2,6 +2,7 @@ import json
 import re
 from collections import Counter
 from dataclasses import dataclass
+from urllib.parse import parse_qsl, urlsplit
 
 from app.models.crawl import UrlSnapshot
 
@@ -33,6 +34,13 @@ VOLATILE_OPENING_STATUS_RE = re.compile(
     r")\b",
     flags=re.IGNORECASE,
 )
+PAGINATION_PATH_RE = re.compile(r"(?:/page/\d+|/page-\d+)/?$", flags=re.IGNORECASE)
+PAGINATION_QUERY_PARAMETERS = {"page", "paged"}
+EXPECTED_PAGINATION_CHANGES = {
+    "internal_links_changed",
+    "main_content_changed",
+    "structured_data_changed",
+}
 
 
 def compare_snapshots(previous: UrlSnapshot | None, current: UrlSnapshot) -> list[DetectedChange]:
@@ -66,6 +74,31 @@ def compare_snapshots(previous: UrlSnapshot | None, current: UrlSnapshot) -> lis
             )
         )
     return changes
+
+
+def filter_expected_pagination_churn(
+    url: str, changes: list[DetectedChange]
+) -> list[DetectedChange]:
+    """Hide routine archive movement without hiding technical pagination changes."""
+    if not _is_numbered_pagination_url(url):
+        return changes
+    return [
+        change
+        for change in changes
+        if change.change_type not in EXPECTED_PAGINATION_CHANGES
+    ]
+
+
+def _is_numbered_pagination_url(value: str) -> bool:
+    split = urlsplit(value)
+    if PAGINATION_PATH_RE.search(split.path):
+        return True
+    return any(
+        name.casefold() in PAGINATION_QUERY_PARAMETERS
+        and raw_value.isdigit()
+        and int(raw_value) > 0
+        for name, raw_value in parse_qsl(split.query, keep_blank_values=True)
+    )
 
 
 def _values_equal(field: str, old: object, new: object) -> bool:

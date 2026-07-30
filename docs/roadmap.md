@@ -574,6 +574,9 @@ bestaat. Verdere issuetype-specifieke verdieping volgt samen met nieuwe diagnose
   veranderd zijn om het probleem als opgelost te bevestigen.
 - Adviezen uitsluitend baseren op opgeslagen bewijs; onzekerheid zichtbaar houden en geen
   onbewezen AI-conclusie als feit presenteren.
+- Verwachte content-, link- en schemaverschuivingen op expliciet genummerde archiefpagina's niet
+  als wijziging opslaan; technische, metadata- en indexatieveranderingen op die pagina's wel
+  behouden.
 
 ### Taakgerichte aanbevelingen en eigenaarschap
 

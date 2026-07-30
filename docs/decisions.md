@@ -693,3 +693,19 @@ geëvalueerd, expliciet goedgekeurd en terugdraaibaar uitgerold.
 Gevolg: het systeem kan effort, confidence en verificatieregels verbeteren zonder individuele
 klantdata als trainingscorpus te gebruiken. Met de huidige klantomvang wordt alleen instrumentatie
 voorbereid; globale kalibratie blijft uitgeschakeld.
+
+## 2026-07-30 — Routineverschuivingen op genummerde archiefpagina's zijn geen wijzigingen
+
+Context: nieuwe publicaties laten content, interne links en ItemList-achtige structured data op
+genummerde nieuws-, tag- en andere archiefpagina's doorschuiven. Dit leverde bij AMEC twaalf
+wijzigingsrecords op zonder bruikbare vervolgactie.
+
+Besluit: herken uitsluitend expliciete pagineringspaden (`/page/<nummer>` en `/page-<nummer>`) en
+de queryparameters `page` en `paged` met een positief nummer. Onderdruk daar vóór opslag alleen
+`main_content_changed`, `internal_links_changed` en `structured_data_changed`. Bewaar snapshots en
+hashes ongewijzigd. Status, redirect, canonical, robots, indexeerbaarheid, title, description en H1
+blijven altijd als wijziging zichtbaar.
+
+Gevolg: verwachte archiefbeweging verdwijnt uit de actielijst, terwijl technische regressies op
+pagineringspagina's volledig detecteerbaar blijven. Andere queryparameters en reguliere URL's
+vallen bewust buiten de regel.

@@ -6,7 +6,11 @@ from sqlalchemy.orm import Session
 from app.models.crawl import ElementLocation, UrlLink, UrlSnapshot
 from app.models.discovery import Url
 from app.models.issues import Change, Issue
-from app.services.change_detection import DetectedChange, compare_snapshots
+from app.services.change_detection import (
+    DetectedChange,
+    compare_snapshots,
+    filter_expected_pagination_churn,
+)
 from app.services.discovery_pages import is_discovery_only_snapshot
 from app.services.element_issues import ELEMENT_ISSUE_TYPES, inspect_element_locations
 from app.services.issue_engine import reconcile_issues
@@ -50,6 +54,10 @@ def analyze_snapshot(
                     json.dumps(new_links, ensure_ascii=False),
                 )
             )
+    detected_changes = filter_expected_pagination_churn(
+        snapshot.final_url or snapshot.requested_url,
+        detected_changes,
+    )
     for detected in detected_changes:
         db.add(
             Change(
