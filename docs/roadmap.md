@@ -243,42 +243,62 @@ Commerciële afbakening:
 - Prijs en capaciteit worden begrensd op unieke relevante URL's, analysefrequentie, bewaartermijn
   en kostbare verwerking; niet op het aantal gevonden issues.
 
-### Search intent en paginafunctie
+### Zoekintentie & klantreis
 
-Status: gepland na de huidige contextuele issue- en ruisreductie en vóór de modulaire AI-advieslaag.
+Status: gepland als fase 10, direct na de Matomo-integratie en vóór de modulaire AI-advieslaag.
+De volledige module wordt niet tijdens de huidige ruis- en diagnosefase gebouwd.
 
-- Zoekintentie en paginafunctie afzonderlijk modelleren. Zoekintentie ondersteunt minimaal
-  informatief, commercieel onderzoek, transactioneel, navigerend en lokaal; paginafunctie
-  ondersteunt minimaal landingspagina, categorie/overzicht, product/dienst/vacature,
-  artikel/nieuws, contact/conversie en functionele/discoverypagina.
-- Begin met een uitlegbare classificatie op basis van URL, title, H1, hoofdcontent, schema,
-  interne ankerteksten en bestaand paginatype. Gebruik GSC-zoekopdrachten als sterkste bewijs
-  voor de werkelijk waargenomen zoekintentie.
-- Sla confidence, gebruikte bewijssignalen en analysemoment op. Zonder voldoende GSC- of
-  contentsignalen blijft de conclusie voorlopig en controlegericht.
-- Ondersteun een handmatig ingestelde verwachte intentie en paginafunctie die automatische
-  classificatie overrulen zonder de gemeten signalen te verwijderen.
-- Maak alleen bruikbare diagnoses voor een aantoonbare intentiemismatch, concurrerende URL's,
-  gemengde intentie of een ontbrekende passende landingspagina. Start deze als `review`, niet als
-  automatisch hard probleem.
-- Sluit functionele en discovery-only pagina's uit van reguliere intentacties. Gebruik geen
-  generieke intentscore.
+De module combineert drie afzonderlijke, uitlegbare dimensies per indexeerbare canonical URL:
 
-Uitvoeringsvolgorde:
+- zoekintentie: informatief, commercieel oriënterend, transactioneel, vertrouwen, navigatie of
+  gemengd/onzeker;
+- klantreisfase: ontdekken, begrijpen, overwegen, vergelijken, beslissen, handelen, nazorg of
+  onzeker;
+- strategische contentrol, zoals verkeer aantrekken, keuze ondersteunen, bewijs leveren,
+  converteren, navigeren of bestaande klanten ondersteunen.
 
-1. Taxonomie, handmatige verwachte intentie/paginafunctie en bewijsmodel.
-2. Automatische waargenomen intentie uit crawlgegevens en beschikbare GSC-query's.
-3. Confidence-drempels, mismatch-, cannibalisatie- en contentkansdiagnoses.
-4. Later optionele AI-verrijking voor twijfelgevallen en adviestekst; AI is geen vereiste voor de
-   feitelijke classificatie.
+Crawlerdata bepaalt de waarschijnlijke contentintentie. GSC-query's tonen waarvoor een pagina
+daadwerkelijk vertoningen en klikken ontvangt. De primaire analyticsbron toont geobserveerde
+landingspagina's, vervolgstappen en conversies. Google levert zelf geen intentielabel; iedere
+conclusie blijft daarom een modelschatting met confidence, brondekking, versie en bewijs.
 
-Acceptatie:
+Randvoorwaarden:
 
-- Iedere intentieconclusie toont waarom zij is getrokken en welke bron het zwaarst weegt.
-- Een handmatige keuze blijft behouden na nieuwe analyses.
-- Pagina's zonder voldoende bewijs leveren geen harde actie op.
-- Meerdere URL's worden alleen als intentieconcurrenten getoond bij aantoonbare overlap in GSC-
-  query's of sterke inhoudelijke en structurele overeenkomst.
+- Geen algemene SEO-score, verplichte lineaire funnel of universele norm voor contentverdeling.
+- Classificeer standaard alleen succesvolle, indexeerbare HTML-pagina's met een bruikbare
+  canonical; functionele en discovery-only pagina's blijven buiten reguliere intentacties.
+- Bewaar automatische classificatie en handmatige, optioneel gelockte overrides afzonderlijk.
+- Presenteer mismatch, ontbrekende vervolgstappen, cannibalisatie en contenthiaten eerst als
+  controle of kans, niet als automatisch hard probleem.
+- Maak analytics provider-onafhankelijk en tel GA4- en Matomo-resultaten nooit stilzwijgend op.
+- Gebruik AI later alleen voor semantische twijfelgevallen en adviestekst; deterministische
+  signalen, GSC-bewijs en handmatige keuzes blijven zelfstandig bruikbaar.
+
+Voorbereidend werk wordt bewust met aangrenzende roadmapitems uitgevoerd:
+
+1. **Interne-linksemantiek:** bewaar of leid linkcontext af als hoofdcontent, CTA, navigatie,
+   footer, breadcrumb of gerelateerde content. Dit is zowel zelfstandig SEO-bewijs als noodzakelijke
+   basis voor intentiedoorstroom.
+2. **Matomo-integratie:** introduceer een kleine provider-onafhankelijke analyticslaag en neem,
+   voor zover de bron dit betrouwbaar levert, transitions, events, doelen, conversies, downloads,
+   uitgaande links en interne zoekopdrachten mee. Toon ook URL-koppelingsgraad en niet-gekoppelde
+   varianten. Hierdoor hoeft fase 10 de Matomo-import niet opnieuw te ontwerpen.
+3. **GSC en opportunity-engine:** behoud queryregels, pagina-totalen, branded-configuratie en
+   dekking geschikt voor periodegebonden query-intentieverdelingen. De feitelijke
+   queryclassificatie blijft onderdeel van fase 10.
+4. **AI-advieslaag:** hergebruik later classificatieversies, inputhashes en confidence, maar maak
+   fase 10 niet afhankelijk van een specifieke AI-provider.
+
+Acceptatie voor de latere module:
+
+- Iedere conclusie toont gebruikte bronnen, periode, confidence, dekking en zwaarst wegend bewijs.
+- Waarschijnlijkheden vormen binnen afrondingsmarge samen 1 en worden niet opnieuw berekend wanneer
+  inputhash en classificatieversie gelijk zijn.
+- Een handmatige keuze blijft na crawls en heranalyses behouden totdat deze expliciet wordt gereset.
+- Pagina's zonder voldoende content-, query- of analyticsbewijs leveren geen harde actie op.
+- Meerdere URL's gelden alleen als intentieconcurrenten bij aantoonbare GSC-overlap of sterke
+  inhoudelijke en structurele overeenkomst.
+- Bezoekersroutes worden als geobserveerde samenhang gepresenteerd en nooit als causale attributie.
 
 ### Data-gedreven opportunity-engine
 
@@ -834,7 +854,14 @@ stabiliteits- en issuekwaliteitspakketten zijn afgerond.
 - Een Matomo-site koppelen via server-URL, `idSite` en een API-token met leestoegang.
 - API-tokens versleuteld bewaren en uitsluitend via POST versturen, nooit in URL's of logs.
 - Bezoeken, paginaweergaven, landingspagina's, verkeersbronnen, doelen en conversies importeren.
+- Introduceer een kleine provider-onafhankelijke analyticslaag voor landingspagina's, events,
+  conversies en beschikbare paginatransities; bestaande GA4- en nieuwe Matomo-imports blijven
+  herkenbare adapters met eigen brondefinities.
+- Importeer waar beschikbaar ook transitions, downloads, uitgaande links en interne zoekopdrachten,
+  met expliciete dekking wanneer de Matomo-configuratie deze gegevens niet levert.
 - Matomo-pagina's via genormaliseerde URL's aan het blijvende URL-register koppelen.
+- Toon per website de URL-koppelingsgraad en niet-gekoppelde URL-varianten zonder functionele
+  queryparameters automatisch te verwijderen.
 - Issues en wijzigingen verrijken met verkeers- en conversie-impact, gelijkwaardig aan GA4-data.
 - Matomo naast GA4 ondersteunen; geen van beide integraties verplicht maken.
 - Per website een primaire analyticsbron voor opportunity-prioritering kiezen en cijfers van GA4
@@ -845,7 +872,34 @@ Acceptatie:
 - Een gebruiker kan een Matomo-verbinding testen en vervolgens de juiste site selecteren.
 - Alleen gegevens van de gekoppelde Matomo-site worden opgeslagen en getoond.
 - Verkeers- en conversiedata zijn per URL en vergelijkingsperiode beschikbaar.
+- De analysemodule kan dezelfde providerinterface gebruiken zonder Matomo-specifieke responses te
+  kennen; ontbrekende transition- of eventdekking blijft zichtbaar als onbekend.
 - Een ongeldig of ingetrokken token veroorzaakt een duidelijke fout zonder geheimen te loggen.
+
+## Fase 10 — Zoekintentie & klantreis
+
+Status: toekomstig; start pas nadat fase 9 is gedeployed en de Matomo-koppeling en
+provider-onafhankelijke analyticslaag in productie zijn gevalideerd.
+
+Uitvoeringsvolgorde:
+
+1. Leg taxonomie, versieerbaar bewijsmodel, branded termen, sectorsjablonen en handmatige overrides
+   vast via Alembic en bestaande website-/URL-identiteiten.
+2. Classificeer pagina-inhoud en GSC-query's hybride en uitlegbaar; cache queryclassificatie per
+   query, taal en markt en bewaar verdelingen op basis van vertoningen en klikken met dekking.
+3. Voeg website-, cluster- en paginaverdelingen toe, plus intentiemismatch, interne doorstroom,
+   cannibalisatie en concrete contenthiaten op basis van voldoende bewijs.
+4. Koppel de primaire analyticsbron voor landingsgedrag, flexibele klantreisroutes, uitval,
+   microconversies en primaire conversies zonder causaliteit te claimen.
+5. Voeg een compacte interface toe met Overzicht, Pagina's, Clusters, Doorstroom, Kansen en
+   Instellingen. Gebruik de bestaande navigatie, tabellen, filters en actielifecycle.
+6. Laat de data-gedreven opportunity-engine concrete acties prioriteren als hoog, gemiddeld, laag
+   of onvoldoende bewijs; voer samenvoegen, splitsen, noindex of publicatie nooit automatisch uit.
+
+De module bewaart classificatiehistorie, inputhash, model-/prompt-/formuleversie, confidence,
+signalen en analyseperiode. Query- en analyticsdata blijven in hun bestaande brontabellen en worden
+niet gedupliceerd. SERP-intentie blijft een latere provideruitbreiding tenzij dan al een betrouwbare
+SERP-bron beschikbaar is.
 
 ## Deploymentafspraak
 
@@ -854,7 +908,7 @@ de NAS gebeurt via SSH-streaming met `dd`. Controleer op de NAS altijd eerst SHA
 met `sudo tar --no-same-owner` en bouw en herstart alleen geraakte services. Migrations worden alleen
 uitgevoerd wanneer een nieuw Alembic-bestand onderdeel van de release is.
 
-## Fase 10 — Volwaardige visuele issue-inspectie
+## Fase 11 — Volwaardige visuele issue-inspectie
 
 Status: toekomstig; laatste brede productfase na de huidige roadmap.
 
