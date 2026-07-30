@@ -438,8 +438,11 @@ Praktijktests:
 
 ### Ruisarme en verklaarbare wijzigingen
 
-Status: in uitvoering; vergelijkingsdata, relevantieniveau, mogelijke impact en aanbevolen controle
-zijn technisch toegevoegd. Verdere normalisatie van dynamische templatewaarden volgt.
+Status: geïmplementeerd, gedeployed en op 2026-07-30 met Schipper Kozijnen gevalideerd.
+Een volledige crawl verwerkte 644 URL's zonder fouten en leverde 33 onderliggende records op,
+tegenover 170 vóór de correctie. Functionele zoekpagina's en dynamische openingsteksten bleven stil;
+11 gelijktijdige canonical-, schema- en interne-linkwisselingen werden als één websitebrede
+domeinverwisseling gepresenteerd.
 
 - Inventariseer welke kleine technische of cosmetische verschillen nu onterecht een wijziging
   triggeren.
