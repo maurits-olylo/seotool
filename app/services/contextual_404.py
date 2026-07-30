@@ -40,6 +40,10 @@ def classify_404_issues(
             )
         )
     )
+    successful_source_ids = select(Url.id).where(
+        Url.website_id == website_id,
+        Url.current_status_code == 200,
+    )
     internally_linked_targets: set[str] = set()
     for url in urls:
         _check_control(check_control)
@@ -57,11 +61,12 @@ def classify_404_issues(
         incoming_links = (
             db.scalar(
                 select(func.count(UrlLink.id)).where(
-                    UrlLink.crawl_run_id == crawl_run_id,
-                    UrlLink.target_url_id == url.id,
-                    UrlLink.source_url_id != url.id,
-                    UrlLink.is_internal.is_(True),
-                )
+                UrlLink.crawl_run_id == crawl_run_id,
+                UrlLink.target_url_id == url.id,
+                UrlLink.source_url_id != url.id,
+                UrlLink.source_url_id.in_(successful_source_ids),
+                UrlLink.is_internal.is_(True),
+            )
             )
             or 0
         )
@@ -286,11 +291,24 @@ def _classify_source_pages(
             )
         )
     )
+    source_statuses = {
+        url_id: status_code
+        for url_id, status_code in db.execute(
+            select(Url.id, Url.current_status_code).where(
+                Url.website_id == website_id,
+                Url.id.in_(source_ids),
+            )
+        )
+    }
     for source_id in source_ids:
         _check_control(check_control)
         broken_links = broken_by_source.get(source_id, [])
         signals: list[IssueSignal] = []
-        if source_id not in discovery_only_ids and len(broken_links) >= 2:
+        if (
+            source_statuses.get(source_id) == 200
+            and source_id not in discovery_only_ids
+            and len(broken_links) >= 2
+        ):
             count = len(broken_links)
             signals.append(
                 IssueSignal(

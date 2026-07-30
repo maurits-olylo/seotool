@@ -709,3 +709,18 @@ blijven altijd als wijziging zichtbaar.
 Gevolg: verwachte archiefbeweging verdwijnt uit de actielijst, terwijl technische regressies op
 pagineringspagina's volledig detecteerbaar blijven. Andere queryparameters en reguliere URL's
 vallen bewust buiten de regel.
+
+## 2026-07-31 — Links uit niet-succesvolle foutpagina's zijn geen bronbewijs
+
+Context: een AMEC-404-pagina bevatte zeven navigatie- en ankerlinks uit het fouttemplate die naar
+dezelfde ontbrekende route wezen. De linkclassificatie controleerde de 404-status van het doel,
+maar niet de status van de bron. Daardoor ontstond een hoog geprioriteerde reparatietaak voor
+links die alleen op een foutpagina bestonden.
+
+Besluit: uitsluitend bron-URL's met actuele HTTP-status 200 leveren bewijs voor
+`internally_linked_404` en `multiple_broken_internal_links`. Niet-succesvolle bronpagina's blijven
+zelf als bereikbaarheidsprobleem zichtbaar, maar hun fouttemplate genereert geen afzonderlijke
+linktaak. Een volgende issueherberekening lost eerder aangemaakte foutpositieven automatisch op.
+
+Gevolg: echte defecte links vanaf bereikbare pagina's blijven behouden. Zelfverwijzingen en
+navigatielinks uit 404-, 410- en serverfoutpagina's veroorzaken geen dubbele of misleidende actie.

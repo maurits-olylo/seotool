@@ -17,7 +17,11 @@ def test_classifies_linked_and_sitemap_404s_exclusively() -> None:
         website.settings = WebsiteSettings()
         db.add(website)
         db.flush()
-        source = Url(website_id=website.id, normalized_url="https://example.com/")
+        source = Url(
+            website_id=website.id,
+            normalized_url="https://example.com/",
+            current_status_code=200,
+        )
         linked = Url(
             website_id=website.id,
             normalized_url="https://example.com/linked",
@@ -164,7 +168,11 @@ def test_groups_multiple_broken_links_on_one_source_page() -> None:
         website.settings = WebsiteSettings()
         db.add(website)
         db.flush()
-        source = Url(website_id=website.id, normalized_url="https://example.com/article")
+        source = Url(
+            website_id=website.id,
+            normalized_url="https://example.com/article",
+            current_status_code=200,
+        )
         targets = [
             Url(
                 website_id=website.id,
@@ -246,6 +254,65 @@ def test_groups_multiple_broken_links_on_one_source_page() -> None:
 
         db.refresh(grouped)
         assert grouped.status == "resolved"
+
+
+def test_does_not_group_links_rendered_on_a_404_error_page() -> None:
+    with SessionLocal() as db:
+        client = Client(name="404 template client")
+        website = Website(client=client, name="404 template site", base_url="https://example.com")
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        source = Url(
+            website_id=website.id,
+            normalized_url="https://example.com/missing-event",
+            current_status_code=404,
+        )
+        targets = [
+            Url(
+                website_id=website.id,
+                normalized_url=f"https://example.com/missing-{number}",
+                current_status_code=404,
+            )
+            for number in range(2)
+        ]
+        db.add_all([source, *targets])
+        db.flush()
+        run = _crawl_run(db, website.id)
+        db.add_all(
+            [
+                UrlLink(
+                    crawl_run_id=run.id,
+                    source_url_id=source.id,
+                    target_url=target.normalized_url,
+                    target_url_id=target.id,
+                    anchor_text=f"Fouttemplatelink {number}",
+                    is_internal=True,
+                    is_nofollow=False,
+                )
+                for number, target in enumerate(targets, start=1)
+            ]
+        )
+        db.flush()
+
+        classify_404_issues(db, website_id=website.id, crawl_run_id=run.id)
+
+        grouped = db.scalar(
+            select(Issue).where(
+                Issue.url_id == source.id,
+                Issue.issue_type == "multiple_broken_internal_links",
+            )
+        )
+        assert grouped is None
+        target_issues = list(
+            db.scalars(
+                select(Issue).where(
+                    Issue.url_id.in_([target.id for target in targets]),
+                    Issue.status == "new",
+                )
+            )
+        )
+        assert {issue.issue_type for issue in target_issues} == {"http_404"}
 
 
 def test_groups_paginated_404_urls_as_one_pattern() -> None:
