@@ -615,6 +615,15 @@ Gefaseerde scope:
    - Voeg uitbreidbare instructieprofielen toe voor WordPress, headless CMS, Lovable, React,
      bekende templates en componenten.
    - Bouw de eerste versie niet afhankelijk van volledige CMS- of repositorykennis.
+5. **Privacyveilige kalibratie uit productiefeedback**
+   - Verzamel eerst klantgebonden uitvoeringstijd, bruikbaarheid, correcties, afwijsredenen en
+     verificatie-uitkomsten.
+   - Bereken later uitsluitend anonieme aggregaten bij minimaal 10 onafhankelijke klanten en 50
+     beoordeelde taken, met begrensde bijdrage per klant en onderdrukking van kleine cellen.
+   - Gebruik aggregaten eerst voor effort-, confidence- en verificatiekalibratie; activeer geen
+     zelflerende productieregel zonder offline evaluatie, expliciete goedkeuring en versiebeheer.
+   - Deel nooit ruwe content, URL's, queries, analyticsregels, vrije opmerkingen of
+     klantidentiteiten tussen tenants.
 
 Niet in scope:
 
@@ -642,6 +651,8 @@ Acceptatie:
 - Gereedcriteria zijn technisch of handmatig toetsbaar en sluiten aan op de verificatiemethode.
 - Taak- en analyseweergave gebruiken hetzelfde bewijs zonder het te dupliceren.
 - Bestaande issuehistorie, suppressions, bulkacties en automatische lifecycle blijven intact.
+- Klantoverstijgende kalibratie blijft uitgeschakeld totdat privacygrondslag, minimale volumes en
+  evaluatiecriteria zijn goedgekeurd.
 
 ### Gerichte verificatiecrawls na uitvoering
 

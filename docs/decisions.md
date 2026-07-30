@@ -663,3 +663,33 @@ Gevolg: dynamische functionele inhoud verdwijnt uit de betekenisvolle wijzigings
 bereikbaarheidsbewijs te verliezen. Een tenant-, cache- of hostincident blijft volledig
 controleerbaar, maar verschijnt niet als tientallen losse URL-gebeurtenissen. Echte wijzigingen in
 adressen, pagina-inhoud, canonicals of links buiten deze aantoonbare patronen blijven zichtbaar.
+
+## 2026-07-30 — Taakuitvoering blijft gescheiden van issue-detectie
+
+Context: `issues.status` wordt automatisch door crawls opgelost, geverifieerd en heropend. Menselijke
+uitvoering vraagt daarnaast planning, eigenaarschap, wachtstatus, aangepaste URL's, feedback en een
+asynchrone verificatie. Beide processen in dezelfde statuskolom zouden elkaars betekenis aantasten.
+
+Besluit: issues blijven de technische diagnosebron. Een gekoppelde taaklaag krijgt een compacte
+menselijke workflow en verwijst naar één of meer issues en URL's zonder bewijs te kopiëren.
+Verificatiestatus blijft apart van taakstatus. De eerste bibliotheek bevat alleen concrete,
+veelvoorkomende en grotendeels controleerbare aanbevelingstypen.
+
+Gevolg: een taak kan uitgevoerd zijn terwijl verificatie nog loopt, en een toekomstige crawl kan
+het technische issue blijven oplossen of heropenen zonder menselijke planning te overschrijven.
+
+## 2026-07-30 — Klantoverstijgend leren gebruikt alleen privacyveilige aggregaten
+
+Context: uitvoeringstijd, handmatige correcties en verificatie-uitkomsten kunnen aanbevelingen en
+confidence verbeteren, maar ruwe klantdata mag niet tussen tenants lekken en kleine groepen zijn
+statistisch en privacytechnisch onbetrouwbaar.
+
+Besluit: feedback blijft eerst klantgebonden. Latere kalibratie gebruikt alleen aggregaten met
+minimaal 10 onafhankelijke klanten en 50 beoordeelde taken, een begrensde bijdrage per klant en
+onderdrukking van kleine cellen. Ruwe content, URL's, queries, analyticsregels, identiteiten en vrije
+opmerkingen worden niet klantoverstijgend gebruikt. Nieuwe kalibratieversies worden offline
+geëvalueerd, expliciet goedgekeurd en terugdraaibaar uitgerold.
+
+Gevolg: het systeem kan effort, confidence en verificatieregels verbeteren zonder individuele
+klantdata als trainingscorpus te gebruiken. Met de huidige klantomvang wordt alleen instrumentatie
+voorbereid; globale kalibratie blijft uitgeschakeld.
