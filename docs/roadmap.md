@@ -1143,7 +1143,8 @@ Status: tien taaktypen gedeployed en technisch gecontroleerd in productie.
 
 ### Volgende gebundelde release — begrijpelijke taakworkflow
 
-Status: afgebakend; nog niet in ontwikkeling.
+Status: eerste begrijpelijkheidsverbetering lokaal gereed en visueel gecontroleerd; nog niet
+gedeployed.
 
 - Toon bovenaan één duidelijke hoofdactie die past bij de huidige taakstatus.
 - Vertaal interne statussen en verificatietermen naar korte, taakgerichte uitleg.
