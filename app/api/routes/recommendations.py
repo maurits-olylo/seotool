@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
+from app.models.discovery import Url
 from app.models.issues import Issue
 from app.models.recommendations import (
     RecommendationFeedback,
@@ -110,9 +111,10 @@ def get_recommendation_task(
             )
         )
     )
-    urls = list(
-        db.scalars(
-            select(RecommendationTaskUrl)
+    url_rows = list(
+        db.execute(
+            select(RecommendationTaskUrl, Url.normalized_url)
+            .join(Url, Url.id == RecommendationTaskUrl.url_id)
             .where(RecommendationTaskUrl.task_id == task.id)
             .order_by(RecommendationTaskUrl.created_at)
         )
@@ -127,7 +129,16 @@ def get_recommendation_task(
     return {
         **RecommendationTaskRead.model_validate(task).model_dump(),
         "issue_ids": issue_ids,
-        "urls": urls,
+        "urls": [
+            {
+                "id": task_url.id,
+                "url_id": task_url.url_id,
+                "role": task_url.role,
+                "is_user_supplied": task_url.is_user_supplied,
+                "url": normalized_url,
+            }
+            for task_url, normalized_url in url_rows
+        ],
         "events": events,
     }
 

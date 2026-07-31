@@ -1800,19 +1800,22 @@ async function loadIssueRecommendation(issue) {
     ]);
     if (state.selectedIssueId !== issue.id) return;
     state.recommendationDefinitions = definitions;
-    state.selectedRecommendationTask = tasks.find((task) => task.primary_issue_id === issue.id) || null;
-    if (state.selectedRecommendationTask) {
-      const taskId = state.selectedRecommendationTask.id;
+    const taskSummary = tasks.find((task) => task.primary_issue_id === issue.id) || null;
+    if (taskSummary) {
+      const taskId = taskSummary.id;
       [
+        state.selectedRecommendationTask,
         state.recommendationFeedback,
         state.recommendationVerificationPlan,
         state.recommendationVerifications,
       ] = await Promise.all([
+        api(`/api/v1/recommendation-tasks/${taskId}`),
         api(`/api/v1/recommendation-tasks/${taskId}/feedback`),
         api(`/api/v1/recommendation-tasks/${taskId}/verification-plan`),
         api(`/api/v1/recommendation-tasks/${taskId}/verifications`),
       ]);
     } else {
+      state.selectedRecommendationTask = null;
       state.recommendationFeedback = [];
       state.recommendationVerificationPlan = null;
       state.recommendationVerifications = [];
@@ -1844,7 +1847,7 @@ function renderRecommendationTask(issue, supported = true) {
     .map((value) => `<option value="${value}">${escapeHtml(taskStatusLabels[value] || value)}</option>`)
     .join("");
   const controls = canWrite
-    ? `<section class="task-panel task-controls-panel"><div class="task-section-heading"><span>Voortgang</span><h4>Taakstatus bijwerken</h4></div><div class="task-controls"><label>Status<select id="recommendation-task-status">${statusOptions}</select></label><label class="task-comment">Toelichting<textarea id="recommendation-task-comment" maxlength="2000" placeholder="Voeg context toe wanneer dat nodig is"></textarea></label><label id="task-close-reason-label" class="task-close-reason hidden">Afsluitreden<select id="recommendation-task-close-reason">${Object.entries(closeReasonLabels).map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join("")}</select></label><button id="save-recommendation-task" class="primary-button" type="button" disabled>Wijziging opslaan</button></div></section>`
+    ? `<section class="task-panel task-controls-panel"><div class="task-section-heading"><span>03</span><div><small>Voortgang</small><h4>Taakstatus bijwerken</h4></div></div><div class="task-controls"><label>Status<select id="recommendation-task-status">${statusOptions}</select></label><label class="task-comment">Toelichting<textarea id="recommendation-task-comment" maxlength="2000" placeholder="Voeg context toe wanneer dat nodig is"></textarea></label><label id="task-close-reason-label" class="task-close-reason hidden">Afsluitreden<select id="recommendation-task-close-reason">${Object.entries(closeReasonLabels).map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join("")}</select></label><button id="save-recommendation-task" class="primary-button" type="button" disabled>Wijziging opslaan</button></div></section>`
     : "";
   const latestFeedback = state.recommendationFeedback[0];
   const feedbackSummary = latestFeedback
@@ -1858,6 +1861,7 @@ function renderRecommendationTask(issue, supported = true) {
 }
 
 function renderTaskVerification(canWrite) {
+  const task = state.selectedRecommendationTask;
   const plan = state.recommendationVerificationPlan;
   const verifications = state.recommendationVerifications || [];
   if (!plan?.supported) return "";
@@ -1879,10 +1883,20 @@ function renderTaskVerification(canWrite) {
     : latest
       ? `<div class="verification-result pending"><strong>${escapeHtml({queued:"In wachtrij",running:"Controle wordt uitgevoerd",error:"Controle mislukt"}[latest.status] || latest.status)}</strong><span>De pagina kan later opnieuw worden geopend voor het resultaat.</span></div>`
       : "";
+  const roleLabels = {
+    source: "Bronpagina",
+    broken_target: "Defect doel",
+    replacement_target: "Vervangend doel",
+    expected_target: "Verwacht einddoel",
+    expected_canonical: "Verwachte canonical",
+  };
+  const scopeRows = (task.urls || []).map((item) => `<li><div><strong>${escapeHtml(roleLabels[item.role] || item.role)}</strong><a href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener">${escapeHtml(item.url || item.url_id)}</a></div>${canWrite ? `<button class="task-scope-remove" type="button" data-task-url-id="${escapeHtml(item.id)}" aria-label="Verwijder ${escapeHtml(roleLabels[item.role] || item.role)}">×</button>` : ""}</li>`).join("");
+  const allowedRoles = [...new Set([...plan.required_roles, ...((task.urls || []).map((item) => item.role)), ...(task.recommendation_type === "repair_broken_internal_link" ? ["replacement_target"] : [])])];
+  const scopeEditor = `<details class="task-scope"><summary>URL-scope bekijken${plan.missing_roles.length ? " en aanvullen" : ""}</summary><ul>${scopeRows || "<li>Geen URL’s vastgelegd.</li>"}</ul>${canWrite ? `<form id="task-scope-form"><label>Rol<select id="task-scope-role">${allowedRoles.map((role) => `<option value="${escapeHtml(role)}">${escapeHtml(roleLabels[role] || role)}</option>`).join("")}</select></label><label class="task-scope-url">URL<input id="task-scope-url" type="url" required placeholder="https://voorbeeld.nl/pagina"></label><button class="detail-button" type="submit">URL toevoegen</button></form>` : ""}</details>`;
   const button = canWrite
     ? `<button id="start-recommendation-verification" class="detail-button verification-button" type="button" ${plan.can_request && !verificationActive ? "" : "disabled"}>${verificationActive ? "Controle loopt" : latest ? "Opnieuw controleren" : "Gerichte controle starten"}</button>`
     : "";
-  return `<section class="task-panel task-verification"><div class="task-verification-head"><div class="task-section-heading"><span>03</span><h4>Verificatie</h4></div>${button}</div>${scope}${result}</section>`;
+  return `<section class="task-panel task-verification"><div class="task-verification-head"><div class="task-section-heading"><span>04</span><h4>Verificatie</h4></div>${button}</div>${scope}${scopeEditor}${result}</section>`;
 }
 
 async function startRecommendationVerification() {
@@ -1904,13 +1918,49 @@ async function startRecommendationVerification() {
   }
 }
 
+async function saveTaskScope(event) {
+  event.preventDefault();
+  const task = state.selectedRecommendationTask;
+  if (!task) return;
+  const message = $("#recommendation-task-message");
+  message.textContent = "URL wordt toegevoegd…";
+  try {
+    await api(`/api/v1/recommendation-tasks/${task.id}/urls`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        role: $("#task-scope-role").value,
+        url: $("#task-scope-url").value.trim(),
+      }),
+    });
+    await loadIssueRecommendation(state.issues.find((issue) => issue.id === state.selectedIssueId));
+    message.textContent = "URL-scope bijgewerkt.";
+  } catch (error) {
+    message.textContent = `URL toevoegen mislukt: ${error.message}`;
+  }
+}
+
+async function removeTaskScope(taskUrlId) {
+  const task = state.selectedRecommendationTask;
+  if (!task) return;
+  const message = $("#recommendation-task-message");
+  message.textContent = "URL wordt verwijderd…";
+  try {
+    await api(`/api/v1/recommendation-tasks/${task.id}/urls/${taskUrlId}`, {method: "DELETE"});
+    await loadIssueRecommendation(state.issues.find((issue) => issue.id === state.selectedIssueId));
+    message.textContent = "URL uit de verificatiescope verwijderd.";
+  } catch (error) {
+    message.textContent = `URL verwijderen mislukt: ${error.message}`;
+  }
+}
+
 async function createRecommendationTask() {
   if (!state.selectedIssueId) return;
   const message = $("#recommendation-task-message");
   message.textContent = "Taak wordt aangemaakt…";
   try {
-    state.selectedRecommendationTask = await api(`/api/v1/issues/${state.selectedIssueId}/recommendation-task`, {method: "POST"});
-    renderRecommendationTask(state.issues.find((issue) => issue.id === state.selectedIssueId));
+    await api(`/api/v1/issues/${state.selectedIssueId}/recommendation-task`, {method: "POST"});
+    await loadIssueRecommendation(state.issues.find((issue) => issue.id === state.selectedIssueId));
     message.textContent = "Uitvoeringstaak aangemaakt.";
   } catch (error) {
     message.textContent = `Aanmaken mislukt: ${error.message}`;
@@ -1931,12 +1981,12 @@ async function saveRecommendationTask() {
   if (status === "closed") payload.close_reason = $("#recommendation-task-close-reason").value;
   message.textContent = "Taak wordt bijgewerkt…";
   try {
-    state.selectedRecommendationTask = await api(`/api/v1/recommendation-tasks/${task.id}`, {
+    await api(`/api/v1/recommendation-tasks/${task.id}`, {
       method: "PATCH",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify(payload),
     });
-    renderRecommendationTask(state.issues.find((issue) => issue.id === state.selectedIssueId));
+    await loadIssueRecommendation(state.issues.find((issue) => issue.id === state.selectedIssueId));
     message.textContent = "Taak bijgewerkt.";
   } catch (error) {
     message.textContent = `Bijwerken mislukt: ${error.message}`;
@@ -2140,6 +2190,8 @@ $("#recommendation-task-content").addEventListener("click", (event) => {
   if (event.target.closest("#create-recommendation-task")) createRecommendationTask();
   if (event.target.closest("#save-recommendation-task")) saveRecommendationTask();
   if (event.target.closest("#start-recommendation-verification")) startRecommendationVerification();
+  const removeScope = event.target.closest("[data-task-url-id]");
+  if (removeScope) removeTaskScope(removeScope.dataset.taskUrlId);
 });
 $("#recommendation-task-content").addEventListener("change", (event) => {
   if (!event.target.closest("#recommendation-task-status")) return;
@@ -2149,6 +2201,7 @@ $("#recommendation-task-content").addEventListener("change", (event) => {
 });
 $("#recommendation-task-content").addEventListener("submit", (event) => {
   if (event.target.closest("#recommendation-feedback-form")) saveRecommendationFeedback(event);
+  if (event.target.closest("#task-scope-form")) saveTaskScope(event);
 });
 $("#dashboard-nav").addEventListener("click", () => showView("dashboard"));
 $("#actions-nav").addEventListener("click", () => showView("actions"));

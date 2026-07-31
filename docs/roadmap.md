@@ -1140,7 +1140,7 @@ Status: lokaal gereed, nog niet gedeployed.
 
 ### Gebundelde interfaceverbetering uitvoeringstaken
 
-Status: meenemen in een grotere interfacerelease; geen losse hotfix.
+Status: lokaal uitgevoerd als onderdeel van de gebundelde verificatie-interface; nog niet gedeployed.
 
 - Beperk de globale dialoogstijl van `dl div` tot directe definitierijen. Geneste taakcomponenten
   krijgen nu onbedoeld bovenlijnen en verticale padding.

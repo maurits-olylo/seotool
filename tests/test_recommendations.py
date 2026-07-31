@@ -213,6 +213,7 @@ def test_recommendation_task_api_lifecycle(client, monkeypatch) -> None:  # type
     assert detail.status_code == 200
     assert detail.json()["issue_ids"] == [str(issue_id)]
     assert detail.json()["urls"][0]["role"] == "broken_target"
+    assert detail.json()["urls"][0]["url"] == "https://example.com/missing-target"
     assert detail.json()["events"][0]["event_type"] == "created"
 
     planned = client.patch(

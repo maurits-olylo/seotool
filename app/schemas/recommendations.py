@@ -87,6 +87,7 @@ class RecommendationTaskUrlRead(ORMModel):
     url_id: UUID
     role: str
     is_user_supplied: bool
+    url: str | None = None
 
 
 class RecommendationTaskUrlCreate(BaseModel):
