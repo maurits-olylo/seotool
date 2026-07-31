@@ -149,7 +149,8 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
 def test_operations_status_ignores_stale_website_responses(client: TestClient) -> None:
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
-    assert 'src="/ui/assets/app.js?v=20260730-3"' in page.text
+    assert 'src="/ui/assets/app.js?v=20260731-1"' in page.text
+    assert 'href="/ui/assets/actionable.css?v=20260731-1"' in page.text
     assert 'id="recommendation-task-section"' in page.text
     assert 'id="recommendation-task-content"' in page.text
 

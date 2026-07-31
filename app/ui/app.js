@@ -1801,9 +1801,22 @@ async function loadIssueRecommendation(issue) {
     if (state.selectedIssueId !== issue.id) return;
     state.recommendationDefinitions = definitions;
     state.selectedRecommendationTask = tasks.find((task) => task.primary_issue_id === issue.id) || null;
-    state.recommendationFeedback = state.selectedRecommendationTask
-      ? await api(`/api/v1/recommendation-tasks/${state.selectedRecommendationTask.id}/feedback`)
-      : [];
+    if (state.selectedRecommendationTask) {
+      const taskId = state.selectedRecommendationTask.id;
+      [
+        state.recommendationFeedback,
+        state.recommendationVerificationPlan,
+        state.recommendationVerifications,
+      ] = await Promise.all([
+        api(`/api/v1/recommendation-tasks/${taskId}/feedback`),
+        api(`/api/v1/recommendation-tasks/${taskId}/verification-plan`),
+        api(`/api/v1/recommendation-tasks/${taskId}/verifications`),
+      ]);
+    } else {
+      state.recommendationFeedback = [];
+      state.recommendationVerificationPlan = null;
+      state.recommendationVerifications = [];
+    }
     if (state.selectedIssueId !== issue.id) return;
     const supported = definitions.some((definition) => definition.source_issue_types.includes(issue.issue_type));
     renderRecommendationTask(issue, supported);
@@ -1825,13 +1838,13 @@ function renderRecommendationTask(issue, supported = true) {
   }
   const effort = task.effort_min_minutes === null
     ? "Nog niet ingeschat"
-    : `${task.effort_min_minutes}–${task.effort_max_minutes} minuten · ${task.effort_confidence} zekerheid`;
+    : `${task.effort_min_minutes}–${task.effort_max_minutes} min`;
   const transitions = TASK_TRANSITIONS[task.status] || [];
   const statusOptions = [task.status, ...transitions]
     .map((value) => `<option value="${value}">${escapeHtml(taskStatusLabels[value] || value)}</option>`)
     .join("");
   const controls = canWrite
-    ? `<div class="task-controls"><label>Nieuwe taakstatus<select id="recommendation-task-status">${statusOptions}</select></label><label>Toelichting<textarea id="recommendation-task-comment" maxlength="2000" placeholder="Optioneel; verplicht bij heropenen"></textarea></label><label id="task-close-reason-label" class="task-close-reason hidden">Afsluitreden<select id="recommendation-task-close-reason">${Object.entries(closeReasonLabels).map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join("")}</select></label><button id="save-recommendation-task" class="primary-button" type="button" disabled>Taak bijwerken</button></div>`
+    ? `<section class="task-panel task-controls-panel"><div class="task-section-heading"><span>Voortgang</span><h4>Taakstatus bijwerken</h4></div><div class="task-controls"><label>Status<select id="recommendation-task-status">${statusOptions}</select></label><label class="task-comment">Toelichting<textarea id="recommendation-task-comment" maxlength="2000" placeholder="Voeg context toe wanneer dat nodig is"></textarea></label><label id="task-close-reason-label" class="task-close-reason hidden">Afsluitreden<select id="recommendation-task-close-reason">${Object.entries(closeReasonLabels).map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join("")}</select></label><button id="save-recommendation-task" class="primary-button" type="button" disabled>Wijziging opslaan</button></div></section>`
     : "";
   const latestFeedback = state.recommendationFeedback[0];
   const feedbackSummary = latestFeedback
@@ -1840,7 +1853,55 @@ function renderRecommendationTask(issue, supported = true) {
   const feedbackForm = canWrite && ["implemented", "closed"].includes(task.status)
     ? `<form id="recommendation-feedback-form" class="task-feedback-form"><h4>Uitvoeringsfeedback</h4><p>Deze gegevens blijven klantgebonden. Vrije opmerkingen worden nooit klantoverstijgend gebruikt.</p><div class="task-feedback-fields"><label>Werkelijke tijd (minuten)<input id="feedback-actual-minutes" type="number" min="0" max="100000"></label><label>Moeilijkheid<select id="feedback-difficulty"><option value="">Niet ingevuld</option><option value="easy">Makkelijker dan verwacht</option><option value="expected">Zoals verwacht</option><option value="hard">Moeilijker dan verwacht</option><option value="blocked">Geblokkeerd</option></select></label><label>Instructie bruikbaar<select id="feedback-helpful"><option value="">Niet ingevuld</option><option value="true">Ja</option><option value="false">Nee</option></select></label><label>Eindbeoordeling<select id="feedback-assessment"><option value="completed">Voltooid</option><option value="partially_completed">Deels voltooid</option><option value="not_completed">Niet voltooid</option></select></label><label class="task-feedback-check"><input id="feedback-missing-input" type="checkbox"> Benodigde input ontbrak</label><label class="task-feedback-check"><input id="feedback-missing-dependency" type="checkbox"> Afhankelijkheid was onduidelijk</label><label class="task-feedback-notes">Toelichting<textarea id="feedback-notes" maxlength="2000" placeholder="Optioneel en alleen binnen deze klant zichtbaar"></textarea></label></div><button class="primary-button" type="submit">Feedback opslaan</button></form>`
     : "";
-  content.innerHTML = `<article class="task-card"><header class="task-card-head"><div><h3>${escapeHtml(task.title)}</h3><p class="task-meta">${escapeHtml(taskRoleLabels[task.primary_role] || task.primary_role)} · ${escapeHtml(effort)} · prioriteit ${escapeHtml(labels[task.priority] || task.priority)}</p></div><span class="task-status">${escapeHtml(taskStatusLabels[task.status] || task.status)}</span></header><div class="task-columns"><section><h4>Stappen</h4><ol>${task.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol></section><section><h4>Gereed wanneer</h4><ul>${task.acceptance_criteria.map((criterion) => `<li>${escapeHtml(criterion)}</li>`).join("")}</ul></section></div>${controls}${feedbackSummary}${feedbackForm}</article>`;
+  const verification = renderTaskVerification(canWrite);
+  content.innerHTML = `<article class="task-card"><header class="task-card-head"><div><span class="task-kicker">Aanbevolen uitvoering</span><h3>${escapeHtml(task.title)}</h3><div class="task-meta"><span>${escapeHtml(taskRoleLabels[task.primary_role] || task.primary_role)}</span><span>${escapeHtml(effort)}</span><span class="task-priority ${escapeHtml(task.priority)}">${escapeHtml(labels[task.priority] || task.priority)} prioriteit</span></div></div><span class="task-status status-${escapeHtml(task.status)}">${escapeHtml(taskStatusLabels[task.status] || task.status)}</span></header><div class="task-columns"><section class="task-panel"><div class="task-section-heading"><span>01</span><h4>Aanpak</h4></div><ol>${task.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol></section><section class="task-panel task-criteria"><div class="task-section-heading"><span>02</span><h4>Gereed wanneer</h4></div><ul>${task.acceptance_criteria.map((criterion) => `<li>${escapeHtml(criterion)}</li>`).join("")}</ul></section></div>${controls}${verification}${feedbackSummary}${feedbackForm}</article>`;
+}
+
+function renderTaskVerification(canWrite) {
+  const plan = state.recommendationVerificationPlan;
+  const verifications = state.recommendationVerifications || [];
+  if (!plan?.supported) return "";
+  const latest = verifications[0];
+  const verificationActive = latest && ["queued", "running"].includes(latest.status);
+  const outcomeLabels = {
+    resolved: "Opgelost",
+    probably_resolved: "Waarschijnlijk opgelost",
+    partially_resolved: "Deels opgelost",
+    not_resolved: "Niet opgelost",
+    manual_review_required: "Handmatige controle nodig",
+  };
+  const ruleLabels = {passed: "Geslaagd", failed: "Niet geslaagd", error: "Niet controleerbaar"};
+  const scope = plan.missing_roles.length
+    ? `<p class="verification-note warning">Nog nodig: ${plan.missing_roles.map((role) => escapeHtml(role.replaceAll("_", " "))).join(", ")}.</p>`
+    : `<p class="verification-note">Scope compleet · ${plan.url_count} URL${plan.url_count === 1 ? "" : "’s"}</p>`;
+  const result = latest?.result?.outcome
+    ? `<div class="verification-result"><strong>${escapeHtml(outcomeLabels[latest.result.outcome] || latest.result.outcome)}</strong><span>${new Date(latest.finished_at || latest.created_at).toLocaleString("nl-NL")}</span></div><ul class="verification-rules">${latest.rules.map((rule) => `<li class="${escapeHtml(rule.status)}"><span aria-hidden="true"></span><div><strong>${escapeHtml(rule.rule.replaceAll("_", " ").split(":")[0])}</strong><small>${escapeHtml(ruleLabels[rule.status] || rule.status)}</small></div></li>`).join("")}</ul>`
+    : latest
+      ? `<div class="verification-result pending"><strong>${escapeHtml({queued:"In wachtrij",running:"Controle wordt uitgevoerd",error:"Controle mislukt"}[latest.status] || latest.status)}</strong><span>De pagina kan later opnieuw worden geopend voor het resultaat.</span></div>`
+      : "";
+  const button = canWrite
+    ? `<button id="start-recommendation-verification" class="detail-button verification-button" type="button" ${plan.can_request && !verificationActive ? "" : "disabled"}>${verificationActive ? "Controle loopt" : latest ? "Opnieuw controleren" : "Gerichte controle starten"}</button>`
+    : "";
+  return `<section class="task-panel task-verification"><div class="task-verification-head"><div class="task-section-heading"><span>03</span><h4>Verificatie</h4></div>${button}</div>${scope}${result}</section>`;
+}
+
+async function startRecommendationVerification() {
+  const task = state.selectedRecommendationTask;
+  if (!task) return;
+  const button = $("#start-recommendation-verification");
+  const message = $("#recommendation-task-message");
+  if (button) button.disabled = true;
+  message.textContent = "Gerichte controle wordt ingepland…";
+  try {
+    const verification = await api(`/api/v1/recommendation-tasks/${task.id}/verifications`, {method: "POST"});
+    state.recommendationVerifications = [verification, ...(state.recommendationVerifications || [])];
+    state.recommendationVerificationPlan = {...state.recommendationVerificationPlan, can_request: false};
+    renderRecommendationTask(state.issues.find((issue) => issue.id === state.selectedIssueId));
+    message.textContent = "Gerichte controle staat in de wachtrij.";
+  } catch (error) {
+    message.textContent = `Controle starten mislukt: ${error.message}`;
+    if (button) button.disabled = false;
+  }
 }
 
 async function createRecommendationTask() {
@@ -2078,6 +2139,7 @@ $("#wont-fix-issue").addEventListener("click", markIssueWontFix);
 $("#recommendation-task-content").addEventListener("click", (event) => {
   if (event.target.closest("#create-recommendation-task")) createRecommendationTask();
   if (event.target.closest("#save-recommendation-task")) saveRecommendationTask();
+  if (event.target.closest("#start-recommendation-verification")) startRecommendationVerification();
 });
 $("#recommendation-task-content").addEventListener("change", (event) => {
   if (!event.target.closest("#recommendation-task-status")) return;
