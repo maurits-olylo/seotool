@@ -197,6 +197,16 @@ docker system df
 
 Configureer meldingen op een mislukte `/health`-controle en bewaak vrije schijfruimte.
 
+Voer elementlocatie-opruiming uitsluitend tijdens een veilige crawl-drain uit, altijd voor één
+website en eerst met de standaardlimiet van 50.000 rijen. Herhaal pas na controle van health,
+databasebelasting en het gerapporteerde `limit_reached`:
+
+```bash
+sudo docker compose -f compose.yaml -f compose.prod.yaml exec -T api \
+  python -m app.maintenance cleanup-element-locations \
+  --website-id <website-uuid> --batch-size 10000 --max-rows 50000 --confirm-delete
+```
+
 # Veilige crawl-drain bij updates
 
 Na installatie van migratie `0020` wordt iedere update om actieve crawls heen uitgevoerd:

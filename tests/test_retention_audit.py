@@ -169,9 +169,90 @@ def test_element_location_cleanup_deletes_only_candidates_in_batches() -> None:
     assert result.deleted == 1
     assert result.batches == 1
     assert result.websites == {"Audit website": 1}
+    assert result.limit_reached is False
     assert len(remaining) == 2
     assert any(item.issue_types == ["missing_h1"] for item in remaining)
     assert progress == [("Audit website", 1, 1)]
+
+
+def test_element_location_cleanup_stops_at_hard_limit_and_can_resume() -> None:
+    with SessionLocal() as db:
+        website, url = _website_and_url(db)
+        old_run, old_snapshot = _run_and_snapshot(db, website, url, "succeeded", 2024)
+        latest_run, latest_snapshot = _run_and_snapshot(db, website, url, "succeeded", 2025)
+        latest_run_id = latest_run.id
+        db.add_all(
+            [
+                _location(website, url, old_run, old_snapshot, []),
+                _location(website, url, old_run, old_snapshot, []),
+                _location(website, url, old_run, old_snapshot, []),
+                _location(website, url, latest_run, latest_snapshot, []),
+            ]
+        )
+        db.commit()
+        status = start_deployment_drain(db)
+        assert status.safe
+
+        first = cleanup_element_locations(
+            db,
+            website_id=website.id,
+            batch_size=10,
+            max_rows=2,
+        )
+        second = cleanup_element_locations(
+            db,
+            website_id=website.id,
+            batch_size=10,
+            max_rows=2,
+        )
+        remaining = db.query(ElementLocation).all()
+
+    assert first.deleted == 2
+    assert first.limit_reached is True
+    assert second.deleted == 1
+    assert second.limit_reached is False
+    assert len(remaining) == 1
+    assert remaining[0].crawl_run_id == latest_run_id
+
+
+def test_element_location_cleanup_is_limited_to_selected_website() -> None:
+    with SessionLocal() as db:
+        selected, selected_url = _website_and_url(db)
+        other_client = Client(name="Other audit client")
+        db.add(other_client)
+        db.flush()
+        other = Website(
+            client_id=other_client.id,
+            name="Other audit website",
+            base_url="https://other.example.com/",
+        )
+        db.add(other)
+        db.flush()
+        other_url = Url(website_id=other.id, normalized_url="https://other.example.com/")
+        db.add(other_url)
+        db.flush()
+
+        for website, url in ((selected, selected_url), (other, other_url)):
+            old_run, old_snapshot = _run_and_snapshot(db, website, url, "succeeded", 2024)
+            latest_run, latest_snapshot = _run_and_snapshot(db, website, url, "succeeded", 2025)
+            db.add_all(
+                [
+                    _location(website, url, old_run, old_snapshot, []),
+                    _location(website, url, latest_run, latest_snapshot, []),
+                ]
+            )
+        db.commit()
+        status = start_deployment_drain(db)
+        assert status.safe
+
+        result = cleanup_element_locations(db, website_id=selected.id)
+        selected_count = db.query(ElementLocation).filter_by(website_id=selected.id).count()
+        other_count = db.query(ElementLocation).filter_by(website_id=other.id).count()
+
+    assert result.deleted == 1
+    assert result.websites == {"Audit website": 1}
+    assert selected_count == 1
+    assert other_count == 2
 
 
 def _website_and_url(db: Session) -> tuple[Website, Url]:

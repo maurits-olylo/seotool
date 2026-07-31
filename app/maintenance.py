@@ -40,6 +40,13 @@ def _parser() -> argparse.ArgumentParser:
         help="Verwijder veilig oude, probleemvrije elementlocaties",
     )
     cleanup.add_argument("--batch-size", type=int, default=10_000)
+    cleanup.add_argument("--website-id", type=UUID)
+    cleanup.add_argument(
+        "--max-rows",
+        type=int,
+        default=50_000,
+        help="Harde limiet per uitvoering (standaard: 50000)",
+    )
     cleanup.add_argument(
         "--confirm-delete",
         action="store_true",
@@ -129,6 +136,8 @@ def main() -> int:
                 result = cleanup_element_locations(
                     db,
                     batch_size=args.batch_size,
+                    website_id=args.website_id,
+                    max_rows=args.max_rows,
                     on_batch=report_batch,
                 )
         except (RuntimeError, ValueError) as exc:

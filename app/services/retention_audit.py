@@ -47,6 +47,7 @@ class ElementLocationCleanup:
     deleted: int
     batches: int
     websites: dict[str, int]
+    limit_reached: bool
 
 
 def build_retention_audit(db: Session, *, as_of: date | None = None) -> dict[str, Any]:
@@ -107,18 +108,26 @@ def cleanup_element_locations(
     db: Session,
     *,
     batch_size: int = 10_000,
+    website_id: UUID | None = None,
+    max_rows: int = 50_000,
     on_batch: Callable[[str, int, int], None] | None = None,
 ) -> ElementLocationCleanup:
     """Delete audited element-location candidates in bounded transactions."""
     if batch_size < 1 or batch_size > 50_000:
         raise ValueError("batch_size moet tussen 1 en 50000 liggen")
+    if max_rows < 1 or max_rows > 1_000_000:
+        raise ValueError("max_rows moet tussen 1 en 1000000 liggen")
     _require_safe_maintenance(db)
 
     protected_runs = _protected_crawl_runs(db)
-    websites = db.scalars(select(Website).order_by(Website.name, Website.id)).all()
+    website_query = select(Website).order_by(Website.name, Website.id)
+    if website_id is not None:
+        website_query = website_query.where(Website.id == website_id)
+    websites = db.scalars(website_query).all()
     deleted_by_website: dict[str, int] = {}
     total_deleted = 0
     batches = 0
+    limit_reached = False
 
     for website in websites:
         protected_run_ids = set(protected_runs.get(website.id, {}))
@@ -129,6 +138,10 @@ def cleanup_element_locations(
 
         while True:
             _require_safe_maintenance(db)
+            remaining_capacity = max_rows - total_deleted
+            if remaining_capacity <= 0:
+                limit_reached = True
+                break
             conditions = [
                 ElementLocation.website_id == website.id,
                 issue_count == 0,
@@ -143,7 +156,7 @@ def cleanup_element_locations(
                     select(ElementLocation.id)
                     .where(*conditions)
                     .order_by(ElementLocation.id)
-                    .limit(batch_size)
+                    .limit(min(batch_size, remaining_capacity))
                 ).all()
             )
             if not ids:
@@ -160,11 +173,14 @@ def cleanup_element_locations(
                 on_batch(website.name, batch_deleted, total_deleted)
 
         deleted_by_website[website.name] = website_deleted
+        if limit_reached:
+            break
 
     return ElementLocationCleanup(
         deleted=total_deleted,
         batches=batches,
         websites=deleted_by_website,
+        limit_reached=limit_reached,
     )
 
 

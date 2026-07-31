@@ -823,3 +823,17 @@ scheduler of een worker draait.
 
 Gevolg: de volgende retentiekeuzes worden op productieaantallen gebaseerd. Een onvolledig archief
 of een restore naast actieve schrijvers kan niet meer stilzwijgend worden gebruikt.
+
+## 2026-07-31 — Elementopschoning is per website en per run begrensd
+
+Context: de productieaudit vond ruim 6,2 miljoen aantoonbare opruimkandidaten in
+`element_locations`. Eén onbegrensde uitvoering zou te veel databasebelasting en een te groot
+operationeel risico geven.
+
+Besluit: behoud de verplichte veilige crawl-drain en vereis operationeel één website-ID per run.
+Hanteer standaard maximaal 50.000 verwijderingen, werk in transactiebatches en rapporteer met
+`limit_reached` of een vervolguitvoering nodig kan zijn. Een expliciete hogere limiet blijft
+technisch begrensd op één miljoen.
+
+Gevolg: opschoning is hervatbaar, meetbaar en gefaseerd uit te rollen. Er wordt pas op productie
+verwijderd na een geslaagde stagingproef en een actuele back-up.
