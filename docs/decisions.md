@@ -628,6 +628,23 @@ De elementlocatie-opschoning vereist vervolgens een actieve, veilige maintenance
 expliciete `--confirm-delete`. De selectie wordt per website vastgezet en in kleine transacties
 verwijderd. GSC-data valt nadrukkelijk niet onder dit commando.
 
+## 2026-07-31 — Elementlocaties krijgen tabelspecifiek autovacuum
+
+Context: `element_locations` bevatte circa 8,9 miljoen rijen. De standaard vacuümdrempel van 20%
+zou bij deze omvang pas na ongeveer 1,8 miljoen wijzigingen worden bereikt. De eerste begrensde
+productiepilot verwijderde voor Floris 95.295 aantoonbare kandidaten in batches van 10.000. Er
+bleven 28.312 beschermde rijen over en productie bleef gezond.
+
+Besluit: stel voor alleen `element_locations` een vacuümschaalfactor van 2% met een basisdrempel
+van 50.000 in. Stel de analyseschaalfactor in op 1% met een basisdrempel van 25.000. Bij circa
+8,8 miljoen rijen liggen de verwachte activeringspunten daarmee rond 226.000 respectievelijk
+113.000 wijzigingen. De migratie wijzigt alleen tabelopties en kan deze opties weer resetten.
+
+Gevolg: PostgreSQL kan vrijgekomen ruimte eerder hergebruiken en plannerstatistieken eerder
+bijwerken. Dit vervangt de veilige, begrensde opschoningsvensters niet en is geen opdracht voor
+`VACUUM FULL`. GSC-bewaartermijnen blijven een afzonderlijk besluit zonder automatische
+verwijdering.
+
 ## Compacte GSC-deduplicatiesleutels
 
 De unieke GSC-indexen bevatten volledige URL- en zoektermteksten en zijn daardoor groter dan nodig.

@@ -207,6 +207,30 @@ sudo docker compose -f compose.yaml -f compose.prod.yaml exec -T api \
   --website-id <website-uuid> --batch-size 10000 --max-rows 50000 --confirm-delete
 ```
 
+De productiepilot voor Floris is afgerond: 95.295 kandidaten zijn verwijderd en 28.312 beschermde
+locaties bleven behouden. Behandel de overige websites in afzonderlijke onderhoudsvensters, in deze
+volgorde: Schipper Kozijnen, Amsterdam Economic Board, werkenbijgrandvision.nl en human.nl. Begin
+ook per website met 50.000 rijen. Verhoog een venster alleen na een gezonde controle en nooit boven
+250.000 rijen. Maak vóór ieder venster een geverifieerde back-up, pauzeer crawls, controleer na elke
+run `/health` en databasebelasting, en hervat crawls ook wanneer `limit_reached=false` is bereikt.
+
+Controleer na migratie `0034` en na ieder onderhoudsvenster de tabelinstellingen en autovacuum:
+
+```bash
+sudo docker compose -f compose.yaml -f compose.prod.yaml exec -T postgres \
+  psql -U seo -d seo -P pager=off -c "
+SELECT c.reloptions, s.n_live_tup, s.n_dead_tup,
+       pg_size_pretty(pg_total_relation_size(c.oid)) AS total_size,
+       s.last_autovacuum, s.last_autoanalyze
+FROM pg_class AS c
+JOIN pg_stat_user_tables AS s ON s.relid = c.oid
+WHERE c.relname = 'element_locations';"
+```
+
+De verwachte opties zijn vacuüm `0.02 + 50000` en analyse `0.01 + 25000`. Gebruik geen
+`VACUUM FULL` in regulier onderhoud. Beoordeel GSC-retentie afzonderlijk op rapportagebehoefte,
+importstrategie en wettelijke bewaartermijn; `cleanup-element-locations` verwijdert geen GSC-data.
+
 # Veilige crawl-drain bij updates
 
 Na installatie van migratie `0020` wordt iedere update om actieve crawls heen uitgevoerd:

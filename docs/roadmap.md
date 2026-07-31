@@ -1160,6 +1160,22 @@ worden daarbij niet over NAS en VPS verdeeld: de VPS krijgt de volledige publiek
 de NAS blijft staging-, back-up- en herstelplatform. Het beoogde toekomstige domein is
 `thactual.nl`; dit wordt pas bij die migratie technisch geconfigureerd.
 
+## Databaseonderhoud na retentionpilot
+
+Status: Floris-pilot afgerond; tabelspecifieke autovacuumrelease gereed voor staging.
+
+- Activeer voor `element_locations` eerder vacuüm en analyse via migratie `0034`.
+- Ruim daarna per afzonderlijk onderhoudsvenster op: Schipper, Amsterdam Economic Board,
+  GrandVision en human.nl; begin steeds met 50.000 en begrens een venster op 250.000 rijen.
+- Meet na iedere run health, databasebelasting, dode rijen, tabelomvang en laatste autovacuum.
+- Ontwerp GSC-retentie afzonderlijk; verwijder nog geen historische GSC-rijen.
+
+Acceptatie:
+
+- Staging en productie rapporteren migratie `0034` en de vier verwachte tabelopties.
+- Iedere website wordt geïsoleerd verwerkt met geverifieerde back-up en veilige crawl-drain.
+- Beschermde elementlocaties blijven bestaan en productie blijft na ieder venster gezond.
+
 ## Gerichte verificatiecrawls
 
 Status: tien taaktypen gedeployed en technisch gecontroleerd in productie.
