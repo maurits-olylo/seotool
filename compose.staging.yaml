@@ -19,7 +19,6 @@ services:
       retries: 3
     cpu_shares: 512
     mem_limit: 1536m
-    pids_limit: 256
     restart: unless-stopped
 
   postgres:
@@ -37,7 +36,6 @@ services:
       retries: 5
     cpu_shares: 384
     mem_limit: 2g
-    pids_limit: 256
     restart: unless-stopped
 
   redis:
@@ -52,7 +50,6 @@ services:
       retries: 5
     cpu_shares: 128
     mem_limit: 256m
-    pids_limit: 128
     restart: unless-stopped
 
 volumes:

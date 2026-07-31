@@ -1140,8 +1140,8 @@ Status: zelfstandig stagingpakket lokaal geïmplementeerd; NAS-installatie en be
   lokale SSH-tunnel; DSM Reverse Proxy en firewallwijzigingen zijn voor de eerste versie niet nodig.
 - Geef staging via `cpu_shares` een lagere relatieve CPU-prioriteit dan productie en begrens het
   gezamenlijke geheugen tot maximaal 4 GB. De Synology-kernel ondersteunt geen harde Docker
-  `NanoCPUs`-limiet. Voer builds en volledige tests bewust uit wanneer productie rustig is; builds
-  hebben afzonderlijke piekbelasting.
+  `NanoCPUs`- of PIDs-limiet. Voer builds en volledige tests bewust uit wanneer productie rustig is;
+  builds hebben afzonderlijke piekbelasting.
 - Gebruik eigen stagingsecrets en synthetische testdata. Kopieer geen productiedatabase naar
   staging.
 - Beheer staging via de bestaande interactieve NAS-shell. Gebruik Container Manager alleen voor
