@@ -98,7 +98,10 @@ De volledige installatie-, beveiligings-, update- en rollbackprocedure staat in
 ./scripts/restore.sh /volumepath/backups/postgres-YYYYMMDDTHHMMSSZ.dump
 ```
 
-Test restores periodiek op een aparte installatie. De scripts bewaren standaard dertig dagen.
+Iedere back-up wordt pas gepubliceerd nadat PostgreSQL het archief kan lezen en krijgt een
+SHA-256-bestand. Restore controleert deze gegevens en weigert zolang een schrijvende service draait.
+Test restores periodiek op een aparte, niet-gepubliceerde database. De scripts bewaren standaard
+dertig dagen.
 
 ## Veelvoorkomende fouten
 

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.db.session import engine
 from app.models.client import Client
-from app.models.crawl import CrawlRun, ElementLocation, UrlSnapshot
+from app.models.crawl import CrawlRun, ElementLocation, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url
 from app.models.integrations import SearchConsoleMetric, SearchConsoleQueryMetric
 from app.models.website import Website
@@ -85,6 +85,40 @@ def test_retention_audit_reports_gsc_age_buckets_without_mutation() -> None:
 
     buckets = result["websites"][0]["search_console_query_metrics"]
     assert buckets == {
+        "total": 3,
+        "last_90_days": 1,
+        "days_91_to_180": 1,
+        "older_than_180_days": 1,
+    }
+    assert remaining == 3
+
+
+def test_retention_audit_reports_url_link_age_without_mutation() -> None:
+    with SessionLocal() as db:
+        website, url = _website_and_url(db)
+        moments = (
+            datetime(2026, 7, 1, tzinfo=UTC),
+            datetime(2026, 4, 1, tzinfo=UTC),
+            datetime(2025, 1, 1, tzinfo=UTC),
+        )
+        for moment in moments:
+            run, _ = _run_and_snapshot(db, website, url, "succeeded", moment.year)
+            run.started_at = moment
+            db.add(
+                UrlLink(
+                    crawl_run_id=run.id,
+                    source_url_id=url.id,
+                    target_url=f"https://example.com/{moment.date()}",
+                    is_internal=True,
+                    is_nofollow=False,
+                )
+            )
+        db.commit()
+
+        result = build_retention_audit(db, as_of=date(2026, 7, 25))
+        remaining = db.query(UrlLink).count()
+
+    assert result["websites"][0]["url_links"] == {
         "total": 3,
         "last_90_days": 1,
         "days_91_to_180": 1,

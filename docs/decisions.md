@@ -809,3 +809,17 @@ Besluit: gebruik een repositorybrede `.dockerignore`. Sluit alle echte `.env`-va
 runtimegegevens uit; alleen de twee lege voorbeeldbestanden blijven beschikbaar als documentatie.
 
 Gevolg: images bevatten geen lokale secrets en builds versturen en verwerken minder gegevens.
+
+## 2026-07-31 — Retentie begint meetbaar en back-upherstel faalt veilig
+
+Context: de productiedatabase is 19 GB. De grootste levende tabellen zijn elementlocaties,
+Search Console-querydetails en interne links; databasebloat is niet de primaire oorzaak. De oude
+restoreprocedure kon bovendien worden gestart terwijl gespecialiseerde workers nog schreven.
+
+Besluit: breid de read-only retentieaudit uit met leeftijdsbuckets voor interne links, zonder een
+verwijderbeleid te activeren. Publiceer een back-up pas nadat `pg_restore --list` slaagt en maak een
+SHA-256-bestand. Laat restore checksum en archief controleren en hard weigeren zolang API,
+scheduler of een worker draait.
+
+Gevolg: de volgende retentiekeuzes worden op productieaantallen gebaseerd. Een onvolledig archief
+of een restore naast actieve schrijvers kan niet meer stilzwijgend worden gebruikt.

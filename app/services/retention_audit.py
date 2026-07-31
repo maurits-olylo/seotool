@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 from uuid import UUID
 
 from sqlalchemy import case, delete, func, select, true
 from sqlalchemy.orm import Session
 
-from app.models.crawl import CrawlRun, ElementLocation
+from app.models.crawl import CrawlRun, ElementLocation, UrlLink
 from app.models.integrations import SearchConsoleMetric, SearchConsoleQueryMetric
 from app.models.website import Website
 
@@ -28,6 +28,14 @@ class ElementLocationAudit:
 
 @dataclass(frozen=True)
 class MetricAgeAudit:
+    total: int
+    last_90_days: int
+    days_91_to_180: int
+    older_than_180_days: int
+
+
+@dataclass(frozen=True)
+class UrlLinkAgeAudit:
     total: int
     last_90_days: int
     days_91_to_180: int
@@ -68,6 +76,7 @@ def build_retention_audit(db: Session, *, as_of: date | None = None) -> dict[str
                 "search_console_query_metrics": asdict(
                     _metric_age_audit(db, SearchConsoleQueryMetric, website.id, audit_date)
                 ),
+                "url_links": asdict(_url_link_age_audit(db, website.id, audit_date)),
             }
         )
 
@@ -83,6 +92,10 @@ def build_retention_audit(db: Session, *, as_of: date | None = None) -> dict[str
             "search_console_query_metrics": (
                 "Leeftijdsmeting voor een mogelijke latere detailretentie van 180 dagen; "
                 "deze audit verwijdert niets."
+            ),
+            "url_links": (
+                "Leeftijdsmeting per volledige crawl; een bewaarbeleid wordt pas ingevoerd nadat "
+                "historie-, issue- en verificatiebewijs expliciet zijn beschermd."
             ),
         },
         "websites": website_results,
@@ -206,9 +219,7 @@ def _element_location_audit(
 ) -> ElementLocationAudit:
     issue_count = func.json_array_length(ElementLocation.issue_types)
     protected_run_condition = (
-        ElementLocation.crawl_run_id.in_(protected_run_ids)
-        if protected_run_ids
-        else ~true()
+        ElementLocation.crawl_run_id.in_(protected_run_ids) if protected_run_ids else ~true()
     )
     latest_snapshot_condition = ElementLocation.snapshot_id.in_(
         _latest_location_snapshot_ids(website_id)
@@ -287,11 +298,41 @@ def _metric_age_audit(
     return MetricAgeAudit(*(int(value or 0) for value in row))
 
 
+def _url_link_age_audit(
+    db: Session,
+    website_id: UUID,
+    audit_date: date,
+) -> UrlLinkAgeAudit:
+    day_90 = datetime.combine(audit_date - timedelta(days=90), time.min, tzinfo=UTC)
+    day_180 = datetime.combine(audit_date - timedelta(days=180), time.min, tzinfo=UTC)
+    row = db.execute(
+        select(
+            func.count(UrlLink.id),
+            func.sum(case((CrawlRun.started_at > day_90, 1), else_=0)),
+            func.sum(
+                case(
+                    (
+                        (CrawlRun.started_at > day_180) & (CrawlRun.started_at <= day_90),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ),
+            func.sum(case((CrawlRun.started_at <= day_180, 1), else_=0)),
+        )
+        .select_from(UrlLink)
+        .join(CrawlRun, CrawlRun.id == UrlLink.crawl_run_id)
+        .where(CrawlRun.website_id == website_id)
+    ).one()
+    return UrlLinkAgeAudit(*(int(value or 0) for value in row))
+
+
 def _sum_website_results(results: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
     sections = (
         "element_locations",
         "search_console_page_metrics",
         "search_console_query_metrics",
+        "url_links",
     )
     totals: dict[str, dict[str, int]] = {}
     for section in sections:

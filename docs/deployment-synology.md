@@ -161,10 +161,12 @@ wijziging dit vereist. Vermeld bij iedere release expliciet of een migratie nodi
 Plan `scripts/backup.sh` dagelijks via Synology Taakplanner. Stel `PROJECT_DIR`, `BACKUP_DIR` en
 optioneel `BACKUP_RETENTION_DAYS` in. Kopieer back-ups ook naar een andere fysieke locatie.
 
-Stop voor restore tijdelijk API, worker en scheduler om writes te voorkomen:
+Stop voor restore alle schrijvende services. Het restorescript weigert verder te gaan zolang één
+van deze services nog draait. PostgreSQL en Redis blijven beschikbaar:
 
 ```bash
-docker compose -f compose.yaml -f compose.prod.yaml stop api worker scheduler
+docker compose -f compose.yaml -f compose.prod.yaml stop \
+  api worker crawl-worker-2 crawl-worker-3 integration-worker export-worker scheduler
 PROJECT_DIR=/volume1/docker/seo-monitor/project ./scripts/restore.sh /pad/backup.dump
 docker compose -f compose.yaml -f compose.prod.yaml up -d
 ```
