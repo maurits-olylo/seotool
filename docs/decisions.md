@@ -798,3 +798,14 @@ versleutelde back-ups en hersteltests; productie gebruikt geen databaseverbindin
 
 Gevolg: een storing van NAS of thuisverbinding legt de publieke productie niet stil. Opslagretentie
 en databasegroei moeten vóór de VPS-migratie afzonderlijk worden begrensd en gemonitord.
+
+## 2026-07-31 — Docker-buildcontext bevat geen secrets of runtimegegevens
+
+Context: `Dockerfile` kopieert de buildcontext naar het image. Zonder expliciete uitsluitlijst
+kunnen lokale environmentbestanden, exports, back-ups, testresultaten en Git-metadata onderdeel van
+het image of de NAS-buildoverdracht worden.
+
+Besluit: gebruik een repositorybrede `.dockerignore`. Sluit alle echte `.env`-varianten en
+runtimegegevens uit; alleen de twee lege voorbeeldbestanden blijven beschikbaar als documentatie.
+
+Gevolg: images bevatten geen lokale secrets en builds versturen en verwerken minder gegevens.
