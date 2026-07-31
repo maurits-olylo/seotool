@@ -100,7 +100,10 @@ Context: directe `scp` naar NAS-paden is onbetrouwbaar gebleken.
 
 Besluit: releases worden lokaal met `git archive` gemaakt, met SHA-256 gecontroleerd en via
 `ssh ... dd of=/tmp/...` geüpload. SCP en Git op de NAS worden niet gebruikt. Na checksumcontrole
-wordt altijd met `sudo tar` uitgepakt, omdat de productiebestanden root-owned zijn.
+wordt altijd met `sudo tar` uitgepakt, omdat de productiebestanden root-owned zijn. De operator
+werkt met twee vaste terminalvensters: de upload gebeurt vanuit de lokale Mac-shell; controle,
+uitpakken en Docker-handelingen gebeuren in de al geopende interactieve NAS-shell. Er wordt na de
+upload geen tweede SSH-login gestart.
 
 Gevolg: ieder deploymentadvies vermeldt volledig pakketpad, checksum, migrationstatus en alleen de
 geraakte containers.

@@ -42,8 +42,9 @@ COMMUNICATIESTIJL
   1. Maak lokaal een `git archive`.
   2. Upload vanaf de lokale Mac uitsluitend via
      `ssh ... "dd of=/tmp/<release>.tar.gz" < /tmp/<release>.tar.gz`.
-  3. Log daarna interactief in met `ssh thact@192.168.2.20`.
-  4. Controleer in die interactieve NAS-shell de SHA-256, pak uit met
+  3. Gebruik daarna het al geopende tweede terminalvenster met de interactieve NAS-shell; geef nooit
+     een tweede `ssh thact@192.168.2.20`-inlogopdracht.
+  4. Controleer in die bestaande NAS-shell de SHA-256, pak uit met
      `sudo tar -xzf ... -C /volume1/docker/seo-monitor/project` en voer alle
      `sudo docker compose`-commando's daar uit.
 - Deze interactieve NAS-route is de enige toegestane deploymentroute. Gebruik nooit SCP,

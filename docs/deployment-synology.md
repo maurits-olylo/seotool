@@ -63,6 +63,9 @@ komt uit de environment.
 Maak iedere release op de Mac vanaf een exacte commit met `git archive`. Upload nooit met SCP en
 gebruik geen Git op de NAS. Stream het archief naar `/tmp`, controleer daar de checksum en pak het
 met `sudo tar` uit: de productiebestanden zijn root-owned en gewone `tar` kan ze niet overschrijven.
+Werk met twee vaste terminalvensters: één lokale Mac-shell voor archief en upload, en één al
+geopende interactieve NAS-shell voor alle controles en Docker-handelingen. Na de upload is dus
+geen tweede SSH-login nodig.
 
 ```bash
 git archive --format=tar.gz --output=/tmp/<release>.tar.gz <commit>
@@ -70,7 +73,7 @@ shasum -a 256 /tmp/<release>.tar.gz
 
 ssh thact@192.168.2.20 "dd of=/tmp/<release>.tar.gz" < /tmp/<release>.tar.gz
 
-# Voer de rest direct uit in de bestaande NAS-shell:
+# Voer de rest direct uit in het al geopende NAS-terminalvenster:
 echo "<sha256>  /tmp/<release>.tar.gz" | sha256sum -c -
 sudo tar -xzf /tmp/<release>.tar.gz -C /volume1/docker/seo-monitor/project
 sudo docker compose -f compose.yaml -f compose.prod.yaml build <geraakte-services>
