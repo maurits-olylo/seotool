@@ -1130,17 +1130,19 @@ uitgevoerd wanneer een nieuw Alembic-bestand onderdeel van de release is.
 
 ## Gerichte verificatiecrawls
 
-Status: lokaal gereed, nog niet gedeployed.
+Status: basis en interface gedeployed; uitbreiding naar zes taaktypen lokaal gereed.
 
 - Dedicated executor voor defecte interne links, redirectketens/-loops en canonicals.
 - Persistente scope, regels, voor-/nasituatie, fouten, retries en conclusie.
 - Eén actieve verificatie per aanbevelingstaak; alleen beschikbaar voor uitgevoerde taken met een
   complete en ondersteunde URL-scope.
 - Geen discovery, sitebrede issueherberekening of wijziging van de full-crawlplanning.
+- Ondersteunt aanvullend interne redirects, herstel/redirect van ontbrekende pagina's en
+  indexatiecorrecties.
 
 ### Gebundelde interfaceverbetering uitvoeringstaken
 
-Status: lokaal uitgevoerd als onderdeel van de gebundelde verificatie-interface; nog niet gedeployed.
+Status: uitgevoerd en gedeployed als onderdeel van de gebundelde verificatie-interface.
 
 - Beperk de globale dialoogstijl van `dl div` tot directe definitierijen. Geneste taakcomponenten
   krijgen nu onbedoeld bovenlijnen en verticale padding.

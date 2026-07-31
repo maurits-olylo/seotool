@@ -39,12 +39,18 @@ PRIORITY_RANK = {"low": 0, "normal": 1, "high": 2, "critical": 3}
 SEVERITY_PRIORITY = {"low": "low", "medium": "normal", "high": "high"}
 SCOPED_VERIFICATION_TYPES = {
     "repair_broken_internal_link",
+    "replace_redirected_internal_link",
+    "restore_or_redirect_missing_page",
     "fix_redirect_chain_or_loop",
+    "correct_indexability",
     "correct_canonical",
 }
 VERIFICATION_URL_ROLES = {
     "repair_broken_internal_link": {"source", "broken_target", "replacement_target"},
+    "replace_redirected_internal_link": {"source", "target", "expected_target"},
+    "restore_or_redirect_missing_page": {"old", "new"},
     "fix_redirect_chain_or_loop": {"source", "expected_target"},
+    "correct_indexability": {"changed"},
     "correct_canonical": {"source", "expected_canonical"},
 }
 
@@ -477,6 +483,33 @@ def _task_url_scope_from_issue(
                     .distinct()
                 )
                 scope.extend((source_id, "source") for source_id in source_ids)
+    elif verification_type == "replace_redirected_internal_link":
+        scope.append((issue.url_id, "target"))
+        evidence = occurrence.evidence if occurrence else {}
+        for value in evidence.get("source_urls", []):
+            if isinstance(value, str):
+                source = _existing_url(db, issue.website_id, value)
+                if source:
+                    scope.append((source.id, "source"))
+        final_url = evidence.get("final_url")
+        if isinstance(final_url, str):
+            target = _existing_url(db, issue.website_id, final_url)
+            if target:
+                scope.append((target.id, "expected_target"))
+        if occurrence and not any(role == "source" for _url_id, role in scope):
+            source_ids = db.scalars(
+                select(UrlLink.source_url_id)
+                .where(
+                    UrlLink.crawl_run_id == occurrence.crawl_run_id,
+                    UrlLink.target_url_id == issue.url_id,
+                    UrlLink.source_url_id != issue.url_id,
+                    UrlLink.is_internal.is_(True),
+                )
+                .distinct()
+            )
+            scope.extend((source_id, "source") for source_id in source_ids)
+    elif verification_type == "restore_or_redirect_missing_page":
+        scope.append((issue.url_id, "old"))
     elif verification_type == "fix_redirect_chain_or_loop":
         scope.append((issue.url_id, "source"))
         snapshot = (
@@ -490,6 +523,8 @@ def _task_url_scope_from_issue(
                 scope.append((target.id, "expected_target"))
     elif verification_type == "correct_canonical":
         scope.append((issue.url_id, "source"))
+    elif verification_type == "correct_indexability":
+        scope.append((issue.url_id, "changed"))
     else:
         scope.append((issue.url_id, _primary_url_role(default_scope)))
     return list(dict.fromkeys(scope))

@@ -45,7 +45,7 @@ DEFINITIONS = (
     ),
     RecommendationDefinition(
         "replace_redirected_internal_link",
-        "1",
+        "2",
         frozenset({"internally_linked_redirect", "multiple_redirected_internal_links"}),
         "Vervang interne redirects door eind-URL's",
         "content",
@@ -59,7 +59,7 @@ DEFINITIONS = (
     ),
     RecommendationDefinition(
         "restore_or_redirect_missing_page",
-        "1",
+        "2",
         frozenset({"http_404", "http_410", "sitemap_404"}),
         "Herstel of redirect een ontbrekende pagina",
         "development",
@@ -75,7 +75,7 @@ DEFINITIONS = (
             "De oude URL heeft de bedoelde status.",
             "Een eind-URL retourneert 200 indien van toepassing.",
         ),
-        ("old", "new"),
+        ("old",),
     ),
     RecommendationDefinition(
         "resolve_server_or_fetch_failure",
@@ -111,7 +111,7 @@ DEFINITIONS = (
     ),
     RecommendationDefinition(
         "correct_indexability",
-        "1",
+        "2",
         frozenset({"unexpected_noindex", "conflicting_robots", "robots_txt_blocked"}),
         "Corrigeer onverwachte indexatieblokkade",
         "seo_analytics",

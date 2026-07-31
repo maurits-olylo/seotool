@@ -26,7 +26,7 @@ from app.services.recommendation_library import (
     get_recommendation_definition,
     recommendation_for_issue_type,
 )
-from app.services.recommendation_verifications import execute_verification
+from app.services.recommendation_verifications import _evaluate, execute_verification
 
 
 def _task_fixture(db):  # type: ignore[no-untyped-def]
@@ -469,6 +469,114 @@ def test_targeted_broken_link_verification_only_fetches_selected_urls(
 
     execute_verification(str(verification_id))
     assert fetched == ["https://example.com/source"]
+
+
+def test_additional_verification_rules_resolve_redirect_missing_and_indexability() -> None:
+    with SessionLocal() as db:
+        website, source, _issue, _task = _task_fixture(db)
+        redirect = Url(
+            website_id=website.id,
+            normalized_url="https://example.com/redirect",
+        )
+        old = Url(
+            website_id=website.id,
+            normalized_url="https://example.com/old",
+        )
+        replacement = Url(
+            website_id=website.id,
+            normalized_url="https://example.com/new",
+        )
+        changed = Url(
+            website_id=website.id,
+            normalized_url="https://example.com/indexable",
+        )
+        db.add_all([redirect, old, replacement, changed])
+        db.flush()
+        job = CrawlJob(
+            website_id=website.id,
+            job_type="recommendation_verification",
+        )
+        db.add(job)
+        db.flush()
+        run = CrawlRun(
+            crawl_job_id=job.id,
+            website_id=website.id,
+            crawl_type="recommendation_verification",
+        )
+        db.add(run)
+        db.flush()
+        db.add_all(
+            [
+                UrlSnapshot(
+                    url_id=source.id,
+                    crawl_run_id=run.id,
+                    requested_url=source.normalized_url,
+                    final_url=source.normalized_url,
+                    status_code=200,
+                    is_indexable=True,
+                ),
+                UrlSnapshot(
+                    url_id=old.id,
+                    crawl_run_id=run.id,
+                    requested_url=old.normalized_url,
+                    final_url=replacement.normalized_url,
+                    status_code=200,
+                    redirect_chain=[
+                        {
+                            "url": old.normalized_url,
+                            "status_code": 301,
+                            "target": replacement.normalized_url,
+                        }
+                    ],
+                    is_indexable=True,
+                ),
+                UrlSnapshot(
+                    url_id=replacement.id,
+                    crawl_run_id=run.id,
+                    requested_url=replacement.normalized_url,
+                    final_url=replacement.normalized_url,
+                    status_code=200,
+                    is_indexable=True,
+                ),
+                UrlSnapshot(
+                    url_id=changed.id,
+                    crawl_run_id=run.id,
+                    requested_url=changed.normalized_url,
+                    final_url=changed.normalized_url,
+                    status_code=200,
+                    meta_robots="index,follow",
+                    is_indexable=True,
+                ),
+            ]
+        )
+        db.flush()
+
+        redirect_rules = _evaluate(
+            db,
+            "replace_redirected_internal_link",
+            {
+                "source": [source],
+                "target": [redirect],
+                "expected_target": [replacement],
+            },
+            run.id,
+        )
+        missing_rules = _evaluate(
+            db,
+            "restore_or_redirect_missing_page",
+            {"old": [old], "new": [replacement]},
+            run.id,
+        )
+        indexability_rules = _evaluate(
+            db,
+            "correct_indexability",
+            {"changed": [changed]},
+            run.id,
+        )
+
+        assert {rule["status"] for rule in redirect_rules} == {"passed"}
+        assert {rule["status"] for rule in missing_rules} == {"passed"}
+        assert {rule["status"] for rule in indexability_rules} == {"passed"}
 
 def test_grouped_broken_link_evidence_enriches_verification_scope(client) -> None:  # type: ignore[no-untyped-def]
     customer = client.post("/api/v1/clients", json={"name": "Scope client"}).json()

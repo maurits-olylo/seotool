@@ -753,3 +753,17 @@ resultaat, terwijl de bestaande technische verificatiestatus de workerstatus bli
 
 Gevolg: aanvragen en retries zijn idempotent, resultaten blijven auditeerbaar en een gerichte
 controle kan nooit stilzwijgend uitgroeien tot een volledige websitecrawl.
+
+## 2026-07-31 — Gewenste redirect- en hersteldoelen worden niet geraden
+
+Context: een ontbrekende pagina kan worden hersteld of naar een opvolger worden gestuurd. Een
+interne redirect kan een aantoonbaar einddoel hebben, maar de gewenste contentbestemming is niet
+altijd uit techniek af te leiden.
+
+Besluit: bewaar crawlbare oude URL's, bronpagina's en aangetoonde einddoelen automatisch. Houd een
+nieuwe URL bij herstel optioneel en accepteer zowel rechtstreeks herstel naar HTTP 200 als een
+redirect naar een expliciet vastgelegde, bereikbare opvolger. Laat onbekende doelen handmatig via
+de beveiligde URL-scope invullen.
+
+Gevolg: de executor kan bereikbaarheid, links en indexatie hard controleren zonder een inhoudelijke
+bestemming te verzinnen.

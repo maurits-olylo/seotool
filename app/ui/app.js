@@ -1889,9 +1889,18 @@ function renderTaskVerification(canWrite) {
     replacement_target: "Vervangend doel",
     expected_target: "Verwacht einddoel",
     expected_canonical: "Verwachte canonical",
+    target: "Redirect-URL",
+    old: "Oude URL",
+    new: "Nieuwe URL",
+    changed: "Te controleren pagina",
   };
   const scopeRows = (task.urls || []).map((item) => `<li><div><strong>${escapeHtml(roleLabels[item.role] || item.role)}</strong><a href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener">${escapeHtml(item.url || item.url_id)}</a></div>${canWrite ? `<button class="task-scope-remove" type="button" data-task-url-id="${escapeHtml(item.id)}" aria-label="Verwijder ${escapeHtml(roleLabels[item.role] || item.role)}">×</button>` : ""}</li>`).join("");
-  const allowedRoles = [...new Set([...plan.required_roles, ...((task.urls || []).map((item) => item.role)), ...(task.recommendation_type === "repair_broken_internal_link" ? ["replacement_target"] : [])])];
+  const optionalRoles = {
+    repair_broken_internal_link: ["replacement_target"],
+    replace_redirected_internal_link: ["expected_target"],
+    restore_or_redirect_missing_page: ["new"],
+  }[task.recommendation_type] || [];
+  const allowedRoles = [...new Set([...plan.required_roles, ...((task.urls || []).map((item) => item.role)), ...optionalRoles])];
   const scopeEditor = `<details class="task-scope"><summary>URL-scope bekijken${plan.missing_roles.length ? " en aanvullen" : ""}</summary><ul>${scopeRows || "<li>Geen URL’s vastgelegd.</li>"}</ul>${canWrite ? `<form id="task-scope-form"><label>Rol<select id="task-scope-role">${allowedRoles.map((role) => `<option value="${escapeHtml(role)}">${escapeHtml(roleLabels[role] || role)}</option>`).join("")}</select></label><label class="task-scope-url">URL<input id="task-scope-url" type="url" required placeholder="https://voorbeeld.nl/pagina"></label><button class="detail-button" type="submit">URL toevoegen</button></form>` : ""}</details>`;
   const button = canWrite
     ? `<button id="start-recommendation-verification" class="detail-button verification-button" type="button" ${plan.can_request && !verificationActive ? "" : "disabled"}>${verificationActive ? "Controle loopt" : latest ? "Opnieuw controleren" : "Gerichte controle starten"}</button>`

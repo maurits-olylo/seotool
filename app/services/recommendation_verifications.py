@@ -30,6 +30,7 @@ from app.services.recommendation_tasks import (
 )
 from app.services.robots import RobotsRules
 from app.services.snapshot import store_fetch_result
+from app.services.technical_checks import _robots_conflict
 from app.services.url_normalization import NormalizationOptions, normalize_url
 
 logger = structlog.get_logger()
@@ -296,13 +297,20 @@ def _roles(db: Session, scope: list[object]) -> dict[str, list[Url]]:
 
 
 def _fetch_urls(verification_type: str, roles: dict[str, list[Url]]) -> list[Url]:
-    requested = list(roles["source"])
+    primary_role = {
+        "restore_or_redirect_missing_page": "old",
+        "correct_indexability": "changed",
+    }.get(verification_type, "source")
+    requested = list(roles[primary_role])
     optional = {
         "repair_broken_internal_link": "replacement_target",
+        "replace_redirected_internal_link": "expected_target",
+        "restore_or_redirect_missing_page": "new",
         "fix_redirect_chain_or_loop": "expected_target",
+        "correct_indexability": None,
         "correct_canonical": "expected_canonical",
     }[verification_type]
-    if optional in roles:
+    if optional and optional in roles:
         requested.extend(roles[optional])
     return list({url.id: url for url in requested}.values())
 
@@ -319,12 +327,16 @@ def _evaluate(
             select(UrlSnapshot).where(UrlSnapshot.crawl_run_id == run_id)
         )
     }
-    source_urls = roles["source"]
+    primary_role = {
+        "restore_or_redirect_missing_page": "old",
+        "correct_indexability": "changed",
+    }.get(verification_type, "source")
+    source_urls = roles[primary_role]
     source_snapshots = [snapshots.get(item.id) for item in source_urls]
     source = source_snapshots[0]
     rules = [
         _status_rule(
-            f"source_reachable:{url.id}",
+            f"{primary_role}_reachable:{url.id}",
             snapshots.get(url.id),
             expected_url=None,
         )
@@ -369,6 +381,116 @@ def _evaluate(
                 )
                 for url in roles["replacement_target"]
             )
+    elif verification_type == "replace_redirected_internal_link":
+        for redirected in roles["target"]:
+            still_linked = bool(
+                db.scalar(
+                    select(UrlLink.id).where(
+                        UrlLink.crawl_run_id == run_id,
+                        UrlLink.source_url_id.in_([item.id for item in source_urls]),
+                        UrlLink.target_url == redirected.normalized_url,
+                    )
+                )
+            )
+            rules.append(
+                {
+                    "rule": f"redirect_target_not_linked:{redirected.id}",
+                    "status": (
+                        "failed"
+                        if still_linked
+                        else (
+                            "passed"
+                            if all(
+                                item and item.status_code == 200
+                                for item in source_snapshots
+                            )
+                            else "error"
+                        )
+                    ),
+                    "evidence": {
+                        "redirect_target": redirected.normalized_url,
+                        "still_linked": still_linked,
+                    },
+                }
+            )
+        if "expected_target" in roles:
+            rules.extend(
+                _status_rule(
+                    f"expected_target_reachable:{url.id}",
+                    snapshots.get(url.id),
+                    expected_url=None,
+                )
+                for url in roles["expected_target"]
+            )
+    elif verification_type == "restore_or_redirect_missing_page":
+        old_snapshot = source
+        new_url = roles.get("new", [None])[0]
+        new_snapshot = snapshots.get(new_url.id) if new_url else None
+        restored = bool(old_snapshot and old_snapshot.status_code == 200)
+        redirected = bool(
+            old_snapshot
+            and new_url
+            and _normalized(old_snapshot.final_url, None) == new_url.normalized_url
+            and new_snapshot
+            and new_snapshot.status_code == 200
+        )
+        rules.append(
+            {
+                "rule": "old_url_restored_or_redirected",
+                "status": (
+                    "passed"
+                    if restored or redirected
+                    else ("error" if old_snapshot is None else "failed")
+                ),
+                "evidence": {
+                    "old_status_code": old_snapshot.status_code if old_snapshot else None,
+                    "old_final_url": old_snapshot.final_url if old_snapshot else None,
+                    "replacement_url": new_url.normalized_url if new_url else None,
+                    "replacement_status_code": (
+                        new_snapshot.status_code if new_snapshot else None
+                    ),
+                },
+            }
+        )
+    elif verification_type == "correct_indexability":
+        robots_values = {
+            value.strip().lower()
+            for value in (
+                source.meta_robots if source else None,
+                source.x_robots_tag if source else None,
+            )
+            if value
+        }
+        blocked = bool(source and source.error_message == "Blocked by robots.txt")
+        rules.extend(
+            [
+                {
+                    "rule": "robots_instructions_consistent",
+                    "status": (
+                        "failed"
+                        if _robots_conflict(robots_values) or blocked
+                        else ("passed" if source else "error")
+                    ),
+                    "evidence": {
+                        "meta_robots": source.meta_robots if source else None,
+                        "x_robots_tag": source.x_robots_tag if source else None,
+                        "robots_txt_blocked": blocked,
+                    },
+                },
+                {
+                    "rule": "page_indexable",
+                    "status": (
+                        "passed"
+                        if source and source.status_code == 200 and source.is_indexable
+                        else ("error" if source is None else "failed")
+                    ),
+                    "evidence": {
+                        "status_code": source.status_code if source else None,
+                        "is_indexable": source.is_indexable if source else None,
+                    },
+                },
+            ]
+        )
     elif verification_type == "fix_redirect_chain_or_loop":
         expected_url = roles["expected_target"][0]
         expected = expected_url.normalized_url
@@ -391,7 +513,7 @@ def _evaluate(
                 ),
             ]
         )
-    else:
+    elif verification_type == "correct_canonical":
         expected_url = roles["expected_canonical"][0]
         expected = expected_url.normalized_url
         canonical = _normalized(source.canonical, source_urls[0]) if source else None
@@ -413,6 +535,8 @@ def _evaluate(
                 ),
             ]
         )
+    else:
+        raise ValueError(f"Unsupported verification type: {verification_type}")
     return rules
 
 

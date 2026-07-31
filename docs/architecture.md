@@ -241,3 +241,9 @@ snapshots gebruiken dezelfde services als reguliere crawls.
 Regelresultaten, voor- en nasnapshot-ID's, fouten en tijden blijven bij de verificatie bewaard.
 Taakstatus, issuestatus en verificatiestatus veranderen onafhankelijk. Een gedeeltelijke of
 mislukte controle zet een geïmplementeerde taak daarom niet automatisch terug.
+
+De executor ondersteunt zes afgebakende taaktypen: defecte interne links, interne links naar
+redirects, ontbrekende pagina's, redirectketens/-loops, indexatiecorrecties en canonicals. Een
+opvolger of verwacht doel is alleen verplicht wanneer de regel zonder die intentie niet betrouwbaar
+kan beslissen. Voor herstel van een ontbrekende pagina blijft `new` optioneel: een rechtstreeks
+herstelde HTTP 200 is eveneens een geldige uitkomst.
