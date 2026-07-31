@@ -1130,7 +1130,7 @@ uitgevoerd wanneer een nieuw Alembic-bestand onderdeel van de release is.
 
 ## Gerichte verificatiecrawls
 
-Status: zes taaktypen gedeployed; uitbreiding naar tien taaktypen lokaal gereed.
+Status: tien taaktypen gedeployed en technisch gecontroleerd in productie.
 
 - Dedicated executor voor defecte interne links, redirectketens/-loops en canonicals.
 - Persistente scope, regels, voor-/nasituatie, fouten, retries en conclusie.
@@ -1139,7 +1139,28 @@ Status: zes taaktypen gedeployed; uitbreiding naar tien taaktypen lokaal gereed.
 - Geen discovery, sitebrede issueherberekening of wijziging van de full-crawlplanning.
 - Ondersteunt aanvullend interne redirects, herstel/redirect van ontbrekende pagina's en
   indexatiecorrecties.
-- Ondersteunt lokaal aanvullend titles, primaire H1-koppen, meta descriptions en structured data.
+- Ondersteunt aanvullend titles, primaire H1-koppen, meta descriptions en structured data.
+
+### Volgende gebundelde release — begrijpelijke taakworkflow
+
+Status: afgebakend; nog niet in ontwikkeling.
+
+- Toon bovenaan één duidelijke hoofdactie die past bij de huidige taakstatus.
+- Vertaal interne statussen en verificatietermen naar korte, taakgerichte uitleg.
+- Presenteer `Wat moet ik doen?`, `Wanneer is het klaar?` en `Controle` in die vaste volgorde.
+- Verberg technische URL-rollen, scopeversies en regelbewijs standaard achter uitklapbare details.
+- Leg bij een uitgeschakelde actie direct uit welke stap of invoer nog ontbreekt.
+- Maak het verschil zichtbaar tussen werk gereedmelden, automatisch controleren en definitief
+  afsluiten.
+- Behoud de volledige technische informatie voor beheerders en probleemonderzoek.
+
+Acceptatie:
+
+- Een gebruiker kan zonder SEO- of systeemkennis bepalen wat de eerstvolgende actie is.
+- De hoofdroute van open taak naar uitgevoerde en gecontroleerde taak past zonder zijwaarts scrollen
+  op 390 px.
+- Technische details verdringen de taakactie niet, maar blijven met één handeling bereikbaar.
+- Bestaande statusovergangen, URL-scopebewerking en gerichte verificaties blijven functioneel.
 
 ### Gebundelde interfaceverbetering uitvoeringstaken
 
