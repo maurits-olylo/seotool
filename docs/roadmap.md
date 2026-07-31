@@ -1138,6 +1138,30 @@ Status: lokaal gereed, nog niet gedeployed.
   complete en ondersteunde URL-scope.
 - Geen discovery, sitebrede issueherberekening of wijziging van de full-crawlplanning.
 
+### Gebundelde interfaceverbetering uitvoeringstaken
+
+Status: meenemen in een grotere interfacerelease; geen losse hotfix.
+
+- Beperk de globale dialoogstijl van `dl div` tot directe definitierijen. Geneste taakcomponenten
+  krijgen nu onbedoeld bovenlijnen en verticale padding.
+- Vervang de tekst `Voortgang` in het vaste nummerbadge door een kort stapnummer of een afzonderlijk
+  sectielabel; de huidige tekst loopt over de kop `Taakstatus bijwerken`.
+- Maak de taakheader compacter en groepeer status met de overige metadata, zodat de statusbadge niet
+  los in de rechterbovenhoek zweeft.
+- Verminder de verticale ruimte tussen header, aanpak, criteria en bediening zonder de scanbaarheid
+  te verliezen.
+- Maak statusformulier en knoppen rustiger: een disabled knop moet duidelijk inactief zijn,
+  toelichting moet op één regel beginnen en labels en velden moeten consistent uitlijnen.
+- Controleer de volledige taakkaart binnen het echte issuedialoogvenster op desktop en mobiel;
+  geïsoleerde componentpreviews zijn niet voldoende vanwege overervende dialoogselectors.
+
+Acceptatie:
+
+- Geen onbedoelde scheidingslijnen of overlappende tekst in de taakkaart.
+- Header, stappen, criteria, statusbediening en verificatie vormen één compacte visuele hiërarchie.
+- Geen horizontale overflow op 390 px en geen afgesneden bediening in het desktopdialoogvenster.
+- De verificatiestroom blijft functioneel en toegankelijk via toetsenbord en zichtbare focusstijlen.
+
 ## Fase 11 — Volwaardige visuele issue-inspectie
 
 Status: toekomstig; laatste brede productfase na de huidige roadmap.
