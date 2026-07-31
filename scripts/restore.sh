@@ -11,8 +11,16 @@ PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
 test -f "$BACKUP_FILE"
 cd "$PROJECT_DIR"
 
+compose() {
+  if [ "${COMPOSE_TARGET:-production}" = "staging" ]; then
+    docker compose --env-file .env.staging -f compose.staging.yaml "$@"
+  else
+    docker compose -f compose.yaml -f compose.prod.yaml "$@"
+  fi
+}
+
 RUNNING_SERVICES="$(
-  docker compose -f compose.yaml -f compose.prod.yaml ps --status running --services
+  compose ps --status running --services
 )"
 RUNNING_WRITERS=""
 for service in $RUNNING_SERVICES; do
@@ -40,10 +48,10 @@ if [ -f "$BACKUP_FILE.sha256" ]; then
     fi
   )
 fi
-docker compose -f compose.yaml -f compose.prod.yaml exec -T postgres \
+compose exec -T postgres \
   pg_restore --list < "$BACKUP_FILE" > /dev/null
-docker compose -f compose.yaml -f compose.prod.yaml exec -T postgres \
+compose exec -T postgres \
   pg_restore --clean --if-exists --no-owner \
   -U "${POSTGRES_USER:-seo}" -d "${POSTGRES_DB:-seo}" < "$BACKUP_FILE"
-docker compose -f compose.yaml -f compose.prod.yaml run --rm api alembic upgrade head
+compose run --rm api alembic upgrade head
 echo "Restore completed: $BACKUP_FILE"

@@ -105,6 +105,10 @@ Stoppen bewaart de stagingdata. `down --volumes` is niet toegestaan in de normal
 sudo docker compose --env-file .env.staging -f compose.staging.yaml stop
 ```
 
+Gebruik voor een expliciete stagingproef van back-up of restore altijd `COMPOSE_TARGET=staging` en
+de stagingdatabasenaam en -gebruiker. Zonder deze variabele richten de scripts zich bewust op
+productie.
+
 De Synology-kernel ondersteunt geen Docker `NanoCPUs` en in deze installatie ook geen PIDs-limiet.
 Daarom gebruikt staging relatieve CPU-prioriteiten (`cpu_shares`) en uitsluitend harde
 geheugenlimieten; dit is geen absolute CPU-cap. Voer builds met `sudo nice -n 10` uit. Controleer

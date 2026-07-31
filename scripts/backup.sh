@@ -9,6 +9,14 @@ TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 BACKUP_FILE="$BACKUP_DIR/postgres-$TIMESTAMP.dump"
 TEMP_BACKUP="$BACKUP_FILE.incomplete"
 
+compose() {
+  if [ "${COMPOSE_TARGET:-production}" = "staging" ]; then
+    docker compose --env-file .env.staging -f compose.staging.yaml "$@"
+  else
+    docker compose -f compose.yaml -f compose.prod.yaml "$@"
+  fi
+}
+
 cleanup() {
   rm -f "$TEMP_BACKUP"
 }
@@ -16,11 +24,11 @@ trap cleanup EXIT HUP INT TERM
 
 mkdir -p "$BACKUP_DIR"
 cd "$PROJECT_DIR"
-docker compose -f compose.yaml -f compose.prod.yaml exec -T postgres \
+compose exec -T postgres \
   pg_dump -U "${POSTGRES_USER:-seo}" -d "${POSTGRES_DB:-seo}" -Fc \
   > "$TEMP_BACKUP"
 test -s "$TEMP_BACKUP"
-docker compose -f compose.yaml -f compose.prod.yaml exec -T postgres \
+compose exec -T postgres \
   pg_restore --list < "$TEMP_BACKUP" > /dev/null
 mv "$TEMP_BACKUP" "$BACKUP_FILE"
 (

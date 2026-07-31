@@ -107,3 +107,30 @@ def test_restore_checks_checksum_and_archive_before_restore(tmp_path: Path) -> N
     assert "pg_restore --list" in log
     assert "pg_restore --clean --if-exists --no-owner" in log
     assert "run --rm api alembic upgrade head" in log
+
+
+def test_staging_target_uses_only_staging_compose(tmp_path: Path) -> None:
+    backup_dir = tmp_path / "backups"
+    env = _fake_docker(tmp_path)
+    env.update(
+        {
+            "PROJECT_DIR": str(PROJECT_DIR),
+            "BACKUP_DIR": str(backup_dir),
+            "COMPOSE_TARGET": "staging",
+            "POSTGRES_USER": "seo_staging",
+            "POSTGRES_DB": "seo_staging",
+        }
+    )
+
+    result = subprocess.run(
+        ["sh", str(PROJECT_DIR / "scripts/backup.sh")],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stderr
+    log = (tmp_path / "docker.log").read_text()
+    assert "--env-file .env.staging -f compose.staging.yaml" in log
+    assert "compose.prod.yaml" not in log
