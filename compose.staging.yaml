@@ -17,7 +17,7 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-    cpus: 0.45
+    cpu_shares: 512
     mem_limit: 1536m
     pids_limit: 256
     restart: unless-stopped
@@ -35,7 +35,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    cpus: 0.35
+    cpu_shares: 384
     mem_limit: 2g
     pids_limit: 256
     restart: unless-stopped
@@ -50,7 +50,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    cpus: 0.10
+    cpu_shares: 128
     mem_limit: 256m
     pids_limit: 128
     restart: unless-stopped

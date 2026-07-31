@@ -1138,8 +1138,10 @@ Status: zelfstandig stagingpakket lokaal geïmplementeerd; NAS-installatie en be
   exportworkers ontbreken uit de stagingstack en kunnen dus niet per ongeluk starten.
 - Publiceer de staging-API uitsluitend op NAS-loopback en benader haar vanaf de Mac via een
   lokale SSH-tunnel; DSM Reverse Proxy en firewallwijzigingen zijn voor de eerste versie niet nodig.
-- Begrens de gezamenlijke runtime tot ongeveer één CPU-core en maximaal 4 GB RAM. Voer builds en
-  volledige tests bewust uit wanneer productie rustig is; builds hebben afzonderlijke piekbelasting.
+- Geef staging via `cpu_shares` een lagere relatieve CPU-prioriteit dan productie en begrens het
+  gezamenlijke geheugen tot maximaal 4 GB. De Synology-kernel ondersteunt geen harde Docker
+  `NanoCPUs`-limiet. Voer builds en volledige tests bewust uit wanneer productie rustig is; builds
+  hebben afzonderlijke piekbelasting.
 - Gebruik eigen stagingsecrets en synthetische testdata. Kopieer geen productiedatabase naar
   staging.
 - Beheer staging via de bestaande interactieve NAS-shell. Gebruik Container Manager alleen voor
