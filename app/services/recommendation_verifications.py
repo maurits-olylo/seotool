@@ -13,7 +13,7 @@ from app.db.session import SessionLocal
 from app.models.common import utc_now
 from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url
-from app.models.issues import ActivityLog
+from app.models.issues import ActivityLog, Issue
 from app.models.recommendations import (
     RecommendationTask,
     RecommendationTaskEvent,
@@ -21,6 +21,7 @@ from app.models.recommendations import (
     RecommendationVerification,
 )
 from app.models.website import Website
+from app.services.html_extraction import INVALID_JSON_LD_MARKER
 from app.services.http_crawler import CrawlError, fetch_url
 from app.services.recommendation_library import get_recommendation_definition
 from app.services.recommendation_tasks import (
@@ -90,13 +91,17 @@ def request_verification(
     )
     db.add(job)
     db.flush()
+    primary_issue = db.get(Issue, task.primary_issue_id) if task.primary_issue_id else None
     verification = RecommendationVerification(
         task_id=task.id,
         requested_by_user_id=principal.user_id,
         crawl_job_id=job.id,
         verification_type=task.recommendation_type,
         scope_version=get_recommendation_definition(task.recommendation_type).version,
-        scope={"urls": scope_urls},
+        scope={
+            "urls": scope_urls,
+            "issue_type": primary_issue.issue_type if primary_issue else None,
+        },
         before_snapshot_ids=before_ids,
     )
     db.add(verification)
@@ -192,7 +197,17 @@ def execute_verification(verification_id: str) -> None:
                 db.commit()
                 if website.settings.request_delay_ms:
                     time.sleep(website.settings.request_delay_ms / 1000)
-            rules = _evaluate(db, task.recommendation_type, roles, run.id)
+            rules = _evaluate(
+                db,
+                task.recommendation_type,
+                roles,
+                run.id,
+                issue_type=(
+                    str(verification.scope["issue_type"])
+                    if verification.scope.get("issue_type")
+                    else None
+                ),
+            )
             outcome = _outcome(rules)
             verification.rules = rules
             verification.result = {
@@ -300,6 +315,10 @@ def _fetch_urls(verification_type: str, roles: dict[str, list[Url]]) -> list[Url
     primary_role = {
         "restore_or_redirect_missing_page": "old",
         "correct_indexability": "changed",
+        "add_or_correct_title": "changed",
+        "add_primary_heading": "changed",
+        "add_meta_description": "changed",
+        "repair_structured_data": "changed",
     }.get(verification_type, "source")
     requested = list(roles[primary_role])
     optional = {
@@ -309,6 +328,10 @@ def _fetch_urls(verification_type: str, roles: dict[str, list[Url]]) -> list[Url
         "fix_redirect_chain_or_loop": "expected_target",
         "correct_indexability": None,
         "correct_canonical": "expected_canonical",
+        "add_or_correct_title": "sample",
+        "add_primary_heading": "sample",
+        "add_meta_description": "sample",
+        "repair_structured_data": "sample",
     }[verification_type]
     if optional and optional in roles:
         requested.extend(roles[optional])
@@ -320,6 +343,8 @@ def _evaluate(
     verification_type: str,
     roles: dict[str, list[Url]],
     run_id: uuid.UUID,
+    *,
+    issue_type: str | None = None,
 ) -> list[dict[str, object]]:
     snapshots = {
         item.url_id: item
@@ -330,6 +355,10 @@ def _evaluate(
     primary_role = {
         "restore_or_redirect_missing_page": "old",
         "correct_indexability": "changed",
+        "add_or_correct_title": "changed",
+        "add_primary_heading": "changed",
+        "add_meta_description": "changed",
+        "repair_structured_data": "changed",
     }.get(verification_type, "source")
     source_urls = roles[primary_role]
     source_snapshots = [snapshots.get(item.id) for item in source_urls]
@@ -535,9 +564,148 @@ def _evaluate(
                 ),
             ]
         )
+    elif verification_type == "add_or_correct_title":
+        changed_snapshots = [snapshots.get(url.id) for url in roles["changed"]]
+        compared = [
+            item
+            for item in [
+                *changed_snapshots,
+                *(snapshots.get(url.id) for url in roles.get("sample", [])),
+            ]
+            if item and item.status_code == 200 and item.title
+        ]
+        normalized_titles = [item.title.strip().casefold() for item in compared if item.title]
+        rules.extend(
+            [
+                _field_present_rule("title_present", snapshot, "title")
+                for snapshot in changed_snapshots
+            ]
+        )
+        rules.append(
+            {
+                "rule": "title_unique_in_scope",
+                "status": (
+                    "passed"
+                    if normalized_titles
+                    and len(normalized_titles) == len(set(normalized_titles))
+                    else "failed"
+                ),
+                "evidence": {"compared_titles": normalized_titles},
+            }
+        )
+    elif verification_type == "add_primary_heading":
+        for url in roles["changed"]:
+            snapshot = snapshots.get(url.id)
+            h1_values = (snapshot.headings or {}).get("h1", []) if snapshot else []
+            rules.append(
+                {
+                    "rule": f"single_primary_heading:{url.id}",
+                    "status": (
+                        "passed"
+                        if len(h1_values) == 1 and h1_values[0].strip()
+                        else ("error" if snapshot is None else "failed")
+                    ),
+                    "evidence": {"h1_values": h1_values},
+                }
+            )
+    elif verification_type == "add_meta_description":
+        changed_snapshots = [snapshots.get(url.id) for url in roles["changed"]]
+        compared = [
+            item
+            for item in [
+                *changed_snapshots,
+                *(snapshots.get(url.id) for url in roles.get("sample", [])),
+            ]
+            if item and item.status_code == 200 and item.meta_description
+        ]
+        normalized_descriptions = [
+            item.meta_description.strip().casefold()
+            for item in compared
+            if item.meta_description
+        ]
+        rules.extend(
+            [
+                _field_present_rule(
+                    "meta_description_present",
+                    snapshot,
+                    "meta_description",
+                )
+                for snapshot in changed_snapshots
+            ]
+        )
+        rules.append(
+            {
+                "rule": "meta_description_unique_in_scope",
+                "status": (
+                    "passed"
+                    if normalized_descriptions
+                    and len(normalized_descriptions) == len(set(normalized_descriptions))
+                    else "failed"
+                ),
+                "evidence": {"compared_descriptions": normalized_descriptions},
+            }
+        )
+    elif verification_type == "repair_structured_data":
+        for url in roles["changed"]:
+            snapshot = snapshots.get(url.id)
+            invalid_blocks = (
+                sum(
+                    isinstance(value, dict)
+                    and value.get(INVALID_JSON_LD_MARKER) is True
+                    for value in (snapshot.schema_data or [])
+                )
+                if snapshot
+                else 0
+            )
+            breadcrumb_required = issue_type == "missing_breadcrumb_schema"
+            intended_present = bool(
+                snapshot
+                and (
+                    "BreadcrumbList" in (snapshot.schema_types or [])
+                    if breadcrumb_required
+                    else snapshot.schema_data
+                )
+            )
+            rules.append(
+                {
+                    "rule": f"structured_data_valid:{url.id}",
+                    "status": (
+                        "passed"
+                        if snapshot
+                        and snapshot.status_code == 200
+                        and invalid_blocks == 0
+                        and intended_present
+                        else ("error" if snapshot is None else "failed")
+                    ),
+                    "evidence": {
+                        "invalid_json_ld_blocks": invalid_blocks,
+                        "schema_types": snapshot.schema_types if snapshot else [],
+                        "required_type": (
+                            "BreadcrumbList" if breadcrumb_required else None
+                        ),
+                    },
+                }
+            )
     else:
         raise ValueError(f"Unsupported verification type: {verification_type}")
     return rules
+
+
+def _field_present_rule(
+    name: str,
+    snapshot: UrlSnapshot | None,
+    field_name: str,
+) -> dict[str, object]:
+    value = getattr(snapshot, field_name, None) if snapshot else None
+    return {
+        "rule": name,
+        "status": (
+            "passed"
+            if snapshot and snapshot.status_code == 200 and value and value.strip()
+            else ("error" if snapshot is None else "failed")
+        ),
+        "evidence": {field_name: value},
+    }
 
 
 def _status_rule(

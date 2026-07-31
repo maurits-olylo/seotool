@@ -1899,6 +1899,10 @@ function renderTaskVerification(canWrite) {
     repair_broken_internal_link: ["replacement_target"],
     replace_redirected_internal_link: ["expected_target"],
     restore_or_redirect_missing_page: ["new"],
+    add_or_correct_title: ["sample"],
+    add_primary_heading: ["sample"],
+    add_meta_description: ["sample"],
+    repair_structured_data: ["sample"],
   }[task.recommendation_type] || [];
   const allowedRoles = [...new Set([...plan.required_roles, ...((task.urls || []).map((item) => item.role)), ...optionalRoles])];
   const scopeEditor = `<details class="task-scope"><summary>URL-scope bekijken${plan.missing_roles.length ? " en aanvullen" : ""}</summary><ul>${scopeRows || "<li>Geen URL’s vastgelegd.</li>"}</ul>${canWrite ? `<form id="task-scope-form"><label>Rol<select id="task-scope-role">${allowedRoles.map((role) => `<option value="${escapeHtml(role)}">${escapeHtml(roleLabels[role] || role)}</option>`).join("")}</select></label><label class="task-scope-url">URL<input id="task-scope-url" type="url" required placeholder="https://voorbeeld.nl/pagina"></label><button class="detail-button" type="submit">URL toevoegen</button></form>` : ""}</details>`;

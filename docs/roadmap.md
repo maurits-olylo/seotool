@@ -1130,7 +1130,7 @@ uitgevoerd wanneer een nieuw Alembic-bestand onderdeel van de release is.
 
 ## Gerichte verificatiecrawls
 
-Status: basis en interface gedeployed; uitbreiding naar zes taaktypen lokaal gereed.
+Status: zes taaktypen gedeployed; uitbreiding naar tien taaktypen lokaal gereed.
 
 - Dedicated executor voor defecte interne links, redirectketens/-loops en canonicals.
 - Persistente scope, regels, voor-/nasituatie, fouten, retries en conclusie.
@@ -1139,6 +1139,7 @@ Status: basis en interface gedeployed; uitbreiding naar zes taaktypen lokaal ger
 - Geen discovery, sitebrede issueherberekening of wijziging van de full-crawlplanning.
 - Ondersteunt aanvullend interne redirects, herstel/redirect van ontbrekende pagina's en
   indexatiecorrecties.
+- Ondersteunt lokaal aanvullend titles, primaire H1-koppen, meta descriptions en structured data.
 
 ### Gebundelde interfaceverbetering uitvoeringstaken
 

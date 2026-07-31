@@ -242,8 +242,15 @@ Regelresultaten, voor- en nasnapshot-ID's, fouten en tijden blijven bij de verif
 Taakstatus, issuestatus en verificatiestatus veranderen onafhankelijk. Een gedeeltelijke of
 mislukte controle zet een geïmplementeerde taak daarom niet automatisch terug.
 
-De executor ondersteunt zes afgebakende taaktypen: defecte interne links, interne links naar
-redirects, ontbrekende pagina's, redirectketens/-loops, indexatiecorrecties en canonicals. Een
-opvolger of verwacht doel is alleen verplicht wanneer de regel zonder die intentie niet betrouwbaar
-kan beslissen. Voor herstel van een ontbrekende pagina blijft `new` optioneel: een rechtstreeks
+De executor ondersteunt tien afgebakende taaktypen: defecte interne links, interne links naar
+redirects, ontbrekende pagina's, redirectketens/-loops, indexatiecorrecties, canonicals, titles,
+primaire H1-koppen, meta descriptions en structured data. Een opvolger, verwacht doel of
+vergelijkingspagina is alleen verplicht wanneer de regel zonder die intentie niet betrouwbaar kan
+beslissen. Voor herstel van een ontbrekende pagina blijft `new` optioneel: een rechtstreeks
 herstelde HTTP 200 is eveneens een geldige uitkomst.
+
+On-pageverificaties crawlen alle URL's met rol `changed` en optionele URL's met rol `sample`.
+Titles en descriptions moeten bestaan en uniek zijn binnen die bevroren scope. H1-verificatie eist
+precies één niet-lege primaire kop. Structured-dataregels gebruiken het oorspronkelijke issuetype:
+een ontbrekende breadcrumb vereist `BreadcrumbList`; ongeldige JSON-LD vereist na herstel geldige,
+aanwezige schema-opmaak.

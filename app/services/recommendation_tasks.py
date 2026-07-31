@@ -44,6 +44,10 @@ SCOPED_VERIFICATION_TYPES = {
     "fix_redirect_chain_or_loop",
     "correct_indexability",
     "correct_canonical",
+    "add_or_correct_title",
+    "add_primary_heading",
+    "add_meta_description",
+    "repair_structured_data",
 }
 VERIFICATION_URL_ROLES = {
     "repair_broken_internal_link": {"source", "broken_target", "replacement_target"},
@@ -52,6 +56,10 @@ VERIFICATION_URL_ROLES = {
     "fix_redirect_chain_or_loop": {"source", "expected_target"},
     "correct_indexability": {"changed"},
     "correct_canonical": {"source", "expected_canonical"},
+    "add_or_correct_title": {"changed", "sample"},
+    "add_primary_heading": {"changed", "sample"},
+    "add_meta_description": {"changed", "sample"},
+    "repair_structured_data": {"changed", "sample"},
 }
 
 
@@ -452,8 +460,6 @@ def _task_url_scope_from_issue(
     verification_type: str,
     default_scope: tuple[str, ...],
 ) -> list[tuple[UUID, str]]:
-    if issue.url_id is None:
-        return []
     occurrence = db.scalar(
         select(IssueOccurrence)
         .where(IssueOccurrence.issue_id == issue.id)
@@ -461,6 +467,35 @@ def _task_url_scope_from_issue(
         .limit(1)
     )
     scope: list[tuple[UUID, str]] = []
+    if verification_type in {
+        "add_or_correct_title",
+        "add_primary_heading",
+        "add_meta_description",
+        "repair_structured_data",
+    }:
+        if issue.url_id is not None:
+            scope.append((issue.url_id, "changed"))
+        evidence = occurrence.evidence if occurrence else {}
+        related_urls = evidence.get("related_urls", [])
+        if isinstance(related_urls, list):
+            for value in related_urls:
+                if isinstance(value, str):
+                    sample = _existing_url(db, issue.website_id, value)
+                    if sample:
+                        scope.append((sample.id, "sample"))
+        clusters = evidence.get("clusters", [])
+        if isinstance(clusters, list):
+            for cluster in clusters:
+                if not isinstance(cluster, dict):
+                    continue
+                for value in cluster.get("urls", []):
+                    if isinstance(value, str):
+                        changed = _existing_url(db, issue.website_id, value)
+                        if changed:
+                            scope.append((changed.id, "changed"))
+        return list(dict.fromkeys(scope))
+    if issue.url_id is None:
+        return []
     if verification_type == "repair_broken_internal_link":
         if issue.issue_type == "multiple_broken_internal_links":
             scope.append((issue.url_id, "source"))

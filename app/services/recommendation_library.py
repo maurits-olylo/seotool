@@ -142,7 +142,7 @@ DEFINITIONS = (
     ),
     RecommendationDefinition(
         "add_or_correct_title",
-        "1",
+        "2",
         frozenset({"missing_title", "duplicate_title", "duplicate_title_clusters"}),
         "Voeg een unieke, passende paginatitel toe",
         "content",
@@ -152,11 +152,11 @@ DEFINITIONS = (
         "needs_content_input",
         ("Bepaal de primaire paginafunctie.", "Schrijf en publiceer een onderscheidende title."),
         ("De title bestaat en is uniek binnen de gecontroleerde scope.",),
-        ("changed", "sample"),
+        ("changed",),
     ),
     RecommendationDefinition(
         "add_primary_heading",
-        "1",
+        "2",
         frozenset({"missing_h1", "multiple_h1", "missing_h1_clusters", "multiple_h1_clusters"}),
         "Corrigeer de primaire paginakop",
         "content",
@@ -166,11 +166,11 @@ DEFINITIONS = (
         "needs_content_input",
         ("Bepaal de primaire paginakop.", "Voeg één duidelijke H1 toe of corrigeer het template."),
         ("De bedoelde H1 is zichtbaar.", "De kopstructuur bevat geen onverwachte extra H1."),
-        ("changed", "sample"),
+        ("changed",),
     ),
     RecommendationDefinition(
         "add_meta_description",
-        "1",
+        "2",
         frozenset(
             {
                 "missing_meta_description",
@@ -187,11 +187,11 @@ DEFINITIONS = (
         "needs_content_input",
         ("Schrijf een paginaspecifieke omschrijving.", "Publiceer deze in het CMS of template."),
         ("De description bestaat en is uniek binnen de gecontroleerde scope.",),
-        ("changed", "sample"),
+        ("changed",),
     ),
     RecommendationDefinition(
         "repair_structured_data",
-        "1",
+        "2",
         frozenset({"invalid_json_ld", "missing_breadcrumb_schema"}),
         "Herstel structured data",
         "development",
@@ -201,7 +201,7 @@ DEFINITIONS = (
         "needs_technical_research",
         ("Identificeer het ongeldige of ontbrekende schema.", "Pas de markup of generator aan."),
         ("JSON-LD is technisch geldig.", "De bedoelde schematypen zijn aanwezig."),
-        ("changed", "sample"),
+        ("changed",),
     ),
     RecommendationDefinition(
         "repair_job_posting_markup",

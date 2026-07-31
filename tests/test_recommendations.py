@@ -490,7 +490,11 @@ def test_additional_verification_rules_resolve_redirect_missing_and_indexability
             website_id=website.id,
             normalized_url="https://example.com/indexable",
         )
-        db.add_all([redirect, old, replacement, changed])
+        onpage = Url(
+            website_id=website.id,
+            normalized_url="https://example.com/onpage",
+        )
+        db.add_all([redirect, old, replacement, changed, onpage])
         db.flush()
         job = CrawlJob(
             website_id=website.id,
@@ -547,6 +551,19 @@ def test_additional_verification_rules_resolve_redirect_missing_and_indexability
                     meta_robots="index,follow",
                     is_indexable=True,
                 ),
+                UrlSnapshot(
+                    url_id=onpage.id,
+                    crawl_run_id=run.id,
+                    requested_url=onpage.normalized_url,
+                    final_url=onpage.normalized_url,
+                    status_code=200,
+                    title="Unieke paginatitel",
+                    meta_description="Unieke en relevante omschrijving.",
+                    headings={"h1": ["Heldere primaire kop"]},
+                    schema_types=["BreadcrumbList"],
+                    schema_data=[{"@type": "BreadcrumbList"}],
+                    is_indexable=True,
+                ),
             ]
         )
         db.flush()
@@ -573,10 +590,46 @@ def test_additional_verification_rules_resolve_redirect_missing_and_indexability
             {"changed": [changed]},
             run.id,
         )
+        title_rules = _evaluate(
+            db,
+            "add_or_correct_title",
+            {"changed": [onpage]},
+            run.id,
+        )
+        duplicate_title_rules = _evaluate(
+            db,
+            "add_or_correct_title",
+            {"changed": [onpage], "sample": [onpage]},
+            run.id,
+        )
+        heading_rules = _evaluate(
+            db,
+            "add_primary_heading",
+            {"changed": [onpage]},
+            run.id,
+        )
+        description_rules = _evaluate(
+            db,
+            "add_meta_description",
+            {"changed": [onpage]},
+            run.id,
+        )
+        schema_rules = _evaluate(
+            db,
+            "repair_structured_data",
+            {"changed": [onpage]},
+            run.id,
+            issue_type="missing_breadcrumb_schema",
+        )
 
         assert {rule["status"] for rule in redirect_rules} == {"passed"}
         assert {rule["status"] for rule in missing_rules} == {"passed"}
         assert {rule["status"] for rule in indexability_rules} == {"passed"}
+        assert {rule["status"] for rule in title_rules} == {"passed"}
+        assert duplicate_title_rules[-1]["status"] == "failed"
+        assert {rule["status"] for rule in heading_rules} == {"passed"}
+        assert {rule["status"] for rule in description_rules} == {"passed"}
+        assert {rule["status"] for rule in schema_rules} == {"passed"}
 
 def test_grouped_broken_link_evidence_enriches_verification_scope(client) -> None:  # type: ignore[no-untyped-def]
     customer = client.post("/api/v1/clients", json={"name": "Scope client"}).json()
