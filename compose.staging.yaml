@@ -1,0 +1,64 @@
+name: seo-monitor-staging
+
+services:
+  api:
+    build: .
+    env_file: ${STAGING_ENV_FILE:-.env.staging}
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "127.0.0.1:${STAGING_API_PORT:-18000}:8000"
+    volumes:
+      - staging_exports_data:/app/exports
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    cpus: 0.45
+    mem_limit: 1536m
+    pids_limit: 256
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-seo_staging}
+      POSTGRES_USER: ${POSTGRES_USER:-seo_staging}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - staging_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    cpus: 0.35
+    mem_limit: 2g
+    pids_limit: 256
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 192mb --maxmemory-policy allkeys-lru
+    volumes:
+      - staging_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    cpus: 0.10
+    mem_limit: 256m
+    pids_limit: 128
+    restart: unless-stopped
+
+volumes:
+  staging_postgres_data:
+    name: seo-monitor-staging-postgres-data
+  staging_redis_data:
+    name: seo-monitor-staging-redis-data
+  staging_exports_data:
+    name: seo-monitor-staging-exports-data

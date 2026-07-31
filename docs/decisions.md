@@ -785,3 +785,16 @@ actuele officiële Synology-documentatie geverifieerd.
 Gevolg: lokale Docker kan na een succesvolle proefperiode worden uitgefaseerd zonder staging aan
 productiedata of publieke toegang te koppelen. De NAS-CPU blijft de begrenzende factor en productie
 krijgt voorrang.
+
+## 2026-07-31 — VPS-portabiliteit zonder verdeelde productiestack
+
+Context: de publieke website en SEO Monitor kunnen later naar een Ubuntu-VPS met Plesk en het
+domein `thactual.nl` verhuizen, terwijl de NAS beschikbaar blijft voor opslag en testwerk.
+
+Besluit: houd configuratie, services en opslag via environmentvariabelen en Docker-volumes
+overdraagbaar. Bij een latere migratie blijven API, database, Redis, scheduler en productieworkers
+samen op de VPS. De NAS wordt via een private verbinding uitsluitend gebruikt voor staging,
+versleutelde back-ups en hersteltests; productie gebruikt geen databaseverbinding over internet.
+
+Gevolg: een storing van NAS of thuisverbinding legt de publieke productie niet stil. Opslagretentie
+en databasegroei moeten vóór de VPS-migratie afzonderlijk worden begrensd en gemonitord.

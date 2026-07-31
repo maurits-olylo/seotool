@@ -1130,7 +1130,7 @@ uitgevoerd wanneer een nieuw Alembic-bestand onderdeel van de release is.
 
 ## Afzonderlijke NAS-stagingomgeving
 
-Status: ontwerp vastgesteld; implementatie nog niet gestart.
+Status: zelfstandig stagingpakket lokaal geïmplementeerd; NAS-installatie en belastingproef volgen.
 
 - Gebruik een zelfstandige `compose.staging.yaml` en projectnaam `seo-monitor-staging`; hergebruik
   geen productiecontainers, netwerken, volumes, database of secrets.
@@ -1152,6 +1152,11 @@ Acceptatie:
 - Geen stagingservice kan automatisch crawls, exports of integraties starten.
 - Stoppen of verwijderen van staging raakt geen productiecontainer of productievolume.
 - CPU-, geheugen- en schijfbelasting worden vóór en tijdens een testbuild gemeten.
+
+De configuratie blijft overdraagbaar naar een latere VPS-productieomgeving. Productiecomponenten
+worden daarbij niet over NAS en VPS verdeeld: de VPS krijgt de volledige publieke productiestack;
+de NAS blijft staging-, back-up- en herstelplatform. Het beoogde toekomstige domein is
+`thactual.nl`; dit wordt pas bij die migratie technisch geconfigureerd.
 
 ## Gerichte verificatiecrawls
 

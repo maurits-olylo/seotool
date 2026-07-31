@@ -56,6 +56,58 @@ waar mogelijk via firewall of VPN. De API-key blijft ook achter de reverse proxy
 technische API-clients. Teamleden loggen in met hun persoonlijke account; het initiële beheeraccount
 komt uit de environment.
 
+## Afzonderlijke staging op dezelfde NAS
+
+Staging gebruikt uitsluitend `compose.staging.yaml`, `.env.staging` en de vaste Compose-projectnaam
+`seo-monitor-staging`. De stack bevat alleen API, PostgreSQL en Redis. Er zijn bewust geen workers
+of scheduler opgenomen.
+
+Maak na het uitpakken van een release in de interactieve NAS-shell een eigen configuratie. Gebruik
+andere geheimen dan productie en plaats uitsluitend synthetische testdata in deze database:
+
+```bash
+cd /volume1/docker/seo-monitor/project
+sudo cp .env.staging.example .env.staging
+sudo chmod 600 .env.staging
+sudo vi .env.staging
+```
+
+Controleer vóór de eerste start dat staging zelfstandig is en uitsluitend op loopback publiceert:
+
+```bash
+sudo docker compose --env-file .env.staging -f compose.staging.yaml config --services
+sudo docker compose --env-file .env.staging -f compose.staging.yaml config \
+  | grep -E '127\.0\.0\.1|seo-monitor-staging-(postgres|redis|exports)-data'
+```
+
+De eerste opdracht moet exact `api`, `postgres` en `redis` tonen. Start daarna eerst de
+gegevensdiensten, voer de migraties uit en start de API:
+
+```bash
+sudo docker compose --env-file .env.staging -f compose.staging.yaml build api
+sudo docker compose --env-file .env.staging -f compose.staging.yaml up -d postgres redis
+sudo docker compose --env-file .env.staging -f compose.staging.yaml run --rm api alembic upgrade head
+sudo docker compose --env-file .env.staging -f compose.staging.yaml up -d api
+sudo docker compose --env-file .env.staging -f compose.staging.yaml ps
+curl --fail --silent --show-error http://127.0.0.1:18000/health
+```
+
+Open vanaf de Mac een tijdelijke tunnel in het lokale terminalvenster. Houd dit venster open en
+bezoek vervolgens `http://127.0.0.1:18000/ui/assets/index.html`:
+
+```bash
+ssh -N -L 18000:127.0.0.1:18000 thact@192.168.2.20
+```
+
+Stoppen bewaart de stagingdata. `down --volumes` is niet toegestaan in de normale werkwijze:
+
+```bash
+sudo docker compose --env-file .env.staging -f compose.staging.yaml stop
+```
+
+Controleer tijdens de eerste build en proef met `docker stats` en `docker system df` de belasting.
+Productie krijgt altijd voorrang; stop staging wanneer productie merkbaar wordt beïnvloed.
+
 ## Updates
 
 ### Terminal-first en DSM-interface
