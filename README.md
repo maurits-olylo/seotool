@@ -74,7 +74,12 @@ docker compose build --pull
 docker compose up -d
 ```
 
-Maak vóór iedere productie-update een back-up. Controleer daarna `/health`, containerstatus en logs.
+Maak niet automatisch vóór iedere productie-update een extra databaseback-up. Maak een
+releasegebonden back-up alleen wanneer die noodzakelijk is om een migratie veilig te kunnen
+uitvoeren of herstellen, bijvoorbeeld bij datatransformatie, destructieve schemawijziging of een
+moeilijk omkeerbare bulkmutatie. Leg deze afweging per release vast. Migratie `0034` wijzigde alleen
+omkeerbare tabelopties voor autovacuum, verwijderde geen data en vereiste daarom geen nieuwe
+back-up. Controleer na iedere update wel `/health`, containerstatus en logs.
 
 ## Productie op Synology
 

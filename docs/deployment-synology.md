@@ -157,8 +157,17 @@ sudo docker compose -f compose.yaml -f compose.prod.yaml ps <geraakte-services>
 curl --fail --silent --show-error https://seo.thact.nl/health
 ```
 
-Maak een volledige databaseback-up en drain crawls alleen wanneer een migratie of risicovolle
-wijziging dit vereist. Vermeld bij iedere release expliciet of een migratie nodig is.
+Maak niet standaard voor iedere deployment of migratie een extra databaseback-up. Maak die alleen
+wanneer dit noodzakelijk is om de migratie veilig te laten verlopen of betrouwbaar te herstellen,
+zoals bij datatransformatie, verwijdering, een destructieve schemawijziging of een moeilijk
+omkeerbare bulkmutatie. Vermeld bij iedere release expliciet of een migratie nodig is en waarom een
+nieuwe back-up wel of niet noodzakelijk is.
+
+Voorbeeld: migratie `0034` stelde uitsluitend vier omkeerbare tabelopties op `element_locations`
+in. De migratie verwijderde en herschreef geen rijen en de downgrade reset de opties. Daarom is na
+de succesvolle stagingproef bewust geen nieuwe productieback-up gemaakt. Een bestaande
+geverifieerde back-up bleef beschikbaar. Dit voorbeeld is geen vrijstelling voor migraties die wel
+data wijzigen of moeilijk herstelbaar zijn.
 
 ## Back-up en restore
 

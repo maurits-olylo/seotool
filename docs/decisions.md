@@ -645,6 +645,13 @@ bijwerken. Dit vervangt de veilige, begrensde opschoningsvensters niet en is gee
 `VACUUM FULL`. GSC-bewaartermijnen blijven een afzonderlijk besluit zonder automatische
 verwijdering.
 
+Back-upafweging: een extra releaseback-up is alleen toegestaan wanneer die noodzakelijk is om een
+migratie veilig uit te voeren of te herstellen. Migratie `0034` wijzigde alleen omkeerbare
+tabelopties, verwijderde of herschreef geen data en was eerst in staging gevalideerd. Daarom is voor
+de productiemigratie bewust geen nieuwe back-up gemaakt; de bestaande geverifieerde back-up bleef
+beschikbaar. Datatransformaties, destructieve schemawijzigingen en moeilijk omkeerbare
+bulkmutaties vereisen wel een nieuwe, geverifieerde back-up.
+
 ## Compacte GSC-deduplicatiesleutels
 
 De unieke GSC-indexen bevatten volledige URL- en zoektermteksten en zijn daardoor groter dan nodig.
