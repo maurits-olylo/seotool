@@ -58,6 +58,22 @@ komt uit de environment.
 
 ## Updates
 
+### Terminal-first en DSM-interface
+
+Beheer productie en staging standaard vanuit de bestaande interactieve NAS-shell. Gebruik de
+Container Manager-interface alleen wanneer een handeling niet veilig via de terminal kan worden
+uitgevoerd. Controleer een noodzakelijk klikpad vooraf tegen de officiële documentatie voor de
+actuele DSM-hoofdversie en geef altijd:
+
+- de exacte Nederlandse namen van toepassing, sectie, knop en scherm;
+- de verwachte zichtbare inhoud vóór een wijziging;
+- een expliciet stopmoment wanneer de interface afwijkt;
+- een waarschuwing vóór acties die containers, images, netwerken of volumes kunnen verwijderen.
+
+Gebruik `Opschonen` en `Verwijderen` nooit voor inspectie. Synology beschrijft `Opschonen` als
+`docker-compose down`, waarbij containers, netwerken, volumes en projectimages kunnen worden
+verwijderd.
+
 ### Vaste route: releasepakket via Mac
 
 Maak iedere release op de Mac vanaf een exacte commit met `git archive`. Upload nooit met SCP en

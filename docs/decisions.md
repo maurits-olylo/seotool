@@ -770,3 +770,18 @@ de beveiligde URL-scope invullen.
 
 Gevolg: de executor kan bereikbaarheid, links en indexatie hard controleren zonder een inhoudelijke
 bestemming te verzinnen.
+
+## 2026-07-31 — NAS-staging is terminal-first en volledig geïsoleerd
+
+Context: lokale Docker-belasting hindert ontwikkeling, terwijl de DSM-navigatie onvoldoende
+voorspelbaar is voor veilige operationele instructies.
+
+Besluit: bouw een minimale stagingstack op dezelfde NAS, maar met een eigen Compose-project,
+volumes, database, secrets en loopbackpoort. Staging bevat standaard geen scheduler of workers en
+wordt vanaf de Mac alleen via een SSH-tunnel benaderd. AI Console wordt niet gebruikt. Alle
+operationele stappen zijn terminal-first; een onvermijdelijk DSM-klikpad wordt vooraf tegen de
+actuele officiële Synology-documentatie geverifieerd.
+
+Gevolg: lokale Docker kan na een succesvolle proefperiode worden uitgefaseerd zonder staging aan
+productiedata of publieke toegang te koppelen. De NAS-CPU blijft de begrenzende factor en productie
+krijgt voorrang.

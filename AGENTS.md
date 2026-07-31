@@ -53,6 +53,12 @@ COMMUNICATIESTIJL
 - De productiebestanden zijn root-owned.
 - Herbouw en herstart alleen de geraakte services. Maak alleen een volledige back-up wanneer een
   migratie of andere risicovolle wijziging dat noodzakelijk maakt.
+- Werk op de Synology terminal-first. Geef alleen DSM-interface-instructies wanneer een handeling
+  niet veilig via de terminal kan worden uitgevoerd. Verifieer dan vooraf het klikpad tegen de
+  actuele officiële Synology-documentatie en de gebruikte DSM-hoofdversie. Noem de exacte
+  Nederlandse scherm- en knopnamen, beschrijf wat zichtbaar moet zijn en laat de gebruiker stoppen
+  zodra het scherm afwijkt. Raad nooit een DSM-menupad en gebruik nooit `Opschonen` of `Verwijderen`
+  als verkennende stap.
 
 CODE EN IMPLEMENTATIE
 

@@ -1128,6 +1128,31 @@ de NAS gebeurt via SSH-streaming met `dd`. Controleer op de NAS altijd eerst SHA
 met `sudo tar --no-same-owner` en bouw en herstart alleen geraakte services. Migrations worden alleen
 uitgevoerd wanneer een nieuw Alembic-bestand onderdeel van de release is.
 
+## Afzonderlijke NAS-stagingomgeving
+
+Status: ontwerp vastgesteld; implementatie nog niet gestart.
+
+- Gebruik een zelfstandige `compose.staging.yaml` en projectnaam `seo-monitor-staging`; hergebruik
+  geen productiecontainers, netwerken, volumes, database of secrets.
+- Start standaard alleen API, PostgreSQL en Redis. Scheduler, crawlers, integratie- en
+  exportworkers ontbreken uit de stagingstack en kunnen dus niet per ongeluk starten.
+- Publiceer de staging-API uitsluitend op NAS-loopback en benader haar vanaf de Mac via een
+  lokale SSH-tunnel; DSM Reverse Proxy en firewallwijzigingen zijn voor de eerste versie niet nodig.
+- Begrens de gezamenlijke runtime tot ongeveer één CPU-core en maximaal 4 GB RAM. Voer builds en
+  volledige tests bewust uit wanneer productie rustig is; builds hebben afzonderlijke piekbelasting.
+- Gebruik eigen stagingsecrets en synthetische testdata. Kopieer geen productiedatabase naar
+  staging.
+- Beheer staging via de bestaande interactieve NAS-shell. Gebruik Container Manager alleen voor
+  read-only statuscontrole wanneer dat werkelijk helpt.
+
+Acceptatie:
+
+- Productie en staging delen geen benoemde volumes, Compose-projectnaam of secretsbestand.
+- Staging is niet rechtstreeks vanaf LAN of internet bereikbaar.
+- Geen stagingservice kan automatisch crawls, exports of integraties starten.
+- Stoppen of verwijderen van staging raakt geen productiecontainer of productievolume.
+- CPU-, geheugen- en schijfbelasting worden vóór en tijdens een testbuild gemeten.
+
 ## Gerichte verificatiecrawls
 
 Status: tien taaktypen gedeployed en technisch gecontroleerd in productie.
