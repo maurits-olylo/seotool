@@ -250,7 +250,8 @@ VERIFICATION_BY_TYPE = {
         "Geen interne link op de bronpagina gaat nog via een redirect."
     ),
     "orphan_page": (
-        "De pagina heeft een bewuste interne route of is bewust buiten de navigatie gehouden."
+        "De pagina heeft een bewuste, crawlbare plek in de sitestructuur, of is samengevoegd of "
+        "doorgestuurd naar de bedoelde bestemming en uit de sitemap verwijderd."
     ),
     "job_posting_schema_missing": (
         "De volgende crawl vindt geldig JobPosting-schema op de vacaturedetailpagina."

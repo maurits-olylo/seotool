@@ -49,6 +49,7 @@ class RecommendationDefinitionRead(BaseModel):
     steps: tuple[str, ...]
     completion_criteria: tuple[str, ...]
     verification_scope: tuple[str, ...]
+    required_input: tuple[str, ...]
 
 
 class RecommendationTaskRead(Timestamped):

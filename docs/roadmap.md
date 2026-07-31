@@ -1143,8 +1143,8 @@ Status: tien taaktypen gedeployed en technisch gecontroleerd in productie.
 
 ### Volgende gebundelde release — begrijpelijke taakworkflow
 
-Status: eerste begrijpelijkheidsverbetering lokaal gereed en visueel gecontroleerd; nog niet
-gedeployed.
+Status: eerste begrijpelijkheidsverbetering gedeployed; beslisgerichte orphan-correctie lokaal
+gereed en gecontroleerd, nog niet gedeployed.
 
 - Toon bovenaan één duidelijke hoofdactie die past bij de huidige taakstatus.
 - Vertaal interne statussen en verificatietermen naar korte, taakgerichte uitleg.
@@ -1162,6 +1162,16 @@ Acceptatie:
   op 390 px.
 - Technische details verdringen de taakactie niet, maar blijven met één handeling bereikbaar.
 - Bestaande statusovergangen, URL-scopebewerking en gerichte verificaties blijven functioneel.
+
+Aanvullende correctie:
+
+- Behandel `orphan_page` als bewezen structuursignaal, niet als bewezen linktekort.
+- Vraag eerst of de pagina zelfstandig moet blijven bestaan.
+- Toon daarna twee heldere routes: structureel opnemen of samenvoegen/redirecten en sitemap
+  bijwerken.
+- Houd `important_page_few_internal_links` als afzonderlijke aanbeveling voor pagina's die al in de
+  interne structuur staan.
+- Migreer alle actieve orphan-taken klantoverstijgend naar de nieuwe beslisgerichte definitie.
 
 ### Gebundelde interfaceverbetering uitvoeringstaken
 

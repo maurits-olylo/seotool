@@ -122,6 +122,7 @@ def create_task_from_issue(
         action=issue.recommended_action,
         rationale=issue.description,
         steps=list(definition.steps),
+        required_input=list(definition.required_input),
         acceptance_criteria=list(definition.completion_criteria),
         verification_spec={"scope": list(definition.verification_scope)},
     )

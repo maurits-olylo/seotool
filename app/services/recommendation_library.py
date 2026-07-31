@@ -26,6 +26,7 @@ class RecommendationDefinition:
     steps: tuple[str, ...]
     completion_criteria: tuple[str, ...]
     verification_scope: tuple[str, ...]
+    required_input: tuple[str, ...] = ()
 
 
 DEFINITIONS = (
@@ -260,24 +261,48 @@ DEFINITIONS = (
         ("source", "target"),
     ),
     RecommendationDefinition(
-        "connect_orphan_page",
+        "resolve_orphan_structure",
         "1",
         frozenset(
             {
                 "orphan_page",
                 "orphan_page_clusters",
-                "important_page_few_internal_links",
             }
         ),
-        "Verbind de pagina met relevante interne links",
+        "Bepaal de juiste plek of bestemming van deze pagina",
+        "seo_analytics",
+        ("content", "development"),
+        "normal",
+        (30, 120),
+        "needs_decision",
+        (
+            "Beslis eerst of deze pagina zelfstandig moet blijven bestaan.",
+            "Blijft de pagina? Geef haar een logische plek in de interne sitestructuur.",
+            "Is de pagina niet nodig? Voeg haar samen of redirect haar en werk de sitemap bij.",
+        ),
+        (
+            "De pagina heeft een bewuste, crawlbare plek in de sitestructuur, of is samengevoegd "
+            "of doorgestuurd naar de bedoelde bestemming.",
+        ),
+        (),
+        ("Moet deze pagina zelfstandig blijven bestaan?",),
+    ),
+    RecommendationDefinition(
+        "connect_orphan_page",
+        "2",
+        frozenset({"important_page_few_internal_links"}),
+        "Versterk deze belangrijke pagina met relevante interne links",
         "seo_analytics",
         ("content",),
         "normal",
         (20, 90),
         "needs_manual_review",
-        ("Selecteer relevante bronpagina's.", "Voeg contextuele links naar de doelpagina toe."),
-        ("De doelpagina heeft relevante crawlbare inkomende links.",),
-        ("source", "target"),
+        (
+            "Kies inhoudelijk verwante pagina's die al in de sitestructuur staan.",
+            "Voeg vanaf die pagina's relevante, contextuele links toe.",
+        ),
+        ("De belangrijke pagina ontvangt relevante crawlbare inkomende links.",),
+        (),
     ),
 )
 

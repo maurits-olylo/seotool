@@ -74,14 +74,23 @@ def detect_orphan_pages(db: Session, *, website_id: object, crawl_run_id: object
                     issue_type="orphan_page",
                     category="internal_links",
                     severity="medium",
-                    title="Orphan page",
+                    title="Indexeerbare pagina staat buiten de interne sitestructuur",
                     description=(
-                        "De URL staat in een sitemap maar is niet bereikbaar via interne links."
+                        "De URL staat in de sitemap en is indexeerbaar, maar de volledige crawl "
+                        "vond geen interne route naar deze pagina. Dit bewijst nog niet of de "
+                        "pagina moet blijven bestaan."
                     ),
                     recommended_action=(
-                        "Voeg een relevante interne link toe of verwijder de URL uit de sitemap."
+                        "Bepaal eerst of de pagina zelfstandig moet blijven. Geef haar daarna een "
+                        "logische plek in de sitestructuur, of voeg haar samen of redirect haar "
+                        "naar de bedoelde bestemming en werk de sitemap bij."
                     ),
-                    evidence={"url": url.normalized_url, "crawl_depth": None},
+                    evidence={
+                        "url": url.normalized_url,
+                        "crawl_depth": None,
+                        "structure_status": "outside_internal_structure",
+                        "decision_required": True,
+                    },
                 )
             ],
             checked_issue_types={"orphan_page"},

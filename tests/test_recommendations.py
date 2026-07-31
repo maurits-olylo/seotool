@@ -78,12 +78,63 @@ def _task_fixture(db):  # type: ignore[no-untyped-def]
 
 
 def test_library_contains_compact_unique_mvp() -> None:
-    assert len(DEFINITIONS) == 15
-    assert len({definition.key for definition in DEFINITIONS}) == 15
+    assert len(DEFINITIONS) == 16
+    assert len({definition.key for definition in DEFINITIONS}) == 16
     assert recommendation_for_issue_type("internally_linked_404").key == (
         "repair_broken_internal_link"
     )
+    assert recommendation_for_issue_type("orphan_page").key == "resolve_orphan_structure"
+    assert (
+        recommendation_for_issue_type("important_page_few_internal_links").key
+        == "connect_orphan_page"
+    )
     assert recommendation_for_issue_type("thin_content") is None
+
+
+def test_orphan_task_requires_structure_decision_before_link_advice(client) -> None:  # type: ignore[no-untyped-def]
+    customer = client.post("/api/v1/clients", json={"name": "Structure client"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": customer["id"],
+            "name": "Structure site",
+            "base_url": "https://example.com",
+        },
+    ).json()
+    with SessionLocal() as db:
+        website_id = UUID(website["id"])
+        url = Url(website_id=website_id, normalized_url="https://example.com/orphan")
+        db.add(url)
+        db.flush()
+        issue = Issue(
+            website_id=website_id,
+            url_id=url.id,
+            issue_type="orphan_page",
+            category="internal_links",
+            severity="medium",
+            title="Indexeerbare pagina staat buiten de interne sitestructuur",
+            description="De pagina heeft geen interne route.",
+            recommended_action="Bepaal eerst of de pagina zelfstandig moet blijven.",
+        )
+        db.add(issue)
+        db.commit()
+        issue_id = issue.id
+
+    response = client.post(f"/api/v1/issues/{issue_id}/recommendation-task")
+
+    assert response.status_code == 201
+    task = response.json()
+    assert task["recommendation_type"] == "resolve_orphan_structure"
+    assert task["feasibility"] == "needs_decision"
+    assert task["required_input"] == ["Moet deze pagina zelfstandig blijven bestaan?"]
+    assert "Beslis eerst" in task["steps"][0]
+    assert all("Voeg contextuele links" not in step for step in task["steps"])
+    detail = client.get(f"/api/v1/recommendation-tasks/{task['id']}").json()
+    assert detail["urls"][0]["role"] == "changed"
+    plan = client.get(
+        f"/api/v1/recommendation-tasks/{task['id']}/verification-plan"
+    ).json()
+    assert plan["supported"] is False
 
 
 def test_task_links_issues_urls_events_and_feedback() -> None:
@@ -175,7 +226,7 @@ def test_recommendation_task_api_lifecycle(client, monkeypatch) -> None:  # type
 
     definitions = client.get("/api/v1/recommendation-types")
     assert definitions.status_code == 200
-    assert len(definitions.json()) == 15
+    assert len(definitions.json()) == 16
 
     created = client.post(f"/api/v1/issues/{issue_id}/recommendation-task")
     assert created.status_code == 201

@@ -4,7 +4,7 @@ from app.db.session import SessionLocal
 from app.models.client import Client
 from app.models.crawl import CrawlRun
 from app.models.discovery import CrawlJob, Url, UrlSource
-from app.models.issues import Issue
+from app.models.issues import Issue, IssueOccurrence
 from app.models.website import Website, WebsiteSettings
 from app.services.internal_link_analysis import detect_orphan_pages
 from app.services.issue_engine import reconcile_issues
@@ -66,6 +66,14 @@ def test_detects_sitemap_url_without_crawl_depth_as_orphan() -> None:
         issue = db.scalar(select(Issue))
         assert issue and issue.issue_type == "orphan_page"
         assert issue.url_id == orphan.id
+        assert issue.title == "Indexeerbare pagina staat buiten de interne sitestructuur"
+        assert "Dit bewijst nog niet" in issue.description
+        occurrence = db.scalar(
+            select(IssueOccurrence).where(IssueOccurrence.issue_id == issue.id)
+        )
+        assert occurrence and occurrence.evidence["decision_required"] is True
+        assert "Bepaal eerst" in issue.recommended_action
+        assert "Voeg een relevante interne link toe" not in issue.recommended_action
 
         reconcile_issues(
             db,

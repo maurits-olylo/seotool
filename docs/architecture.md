@@ -147,6 +147,13 @@ Na de breadth-first crawl worden actieve sitemap-URL's met een lege diepte als o
 gemarkeerd. Het issue wordt per URL gededupliceerd en automatisch opgelost zodra de URL bij een
 latere crawl wel intern bereikbaar wordt.
 
+Een orphan-signaal bewijst alleen dat een indexeerbare sitemap-URL buiten de gecrawlde interne
+structuur staat. Het systeem schrijft daarom niet automatisch extra links voor. De uitvoeringstaak
+vereist eerst een inhoudelijk besluit: een bedoelde zelfstandige pagina krijgt een logische,
+crawlbare plek in de sitestructuur; een overbodige pagina wordt samengevoegd of doorgestuurd en
+daarna uit de sitemap verwijderd. Een belangrijke pagina die al in de structuur staat maar te
+weinig inkomende links heeft, blijft een afzonderlijk linkkwaliteitsprobleem.
+
 Orphan-analyse draait alleen wanneer de breadth-first wachtrij volledig is verwerkt. Als `max_urls`
 de crawl afkapt, wordt de run `partially_succeeded` en blijven bestaande orphan-statussen ongewijzigd.
 

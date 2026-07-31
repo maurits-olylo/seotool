@@ -78,7 +78,8 @@ controleerbare acties.
 | `repair_job_posting_markup` | harde JobPosting-signalen en clusters | `development` | vacature of steekproef |
 | `repair_application_action` | `broken_application_cta`, ontbrekende sollicitatieactie | `development` | vacature en formulierdoel |
 | `replace_cms_link_placeholder` | `cms_link_placeholder` | `content` | bron en doel |
-| `connect_orphan_page` | `orphan_page`, zwakke belangrijke pagina | `seo_analytics` | bron(nen), doel en linkcontext |
+| `resolve_orphan_structure` | `orphan_page` en orphanclusters | `seo_analytics` | besluit: structureel opnemen of samenvoegen/redirecten |
+| `connect_orphan_page` | belangrijke pagina met te weinig interne links | `seo_analytics` | relevante bronpagina's en linkcontext |
 
 `thin_content`, `near_duplicate_content`, algemene ouderdom, alt-tekstoptimalisatie,
 zoekintentie, samenvoegen, splitsen en noindex blijven eerst review- of analysetaken. Ze zijn te
