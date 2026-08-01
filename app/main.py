@@ -17,6 +17,7 @@ from app.api.routes import (
     integrations,
     issues,
     jobs,
+    public_estimates,
     recommendations,
     reports,
     system,
@@ -83,6 +84,7 @@ app.include_router(insights.router, prefix="/api/v1", dependencies=[Depends(requ
 app.include_router(system.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(users.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(users.public_router, prefix="/api/v1")
+app.include_router(public_estimates.router, prefix="/api/v1")
 app.include_router(integrations.oauth_router, prefix="/api/v1")
 app.include_router(ui.router)
 app.mount("/ui/assets", StaticFiles(directory=ui.UI_ROOT), name="ui-assets")

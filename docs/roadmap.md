@@ -1212,7 +1212,8 @@ Acceptatie:
 
 ## Publieke website-inschatting en pakketadvies
 
-Status: gepland na automatische retentie.
+Status: veilige read-only backend technisch geïmplementeerd; publieke interface, stagingdeployment
+en productievalidatie volgen.
 
 - Laat een bezoeker een website-URL invullen en lees veilig `robots.txt` en sitemaps.
 - Normaliseer en ontdubbel URL's en beperk discovery tot het publieke domein.
