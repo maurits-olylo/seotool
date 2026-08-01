@@ -1232,6 +1232,19 @@ Voorlopige pakketten:
 - Maatwerk: meer dan 10.000 pagina's of afwijkende frequentie, opslag en verwerking.
 - Frequentere monitoring blijft een add-on en dwingt geen groter paginapakket af.
 
+## Invitation-only onboardingworkflow
+
+Status: gepland; nog niet in uitvoering. Dit is een verplichte, releaseblokkerende fase vóór de
+friends-and-family-release. De functionele scope, beveiligingskeuze, testmatrix en raming staan in
+`docs/onboarding-friends-family.md`.
+
+- Bouw voort op de bestaande accounts, uitnodigingen, rollen en atomaire klant-/websitecreatie.
+- Voeg een begeleide en hervatbare flow toe van uitnodiging tot eerste crawlresultaten.
+- Voeg één veilige methode voor website-eigendomsverificatie toe.
+- Voorkom dubbele websites en initiële crawls bij refresh, dubbel klikken of opnieuw proberen.
+- Valideer de volledige flow met minimaal twee niet-technische proefgebruikers.
+- Start deze implementatie pas als een afzonderlijke ontwikkelfase expliciet wordt gekozen.
+
 ## Friends-and-family-release
 
 Status: gepland als besloten mijlpaal; voorlopig doelvenster november 2026, zonder harde
