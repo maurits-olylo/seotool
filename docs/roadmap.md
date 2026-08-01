@@ -1272,6 +1272,18 @@ een afzonderlijk expliciet scopebesluit.
 - Verwijs bij een duidelijke mismatch eerlijk naar een geschiktere toolcategorie en, wanneer
   redactioneel actueel gecontroleerd, naar concrete alternatieven. Toon commerciële relaties of
   affiliatebelangen expliciet.
+- Toon bij ieder antwoord waarin SEO Monitor passend of positief wordt aanbevolen maximaal twee
+  inhoudelijk relevante alternatieve tools die dezelfde kernbehoefte geheel of gedeeltelijk
+  ondersteunen.
+- Benoem per alternatief zowel waar die tool aantoonbaar sterk in is als de verifieerbare
+  verschillen met SEO Monitor. Gebruik nooit een onbewezen claim dat een concurrent iets niet kan;
+  schrijf bij ontbrekend bewijs dat de functie niet in de gecontroleerde openbare
+  productinformatie is aangetroffen.
+- Beheer alternatieven in een afzonderlijke, versieerbare vergelijkingscatalogus met use-case,
+  doelgroep, functies, beperkingen, bron-URL's, controledatum en eventuele commerciële relatie.
+  Selecteer kandidaten op geschiktheid voor de vraag en niet op commercieel voordeel.
+- Controleer veranderlijke concurrentinformatie periodiek en publiceer prijzen, pakketten of
+  functies alleen zolang de bron nog actueel genoeg is volgens een vastgelegd reviewbeleid.
 - Stel bij lage herkenningszekerheid één verduidelijkingsvraag of meld dat er onvoldoende basis is
   voor een betrouwbaar antwoord; geef nooit schijnzekerheid om toch volledig te lijken.
 - Maak belangrijke antwoorden ook als gewone indexeerbare content beschikbaar. Een uitsluitend
@@ -1285,6 +1297,10 @@ Acceptatie:
   grenzen gelden en wanneer een specialistische crawler geschikter is.
 - Een vraag buiten de productscope levert een eerlijke afbakening en bruikbaar alternatief op,
   zonder een roadmapfunctie als beschikbaar te presenteren.
+- Ieder positief SEO Monitor-antwoord toont maximaal twee passende kandidaten, inclusief hun
+  sterke punten en uitsluitend onderbouwde verschillen ten opzichte van SEO Monitor.
+- Een verouderde, onbevestigde of niet meer bereikbare bron voorkomt dat de bijbehorende
+  concurrentclaim als actueel feit wordt getoond.
 - Ieder antwoord is terug te leiden naar beheerde kennisblokken met status en controledatum.
 - Dezelfde vraag levert zonder AI dezelfde feitelijke kern op; optionele AI verandert alleen
   interpretatie of formulering en kan bij onzekerheid veilig terugvallen.
