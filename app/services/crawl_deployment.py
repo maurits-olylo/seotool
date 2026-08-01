@@ -82,11 +82,13 @@ def start_deployment_drain(db: Session) -> DeploymentDrainStatus:
 def deployment_drain_status(db: Session) -> DeploymentDrainStatus:
     control = _control(db)
     tracked = tuple(control.paused_job_ids)
+    if not control.is_active:
+        return DeploymentDrainStatus(False, tracked, ())
     waiting = [
         str(job_id)
         for job_id in db.scalars(select(CrawlJob.id).where(CrawlJob.status.in_(UNSAFE_STATUSES)))
     ]
-    return DeploymentDrainStatus(bool(control.is_active), tracked, tuple(sorted(waiting)))
+    return DeploymentDrainStatus(True, tracked, tuple(sorted(waiting)))
 
 
 def wait_for_deployment_drain(

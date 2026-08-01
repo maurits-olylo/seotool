@@ -657,6 +657,11 @@ kandidaten verwijderd. De tweede aanroep volgde na een terminalonderbreking. Daa
 onderbroken verwijdercommando voortaan altijd als mogelijk uitgevoerd beschouwd. Eerst volgt een
 read-only telling en nieuwe retentionaudit; direct opnieuw uitvoeren is niet toegestaan.
 
+Statuscorrectie: na het hervatten werd een normaal draaiende `human.nl`-lightcheck ten onrechte als
+`waiting=1` getoond terwijl de maintenance-pauze al inactief was. `waiting` beschrijft voortaan
+alleen crawls waarop een actieve drain nog wacht. Reguliere actieve crawls maken een inactieve
+maintenance-status niet langer onrustwekkend.
+
 ## Compacte GSC-deduplicatiesleutels
 
 De unieke GSC-indexen bevatten volledige URL- en zoektermteksten en zijn daardoor groter dan nodig.

@@ -56,6 +56,12 @@ def test_deployment_drain_only_resumes_jobs_it_paused(client) -> None:  # type: 
         assert db.get(CrawlJob, manual_id).status == "paused"
         assert db.get(CrawlJob, manual_request_id).status == "paused"
 
+        db.get(CrawlJob, running_id).status = "running"
+        db.commit()
+        inactive = deployment_drain_status(db)
+        assert not inactive.active
+        assert inactive.waiting_job_ids == ()
+
 
 def test_deployment_drain_blocks_api_and_scheduler_creation(client, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     customer = client.post("/api/v1/clients", json={"name": "Blocked crawl"}).json()
