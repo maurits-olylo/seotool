@@ -80,6 +80,38 @@ TERMINAL-FIRST
 
 De gebruiker werkt via terminal.
 
+Geef terminalinstructies voortaan in deze vaste vorm:
+
+- Noem vóór ieder blok exact in welk bestaand terminalvenster het moet worden uitgevoerd, zoals
+  `lokale Mac-terminal` of `bestaande NAS-shell`.
+- Deel risicodragende of langdurige handelingen op in genummerde commandoblokken die één voor één
+  kunnen worden gekopieerd en geplakt.
+- Vermeld per blok of het commando blokkeert, wat ongeveer zichtbaar gebeurt en dat de gebruiker
+  pas doorgaat zodra de normale prompt terugkomt.
+- Wanneer stap 4 afhankelijk is van services of migraties uit stap 3 die kort moeten stabiliseren,
+  sluit stap 3 dan af met een expliciet `sleep <passend-aantal-seconden>`-commando. Kies de
+  wachttijd op basis van de uitgevoerde handeling, vermeld dat `sleep` bewust blokkeert en laat stap
+  4 pas uitvoeren nadat de prompt na `sleep` is teruggekeerd.
+- Geef vóór ieder commandoblok altijd aan welk uitvoergedrag verwacht wordt: direct gereed,
+  blokkerend tot voltooiing, interactief, of op de achtergrond gestart.
+- Geef bij ieder blok een realistische normale tijdsduur of bandbreedte en vermeld expliciet of
+  tijdelijke stilte, een stilstaande regel of doorlopende uitvoer normaal is.
+- Vermeld het concrete gereed-signaal, bijvoorbeeld terugkeer van de normale prompt, een specifieke
+  statusregel, een geslaagde healthcheck of een gezonde containerstatus.
+- Geef een duidelijke grens waarna wachten niet meer normaal is en de gebruiker moet stoppen en de
+  actuele uitvoer moet delen. Laat een mogelijk nog lopend of onderbroken muterend commando nooit
+  opnieuw uitvoeren zonder eerst read-only de status of het resultaat te controleren.
+- Voeg alleen een `sleep` toe wanneer het voorgaande commando asynchroon werk start of wanneer een
+  service aantoonbaar tijd nodig heeft om stabiel en controleerbaar te worden. Voeg geen
+  cosmetische wachttijd toe na een synchroon commando dat pas terugkeert nadat het werk gereed is.
+- Benoem bij achtergrondcommando's dat terugkeer van de prompt niet betekent dat de service al
+  klaar is en combineer zo nodig `sleep` met een expliciete status- of healthcheck.
+- Gebruik geen interactieve shellvariabelen, extra invoerprompts of ongebruikelijke constructies
+  wanneer een direct commando mogelijk is.
+- Laat na een fout stoppen en de foutuitvoer delen; laat vervolgstappen niet blind uitvoeren.
+- Ga ervan uit dat de gebruiker een getoonde checksum zelf vergelijkt. Vraag alleen om de uitvoer
+  wanneer die nodig is om veilig over de volgende stap te beslissen.
+
 Geef of voer per fase relevante terminalcommando’s uit voor:
 
 - installatie;

@@ -1,0 +1,206 @@
+CODEX DEVELOPMENT PROFILE
+Versie: 2026-08-01
+
+DOEL
+
+Gebruik dit bestand als persoonlijke werkinstructie bij nieuwe developmentprojecten. Controleer
+altijd eerst de actuele projectmap en projectspecifieke AGENTS.md. Projectspecifieke instructies
+gaan voor op dit algemene profiel.
+
+TAAL EN COMMUNICATIE
+
+- Communiceer standaard in het Nederlands.
+- Code, bestandsnamen, databasevelden en technische documentatie mogen Engels zijn.
+- Schrijf kort, duidelijk en praktisch. Vermijd complimenten, opvulling en herhaling.
+- Focus op actie, resultaat en controleerbaarheid.
+- Geef maximaal vier uitvoeringsstappen tegelijk.
+- Werk maximaal één duidelijke fase tegelijk uit.
+- Stop na een afgeronde fase en vraag exact: “Klaar voor de volgende fase?”
+- Wanneer ik na terminalopdrachten alleen `ja` antwoord, neem dan aan dat ze succesvol zijn
+  uitgevoerd, tenzij ik foutuitvoer deel.
+- Maak redelijke, veilige aannames als de projectmap voldoende context biedt. Stel maximaal één
+  gerichte vraag wanneer een noodzakelijke keuze niet kan worden afgeleid.
+
+TERMINALWERKWIJZE
+
+- Ik werk terminal-first.
+- Noem vóór ieder commandoblok exact het bedoelde bestaande venster, bijvoorbeeld:
+  - lokale Mac-terminal;
+  - bestaande NAS-shell;
+  - Linux-workerterminal.
+- Geef genummerde commandoblokken die één voor één volledig gekopieerd en geplakt kunnen worden.
+- Vermeld vóór ieder blok of het:
+  - direct gereed is;
+  - blokkeert tot voltooiing;
+  - interactief om invoer vraagt;
+  - werk op de achtergrond start.
+- Geef een realistische normale tijdsduur of bandbreedte.
+- Vermeld of tijdelijke stilte, een stilstaande regel of doorlopende uitvoer normaal is.
+- Noem het concrete gereed-signaal, zoals:
+  - de normale prompt keert terug;
+  - een specifieke succesregel verschijnt;
+  - de healthcheck is gezond;
+  - containers tonen de verwachte status.
+- Geef aan vanaf welk moment wachten niet meer normaal is en ik de actuele uitvoer moet delen.
+- Laat mij bij een fout direct stoppen. Laat vervolgstappen niet blind uitvoeren.
+- Een onderbroken muterend commando geldt als mogelijk uitgevoerd. Laat het nooit direct herhalen;
+  controleer eerst read-only de status, logs, markers of aantallen.
+- Voeg een passend `sleep <seconden>` toe wanneer een achtergrondproces of service aantoonbaar
+  stabilisatietijd nodig heeft voordat de volgende stap betrouwbaar is.
+- Vermeld dat `sleep` bewust blokkeert en laat pas doorgaan nadat de prompt terugkomt.
+- Voeg geen cosmetische `sleep` toe na een synchroon commando dat zelf pas terugkeert wanneer het
+  werk klaar is.
+- Ga ervan uit dat ik een getoonde checksum zelf kan vergelijken. Vraag de checksumuitvoer alleen
+  wanneer die nodig is om veilig verder te gaan.
+- Gebruik geen onnodige shellvariabelen, invoerprompts of ongebruikelijke constructies wanneer een
+  direct commando mogelijk is.
+
+ONTWIKKELWERKWIJZE
+
+- Inspecteer eerst bestaande bestanden, documentatie, Git-status, dependencies en infrastructuur.
+- Begin een bestaand project niet opnieuw vanuit een generieke starter of oorspronkelijke MVP.
+- Hergebruik bruikbare bestaande code.
+- Werk rechtstreeks in de geopende projectmap.
+- Voer wijzigingen, migrations, linting en tests waar mogelijk zelf uit.
+- Werk naar een aantoonbaar functionerend resultaat.
+- Kies eenvoudige, onderhoudbare oplossingen en vermijd overengineering.
+- Voeg geen dependency toe wanneer bestaande dependencies of eenvoudige standaardfunctionaliteit
+  voldoende zijn.
+- Breek bestaande functionaliteit niet zonder dit expliciet te melden.
+- Respecteer een dirty worktree en laat onbekende of niet-gerelateerde bestanden ongemoeid.
+- Gebruik migrations voor databasewijzigingen.
+- Gebruik type hints, duidelijke namen, kleine functies, foutafhandeling en structured logging.
+- Voeg tests toe voor belangrijke logica en regressies.
+- Tests mogen bij voorkeur niet afhankelijk zijn van externe websites.
+- Leg belangrijke architectuurkeuzes kort vast in documentatie.
+- Meld exact welke relatieve bestanden zijn aangemaakt of gewijzigd.
+
+GIT EN RELEASES
+
+- Gebruik logische commits met duidelijke conventionele commitmessages.
+- Bundel samenhangende correcties in één releasepakket; maak niet voor ieder klein detail een
+  afzonderlijke release.
+- Commit nooit secrets, lokale environmentbestanden, exports, databasebestanden, grote logs of
+  tijdelijke data.
+- Maak releases vanaf een exacte, geteste commit.
+- Controleer vóór een release tests, linting, migrations, configuratie en relevante healthchecks.
+- Maak niet automatisch voor iedere migration of deployment een databaseback-up.
+- Motiveer per release of een extra back-up nodig is. Een additieve, eenvoudig omkeerbare migration
+  zonder dataherschrijving vereist doorgaans geen extra releaseback-up; destructieve wijzigingen
+  en moeilijk omkeerbare bulkmutaties wel.
+
+PRIVACY EN SECRETS
+
+- Noem, herhaal of bewaar geen serienummers, MAC-adressen, lokale of publieke netwerkadressen,
+  DDNS-gegevens, wachtwoorden, tokens, privésleutels of echte secrets in documentatie of antwoorden.
+- Plaats secrets uitsluitend in niet-gecommitte environmentbestanden of een geschikte secretstore.
+- Gebruik in documentatie veilige placeholders of een reeds ingestelde hostalias.
+- Log geen secrets of volledige gevoelige responsecontent.
+
+PRIMAIRE WERKPLEK
+
+- Mijn Mac blijft mijn primaire werkplek voor Codex, codebeheer en Git.
+- Ik wil wachtwoordinvoer beperken.
+- Gewenste SSH-route: sleutelgebaseerde authenticatie vanaf de Mac, bij voorkeur met een sleutel in
+  de Secure Enclave en Touch ID voor nieuwe verbindingen.
+- Kort verbindingshergebruik, bijvoorbeeld tien minuten, is wenselijk zodat niet ieder commando
+  opnieuw biometrische goedkeuring vraagt.
+- Wachtwoordlogin mag pas worden uitgeschakeld nadat sleuteltoegang en een herstelroute aantoonbaar
+  werken.
+
+LINUX-WORKER — GEPLANDE SETUP
+
+- Een beschikbare pc wordt volledig ingericht als headless Linux-worker en mag daarnaast
+  geïsoleerde andere projecten uitvoeren.
+- Hardware:
+  - MSI MPG X570 GAMING EDGE WIFI-moederbord;
+  - AMD Ryzen 9 3900X, 12 cores en 24 threads;
+  - 32 GB RAM;
+  - NVIDIA GeForce RTX 2080 SUPER;
+  - Samsung 970 EVO NVMe SSD van 1 TB nominale capaciteit.
+- Huidige toestand: Windows 11; omzetting naar Linux is gepland maar nog niet uitgevoerd.
+- Voorkeursbesturingssysteem: Ubuntu Server 24.04 LTS zonder desktopomgeving.
+- De pc wordt standaard zonder monitor, toetsenbord of muis gebruikt. Tijdelijke lokale aansluiting
+  is toegestaan voor installatie of noodherstel.
+- Een PiKVM is daarom voorlopig niet nodig, maar blijft een latere optie.
+- De server wordt bedraad met de router verbonden.
+- Gewenste rollen:
+  - Docker-buildserver;
+  - volledige test- en lintserver;
+  - migration- en herstelproeven;
+  - zware crawlexperimenten;
+  - later eventueel self-hosted CI-runner, Playwright en lokale AI-verwerking.
+- Gebruik lokale Linux-opslag voor code, databases en Docker-volumes; ontwikkel niet rechtstreeks
+  op een NAS-netwerkshare.
+- Scheid projecten via eigen mappen, Compose-projectnamen, netwerken, volumes, environmentbestanden
+  en zo nodig serviceaccounts en resourcegrenzen.
+- Gewenste hoofdmap: `/srv/projects/<projectnaam>`.
+- De Linux-worker is geen publieke productieserver.
+
+BESCHIKBAARHEID EN STROOMHERSTEL
+
+- Stel in het BIOS `Restore after AC Power Loss` in op automatisch inschakelen.
+- Docker en noodzakelijke services moeten automatisch met Linux starten.
+- Containers krijgen passende restart policies en healthchecks.
+- Internetuitval mag geen blinde volledige reboot veroorzaken. Lokale diensten blijven draaien en
+  netwerkdiensten herstellen gericht nadat de verbinding terugkeert.
+- Wake-on-LAN kan als aanvullende herstelroute worden ingesteld.
+- Test gecontroleerd:
+  - normale herstart;
+  - stroomverlies en terugkeer;
+  - router- of internetonderbreking;
+  - herstel van SSH, Docker en applicaties.
+- Later komt een UPS. Selecteer die op voldoende werkelijk wattvermogen, communicatie met Linux,
+  ondersteuning door Network UPS Tools, gecontroleerde shutdown en automatische terugkeer van de
+  uitgangsspanning.
+
+NAS EN DEPLOYMENT
+
+- De NAS blijft voorlopig productie-, staging-, back-up- en herstelplatform. Later verhuist
+  publieke productie naar een VPS; de NAS blijft dan voor staging, back-ups en hersteltests.
+- Productie en staging moeten eigen Compose-projecten, databases, Redis-volumes, exportvolumes en
+  secrets gebruiken.
+- Staging gebruikt synthetische testdata en mag geen productie-integraties, crawlers of scheduler
+  activeren tenzij dit expliciet voor een gecontroleerde proef wordt gewijzigd.
+- Werk op de NAS terminal-first en gebruik steeds het reeds geopende interactieve NAS-venster.
+- Open nooit een tweede interactieve NAS-login wanneer al een NAS-shell beschikbaar is.
+- Voor uploads naar de huidige NAS geldt uitsluitend:
+  1. Maak lokaal op de Mac een `git archive` vanaf een exacte commit.
+  2. Upload vanaf de Mac via SSH-streaming met `dd of=/tmp/<release>.tar.gz`.
+  3. Controleer de checksum op de NAS.
+  4. Pak in de bestaande NAS-shell als root uit naar de projectmap.
+  5. Voer alle `sudo docker compose`-handelingen in diezelfde NAS-shell uit.
+- Gebruik geen SCP, Git op de NAS, tweede SSH-login of niet-interactieve remote Docker-opdrachten.
+- Productiebestanden op de NAS zijn root-owned.
+- Herbouw en herstart alleen geraakte services.
+- Gebruik geen DSM-interface-instructies wanneer terminalbeheer veilig mogelijk is.
+- Als DSM onvermijdelijk is, verifieer eerst de actuele officiële documentatie en DSM-hoofdversie,
+  gebruik de exacte Nederlandse scherm- en knopnamen en laat stoppen zodra het scherm afwijkt.
+
+BACK-UPS EN DATA
+
+- Eén lokale SSD is geen back-up.
+- Maak versleutelde, controleerbare back-ups naar de NAS en bij voorkeur ook naar een tweede fysieke
+  locatie.
+- Publiceer een databaseback-up pas nadat het archief aantoonbaar leesbaar is.
+- Test herstel periodiek in een geïsoleerde omgeving.
+- Kopieer productiedata niet naar development zonder expliciet besluit, passende afscherming en
+  waar nodig anonimisering.
+- Gebruik nooit `VACUUM FULL`, volume deletion, brede recursive delete of andere destructieve
+  onderhoudsacties als verkennende stap.
+
+STANDAARD PROJECTSTART
+
+Voer bij een nieuw project eerst één inspectiefase uit:
+
+1. Lees AGENTS.md, README en relevante documentatie volledig.
+2. Toon alleen de relevante projectstructuur en controleer Git-status, taal, dependencies,
+   containers, database en testopzet.
+3. Benoem alleen echte blokkades of keuzes die niet uit de projectmap kunnen worden afgeleid.
+4. Stel een compact, gefaseerd uitvoeringsplan voor en stop voor bevestiging.
+
+ACTUELE OPMERKING
+
+Dit profiel beschrijft voorkeuren en geplande infrastructuur. Controleer vóór iedere uitvoering wat
+daadwerkelijk geïnstalleerd, bereikbaar en operationeel is. Neem geplande Linux-worker-, UPS- of
+VPS-functionaliteit niet als al gerealiseerd aan.
