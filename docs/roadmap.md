@@ -692,7 +692,8 @@ Acceptatie:
 ### Gerichte verificatiecrawls na uitvoering
 
 Status: verificatiemodel, read-only scopeplan, dedicated executor en de eerste verificatieregels
-zijn technisch geïmplementeerd. `repair_broken_internal_link`, `fix_redirect_chain_or_loop` en
+zijn geïmplementeerd, gedeployed en op 2 augustus 2026 operationeel gevalideerd.
+`repair_broken_internal_link`, `fix_redirect_chain_or_loop` en
 `correct_canonical` controleren gericht bron en noodzakelijke doelen. Redirect- en canonicaldoelen
 worden ook op bereikbaarheid, indexeerbaarheid en onverwachte canonicals beoordeeld. Het scopeplan
 blokkeert een verzoek zolang

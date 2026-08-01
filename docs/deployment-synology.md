@@ -171,6 +171,10 @@ data wijzigen of moeilijk herstelbaar zijn.
 
 ### Wachttijd bij asynchrone productiecontroles
 
+Gebruik na het opnieuw starten van een worker altijd `sleep 30` voordat de containerstatus en
+healthcheck worden beoordeeld. Twintig seconden bleek op productie onvoldoende: de worker draaide
+al wel, maar rapporteerde nog `health: starting`.
+
 Baseer een `sleep` na een achtergrondjob op een eerder gemeten doorlooptijd en rond slechts beperkt
 naar boven af. De HUMAN-sitemapimport van 193 documenten duurde op 1 augustus 2026 circa 49
 seconden; een eerste statuscontrole na `sleep 60` is daarom passend. Wanneer de job dan nog

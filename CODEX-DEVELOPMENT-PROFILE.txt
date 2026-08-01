@@ -51,6 +51,8 @@ TERMINALWERKWIJZE
   controleer eerst read-only de status, logs, markers of aantallen.
 - Voeg een passend `sleep <seconden>` toe wanneer een achtergrondproces of service aantoonbaar
   stabilisatietijd nodig heeft voordat de volgende stap betrouwbaar is.
+- Gebruik na het opnieuw starten van een SEO Monitor-worker standaard `sleep 30` vóór status- en
+  healthcontroles; twintig seconden is voor deze productieomgeving onvoldoende.
 - Baseer de duur van `sleep` bij voorkeur op een eerder gemeten doorlooptijd, rond beperkt naar
   boven af en controleer daarna read-only. Als het proces nog loopt, wacht kort aanvullend en
   herhaal nooit de muterende startopdracht.
