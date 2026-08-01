@@ -1250,16 +1250,17 @@ Basis van de raming op 1 augustus 2026:
 
 Resterende actieve ontwikkeltijd tot een verantwoorde friends-and-family-release:
 
-- Volledige onboardingworkflow afronden en valideren: circa 4–7 werkdagen.
+- Volledige onboardingworkflow afronden en valideren: circa 6–10 werkdagen; zie
+  `docs/onboarding-friends-family.md`.
 - Publieke website-inschatting en pakketadvies: circa 3–5 werkdagen.
 - Openstaande productievalidaties en begrijpelijkheidsverbeteringen: circa 5–8 werkdagen.
 - Afzonderlijk Linux-workerproject en capaciteitsmeting: circa 2–4 werkdagen.
 - VPS-capaciteit, migratie, monitoring, back-up en herstelproef: circa 4–7 werkdagen.
 - Integrale acceptatie, beveiligingscontrole en pilotvoorbereiding: circa 4–6 werkdagen.
 
-Brutoraming: 22–37 actieve werkdagen. Gebruik inclusief integratie- en herstelbuffer een
-planningsbandbreedte van 25–40 actieve werkdagen. Bij een duurzame inzet van vier tot vijf actieve
-ontwikkeldagen per week is dat ongeveer zeven tot tien kalenderweken.
+Brutoraming: 24–40 actieve werkdagen. Gebruik inclusief integratie- en herstelbuffer een
+planningsbandbreedte van 28–44 actieve werkdagen. Bij een duurzame inzet van vier tot vijf actieve
+ontwikkeldagen per week is dat ongeveer zeven tot elf kalenderweken.
 
 Voorgestelde planning:
 
@@ -1310,6 +1311,8 @@ Doel:
 ### Productgates
 
 - Multi-clientisolatie is met minimaal twee afzonderlijke klanten en rollen opnieuw gecontroleerd.
+- De invitation-only onboarding volgt de vastgelegde flow en acceptatiematrix in
+  `docs/onboarding-friends-family.md`; publieke zelfregistratie is nog geen releasevoorwaarde.
 - De volledige onboardingworkflow is vóór de release functioneel afgerond: uitnodiging of
   registratie, persoonlijk account, organisatie en website aanmaken, website-eigendom verifiëren,
   crawlvoorkeuren bevestigen, eerste crawl starten en voortgang en eerste resultaten tonen.
