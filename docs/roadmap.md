@@ -136,14 +136,19 @@ Status: afgerond, gedeployed en geaccepteerd.
 
 ### Contextuele JobPosting-identifiers
 
-Status: technisch geïmplementeerd en onderdeel van de huidige productierelease; gerichte
-productievalidatie volgt.
+Status: geïmplementeerd, gedeployed en op 1 augustus 2026 in productie gevalideerd.
 
 - Ontbrekende aanbevolen velden niet zelfstandig als waarschuwing tonen.
 - Vacatures zonder identifier sitebreed op sterke inhoudelijke gelijkenis vergelijken.
 - Alleen bij aantoonbaar verwarringsrisico een contextueel issue maken.
 - Groepsgrootte, overlap en gerelateerde URL's als technisch bewijs tonen.
 - Vanaf vijf vergelijkbare vacatures de prioriteit van laag naar middel verhogen.
+- De actieve productie-worker bevat de contextuele analyse. In productie missen 28 actieve,
+  indexeerbare vacatures van Schipper Kozijnen en 507 van GrandVision een identifier zonder dat dit
+  op zichzelf losse waarschuwingen oplevert.
+- GrandVision leverde één aantoonbaar overlapcluster van twee vacatures op met bron
+  `cross_vacancy_similarity`, lage prioriteit en volledig clusterbewijs. Een latere geslaagde
+  volledige crawl verifieerde het issue; een aanvullende crawl of herberekening was niet nodig.
 
 - Thin-contentdetectie en ruisarme wijzigingsdetectie aanscherpen.
 - Verouderde content buiten vacatures toevoegen met voorzichtige signalering.

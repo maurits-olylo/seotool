@@ -54,6 +54,16 @@ stagingstatus die voor de eerstvolgende roadmaptaak nodig is. Laat de bestaande 
   seconden doorlooptijd. De oude afgeknotte import vond 2.789 URL's; de correctie maakte 956 extra
   URL's zichtbaar.
 
+### Contextuele JobPosting-identifiers
+
+- De actieve productie-worker bevat aantoonbaar de contextuele identifieranalyse.
+- Schipper Kozijnen heeft 28 en GrandVision 507 actieve, indexeerbare vacatures zonder identifier;
+  deze ontbreken blijven zonder inhoudelijk verwarringsrisico terecht stil.
+- GrandVision leverde één echt overlapcluster van twee vacatures op met bron
+  `cross_vacancy_similarity`, lage prioriteit en clusterbewijs.
+- Het issue is na een latere geslaagde volledige crawl `verified`. Een aanvullende crawl of
+  herberekening was niet nodig.
+
 ### Sitemapkwaliteit als later productonderdeel
 
 - HUMAN en VPRO gebruiken vanuit hun gedeelde CMS een maandelijkse sitemapindeling.
@@ -79,16 +89,10 @@ stagingstatus die voor de eerstvolgende roadmaptaak nodig is. Laat de bestaande 
 
 ## Eerstvolgende stap
 
-Ga verder met `Contextuele JobPosting-identifiers` onder fase 4 van `docs/roadmap.md`.
-
-1. Bevestig read-only dat de implementatie daadwerkelijk in de actieve productie-images aanwezig
-   is; bouw of deploy niets dubbel.
-2. Inspecteer bestaande productiegegevens op vacatures zonder identifier en op eventuele
-   gegenereerde contextuele identifier-issues.
-3. Bepaal of er voldoende echte productiegevallen zijn voor validatie. Start alleen wanneer nodig
-   één gecontroleerde herberekening of crawl en herhaal een muterende opdracht nooit blind.
-4. Werk na aantoonbare validatie de roadmapstatus bij. Ga anders door met een concrete, gedocumenteerde
-   reden waarom productievalidatie nog openblijft.
+Ga verder met de eerstvolgende open fase-4-taak in `docs/roadmap.md`: thin-contentdetectie verder
+aanscherpen. Inspecteer eerst de bestaande implementatie, tests en productiebevindingen en bepaal
+daarna een begrensde validatie- of correctiestap. Bouw de later geplande signalen voor algemene
+verouderde content en sitemapkwaliteit niet buiten hun roadmapvolgorde.
 
 ## Vaste terminal- en deploymentvoorkeuren
 
