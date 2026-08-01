@@ -136,7 +136,8 @@ Status: afgerond, gedeployed en geaccepteerd.
 
 ### Contextuele JobPosting-identifiers
 
-Status: technisch geïmplementeerd; deployment en productievalidatie volgen.
+Status: technisch geïmplementeerd en onderdeel van de huidige productierelease; gerichte
+productievalidatie volgt.
 
 - Ontbrekende aanbevolen velden niet zelfstandig als waarschuwing tonen.
 - Vacatures zonder identifier sitebreed op sterke inhoudelijke gelijkenis vergelijken.
@@ -189,6 +190,10 @@ onpage-, duplicate-, thin-content-, JobPosting- en alt-tekstcontroles blijven de
      child-sitemaps.
    - Beoordeel `lastmod` alleen bij aantoonbare structurele afwijking van inhoudswijzigingen.
    - Signaleer discovery-, filter- en functionele pagina's in sitemaps als patroonreview.
+   - Signaleer overfragmentatie contextueel wanneer veel child-sitemaps structureel zeer weinig
+     URL's bevatten; het aantal sitemapbestanden alleen is geen harde SEO-fout.
+   - Detecteer lege of dubbele child-sitemaps, ontbrekende `lastmod`-waarden in sitemapindexen en
+     ongeldige epoch-fallbacks rond 1970 als afzonderlijk technisch bewijs.
 8. **Interne-linksemantiek**
    - Detecteer lege of niet-beschrijvende ankers, intern `nofollow`, uitsluitend template- of
      footerlinks en inconsistent ankergebruik voor belangrijke doelen.
