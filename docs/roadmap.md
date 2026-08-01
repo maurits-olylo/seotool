@@ -1361,6 +1361,31 @@ gescheiden houden van de publieke homepagevraagassistent.
   zonder passend experimenteel of ander sterk bewijs. Hergebruik hiervoor de geplande
   opportunity-engine en effectmeting in plaats van een tweede score- of conclusiemodel te bouwen.
 
+### Analytics-meetkwaliteit en anomaliedetectie
+
+Status: gepland als verplichte kwaliteitslaag vóór conversie-inzichten en aanbevelingen.
+
+- Detecteer onwaarschijnlijke combinaties van gekwalificeerde events en sessies per dag,
+  landingspagina en eventtype. Gebruik geen universele harde conversiegrens, maar combineer
+  eventvolume, sessievolume, historische bandbreedte, plotselinge pieken en vergelijkbare pagina's.
+- Signaleer herhaald afgevuurde events, abrupte eventpieken, events op bedank- of vervolgpagina's,
+  token- en campagnevarianten, ontbrekende sessies en landingspagina's die niet logisch als ingang
+  bij het event passen.
+- Normaliseer alleen veilige URL-varianten voor analyse en behoud de oorspronkelijke bronregel als
+  bewijs. Toon gevoelige querywaarden of tokens nooit in antwoorden, logging of exports.
+- Verwijder of corrigeer verdachte events niet automatisch. Markeer ze als mogelijke
+  meetafwijking, toon zowel ruwe als gevoeligheidsberekende totalen en verlaag de confidence van
+  alle afhankelijke conversie-inzichten.
+- Maak van een voldoende sterke afwijking één gededupliceerde analytics-kwaliteitscontrole met
+  eventnaam, datum, geanonimiseerde of genormaliseerde pagina, events, sessies, historische
+  vergelijking, waarschijnlijke meetoorzaken en concrete verificatiestappen voor analytics- of
+  websitebeheer.
+- Laat een meetkwaliteitscontrole na volgende imports de normale issue-lifecycle doorlopen en pas
+  afhankelijke inzichten weer als betrouwbaar presenteren nadat de afwijking aantoonbaar wegblijft.
+- Praktijkgeval Schipper Kozijnen: twintig nieuwsbrief-events op één dag, toegeschreven aan een
+  regionale landingspagina met twee sessies, moet als waarschijnlijk meetprobleem worden herkend en
+  mag niet stilzwijgend de conclusie `meer leads door hogere conversie` bepalen.
+
 Acceptatie:
 
 - Een vraag vanuit een issuedetail legt het zichtbare signaal, bewijs, relevantie, aanbevolen actie
@@ -1376,6 +1401,10 @@ Acceptatie:
   hersteld.
 - Bij meer leads benoemt het antwoord welke positieve patronen behouden of verantwoord uitgebreid
   kunnen worden zonder de stijging automatisch aan één wijziging toe te schrijven.
+- Een sterke event-/sessieafwijking maakt vóór de conversieconclusie zichtbaar dat de meting
+  waarschijnlijk onbetrouwbaar is en toont het resultaat met en zonder de verdachte bijdrage.
+- Een analytics-anomalie wordt niet automatisch verwijderd, maar blijft met bronbewijs,
+  controledatum, status en verificatiehistorie beschikbaar.
 - De in-product assistent noemt of adviseert geen externe tools, ook niet wanneer SEO Monitor een
   gevraagde functie niet ondersteunt.
 - Een algemene SEO- of toolvergelijkingsvraag binnen het product wordt niet via de publieke
