@@ -1238,6 +1238,40 @@ Status: gepland als besloten mijlpaal; voorlopig doelvenster november 2026, zond
 releasedatum. Neem in oktober 2026 een expliciet go/no-go-besluit op basis van onderstaande
 acceptatiecriteria. Kwaliteit en herstelbaarheid gaan voor de kalenderdatum.
 
+### Ontwikkeltijdraming
+
+Basis van de raming op 1 augustus 2026:
+
+- De Git-historie loopt vanaf 10 juli 2026: 23 kalenderdagen en 21 dagen met commits.
+- In die periode zijn 235 commits gemaakt en is een werkende productie- en stagingomgeving met
+  322 geautomatiseerde tests bereikt.
+- Commitvolume is geen urendeclaratie. Integraties, migraties, gebruikersproeven en operationele
+  acceptatie verlopen langzamer en onregelmatiger dan de eerste technische bouwfase.
+
+Resterende actieve ontwikkeltijd tot een verantwoorde friends-and-family-release:
+
+- Volledige onboardingworkflow afronden en valideren: circa 4–7 werkdagen.
+- Publieke website-inschatting en pakketadvies: circa 3–5 werkdagen.
+- Openstaande productievalidaties en begrijpelijkheidsverbeteringen: circa 5–8 werkdagen.
+- Afzonderlijk Linux-workerproject en capaciteitsmeting: circa 2–4 werkdagen.
+- VPS-capaciteit, migratie, monitoring, back-up en herstelproef: circa 4–7 werkdagen.
+- Integrale acceptatie, beveiligingscontrole en pilotvoorbereiding: circa 4–6 werkdagen.
+
+Brutoraming: 22–37 actieve werkdagen. Gebruik inclusief integratie- en herstelbuffer een
+planningsbandbreedte van 25–40 actieve werkdagen. Bij een duurzame inzet van vier tot vijf actieve
+ontwikkeldagen per week is dat ongeveer zeven tot tien kalenderweken.
+
+Voorgestelde planning:
+
+- September 2026: onboarding, publieke inschatting, openstaande validaties en Linux-worker.
+- Oktober 2026: VPS-migratie, herstelproef, integrale acceptatie en go/no-go.
+- November 2026: besloten release aan drie tot vijf deelnemers.
+
+Een zeer intensief tempo kan een releasekandidaat in oktober opleveren. November blijft de
+realistische doelmaand omdat de laatste fase ruimte nodig heeft voor onbekende fouten en
+niet-technische gebruikerstests. Herbereken de raming na afronding van onboarding en opnieuw na de
+eerste volledige VPS-herstelproef.
+
 Doel:
 
 - Nodig aanvankelijk drie tot vijf bekende gebruikers of organisaties uit.
