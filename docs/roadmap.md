@@ -1317,6 +1317,43 @@ Acceptatie:
 - De homepage toont maximaal vijf overzichtelijke resultaten en blijft snel, toegankelijk en
   bruikbaar op mobiel.
 
+## In-product contextuele data-assistent
+
+Status: gepland als afzonderlijk productonderdeel. Functioneel, inhoudelijk en in de interface
+gescheiden houden van de publieke homepagevraagassistent.
+
+- Laat ingelogde gebruikers vragen stellen over de gegevens die zij op dat moment binnen SEO
+  Monitor zien, zoals een URL, snapshot, wijziging, issue, crawl, taak, export of integratiemeting.
+- Baseer ieder antwoord uitsluitend op tenantbevoegde zichtbare data, opgeslagen technisch bewijs,
+  meetperioden, productregels en bijbehorende interne uitleg. Maak duidelijk welke feiten gemeten
+  zijn, welke interpretatie de applicatie geeft en waar bewijs ontbreekt.
+- Gebruik de actuele schermcontext als expliciete scope, waaronder website, geselecteerde entiteit,
+  filters en meetmoment. Laat de gebruiker verduidelijken wanneer meerdere zichtbare records of
+  perioden mogelijk bedoeld worden.
+- Beantwoord alleen inhoudelijke vragen over de zichtbare klantdata en de betekenis daarvan binnen
+  SEO Monitor. De in-product assistent geeft geen algemene marktvergelijkingen, concurrentnamen,
+  affiliateverwijzingen of aanbevelingen zoals dat een functie in een andere tool beschikbaar is.
+- Gebruik geen antwoorden, kandidatenroutes of fallbackgedrag van de publieke
+  vergelijkingscatalogus. Houd endpoints, antwoordtypen, prompts of regels, logging en
+  gebruiksmetingen aantoonbaar gescheiden, ook wanneer onderliggende technische componenten worden
+  hergebruikt.
+- Start geen crawl, statuswijziging, taakactie, export of andere mutatie vanuit een antwoord zonder
+  een afzonderlijke expliciete gebruikershandeling en de bestaande autorisatiecontroles.
+- Antwoord bij onvoldoende of niet-zichtbaar bewijs dat de conclusie niet uit de beschikbare data
+  kan worden afgeleid. Vul geen ontbrekende klantdata aan met algemene aannames.
+
+Acceptatie:
+
+- Een vraag vanuit een issuedetail legt het zichtbare signaal, bewijs, relevantie, aanbevolen actie
+  en verificatie uit zonder gegevens van andere klanten of schermcontexten te gebruiken.
+- Een vraag over een waarde, status of verandering noemt het gebruikte meetmoment en kan naar de
+  betrokken zichtbare bronrecords verwijzen.
+- De in-product assistent noemt of adviseert geen externe tools, ook niet wanneer SEO Monitor een
+  gevraagde functie niet ondersteunt.
+- Een algemene SEO- of toolvergelijkingsvraag binnen het product wordt niet via de publieke
+  antwoordroute afgehandeld; de gebruiker krijgt een korte scopeverklaring.
+- Autorisatie-, tenantisolatie- en geen-onbedoelde-mutatieregels zijn met regressietests afgedekt.
+
 ## Invitation-only onboardingworkflow
 
 Status: gepland; nog niet in uitvoering. Dit is een verplichte, releaseblokkerende fase vóór de
