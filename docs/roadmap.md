@@ -1272,6 +1272,10 @@ een afzonderlijk expliciet scopebesluit.
 - Verwijs bij een duidelijke mismatch eerlijk naar een geschiktere toolcategorie en, wanneer
   redactioneel actueel gecontroleerd, naar concrete alternatieven. Toon commerciële relaties of
   affiliatebelangen expliciet.
+- Geef wanneer SEO Monitor een behoefte niet of onvoldoende ondersteunt een expliciet negatief
+  geschiktheidsantwoord en adviseer maximaal twee tools die voor die concrete behoefte aantoonbaar
+  beter passen. Leg kort uit waarom deze kandidaten geschikter zijn; probeer de vraag niet alsnog
+  naar een SEO Monitor-verkoopargument om te buigen.
 - Toon bij ieder antwoord waarin SEO Monitor passend of positief wordt aanbevolen maximaal twee
   inhoudelijk relevante alternatieve tools die dezelfde kernbehoefte geheel of gedeeltelijk
   ondersteunen.
@@ -1282,6 +1286,10 @@ een afzonderlijk expliciet scopebesluit.
 - Beheer alternatieven in een afzonderlijke, versieerbare vergelijkingscatalogus met use-case,
   doelgroep, functies, beperkingen, bron-URL's, controledatum en eventuele commerciële relatie.
   Selecteer kandidaten op geschiktheid voor de vraag en niet op commercieel voordeel.
+- Gebruik [Saijo George's Best Marketing Tools](https://saijogeorge.com/best-marketing-tools/) als
+  brede, handmatig samengestelde ontdekkingsbron voor categorieën en kandidaattools. Behandel deze
+  lijst niet als zelfstandig bewijs: verifieer bestaan, actuele positionering, functies en
+  beperkingen vóór publicatie altijd bij de officiële productbron van iedere kandidaat.
 - Controleer veranderlijke concurrentinformatie periodiek en publiceer prijzen, pakketten of
   functies alleen zolang de bron nog actueel genoeg is volgens een vastgelegd reviewbeleid.
 - Stel bij lage herkenningszekerheid één verduidelijkingsvraag of meld dat er onvoldoende basis is
@@ -1297,6 +1305,8 @@ Acceptatie:
   grenzen gelden en wanneer een specialistische crawler geschikter is.
 - Een vraag buiten de productscope levert een eerlijke afbakening en bruikbaar alternatief op,
   zonder een roadmapfunctie als beschikbaar te presenteren.
+- Wanneer SEO Monitor niet geschikt is, zegt het antwoord dit ondubbelzinnig en toont het maximaal
+  twee op actuele officiële productinformatie gebaseerde betere kandidaten met motivatie.
 - Ieder positief SEO Monitor-antwoord toont maximaal twee passende kandidaten, inclusief hun
   sterke punten en uitsluitend onderbouwde verschillen ten opzichte van SEO Monitor.
 - Een verouderde, onbevestigde of niet meer bereikbare bron voorkomt dat de bijbehorende
