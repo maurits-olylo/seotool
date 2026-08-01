@@ -682,6 +682,103 @@ def test_additional_verification_rules_resolve_redirect_missing_and_indexability
         assert {rule["status"] for rule in description_rules} == {"passed"}
         assert {rule["status"] for rule in schema_rules} == {"passed"}
 
+
+def test_redirect_and_canonical_verification_validate_destination_quality() -> None:
+    with SessionLocal() as db:
+        website, source, _issue, _task = _task_fixture(db)
+        expected = Url(
+            website_id=website.id,
+            normalized_url="https://example.com/preferred",
+        )
+        db.add(expected)
+        db.flush()
+        job = CrawlJob(
+            website_id=website.id,
+            job_type="recommendation_verification",
+        )
+        db.add(job)
+        db.flush()
+        run = CrawlRun(
+            crawl_job_id=job.id,
+            website_id=website.id,
+            crawl_type="recommendation_verification",
+        )
+        db.add(run)
+        db.flush()
+        db.add_all(
+            [
+                UrlSnapshot(
+                    url_id=source.id,
+                    crawl_run_id=run.id,
+                    requested_url=source.normalized_url,
+                    final_url=expected.normalized_url,
+                    status_code=200,
+                    redirect_chain=[
+                        {
+                            "url": source.normalized_url,
+                            "status_code": 301,
+                            "target": expected.normalized_url,
+                        }
+                    ],
+                    canonical=expected.normalized_url,
+                    is_indexable=True,
+                ),
+                UrlSnapshot(
+                    url_id=expected.id,
+                    crawl_run_id=run.id,
+                    requested_url=expected.normalized_url,
+                    final_url=expected.normalized_url,
+                    status_code=200,
+                    canonical=expected.normalized_url,
+                    is_indexable=True,
+                ),
+            ]
+        )
+        db.flush()
+
+        redirect_rules = _evaluate(
+            db,
+            "fix_redirect_chain_or_loop",
+            {"source": [source], "expected_target": [expected]},
+            run.id,
+        )
+        canonical_rules = _evaluate(
+            db,
+            "correct_canonical",
+            {"source": [source], "expected_canonical": [expected]},
+            run.id,
+        )
+
+        assert {rule["status"] for rule in redirect_rules} == {"passed"}
+        assert {rule["status"] for rule in canonical_rules} == {"passed"}
+
+        destination = (
+            db.query(UrlSnapshot)
+            .filter_by(crawl_run_id=run.id, url_id=expected.id)
+            .one_or_none()
+        )
+        assert destination is not None
+        destination.is_indexable = False
+        destination.canonical = "https://example.com/other"
+        db.flush()
+
+        failed_redirect = _evaluate(
+            db,
+            "fix_redirect_chain_or_loop",
+            {"source": [source], "expected_target": [expected]},
+            run.id,
+        )
+        failed_canonical = _evaluate(
+            db,
+            "correct_canonical",
+            {"source": [source], "expected_canonical": [expected]},
+            run.id,
+        )
+
+        assert failed_redirect[-1]["status"] == "failed"
+        assert failed_canonical[-1]["status"] == "failed"
+
+
 def test_grouped_broken_link_evidence_enriches_verification_scope(client) -> None:  # type: ignore[no-untyped-def]
     customer = client.post("/api/v1/clients", json={"name": "Scope client"}).json()
     website = client.post(

@@ -523,6 +523,7 @@ def _evaluate(
     elif verification_type == "fix_redirect_chain_or_loop":
         expected_url = roles["expected_target"][0]
         expected = expected_url.normalized_url
+        expected_snapshot = snapshots.get(expected_url.id)
         rules.extend(
             [
                 {
@@ -537,14 +538,20 @@ def _evaluate(
                 _status_rule("expected_target_reached", source, expected_url=expected),
                 _status_rule(
                     "expected_target_reachable",
-                    snapshots.get(expected_url.id),
+                    expected_snapshot,
                     expected_url=None,
+                ),
+                _indexable_canonical_rule(
+                    "expected_target_indexable_canonical",
+                    expected_snapshot,
+                    expected_url=expected,
                 ),
             ]
         )
     elif verification_type == "correct_canonical":
         expected_url = roles["expected_canonical"][0]
         expected = expected_url.normalized_url
+        expected_snapshot = snapshots.get(expected_url.id)
         canonical = _normalized(source.canonical, source_urls[0]) if source else None
         rules.extend(
             [
@@ -559,8 +566,13 @@ def _evaluate(
                 },
                 _status_rule(
                     "expected_canonical_reachable",
-                    snapshots.get(expected_url.id),
+                    expected_snapshot,
                     expected_url=None,
+                ),
+                _indexable_canonical_rule(
+                    "expected_canonical_indexable",
+                    expected_snapshot,
+                    expected_url=expected,
                 ),
             ]
         )
@@ -725,6 +737,33 @@ def _status_rule(
         "evidence": {
             "status_code": snapshot.status_code if snapshot else None,
             "final_url": snapshot.final_url if snapshot else None,
+            "expected_url": expected_url,
+            "error": snapshot.error_message if snapshot else "Geen snapshot",
+        },
+    }
+
+
+def _indexable_canonical_rule(
+    name: str,
+    snapshot: UrlSnapshot | None,
+    *,
+    expected_url: str,
+) -> dict[str, object]:
+    canonical = _normalized(snapshot.canonical, None) if snapshot else None
+    canonical_matches = canonical in {None, expected_url}
+    if snapshot is None or snapshot.error_message:
+        status = "error"
+    elif snapshot.status_code == 200 and snapshot.is_indexable and canonical_matches:
+        status = "passed"
+    else:
+        status = "failed"
+    return {
+        "rule": name,
+        "status": status,
+        "evidence": {
+            "status_code": snapshot.status_code if snapshot else None,
+            "is_indexable": snapshot.is_indexable if snapshot else None,
+            "canonical": canonical,
             "expected_url": expected_url,
             "error": snapshot.error_message if snapshot else "Geen snapshot",
         },

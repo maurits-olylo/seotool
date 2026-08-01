@@ -691,14 +691,21 @@ Acceptatie:
 
 ### Gerichte verificatiecrawls na uitvoering
 
-Status: verificatiemodel en read-only scopeplan technisch geïmplementeerd; dedicated executor en
-drie eerste regels volgen. `repair_broken_internal_link`, `fix_redirect_chain_or_loop` en
-`correct_canonical` zijn als eerste scope geselecteerd. Het scopeplan blokkeert een verzoek zolang
+Status: verificatiemodel, read-only scopeplan, dedicated executor en de eerste verificatieregels
+zijn technisch geïmplementeerd. `repair_broken_internal_link`, `fix_redirect_chain_or_loop` en
+`correct_canonical` controleren gericht bron en noodzakelijke doelen. Redirect- en canonicaldoelen
+worden ook op bereikbaarheid, indexeerbaarheid en onverwachte canonicals beoordeeld. Het scopeplan
+blokkeert een verzoek zolang
 de taak niet uitgevoerd is of vereiste bron-, doel-, oude-, nieuwe- of canonicalrollen ontbreken.
 De bestaande Redis/RQ-infrastructuur, crawlbeveiliging, snapshots, hashes en lichte crawlqueue
 worden hergebruikt, maar de algemene `light_check` wordt niet direct gebruikt omdat die standaard
 alle actieve website-URL's verwerkt.
 Een gerichte controle start nooit impliciet een volledige websitecrawl.
+
+De executor ondersteunt daarnaast al interne links naar redirects, ontbrekende pagina's,
+indexatiecorrecties, titles, primaire H1-koppen, meta descriptions en structured data. Precieze
+classificatie van een link als hoofdcontent, navigatie, footer of CTA volgt pas nadat
+interne-linksemantiek die context betrouwbaar in het linkmodel bewaart.
 
 Doel en gebruikerswaarde:
 
