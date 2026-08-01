@@ -1,5 +1,6 @@
 import time
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from urllib.parse import urljoin
 
@@ -51,6 +52,15 @@ from app.services.url_scope import is_url_in_website_scope
 
 logger = structlog.get_logger()
 CRAWL_HEARTBEAT_INTERVAL_SECONDS = 15
+MAX_SITEMAP_DOCUMENTS = 1_000
+
+
+@dataclass(frozen=True)
+class SitemapImportResult:
+    documents: int
+    urls: int
+    complete: bool
+    remaining_documents: int = 0
 
 
 class CrawlPaused(RuntimeError):
@@ -93,6 +103,7 @@ def execute_crawl_job(job_id: str) -> None:
         run.heartbeat_at = utc_now()
         db.add(run)
         db.commit()
+        sitemap_import_complete = True
         try:
             website = db.get(Website, job.website_id)
             if website is None:
@@ -105,18 +116,27 @@ def execute_crawl_job(job_id: str) -> None:
             _deactivate_out_of_scope_urls(db, website)
             db.commit()
             if job.job_type == "fetch_sitemap":
-                sitemap_documents, sitemap_urls = _import_sitemaps(db, job, run)
+                sitemap_import = _import_sitemaps(db, job, run)
             elif job.job_type == "full_site_crawl" and not resumed:
-                _import_sitemaps(db, job, run)
+                sitemap_import_complete = _import_sitemaps(db, job, run).complete
             if job.job_type == "fetch_sitemap":
-                run.crawled_urls = sitemap_documents
-                if sitemap_documents == 0:
+                run.crawled_urls = sitemap_import.documents
+                if sitemap_import.documents == 0:
                     message = "Geen sitemap ingesteld of gevonden via robots.txt en /sitemap.xml"
                     run.status = "failed"
                     job.status = "failed"
                     job.error_message = message
+                elif not sitemap_import.complete:
+                    message = (
+                        f"Sitemapimport afgebroken na {sitemap_import.documents} documenten; "
+                        f"nog niet verwerkt: {sitemap_import.remaining_documents}"
+                    )
+                    run.discovered_urls = sitemap_import.urls
+                    run.status = "partially_succeeded"
+                    job.status = "partially_succeeded"
+                    job.error_message = message
                 else:
-                    run.discovered_urls = sitemap_urls
+                    run.discovered_urls = sitemap_import.urls
                     run.status = "succeeded"
                     job.status = "succeeded"
                 return
@@ -133,7 +153,7 @@ def execute_crawl_job(job_id: str) -> None:
                 _set_crawl_phase(db, run, "finalizing")
                 run.status = (
                     "succeeded"
-                    if run.failed_urls == 0 and site_crawl_complete
+                    if run.failed_urls == 0 and site_crawl_complete and sitemap_import_complete
                     else "partially_succeeded"
                 )
                 job.status = run.status
@@ -219,7 +239,7 @@ def execute_crawl_job(job_id: str) -> None:
                     )
 
 
-def _import_sitemaps(db, job: CrawlJob, run: CrawlRun) -> tuple[int, int]:  # type: ignore[no-untyped-def]
+def _import_sitemaps(db, job: CrawlJob, run: CrawlRun) -> SitemapImportResult:  # type: ignore[no-untyped-def]
     website = db.get(Website, job.website_id)
     if website is None:
         raise RuntimeError("Website does not exist")
@@ -231,10 +251,11 @@ def _import_sitemaps(db, job: CrawlJob, run: CrawlRun) -> tuple[int, int]:  # ty
     fallback_only = not pending
     if fallback_only:
         pending.append(fallback_url)
+    queued = set(pending)
     visited: set[str] = set()
     successful_roots: list[str] = []
     registered_url_ids: set[object] = set()
-    while pending and len(visited) < 100:
+    while pending and len(visited) < MAX_SITEMAP_DOCUMENTS:
         sitemap_url = pending.pop(0)
         if sitemap_url in visited:
             continue
@@ -263,15 +284,15 @@ def _import_sitemaps(db, job: CrawlJob, run: CrawlRun) -> tuple[int, int]:  # ty
             or sitemap_url == fallback_url
         ):
             successful_roots.append(sitemap_url)
-        pending.extend(
-            child
-            for child in document.child_sitemaps
-            if is_url_in_website_scope(
+        for child in document.child_sitemaps:
+            if child in queued or not is_url_in_website_scope(
                 child,
                 base_url=website.base_url,
                 allowed_subdomains=website.settings.allowed_subdomains,
-            )
-        )
+            ):
+                continue
+            pending.append(child)
+            queued.add(child)
         for item in document.urls[: website.settings.max_urls]:
             if not is_url_in_website_scope(
                 item.location,
@@ -313,7 +334,13 @@ def _import_sitemaps(db, job: CrawlJob, run: CrawlRun) -> tuple[int, int]:  # ty
         website.settings.sitemap_urls = list(dict.fromkeys(successful_roots))
     run.discovered_urls = len(registered_url_ids)
     db.commit()
-    return len(visited) if successful_roots else 0, len(registered_url_ids)
+    documents = len(visited) if successful_roots else 0
+    return SitemapImportResult(
+        documents=documents,
+        urls=len(registered_url_ids),
+        complete=not pending,
+        remaining_documents=len(pending),
+    )
 
 
 def _crawl_full_site(  # type: ignore[no-untyped-def]

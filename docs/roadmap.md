@@ -116,6 +116,10 @@ Status: technisch geïmplementeerd; deployment en productievalidatie volgen.
 - Automatisch gevonden sitemapadressen voor volgende jobs bewaren.
 - Unieke gevonden URL's en gelezen sitemapdocumenten tellen.
 - Een job zonder beschikbare sitemap niet langer leeg als geslaagd tonen.
+- Tot 1.000 unieke sitemapdocumenten verwerken, zodat grote maar geldige sitemapindexen zoals die
+  van HUMAN volledig worden ingelezen.
+- Bij overschrijding van de veiligheidslimiet nooit stil afkappen, maar de job als deels geslaagd
+  markeren met het aantal nog niet verwerkte documenten.
 
 ### Visuele vernieuwing publieke website
 

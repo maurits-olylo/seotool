@@ -62,6 +62,80 @@ def test_sitemap_job_fails_clearly_when_no_sitemap_exists(monkeypatch) -> None: 
         assert run.crawled_urls == 0
 
 
+def test_sitemap_job_processes_large_sitemap_index_completely(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    child_urls = [f"https://example.com/sitemap-{number}.xml" for number in range(192)]
+    sitemap_index = _sitemap_index(child_urls)
+
+    def fetch(url: str, **kwargs):  # type: ignore[no-untyped-def]
+        if url.endswith("robots.txt"):
+            return SimpleNamespace(status_code=200, content=b"User-agent: *")
+        if url == "https://example.com/sitemap.xml":
+            return SimpleNamespace(status_code=200, content=sitemap_index)
+        number = int(url.removesuffix(".xml").rsplit("-", 1)[1])
+        return SimpleNamespace(
+            status_code=200,
+            content=_urlset([f"https://example.com/page-{number}"]),
+        )
+
+    monkeypatch.setattr("app.jobs.fetch_url", fetch)
+    job_id, _ = _website_and_job("https://example.com/")
+
+    execute_crawl_job(str(job_id))
+
+    with SessionLocal() as db:
+        job = db.get(CrawlJob, job_id)
+        run = db.query(CrawlRun).filter(CrawlRun.crawl_job_id == job_id).one()
+        assert job is not None and job.status == "succeeded"
+        assert job.error_message is None
+        assert run.status == "succeeded"
+        assert run.crawled_urls == 193
+        assert run.discovered_urls == 192
+
+
+def test_sitemap_job_reports_document_limit_without_silent_truncation(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setattr("app.jobs.MAX_SITEMAP_DOCUMENTS", 2)
+    sitemap_index = _sitemap_index(
+        ["https://example.com/sitemap-1.xml", "https://example.com/sitemap-2.xml"]
+    )
+
+    def fetch(url: str, **kwargs):  # type: ignore[no-untyped-def]
+        if url.endswith("robots.txt"):
+            return SimpleNamespace(status_code=200, content=b"User-agent: *")
+        if url == "https://example.com/sitemap.xml":
+            return SimpleNamespace(status_code=200, content=sitemap_index)
+        return SimpleNamespace(
+            status_code=200,
+            content=_urlset(["https://example.com/page-1"]),
+        )
+
+    monkeypatch.setattr("app.jobs.fetch_url", fetch)
+    job_id, _ = _website_and_job("https://example.com/")
+
+    execute_crawl_job(str(job_id))
+
+    with SessionLocal() as db:
+        job = db.get(CrawlJob, job_id)
+        run = db.query(CrawlRun).filter(CrawlRun.crawl_job_id == job_id).one()
+        assert job is not None and job.status == "partially_succeeded"
+        assert job.error_message == (
+            "Sitemapimport afgebroken na 2 documenten; nog niet verwerkt: 1"
+        )
+        assert run.status == "partially_succeeded"
+        assert run.crawled_urls == 2
+
+
+def _sitemap_index(urls: list[str]) -> bytes:
+    entries = "".join(f"<sitemap><loc>{url}</loc></sitemap>" for url in urls)
+    return f'<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{entries}</sitemapindex>'.encode()
+
+
+def _urlset(urls: list[str]) -> bytes:
+    entries = "".join(f"<url><loc>{url}</loc></url>" for url in urls)
+    return (
+        f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{entries}</urlset>'.encode()
+    )
+
+
 def _website_and_job(base_url: str):  # type: ignore[no-untyped-def]
     with SessionLocal() as db:
         client = Client(name=f"Sitemap {base_url}")
