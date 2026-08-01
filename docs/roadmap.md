@@ -1306,6 +1306,11 @@ gebruiker ze expliciet onderdeel maakt van dezelfde friends-and-family-scope.
   risico's, test- en productie-evidence en een duidelijke eigen aanbeveling.
 - De gebruiker neemt het definitieve go/no-go-besluit. Zonder expliciet `ja` blijft de release
   geblokkeerd.
+- Na een positief algemeen go/no-go vraagt Codex afzonderlijk en letterlijk of de homepage
+  definitief klaar is. Een eerder `ja` of algemene releasegoedkeuring telt niet als antwoord op
+  deze homepagevraag.
+- Start geen friends-and-family-deployment totdat de gebruiker ook de homepagevraag expliciet met
+  `ja` heeft beantwoord. Nieuwe homepagewensen zetten deze goedkeuring terug naar onbevestigd.
 
 Redenen vóór release omvatten minimaal: alle afgesproken roadmapitems aantoonbaar afgerond,
 geslaagde volledige tests, gezonde staging en productie, geslaagde onboardingproeven, bewezen
@@ -1353,6 +1358,8 @@ Doel:
 
 ### Productgates
 
+- Alle geplande homepagewijzigingen zijn verwerkt, responsive en functioneel gecontroleerd en de
+  gebruiker heeft vlak vóór deployment afzonderlijk bevestigd dat de homepage definitief klaar is.
 - Multi-clientisolatie is met minimaal twee afzonderlijke klanten en rollen opnieuw gecontroleerd.
 - De invitation-only onboarding volgt de vastgelegde flow en acceptatiematrix in
   `docs/onboarding-friends-family.md`; publieke zelfregistratie is nog geen releasevoorwaarde.

@@ -38,6 +38,11 @@ COMMUNICATIESTIJL
   tenzij de gebruiker een foutmelding of afwijkende uitvoer deelt.
 - Bundel samenhangende correcties in één logisch releasepakket. Maak niet voor iedere kleine
   wijziging een aparte release, behalve wanneer een directe productiestoring een losse hotfix vereist.
+- Voer nooit een friends-and-family-deployment uit zonder twee afzonderlijke expliciete
+  bevestigingen van de gebruiker: eerst het algemene go/no-go-besluit en daarna de bevestiging dat
+  de homepage definitief klaar is. Vraag vóór de deployment letterlijk of de homepage klaar is.
+  Een eerder algemeen `ja` geldt niet als homepagegoedkeuring. Zonder beide bevestigingen blijft de
+  friends-and-family-deployment geblokkeerd.
 - Gebruik voor iedere deployment naar de Synology uitsluitend deze route:
   1. Maak lokaal een `git archive`.
   2. Upload vanaf de lokale Mac uitsluitend via
