@@ -229,6 +229,11 @@ retentieoperatie. De scheduler zet deze op de queue `maintenance`; `integration-
 per uitvoering maximaal 50.000 rijen en hervat resterend werk automatisch. Een actieve crawl voor
 dezelfde website stelt cleanup uit. GSC- en interne-linkretentie blijven uitgesloten.
 
+De eerste productievalidatie op 1 augustus 2026 maakte vijf operaties aan. Vier eindigden direct
+zonder kandidaten. De vijfde bereikte de uitvoeringslimiet, werd door de scheduler automatisch
+hervat en eindigde na 19 batches als `succeeded`; daarbij zijn 185.741 oude, onbeschermde locaties
+verwijderd. Dit bevestigde de persistente voortgang, begrenzing en automatische hervatting.
+
 Maak of hervat alle operaties terminal-first met:
 
 ```bash

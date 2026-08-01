@@ -6,10 +6,13 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 
 ## Huidige status
 
-- Actieve ontwikkellijn: automatische retentie en databasegroeibewaking, gevolgd door publieke
-  website-inschatting en pakketadvies.
-- Productie en de geïsoleerde NAS-stagingomgeving zijn gezond en staan op migratie `0034`.
+- Actieve ontwikkellijn: publieke website-inschatting en pakketadvies, gevolgd door voorbereiding
+  van een besloten friends-and-family-release.
+- Productie en de geïsoleerde NAS-stagingomgeving zijn gezond en staan op migratie `0035`.
 - De elementlocatie-cleanup is op 1 augustus 2026 afgerond en operationeel gecontroleerd.
+- Automatische elementlocatieretentie is op 1 augustus 2026 in productie gevalideerd: vijf
+  persistente operaties zijn geslaagd en één operatie hervatte zichzelf begrensd via scheduler en
+  maintenancequeue.
 - Laatste volledige lokale kwaliteitscontrole vóór de autovacuumrelease: 318 tests geslaagd;
   gerichte crawl-deployment- en retentiontests zijn na de statuscorrectie opnieuw geslaagd.
 - Multi-client domeinisolatie is op 2026-07-19 in productie bevestigd: `jobsatpearle.be` komt niet
@@ -1183,7 +1186,7 @@ Acceptatie:
 
 ## Automatische retentie en databasegroeibewaking
 
-Status: lokaal geïmplementeerd met migratie `0035`; 322 tests geslaagd, stagingvalidatie volgt.
+Status: afgerond, gedeployed en op 1 augustus 2026 in productie gevalideerd; 322 tests geslaagd.
 
 - Start begrensde elementlocatie-retentie per website na een geslaagde volledige crawl.
 - Selecteer websites automatisch; gebruik geen handmatig gekopieerde website-ID's.
@@ -1197,11 +1200,15 @@ Status: lokaal geïmplementeerd met migratie `0035`; 322 tests geslaagd, staging
 
 Acceptatie:
 
-- Een onderbroken operatie kan zonder dubbele verwijdering worden hervat.
-- Gelijktijdige crawl- en cleanupmutaties voor dezelfde website zijn uitgesloten.
-- Na iedere uitvoering zijn aantallen, duur, vrijgemaakte logische ruimte en resterende kandidaten
-  controleerbaar.
-- De database groeit niet opnieuw onbeperkt door historische elementlocaties.
+- Migratie `0035`, API en alle geraakte workers zijn gezond op staging en productie: behaald.
+- Vijf persistente productieoperaties zijn zonder fout afgerond: behaald.
+- Eén operatie bereikte eerst de limiet van 50.000 rijen en hervatte daarna automatisch via de
+  scheduler tot `succeeded`: behaald.
+- In totaal zijn tijdens deze productievalidatie 185.741 oude, onbeschermde elementlocaties in 19
+  batches verwijderd; vier andere websites hadden nul kandidaten.
+- Gelijktijdige crawl- en cleanupmutaties voor dezelfde website zijn via een persistente
+  `waiting_for_crawl`-toestand uitgesloten en door regressietests afgedekt.
+- Nieuwe volledige crawls maken voortaan automatisch een eigen idempotente retentieoperatie.
 
 ## Publieke website-inschatting en pakketadvies
 
@@ -1224,6 +1231,64 @@ Voorlopige pakketten:
 - Groot: tot 10.000 pagina's, volledige crawl wekelijks, indicatief vanaf EUR 149 per maand.
 - Maatwerk: meer dan 10.000 pagina's of afwijkende frequentie, opslag en verwerking.
 - Frequentere monitoring blijft een add-on en dwingt geen groter paginapakket af.
+
+## Friends-and-family-release
+
+Status: gepland als besloten mijlpaal; voorlopig doelvenster november 2026, zonder harde
+releasedatum. Neem in oktober 2026 een expliciet go/no-go-besluit op basis van onderstaande
+acceptatiecriteria. Kwaliteit en herstelbaarheid gaan voor de kalenderdatum.
+
+Doel:
+
+- Nodig aanvankelijk drie tot vijf bekende gebruikers of organisaties uit.
+- Gebruik echte websites en normale gebruikersflows, maar nog zonder brede publieke verkoop.
+- Verzamel gericht feedback over onboarding, begrijpelijkheid, taken, rapportage en betrouwbaarheid.
+- Houd de proef vier tot acht weken besloten voordat een bredere release wordt overwogen.
+
+### Beoogde development- en productieopstelling
+
+- **MacBook:** primaire werkplek voor Codex, broncode, Git, reviews, SSH en releasegoedkeuring;
+  geen zware builds, crawls of lokale productiedatabase.
+- **Linux-worker-pc:** afzonderlijk infrastructuurproject voor builds, volledige tests, linting,
+  migratie- en herstelproeven en begrensde crawlexperimenten; nooit een noodzakelijke schakel voor
+  publieke productie.
+- **Synology NAS:** geïsoleerde staging, centrale opslag, snapshots, versleutelde back-ups en
+  hersteltests; na migratie geen langdurige publieke productie of zware crawling.
+- **VPS:** volledige zelfstandige publieke productiestack met API, PostgreSQL, Redis, scheduler en
+  workers; productie blijft functioneren wanneer MacBook, thuis-pc, NAS of thuisinternet uitvalt.
+- **Releaseflow:** MacBook naar Git, zware kwaliteitscontrole op de Linux-worker, gecontroleerde
+  release naar de VPS en afzonderlijke back-up en herstelcontrole op de NAS.
+
+### Infrastructuurgates
+
+- Richt de pc eerst als afzonderlijk headless Ubuntu Server-project in en meet builds, tests,
+  crawls, geheugen, schijf en netwerk voordat de SEO-tool hem gebruikt.
+- Migreer productie pas nadat de VPS minimaal een aantoonbaar passend opslag-, geheugen- en
+  retentiebudget heeft. De huidige 80 GB SSD is onvoldoende als veilige groeicapaciteit voor de
+  volledige productiestack; richtwaarde is minimaal 160 GB en bij voorkeur circa 250 GB NVMe.
+- Houd de volledige productiestack op de VPS; plaats geen productieworkers of live database op de
+  thuis-pc of NAS.
+- Maak dagelijkse versleutelde databaseback-ups naar de NAS en behoud daarnaast minimaal één
+  onafhankelijke offsite kopie.
+- Valideer restore, rollback, monitoring, certificaatvernieuwing, schijfruimtewaarschuwingen en
+  herstel na service- of VPS-herstart vóór uitnodigingen worden verstuurd.
+
+### Productgates
+
+- Multi-clientisolatie is met minimaal twee afzonderlijke klanten en rollen opnieuw gecontroleerd.
+- De volledige onboardingworkflow is vóór de release functioneel afgerond: uitnodiging of
+  registratie, persoonlijk account, organisatie en website aanmaken, website-eigendom verifiëren,
+  crawlvoorkeuren bevestigen, eerste crawl starten en voortgang en eerste resultaten tonen.
+- Onboarding kan zonder handmatige databasewijziging, terminalhandeling of beheerdercorrectie
+  worden voltooid en biedt herstelbare foutmeldingen, opnieuw proberen en hervatten na uitloggen.
+- Onboarding, crawlstatus, issues, taakafhandeling en exports zijn begrijpelijk zonder directe
+  technische begeleiding en zijn met minimaal twee niet-technische proefgebruikers doorlopen.
+- Scheduler, retries, retentie, deployment-drain en workerherstel functioneren aantoonbaar.
+- Iedere deelnemer weet dat dit een besloten test is en waar feedback en incidenten worden gemeld.
+- Er is een eenvoudige procedure voor toegang intrekken, data exporteren en testdata verwijderen.
+
+De Linux-worker verhoogt ontwikkelsnelheid en betrouwbaarheid, maar is geen releaseafhankelijkheid:
+een storing thuis mag de friends-and-family-productie niet onderbreken.
 
 ## Gerichte verificatiecrawls
 
