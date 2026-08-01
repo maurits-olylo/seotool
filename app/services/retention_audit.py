@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import case, delete, func, select, true
+from sqlalchemy import case, delete, func, select, text, true
 from sqlalchemy.orm import Session
 
 from app.models.crawl import CrawlRun, ElementLocation, UrlLink, UrlSnapshot
@@ -77,6 +77,7 @@ class ElementLocationCleanup:
 
 def build_retention_audit(db: Session, *, as_of: date | None = None) -> dict[str, Any]:
     """Report retention candidates without changing database state."""
+    configure_retention_session(db)
     audit_date = as_of or date.today()
     protected_runs = _protected_crawl_runs(db)
     websites = db.scalars(select(Website).order_by(Website.name, Website.id)).all()
@@ -195,6 +196,7 @@ def cleanup_element_locations(
     on_batch: Callable[[str, int, int], None] | None = None,
 ) -> ElementLocationCleanup:
     """Delete audited element-location candidates in bounded transactions."""
+    configure_retention_session(db)
     if batch_size < 1 or batch_size > 50_000:
         raise ValueError("batch_size moet tussen 1 en 50000 liggen")
     if max_rows < 1 or max_rows > 1_000_000:
@@ -379,6 +381,7 @@ def _latest_location_snapshot_ids(website_id: UUID):  # type: ignore[no-untyped-
 
 def element_location_candidate_ids(db: Session, website_id: UUID, *, limit: int):
     """Return the current safe deletion candidates for one website."""  # type: ignore[no-untyped-def]
+    configure_retention_session(db)
     protected_run_ids = set(_protected_crawl_runs(db).get(website_id, {}))
     latest_snapshot_ids = _latest_location_snapshot_ids(website_id)
     conditions = [
@@ -393,6 +396,12 @@ def element_location_candidate_ids(db: Session, website_id: UUID, *, limit: int)
             select(ElementLocation.id).where(*conditions).order_by(ElementLocation.id).limit(limit)
         ).all()
     )
+
+
+def configure_retention_session(db: Session) -> None:
+    """Avoid PostgreSQL parallel-query shared-memory exhaustion during maintenance."""
+    if db.get_bind().dialect.name == "postgresql":
+        db.execute(text("SET max_parallel_workers_per_gather = 0"))
 
 
 def _metric_age_audit(
