@@ -1341,6 +1341,25 @@ gescheiden houden van de publieke homepagevraagassistent.
   een afzonderlijke expliciete gebruikershandeling en de bestaande autorisatiecontroles.
 - Antwoord bij onvoldoende of niet-zichtbaar bewijs dat de conclusie niet uit de beschikbare data
   kan worden afgeleid. Vul geen ontbrekende klantdata aan met algemene aannames.
+- Vergelijk ontwikkelingen standaard met de direct voorafgaande gelijkwaardige periode, dezelfde
+  kalenderperiode één jaar eerder en, wanneer de dekking en definities vergelijkbaar zijn, dezelfde
+  periode twee jaar eerder. Toon ontbrekende historie als onbekend en niet als nul.
+- Gebruik gelijke aantallen kalenderdagen en benoem afwijkingen door seizoen, weekdagen, campagnes,
+  consent, attributie, gewijzigde doelen of meetimplementaties. Vergelijk onverenigbare
+  metricdefinities niet stilzwijgend.
+- Ontleed leads minimaal naar kanaal, organische landingspagina, paginatype en conversieratio.
+  Benoem welke pagina's de absolute stijging of daling het meest dreven en onderscheid extra
+  verkeer van een gewijzigde conversieratio.
+- Koppel GSC-klikken en vertoningen, analytics-landingssessies en conversies, crawlwijzigingen,
+  issues en uitgevoerde taken via genormaliseerde URL en periode. Houd brondefinities en
+  niet-gekoppelde data zichtbaar en tel GSC-klikken nooit op bij analytics-sessies.
+- Genereer bij groei behoud- en uitbreidingsadviezen voor aantoonbare positieve drijvers. Genereer
+  bij daling gerichte herstel- of onderzoekstappen voor de grootste negatieve paginabijdragen,
+  verlies van relevante zichtbaarheid, lagere conversieratio, technische regressies of
+  meetproblemen. Iedere aanbeveling noemt bewijs, onzekerheid, eigenaar en controle na uitvoering.
+- Presenteer samenhang en waarschijnlijke verklaringen met confidence, maar claim geen causaliteit
+  zonder passend experimenteel of ander sterk bewijs. Hergebruik hiervoor de geplande
+  opportunity-engine en effectmeting in plaats van een tweede score- of conclusiemodel te bouwen.
 
 Acceptatie:
 
@@ -1348,6 +1367,15 @@ Acceptatie:
   en verificatie uit zonder gegevens van andere klanten of schermcontexten te gebruiken.
 - Een vraag over een waarde, status of verandering noemt het gebruikte meetmoment en kan naar de
   betrokken zichtbare bronrecords verwijzen.
+- Een vraag over stijgende of dalende leads vergelijkt minimaal de vorige gelijkwaardige periode
+  en, bij voldoende dekking, dezelfde periode één en twee jaar eerder.
+- Het antwoord rangschikt de pagina's die de leadverandering het sterkst dreven en laat per pagina
+  zien of verkeer, conversieratio of beide veranderden.
+- Bij minder leads bevat het antwoord uitsluitend bewijsgebonden acties voor de belangrijkste
+  negatieve drijvers en benoemt het expliciet wanneer eerst tracking of datadekking moet worden
+  hersteld.
+- Bij meer leads benoemt het antwoord welke positieve patronen behouden of verantwoord uitgebreid
+  kunnen worden zonder de stijging automatisch aan één wijziging toe te schrijven.
 - De in-product assistent noemt of adviseert geen externe tools, ook niet wanneer SEO Monitor een
   gevraagde functie niet ondersteunt.
 - Een algemene SEO- of toolvergelijkingsvraag binnen het product wordt niet via de publieke
