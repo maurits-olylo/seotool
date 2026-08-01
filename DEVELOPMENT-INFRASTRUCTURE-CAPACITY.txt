@@ -31,19 +31,29 @@ Status: actief en lokaal gecontroleerd op 1 augustus 2026.
 
 SYNOLOGY NAS — HUIDIGE PRODUCTIE EN STAGING
 
-Status: actief voor de SEO-tool.
+Status: actief voor de SEO-tool; specificaties aangeleverd op 1 augustus 2026.
 
-- Fabrikant/platform: Synology NAS; exact model en CPU nog niet vastgelegd in deze inventaris.
-- Werkgeheugen: nog te inventariseren.
-- HDD's: aantal, merk, model, nominale capaciteit, RAID/SHR-indeling en vrije ruimte nog te
-  inventariseren.
-- SSD's/cache: aanwezigheid, merk, model, nominale capaciteit en vrije ruimte nog te inventariseren.
+- Model: Synology DS923+.
+- Architectuur: x86_64.
+- Besturingssysteem: DSM 7.3.2, build 86009 update 4.
+- Kernel: 4.4.302+.
+- CPU: AMD Ryzen Embedded R1600, 2 fysieke cores en 4 threads.
+- Werkgeheugen: 16 GiB RAM; tijdens de meting circa 4 GiB actief gebruikt en circa 8 GiB
+  beschikbaar.
+- Swap: circa 11 GiB totaal en circa 1,9 GiB gebruikt tijdens de meting.
+- HDD-opslag: 2 × 20 TB SATA-HDD in RAID 1; merk en exact model nog niet vastgelegd.
+- HDD-volumes: circa 18,18 TiB bruto LVM en circa 17 TiB Btrfs.
+- HDD-gebruik tijdens de meting: circa 4,4 TiB gebruikt en 13 TiB beschikbaar.
+- NVMe-opslag: 2 × 4 TB NVMe-SSD in RAID 1, circa 3,64 TiB bruikbaar; merk, model, actuele vrije
+  ruimte en precieze toepassing als volume of cache nog niet vastgelegd.
+- Netwerkhardware: Synology E10G22-T1-Mini 10GbE-kaart; werkelijke verbindingssnelheid en
+  doorvoer moeten per inzet worden gecontroleerd.
 - Applicatiecapaciteit: draait momenteel productie en geïsoleerde staging via Docker Compose.
-- Bekende operationele grens: NAS-CPU is de huidige begrenzende factor; staging heeft lagere
-  relatieve CPU-prioriteit en harde geheugenlimieten.
+- Bekende operationele grens: de CPU met 2 cores en 4 threads is de primaire beperking voor zware
+  crawling; staging heeft daarom lagere relatieve CPU-prioriteit en harde geheugenlimieten.
 - Rol: huidige productie, staging, persistente opslag, back-ups en herstelproeven.
 - Toekomstige rol: staging-, back-up- en herstelplatform nadat publieke productie naar een VPS is
-  verhuisd.
+  verhuisd; niet bedoeld als langdurige publieke productieomgeving.
 
 PC — GEPLANDE HEADLESS LINUX-WORKER
 
@@ -67,17 +77,22 @@ afzonderlijk, nog niet uitgevoerd project.
 
 VPS — TOEKOMSTIGE PUBLIEKE PRODUCTIE
 
-Status: toekomstige omgeving; concrete provider en capaciteit zijn nog niet vastgelegd.
+Status: bestaande externe server; laatst bekende specificaties aangeleverd op 1 augustus 2026.
 
-- Besturingssysteem/bediening: Ubuntu met Plesk is voorzien.
-- CPU/vCPU: nog te inventariseren.
-- Werkgeheugen: nog te inventariseren.
-- Opslagtype, nominale capaciteit en vrije ruimte: nog te inventariseren.
+- CPU: 4 CPU-cores; exact processormodel en type fysieke of virtuele cores nog niet vastgelegd.
+- Werkgeheugen: 8 GB RAM; actuele vrije ruimte nog te meten.
+- Opslag: 80 GB SSD; indeling en actuele vrije ruimte nog te meten.
+- Besturingssysteem: Ubuntu 24.04.4 LTS. Eerdere CentOS 7-informatie geldt als achterhaald.
+- Hostingbeheer: Plesk Web Admin, licentie voor maximaal 10 domeinen.
+- Webstack: nginx 1.28.3, MariaDB 10.11.14 en PHP 8.3 en 8.4.
+- Bekende PHP 8.4-capaciteiten: curl, gd, intl, mbstring, mysqli, PDO MySQL, SimpleXML, XML en zip.
 - Netwerkcapaciteit, datalimiet en back-upvoorziening: nog te inventariseren.
 - Rol: later de volledige publieke productiestack; geen verdeling van één productiestack over VPS
   en NAS.
 - NAS-afhankelijkheid: publieke productie moet na migratie blijven functioneren bij uitval van NAS
   of thuisverbinding.
+- Belangrijkste grenzen: 8 GB RAM en 80 GB SSD vragen vóór migratie een concreet geheugen-, opslag-
+  en retentiebudget; de externe beschikbaarheid is het belangrijkste voordeel boven NAS-productie.
 
 LATERE CAPACITEITSPLANNING
 
