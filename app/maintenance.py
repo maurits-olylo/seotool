@@ -20,7 +20,7 @@ from app.services.crawl_deployment import (
 )
 from app.services.retention_audit import build_retention_audit, cleanup_element_locations
 from app.services.retention_operations import (
-    create_retention_operation,
+    create_retention_operations,
     execute_retention_operation,
 )
 
@@ -136,9 +136,9 @@ def main() -> int:
                 if run.website_id in seen:
                     continue
                 seen.add(run.website_id)
-                operation = create_retention_operation(db, run.id)
-                if operation is not None:
-                    operations.append(str(operation.id))
+                operations.extend(
+                    str(operation.id) for operation in create_retention_operations(db, run.id)
+                )
         results = [
             asdict(
                 execute_retention_operation(

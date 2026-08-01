@@ -6,7 +6,11 @@ from app.db.session import engine
 from app.models.client import Client
 from app.models.crawl import CrawlRun, ElementLocation, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url
-from app.models.integrations import SearchConsoleMetric, SearchConsoleQueryMetric
+from app.models.integrations import (
+    GoogleAnalyticsMetric,
+    SearchConsoleMetric,
+    SearchConsoleQueryMetric,
+)
 from app.models.website import Website
 from app.services.crawl_deployment import start_deployment_drain
 from app.services.retention_audit import build_retention_audit, cleanup_element_locations
@@ -89,8 +93,31 @@ def test_retention_audit_reports_gsc_age_buckets_without_mutation() -> None:
         "last_90_days": 1,
         "days_91_to_180": 1,
         "older_than_180_days": 1,
+        "within_1098_days": 3,
+        "cleanup_candidates": 0,
     }
     assert remaining == 3
+
+
+def test_retention_audit_exposes_versioned_policy_and_all_analytics_sources() -> None:
+    with SessionLocal() as db:
+        website, _ = _website_and_url(db)
+        db.add(
+            GoogleAnalyticsMetric(
+                website_id=website.id,
+                date=date(2025, 1, 1),
+                landing_page="/organic",
+            )
+        )
+        db.commit()
+
+        result = build_retention_audit(db, as_of=date(2026, 8, 2))
+
+    assert result["policy_version"] == "2026-08-02-v1"
+    assert result["policies"]["google_analytics_metrics"]["retain_days"] == 1098
+    assert result["policies"]["url_snapshots"]["automatic_cleanup"] is False
+    assert result["websites"][0]["google_analytics_metrics"]["total"] == 1
+    assert "permanent_history" in result["websites"][0]
 
 
 def test_retention_audit_reports_url_link_age_without_mutation() -> None:

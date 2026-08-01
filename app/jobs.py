@@ -26,7 +26,7 @@ from app.services.internal_redirect_analysis import analyze_internal_redirect_pa
 from app.services.issue_engine import reconcile_issues
 from app.services.job_identifier_analysis import analyze_job_identifier_risk
 from app.services.pagination_analysis import analyze_pagination_series
-from app.services.retention_operations import create_retention_operation
+from app.services.retention_operations import create_retention_operations
 from app.services.robots import RobotsRules
 from app.services.server_error_analysis import analyze_server_error_incident
 from app.services.sitemap import InvalidSitemapError, parse_sitemap
@@ -229,7 +229,7 @@ def execute_crawl_job(job_id: str) -> None:
                 and run.status in {"succeeded", "partially_succeeded"}
             ):
                 try:
-                    create_retention_operation(db, run.id)
+                    create_retention_operations(db, run.id)
                 except Exception:
                     logger.exception(
                         "retention_operation_creation_failed",

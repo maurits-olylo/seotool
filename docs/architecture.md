@@ -130,20 +130,23 @@ niet impliciet gestart door alleen de configuratie te deployen.
 ## Automatische retentie
 
 Iedere geslaagde of gedeeltelijk geslaagde volledige crawl maakt idempotent één
-`retention_operation` aan. De scheduler zet verschuldigde, wachtende, mislukte of onderbroken
-operaties op de afzonderlijke RQ-queue `maintenance`; de integration-worker verwerkt die queue
-naast integraties.
+`retention_operation` per automatisch datatype aan. De scheduler zet verschuldigde, wachtende,
+mislukte of onderbroken operaties op de afzonderlijke RQ-queue `maintenance`; de
+integration-worker verwerkt die queue naast integraties.
 
 Een operatie vergrendelt de websiterij per batch. De scheduler gebruikt dezelfde rijlock voor
 nieuwe crawls. Voor iedere verwijdering wordt bovendien gecontroleerd dat voor de website geen
 pending, actieve of gepauzeerde crawl bestaat. Daardoor kunnen crawl en retentie voor dezelfde
 website niet gelijktijdig muteren, terwijl andere websites beschikbaar blijven.
 
-Elke commit bewaart verwijderd aantal, batchaantal, status, attempts en eerstvolgende poging in
-PostgreSQL. De selectie wordt na een herstart opnieuw berekend; al verwijderde records kunnen
-daardoor niet nogmaals worden verwijderd. De nieuwste volledige crawl, nieuwste locatiehoudende
-snapshot per URL, actieve crawls en issuebewijs blijven beschermd. Per queue-uitvoering geldt een
-harde limiet van 50.000 rijen. Resterend werk wordt later automatisch hervat.
+Elke commit bewaart datatype, beleidsversie, voor-/narapport, verwijderd aantal, batchaantal,
+status, attempts en eerstvolgende poging in PostgreSQL. De selectie wordt na een herstart opnieuw
+berekend; al verwijderde records kunnen daardoor niet nogmaals worden verwijderd. De nieuwste
+volledige crawl, nieuwste locatiehoudende snapshot per URL, actieve crawls, issuebewijs en
+verificatiebewijs blijven beschermd. Dagelijkse GSC-, GA4- en Bing-data blijft minimaal 1.098
+dagen beschikbaar; interne linkdetails 180 dagen plus beschermd bewijs. Snapshots en wijzigingen
+worden alleen geaudit. Per queue-uitvoering geldt een harde limiet van 50.000 rijen. Resterend werk
+wordt later automatisch hervat. Het volledige beleid staat in `docs/retention-policy.md`.
 
 Google-imports halen onafhankelijke rapporten gelijktijdig op. GSC vervangt pagina- en
 zoektermmetrics voor het geïmporteerde datumbereik transactioneel; GA4 doet hetzelfde voor

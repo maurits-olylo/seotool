@@ -6,8 +6,8 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 
 ## Huidige status
 
-- Actieve ontwikkellijn: gebundelde Release A voor productieafronding en operationele
-  betrouwbaarheid. Publieke website-inschatting en friends-and-family volgen in Release F.
+- Actieve ontwikkellijn: Release 1 voor retentie en productie-integriteit. Publieke
+  website-inschatting en friends-and-family volgen in Release 13.
 - Productie en de geïsoleerde NAS-stagingomgeving zijn gezond en staan op migratie `0035`.
 - De elementlocatie-cleanup is op 1 augustus 2026 afgerond en operationeel gecontroleerd.
 - Automatische elementlocatieretentie is op 1 augustus 2026 in productie gevalideerd: vijf
@@ -25,32 +25,26 @@ secties hieronder blijven de inhoudelijke specificatie en behouden hun gerealise
 releasevolgorde is leidend voor planning en deployment. Interne mijlpalen worden niet afzonderlijk
 gedeployed; per release volgt één integrale kwaliteitscontrole, stagingproef en productiedeployment.
 
-1. **Release A — Productieafronding en operationele betrouwbaarheid**
-   - Rond retentie per datatype, multi-clientvalidatie, crawl-admission, queuebeleid,
-     sitemapregressies en het operationele runbook af.
-   - Valideer tevens exports, URL-overzicht, live elementlocaties, periodieke volledige crawls en
-     resterende taak- en verificatieworkflows die technisch al bestaan.
-2. **Release B — Technische SEO-dekking**
-   - Lever URL Inspection, hreflang, soft 404, canonical-integriteit, begrensde
-     JavaScript-rendering, sitemap-/robotskwaliteit en het asset- en mediaregister als één pakket.
-   - Voeg Lighthouse/CrUX en contextuele structured data toe waar de databronnen en quotas dit
-     betrouwbaar toelaten.
-3. **Release C — Begrijpelijk actieplatform**
-   - Rond diagnoses, aanbevelingen, uitvoeringstaken, centrale URL-weergave, crawldiepte,
-     gerichte exports, notificaties en UX/UI-polish gezamenlijk af.
-4. **Release D — Analytics, content en opportunities**
-   - Voeg Matomo, analytics-meetkwaliteit, zoekintentie, contentkwaliteit en -veroudering,
-     kannibalisatie, interne-linkkansen, opportunity-engine en contextuele data-assistent samen.
-5. **Release E — Externe marktdata en resultaatmeting**
-   - Introduceer het genormaliseerde externe-linkmodel, één eerste betaalde dataprovider,
-     SERP-/concurrentiedata, verklaarbare prioritering, effectmeting en klant-/managementrapportage.
-6. **Release F — Publieke ervaring en onboarding**
-   - Rond website-inschatting, publieke vraagassistent, eerlijke toolvergelijkingen,
-     invitation-only onboarding, websiteverificatie en meetvalidatie af.
-   - Pakketdefinitie en commerciële teksten volgen pas na de bestaande readinessgates.
-7. **Release G — Begrensde generatieve AI**
-   - Bouw eerst providerabstractie, gebruiksregistratie, budgetten, prijsbevestiging, audit en
-     veiligheidsregels; activeer daarna alleen de goedgekeurde kleine generatieve functies.
+1. **Retentie en productie-integriteit** — versieerbaar beleid, volledige audit, veilige
+   multi-datasetretentie en bewijsbehoud. Status: lokaal geïmplementeerd en getest; staging- en
+   productievalidatie volgen.
+2. **Queuecapaciteit en operationele stabiliteit** — admission, prioriteiten, backpressure,
+   dead-letter-afhandeling, sitemapregressies en resterend runbook.
+3. **URL Inspection, hreflang en canonical-integriteit.**
+4. **Soft 404, begrensde JavaScript-rendering en asset-/mediaregister.**
+5. **Lighthouse/CrUX, contextuele structured data en sitemap-/robotskwaliteit.**
+6. **Begrijpelijk actieplatform** — diagnoses, taken, URL-overzicht, crawldiepte, exports,
+   notificaties en UX/UI-polish.
+7. **Matomo en analytics-meetkwaliteit.**
+8. **Zoekintentie en contentanalyse** — kwaliteit, veroudering, overlap en interne-linkkansen.
+9. **Opportunity-engine en contextuele data-assistent.**
+10. **Genormaliseerde externe links en eerste betaalde dataprovider.**
+11. **SERP-, zichtbaarheid- en concurrentieanalyse.**
+12. **Effectmeting en klant-/managementrapportage.**
+13. **Publieke ervaring en onboarding** — website-inschatting, publieke vraagassistent,
+    vergelijkingen, invitation-only onboarding, websiteverificatie en meetvalidatie.
+14. **Begrensde generatieve AI** — providerabstractie, gebruiksregistratie, budgetten,
+    prijsbevestiging, audit, veiligheidsregels en alleen goedgekeurde kleine functies.
 
 Grote releases betekenen niet dat onverenigbare risico's ongescheiden worden uitgevoerd. Iedere
 migratie blijft herhaalbaar en controleerbaar. Destructieve dataverwerking, providerkosten en

@@ -9,9 +9,24 @@ from uuid import UUID
 from sqlalchemy import case, delete, func, select, true
 from sqlalchemy.orm import Session
 
-from app.models.crawl import CrawlRun, ElementLocation, UrlLink
-from app.models.integrations import SearchConsoleMetric, SearchConsoleQueryMetric
+from app.models.crawl import CrawlRun, ElementLocation, UrlLink, UrlSnapshot
+from app.models.integrations import (
+    BingPageMetric,
+    BingQueryMetric,
+    GoogleAnalyticsEventMetric,
+    GoogleAnalyticsLandingPageEventMetric,
+    GoogleAnalyticsMetric,
+    SearchConsoleMetric,
+    SearchConsoleQueryMetric,
+)
+from app.models.issues import ActivityLog, Change, Issue, IssueOccurrence
+from app.models.recommendations import (
+    RecommendationTask,
+    RecommendationTaskEvent,
+    RecommendationVerification,
+)
 from app.models.website import Website
+from app.services.retention_policy import POLICY_VERSION, serialized_policies
 
 COMPLETED_FULL_CRAWL_STATUSES = {"succeeded", "partially_succeeded"}
 ACTIVE_CRAWL_STATUSES = {"running", "paused", "pause_requested"}
@@ -32,6 +47,8 @@ class MetricAgeAudit:
     last_90_days: int
     days_91_to_180: int
     older_than_180_days: int
+    within_1098_days: int
+    cleanup_candidates: int
 
 
 @dataclass(frozen=True)
@@ -40,6 +57,14 @@ class UrlLinkAgeAudit:
     last_90_days: int
     days_91_to_180: int
     older_than_180_days: int
+
+
+@dataclass(frozen=True)
+class LongTermAgeAudit:
+    total: int
+    last_180_days: int
+    days_181_to_1098: int
+    older_than_1098_days: int
 
 
 @dataclass(frozen=True)
@@ -77,13 +102,64 @@ def build_retention_audit(db: Session, *, as_of: date | None = None) -> dict[str
                 "search_console_query_metrics": asdict(
                     _metric_age_audit(db, SearchConsoleQueryMetric, website.id, audit_date)
                 ),
+                "google_analytics_metrics": asdict(
+                    _metric_age_audit(db, GoogleAnalyticsMetric, website.id, audit_date)
+                ),
+                "google_analytics_event_metrics": asdict(
+                    _metric_age_audit(db, GoogleAnalyticsEventMetric, website.id, audit_date)
+                ),
+                "google_analytics_landing_page_event_metrics": asdict(
+                    _metric_age_audit(
+                        db,
+                        GoogleAnalyticsLandingPageEventMetric,
+                        website.id,
+                        audit_date,
+                    )
+                ),
+                "bing_page_metrics": asdict(
+                    _metric_age_audit(db, BingPageMetric, website.id, audit_date)
+                ),
+                "bing_query_metrics": asdict(
+                    _metric_age_audit(db, BingQueryMetric, website.id, audit_date)
+                ),
                 "url_links": asdict(_url_link_age_audit(db, website.id, audit_date)),
+                "url_snapshots": asdict(
+                    _timestamp_age_audit(
+                        db,
+                        UrlSnapshot,
+                        UrlSnapshot.checked_at,
+                        website.id,
+                        audit_date,
+                        join_url=True,
+                    )
+                ),
+                "crawl_runs": asdict(
+                    _timestamp_age_audit(
+                        db,
+                        CrawlRun,
+                        CrawlRun.started_at,
+                        website.id,
+                        audit_date,
+                    )
+                ),
+                "changes": asdict(
+                    _timestamp_age_audit(
+                        db,
+                        Change,
+                        Change.detected_at,
+                        website.id,
+                        audit_date,
+                    )
+                ),
+                "permanent_history": _permanent_history_counts(db, website.id),
             }
         )
 
     return {
         "mode": "read_only_dry_run",
         "as_of": audit_date.isoformat(),
+        "policy_version": POLICY_VERSION,
+        "policies": serialized_policies(),
         "retention_proposal": {
             "element_locations": (
                 "Bewaar actieve crawls, de laatste geslaagde of gedeeltelijk geslaagde "
@@ -95,8 +171,14 @@ def build_retention_audit(db: Session, *, as_of: date | None = None) -> dict[str
                 "deze audit verwijdert niets."
             ),
             "url_links": (
-                "Leeftijdsmeting per volledige crawl; een bewaarbeleid wordt pas ingevoerd nadat "
-                "historie-, issue- en verificatiebewijs expliciet zijn beschermd."
+                "Bewaar 180 dagen detail plus actieve, nieuwste volledige en bewijsdragende "
+                "crawls."
+            ),
+            "daily_integration_metrics": (
+                "Bewaar 1098 dagen zodat twee volledige jaarvergelijkingen beschikbaar blijven."
+            ),
+            "url_snapshots_and_changes": (
+                "Volledig auditen maar nog niet automatisch verwijderen."
             ),
         },
         "websites": website_results,
@@ -315,21 +397,108 @@ def element_location_candidate_ids(db: Session, website_id: UUID, *, limit: int)
 
 def _metric_age_audit(
     db: Session,
-    model: type[SearchConsoleMetric] | type[SearchConsoleQueryMetric],
+    model: type,
     website_id: UUID,
     audit_date: date,
 ) -> MetricAgeAudit:
     day_90 = audit_date - timedelta(days=90)
     day_180 = audit_date - timedelta(days=180)
+    day_1098 = audit_date - timedelta(days=1098)
     row = db.execute(
         select(
             func.count(model.id),
             func.sum(case((model.date > day_90, 1), else_=0)),
             func.sum(case(((model.date > day_180) & (model.date <= day_90), 1), else_=0)),
             func.sum(case((model.date <= day_180, 1), else_=0)),
+            func.sum(case((model.date >= day_1098, 1), else_=0)),
+            func.sum(case((model.date < day_1098, 1), else_=0)),
         ).where(model.website_id == website_id)
     ).one()
     return MetricAgeAudit(*(int(value or 0) for value in row))
+
+
+def _timestamp_age_audit(
+    db: Session,
+    model: type,
+    timestamp_column,
+    website_id: UUID,
+    audit_date: date,
+    *,
+    join_url: bool = False,
+) -> LongTermAgeAudit:
+    from app.models.discovery import Url
+
+    day_180 = datetime.combine(audit_date - timedelta(days=180), time.min, tzinfo=UTC)
+    day_1098 = datetime.combine(audit_date - timedelta(days=1098), time.min, tzinfo=UTC)
+    statement = select(
+        func.count(model.id),
+        func.sum(case((timestamp_column > day_180, 1), else_=0)),
+        func.sum(
+            case(
+                ((timestamp_column > day_1098) & (timestamp_column <= day_180), 1),
+                else_=0,
+            )
+        ),
+        func.sum(case((timestamp_column <= day_1098, 1), else_=0)),
+    )
+    if join_url:
+        statement = statement.join(Url, Url.id == model.url_id).where(Url.website_id == website_id)
+    else:
+        statement = statement.where(model.website_id == website_id)
+    row = db.execute(statement).one()
+    return LongTermAgeAudit(*(int(value or 0) for value in row))
+
+
+def _permanent_history_counts(db: Session, website_id: UUID) -> dict[str, int]:
+    return {
+        "issues": int(
+            db.scalar(select(func.count(Issue.id)).where(Issue.website_id == website_id)) or 0
+        ),
+        "issue_occurrences": int(
+            db.scalar(
+                select(func.count(IssueOccurrence.id))
+                .join(Issue, Issue.id == IssueOccurrence.issue_id)
+                .where(Issue.website_id == website_id)
+            )
+            or 0
+        ),
+        "activity_log": int(
+            db.scalar(
+                select(func.count(ActivityLog.id)).where(ActivityLog.website_id == website_id)
+            )
+            or 0
+        ),
+        "recommendation_tasks": int(
+            db.scalar(
+                select(func.count(RecommendationTask.id)).where(
+                    RecommendationTask.website_id == website_id
+                )
+            )
+            or 0
+        ),
+        "recommendation_task_events": int(
+            db.scalar(
+                select(func.count(RecommendationTaskEvent.id))
+                .join(
+                    RecommendationTask,
+                    RecommendationTask.id == RecommendationTaskEvent.task_id,
+                )
+                .where(RecommendationTask.website_id == website_id)
+            )
+            or 0
+        ),
+        "recommendation_verifications": int(
+            db.scalar(
+                select(func.count(RecommendationVerification.id))
+                .join(
+                    RecommendationTask,
+                    RecommendationTask.id == RecommendationVerification.task_id,
+                )
+                .where(RecommendationTask.website_id == website_id)
+            )
+            or 0
+        ),
+    }
 
 
 def _url_link_age_audit(
@@ -367,6 +536,15 @@ def _sum_website_results(results: list[dict[str, Any]]) -> dict[str, dict[str, i
         "search_console_page_metrics",
         "search_console_query_metrics",
         "url_links",
+        "google_analytics_metrics",
+        "google_analytics_event_metrics",
+        "google_analytics_landing_page_event_metrics",
+        "bing_page_metrics",
+        "bing_query_metrics",
+        "url_snapshots",
+        "crawl_runs",
+        "changes",
+        "permanent_history",
     )
     totals: dict[str, dict[str, int]] = {}
     for section in sections:

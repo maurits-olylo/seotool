@@ -12,32 +12,32 @@ opnieuw gebouwd. `docs/roadmap.md` blijft de actuele uitvoeringsplanning.
 
 | Nr. | Onderdeel | Dekking in bestaande roadmap | Verwerking |
 |---:|---|---|---|
-| 1 | Databaseopschoning en retentie | Gedeeltelijk | Uitgebreid per datatype in Release A |
-| 2 | Productievalidatie meerdere klanten | Aanwezig, in uitvoering | Behouden in Release A |
+| 1 | Databaseopschoning en retentie | Gedeeltelijk | Uitgebreid per datatype in Release 1 |
+| 2 | Productievalidatie meerdere klanten | Aanwezig, in uitvoering | Behouden in Release 2 |
 | 3 | Crawlcapaciteit en wachtrijen | Grotendeels aanwezig | Uitgebreid met prioriteit, backpressure en dead-letter-afhandeling |
-| 4 | Sitemapjobs | Aanwezig en grotendeels gevalideerd | Regressies blijven in Release A |
-| 5 | Productieafronding en runbook | Gedeeltelijk | Compleet runbook toegevoegd aan Release A |
-| 6 | Google URL Inspection | Gepland | Behouden in Release B |
-| 7 | Hreflang | Gepland | Behouden in Release B |
-| 8 | Soft 404 | Gepland | Behouden in Release B |
+| 4 | Sitemapjobs | Aanwezig en grotendeels gevalideerd | Regressies blijven in Release 2 |
+| 5 | Productieafronding en runbook | Gedeeltelijk | Verdeeld over Release 1 en 2 |
+| 6 | Google URL Inspection | Gepland | Behouden in Release 3 |
+| 7 | Hreflang | Gepland | Behouden in Release 3 |
+| 8 | Soft 404 | Gepland | Behouden in Release 4 |
 | 9 | Canonical-integriteit | Gepland | Behouden en gekoppeld aan URL Inspection/hreflang |
 | 10 | Beperkte JavaScript-rendering | Gepland | Behouden met aparte renderqueue |
 | 11 | Asset- en medialokalisatie | Alleen gedeeltelijk bewijs aanwezig | Blijvend register toegevoegd |
 | 12 | Live elementlokalisatie | Eerste versie aanwezig | Uitbreiding en productievalidatie behouden |
-| 13 | Diagnoses vereenvoudigen | Aanwezig, in uitvoering | Gebundeld in Release C |
-| 14 | Aanbevelingen vereenvoudigen | Aanwezig, in uitvoering | Gebundeld in Release C |
-| 15 | Uitvoeringstaken | Aanwezig, deels gedeployed | Afronding in Release C |
+| 13 | Diagnoses vereenvoudigen | Aanwezig, in uitvoering | Gebundeld in Release 6 |
+| 14 | Aanbevelingen vereenvoudigen | Aanwezig, in uitvoering | Gebundeld in Release 6 |
+| 15 | Uitvoeringstaken | Aanwezig, deels gedeployed | Afronding in Release 6 |
 | 16 | URL-overzicht | Technische basis aanwezig | Uitgebreid met bron- en meetdekking |
 | 17 | Gerichte exports | Basis gedeployed | Uitgebreid met kolommen en nieuwe datatypen |
-| 18 | Crawldiepte uitleggen | Technisch aanwezig | Productievalidatie in Release A/C |
-| 19 | Matomo | Gepland | Behouden in Release D |
+| 18 | Crawldiepte uitleggen | Technisch aanwezig | Productievalidatie in Release 6 |
+| 19 | Matomo | Gepland | Behouden in Release 7 |
 | 20 | Zoekintentie | Gepland | Behouden en uitgebreid met lokale/recruitmentcontext |
 | 21 | Contentkwaliteit | Alleen deels via thin content/opportunities | Nieuwe bewijsgebonden module |
 | 22 | Contentveroudering | Gepland | Uitgebreid met bronnen, downloads en risicoprioriteit |
 | 23 | Kannibalisatie/contentoverlap | Deels in opportunitypatronen | Zelfstandige analyse toegevoegd |
 | 24 | Interne-linkkansen | Alleen semantische basis gepland | Nieuwe opportunitymodule |
-| 25 | Opportunity-engine | Uitgebreid gepland | Behouden in Release D |
-| 26 | Genormaliseerde externe links | Bing-bron bestaat, generiek model ontbreekt | Nieuwe module in Release E |
+| 25 | Opportunity-engine | Uitgebreid gepland | Behouden in Release 9 |
+| 26 | Genormaliseerde externe links | Bing-bron bestaat, generiek model ontbreekt | Nieuwe module in Release 10 |
 | 27 | DataForSEO | Niet aanwezig | Nieuwe begrensde provideroptie |
 | 28 | Ahrefs/Majestic | Niet aanwezig | Latere provider achter dezelfde interface |
 | 29 | Linkwaardeclassificatie | Niet aanwezig | Nieuwe verklaarbare kenmerken, geen linkscore |
@@ -56,7 +56,7 @@ opnieuw gebouwd. `docs/roadmap.md` blijft de actuele uitvoeringsplanning.
 | 42 | AI-kwaliteit/veiligheid | Richting aanwezig | Uitgebreid tot acceptatie-eisen |
 | 43 | AI-impactbijdrage | Niet aanwezig | Transparantiekader toegevoegd, geen CO₂-claim |
 | 44 | AI-providerabstractie | Richting aanwezig | Verplicht fundament vóór generatie |
-| 45 | AI-tests | Niet aanwezig als volledige set | Verplichte testmatrix voor Release G |
+| 45 | AI-tests | Niet aanwezig als volledige set | Verplichte testmatrix voor Release 14 |
 
 ### Reeds aanwezig of al substantieel gespecificeerd
 
