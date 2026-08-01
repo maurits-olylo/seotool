@@ -1420,6 +1420,16 @@ friends-and-family-release. De functionele scope, beveiligingskeuze, testmatrix 
 - Bouw voort op de bestaande accounts, uitnodigingen, rollen en atomaire klant-/websitecreatie.
 - Voeg een begeleide en hervatbare flow toe van uitnodiging tot eerste crawlresultaten.
 - Voeg één veilige methode voor website-eigendomsverificatie toe.
+- Maak analytics-meetkwaliteit onderdeel van onboarding zodra een analyticsbron wordt gekoppeld:
+  valideer koppeling en scope, leg gekwalificeerde leadevents en hun ingangsdatum vast, voer een
+  historische nulmeting uit en toon een blijvende betrouwbaarheidsstatus.
+- Laat ontbrekende of nog niet gevalideerde analytics technische onboarding en crawling niet
+  blokkeren, maar presenteer afhankelijke conversie-inzichten niet als betrouwbaar.
+- Plan bij onvoldoende historie automatische hercontroles na 7, 14 en 30 dagen en maak sterke
+  afwijkingen tot gededupliceerde analytics-kwaliteitscontroles met bewijs en lifecycle.
+- Houd ruimte voor een latere aanvullende meetservice rond meetplan, tagging, consent en handmatige
+  validatie; de automatische basiscontrole en eerlijke betrouwbaarheidsstatus blijven inbegrepen in
+  het product.
 - Voorkom dubbele websites en initiële crawls bij refresh, dubbel klikken of opnieuw proberen.
 - Valideer de volledige flow met minimaal twee niet-technische proefgebruikers.
 - Start deze implementatie pas als een afzonderlijke ontwikkelfase expliciet wordt gekozen.
