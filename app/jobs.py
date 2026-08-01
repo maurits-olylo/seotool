@@ -25,6 +25,7 @@ from app.services.internal_redirect_analysis import analyze_internal_redirect_pa
 from app.services.issue_engine import reconcile_issues
 from app.services.job_identifier_analysis import analyze_job_identifier_risk
 from app.services.pagination_analysis import analyze_pagination_series
+from app.services.retention_operations import create_retention_operation
 from app.services.robots import RobotsRules
 from app.services.server_error_analysis import analyze_server_error_incident
 from app.services.sitemap import InvalidSitemapError, parse_sitemap
@@ -202,6 +203,20 @@ def execute_crawl_job(job_id: str) -> None:
             if run and run.status != "paused":
                 run.finished_at = finished
             db.commit()
+            if (
+                run
+                and run.crawl_type == "full_site_crawl"
+                and run.status in {"succeeded", "partially_succeeded"}
+            ):
+                try:
+                    create_retention_operation(db, run.id)
+                except Exception:
+                    logger.exception(
+                        "retention_operation_creation_failed",
+                        job_id=job_id,
+                        crawl_run_id=str(run.id),
+                        website_id=str(run.website_id),
+                    )
 
 
 def _import_sitemaps(db, job: CrawlJob, run: CrawlRun) -> tuple[int, int]:  # type: ignore[no-untyped-def]

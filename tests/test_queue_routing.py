@@ -4,8 +4,10 @@ from app.core.queue import (
     FULL_CRAWL_QUEUE,
     INTEGRATION_QUEUE,
     LIGHT_CRAWL_QUEUE,
+    MAINTENANCE_QUEUE,
     enqueue_crawl_job,
     enqueue_integration_sync,
+    enqueue_retention_operation,
 )
 
 
@@ -46,3 +48,18 @@ def test_integration_syncs_use_dedicated_queue(monkeypatch) -> None:
         "website-id",
         480,
     )
+
+
+def test_retention_uses_dedicated_maintenance_queue(monkeypatch) -> None:
+    queue = Mock()
+    get_queue = Mock(return_value=queue)
+    monkeypatch.setattr("app.core.queue.get_queue", get_queue)
+
+    enqueue_retention_operation("operation-id", attempt=2)
+
+    get_queue.assert_called_once_with(MAINTENANCE_QUEUE)
+    assert queue.enqueue.call_args.args[:2] == (
+        "app.services.retention_operations.execute_retention_operation",
+        "operation-id",
+    )
+    assert queue.enqueue.call_args.kwargs["job_id"] == "retention-operation-id-2"

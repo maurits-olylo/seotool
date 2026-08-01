@@ -216,18 +216,28 @@ sudo docker compose -f compose.yaml -f compose.prod.yaml exec -T api \
   --website-id <website-uuid> --batch-size 10000 --max-rows 50000 --confirm-delete
 ```
 
-De productiepilot voor Floris is afgerond: 95.295 kandidaten zijn verwijderd en 28.312 beschermde
-locaties bleven behouden. Bij Schipper zijn op 1 augustus 2026 door twee afzonderlijke aanroepen
-100.000 kandidaten verwijderd; daarna resteerden 1.025.150 locaties, waarvan 727.605
-opruimkandidaten. De dubbele aanroep ontstond doordat het commando na een terminalonderbreking
-opnieuw werd uitgevoerd, niet doordat één aanroep de ingestelde limiet overschreed.
+De handmatige productiecleanup is op 1 augustus 2026 afgerond. In totaal zijn `6.787.671` oude,
+probleemvrije elementlocaties verwijderd en `2.729.964` beschermde locaties behouden. De
+eindaudit rapporteerde nul kandidaten voor vier websites en nog `4.431` voor Floris en Van Maurik;
+die zijn daarna in één begrensde batch verwijderd. Vóór die laatste kleine batch rapporteerde
+PostgreSQL na autovacuum en auto-analyze nul geschatte dode rijen; een handmatige `ANALYZE` was niet
+nodig. Nieuwe handmatige cleanupvensters zijn alleen nodig wanneer een latere read-only audit nieuwe
+kandidaten aantoont.
 
-Behandel de resterende websites in afzonderlijke onderhoudsvensters, in deze volgorde: Schipper
-Kozijnen, Amsterdam Economic Board, werkenbijgrandvision.nl en human.nl. Begin per website met
-50.000 rijen. Verhoog een venster alleen na een gezonde controle en nooit boven 250.000 rijen.
-Pauzeer crawls, controleer na elke run `/health` en databasebelasting, en hervat crawls ook wanneer
-`limit_reached=false` is bereikt. Pas het releasegebonden back-upbeleid hierboven toe; maak niet
-automatisch voor ieder opschoningsvenster een nieuwe back-up.
+Vanaf migratie `0035` maakt iedere afgeronde volledige crawl automatisch een persistente
+retentieoperatie. De scheduler zet deze op de queue `maintenance`; `integration-worker` verwerkt
+per uitvoering maximaal 50.000 rijen en hervat resterend werk automatisch. Een actieve crawl voor
+dezelfde website stelt cleanup uit. GSC- en interne-linkretentie blijven uitgesloten.
+
+Maak of hervat alle operaties terminal-first met:
+
+```bash
+sudo docker compose -f compose.yaml -f compose.prod.yaml exec -T api \
+  python -m app.maintenance retention-all
+```
+
+Gebruik de handmatige websitegebonden cleanup hierboven alleen als herstelprocedure wanneer de
+persistente operatie aantoonbaar niet kan worden gebruikt.
 
 Wanneer de terminalverbinding tijdens of na een verwijdercommando wordt onderbroken, geldt de
 aanroep als mogelijk uitgevoerd. Herhaal het commando niet. Controleer eerst read-only het totale

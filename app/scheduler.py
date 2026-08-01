@@ -9,11 +9,16 @@ from sqlalchemy.orm import Session
 
 from app.api.routes.reports import build_client_report
 from app.core.logging import configure_logging
-from app.core.queue import enqueue_crawl_job, enqueue_integration_sync
+from app.core.queue import (
+    enqueue_crawl_job,
+    enqueue_integration_sync,
+    enqueue_retention_operation,
+)
 from app.db.session import SessionLocal
 from app.models.discovery import CrawlJob
 from app.models.integrations import WebsiteIntegration
 from app.models.reporting import MonthlyReportSnapshot
+from app.models.system import RetentionOperation
 from app.models.website import Website
 from app.services.crawl_deployment import crawl_deployment_is_active
 
@@ -37,9 +42,7 @@ def schedule_due_jobs() -> int:
             db.scalars(select(Website.id).where(Website.status == "active").order_by(Website.id))
         )
         for website_id in website_ids:
-            website = db.scalar(
-                select(Website).where(Website.id == website_id).with_for_update()
-            )
+            website = db.scalar(select(Website).where(Website.id == website_id).with_for_update())
             if website is None:
                 continue
             active = db.scalar(
@@ -203,6 +206,36 @@ def schedule_monthly_report_snapshots() -> int:
     return created
 
 
+def schedule_pending_retention_operations() -> int:
+    """Requeue due or interrupted retention work without duplicating deletions."""
+    now = datetime.now(UTC)
+    queued: list[tuple[str, int]] = []
+    with SessionLocal() as db:
+        operations = list(
+            db.scalars(
+                select(RetentionOperation)
+                .where(
+                    RetentionOperation.status.in_(
+                        ["pending", "waiting_for_crawl", "failed", "running"]
+                    ),
+                    (RetentionOperation.next_attempt_at.is_(None))
+                    | (RetentionOperation.next_attempt_at <= now),
+                )
+                .order_by(RetentionOperation.created_at)
+                .limit(20)
+                .with_for_update(skip_locked=True)
+            )
+        )
+        for operation in operations:
+            operation.status = "pending"
+            operation.next_attempt_at = now + timedelta(minutes=10)
+            queued.append((str(operation.id), operation.attempt_count + 1))
+        db.commit()
+    for operation_id, attempt in queued:
+        enqueue_retention_operation(operation_id, attempt=attempt)
+    return len(queued)
+
+
 def _json_ready(value: object) -> object:
     if isinstance(value, (date, datetime)):
         return value.isoformat()
@@ -220,11 +253,13 @@ def main() -> None:
             crawl_count = schedule_due_jobs()
             integration_count = schedule_integration_syncs()
             report_count = schedule_monthly_report_snapshots()
+            retention_count = schedule_pending_retention_operations()
             logger.info(
                 "scheduler_cycle",
                 jobs_created=crawl_count,
                 integration_syncs_created=integration_count,
                 report_snapshots_created=report_count,
+                retention_operations_queued=retention_count,
             )
         except Exception:
             logger.exception("scheduler_cycle_failed")

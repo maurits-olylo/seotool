@@ -6,12 +6,12 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 
 ## Huidige status
 
-- Actieve ontwikkellijn: fase 6 — intelligente diagnose en UX/UI-polish.
-- Actueel releasepakket: websitebrede asset- en mediakwaliteit; technisch geïmplementeerd en
-  gedeployed, productievalidatie loopt met een nieuwe volledige crawl.
-- Productie: `https://seo.thact.nl` op Synology NAS `192.168.2.20`.
-- Laatste lokale kwaliteitscontrole: 259 tests, Ruff, JavaScript-syntaxis en productie-Compose
-  geslaagd.
+- Actieve ontwikkellijn: automatische retentie en databasegroeibewaking, gevolgd door publieke
+  website-inschatting en pakketadvies.
+- Productie en de geïsoleerde NAS-stagingomgeving zijn gezond en staan op migratie `0034`.
+- De elementlocatie-cleanup is op 1 augustus 2026 afgerond en operationeel gecontroleerd.
+- Laatste volledige lokale kwaliteitscontrole vóór de autovacuumrelease: 318 tests geslaagd;
+  gerichte crawl-deployment- en retentiontests zijn na de statuscorrectie opnieuw geslaagd.
 - Multi-client domeinisolatie is op 2026-07-19 in productie bevestigd: `jobsatpearle.be` komt niet
   meer als actieve URL van `werkenbijgrandvision.nl` voor.
 
@@ -1130,7 +1130,7 @@ uitgevoerd wanneer een nieuw Alembic-bestand onderdeel van de release is.
 
 ## Afzonderlijke NAS-stagingomgeving
 
-Status: zelfstandig stagingpakket lokaal geïmplementeerd; NAS-installatie en belastingproef volgen.
+Status: volledig geïnstalleerd en gevalideerd op de NAS.
 
 - Gebruik een zelfstandige `compose.staging.yaml` en projectnaam `seo-monitor-staging`; hergebruik
   geen productiecontainers, netwerken, volumes, database of secrets.
@@ -1162,22 +1162,68 @@ de NAS blijft staging-, back-up- en herstelplatform. Het beoogde toekomstige dom
 
 ## Databaseonderhoud na retentionpilot
 
-Status: Floris-pilot en eerste Schipper-venster afgerond; tabelspecifiek autovacuum actief in
-staging en productie.
+Status: afgerond en op 1 augustus 2026 in productie gecontroleerd.
 
-- Activeer voor `element_locations` eerder vacuüm en analyse via migratie `0034`.
-- Schipper: 100.000 verwijderd via twee begrensde aanroepen; 727.605 kandidaten resteren.
-- Ruim daarna per afzonderlijk onderhoudsvenster verder op: Schipper, Amsterdam Economic Board,
-  GrandVision en human.nl; begin steeds met 50.000 en begrens een venster op 250.000 rijen.
-- Meet na iedere run health, databasebelasting, dode rijen, tabelomvang en laatste autovacuum.
+- Migratie `0034` activeert eerder vacuüm en analyse voor `element_locations` in staging en
+  productie.
+- In totaal zijn `6.787.671` oude, probleemvrije elementlocaties verwijderd; `2.729.964` beschermde
+  locaties resteren.
+- De eindaudit rapporteerde nul kandidaten voor vier websites en nog `4.431` voor Floris en Van
+  Maurik; die laatste kandidaten zijn daarna in één begrensde batch verwijderd.
+- Vóór die laatste kleine batch rapporteerde PostgreSQL nul geschatte dode rijen en recente
+  automatische vacuüm- en analysestatistieken; een handmatige `ANALYZE` was niet nodig.
 - Herhaal een onderbroken verwijdercommando nooit zonder eerst read-only na te tellen.
 - Ontwerp GSC-retentie afzonderlijk; verwijder nog geen historische GSC-rijen.
 
 Acceptatie:
 
-- Staging en productie rapporteren migratie `0034` en de vier verwachte tabelopties.
-- Iedere website wordt geïsoleerd verwerkt met geverifieerde back-up en veilige crawl-drain.
-- Beschermde elementlocaties blijven bestaan en productie blijft na ieder venster gezond.
+- Staging en productie rapporteren migratie `0034` en de vier verwachte tabelopties: behaald.
+- Beschermde elementlocaties zijn behouden en productie is gezond: behaald.
+- Maintenance is afgesloten met `active=false safe=false tracked=0 waiting=0`: behaald.
+
+## Automatische retentie en databasegroeibewaking
+
+Status: lokaal geïmplementeerd met migratie `0035`; 322 tests geslaagd, stagingvalidatie volgt.
+
+- Start begrensde elementlocatie-retentie per website na een geslaagde volledige crawl.
+- Selecteer websites automatisch; gebruik geen handmatig gekopieerde website-ID's.
+- Bewaar onderhoudsoperaties, batches, voortgang en fouten persistent in PostgreSQL.
+- Maak hervatten na terminal-, proces- of workeronderbreking idempotent.
+- Bescherm actieve crawls, de nieuwste relevante crawls en snapshots, en issuebewijs volgens de
+  bestaande retentionaudit.
+- Voeg een hervatbaar onderhoudscommando voor alle websites, periodieke audits, structured logging
+  en groeialarmen toe.
+- Houd GSC- en interne-linkretentie als afzonderlijke beleidsbesluiten.
+
+Acceptatie:
+
+- Een onderbroken operatie kan zonder dubbele verwijdering worden hervat.
+- Gelijktijdige crawl- en cleanupmutaties voor dezelfde website zijn uitgesloten.
+- Na iedere uitvoering zijn aantallen, duur, vrijgemaakte logische ruimte en resterende kandidaten
+  controleerbaar.
+- De database groeit niet opnieuw onbeperkt door historische elementlocaties.
+
+## Publieke website-inschatting en pakketadvies
+
+Status: gepland na automatische retentie.
+
+- Laat een bezoeker een website-URL invullen en lees veilig `robots.txt` en sitemaps.
+- Normaliseer en ontdubbel URL's en beperk discovery tot het publieke domein.
+- Gebruik zonder sitemap uitsluitend een begrensde steekproefcrawl.
+- Toon vóór eigendomsverificatie alleen geschat volume en pakketadvies, geen technische problemen.
+- Bepaal het definitieve volume na registratie, verificatie en een volledige crawl.
+- Tel actieve, relevante canonical HTML-pagina's en sluit assets, externe URL's,
+  trackingvarianten en filterexplosies uit.
+- Baseer pakketwissels op het gemiddelde van twee volledige crawls; verhoog nooit automatisch na
+  één overschrijding.
+
+Voorlopige pakketten:
+
+- Klein: tot 100 pagina's, volledige crawl maandelijks, indicatief EUR 39 per maand.
+- Groei: tot 1.000 pagina's, volledige crawl tweemaal per maand, indicatief EUR 79 per maand.
+- Groot: tot 10.000 pagina's, volledige crawl wekelijks, indicatief vanaf EUR 149 per maand.
+- Maatwerk: meer dan 10.000 pagina's of afwijkende frequentie, opslag en verwerking.
+- Frequentere monitoring blijft een add-on en dwingt geen groter paginapakket af.
 
 ## Gerichte verificatiecrawls
 
@@ -1194,8 +1240,8 @@ Status: tien taaktypen gedeployed en technisch gecontroleerd in productie.
 
 ### Volgende gebundelde release — begrijpelijke taakworkflow
 
-Status: eerste begrijpelijkheidsverbetering gedeployed; beslisgerichte orphan-correctie lokaal
-gereed en gecontroleerd, nog niet gedeployed.
+Status: eerste begrijpelijkheidsverbetering en beslisgerichte orphan-correctie gedeployed via
+migratie `0033`; verdere vereenvoudiging voor niet-technische gebruikers blijft gepland.
 
 - Toon bovenaan één duidelijke hoofdactie die past bij de huidige taakstatus.
 - Vertaal interne statussen en verificatietermen naar korte, taakgerichte uitleg.

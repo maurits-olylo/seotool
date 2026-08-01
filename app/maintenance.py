@@ -5,9 +5,12 @@ from dataclasses import asdict
 from datetime import date
 from uuid import UUID
 
+from sqlalchemy import select
+
 from app.core.logging import configure_logging
 from app.core.queue import enqueue_crawl_job
 from app.db.session import SessionLocal
+from app.models.crawl import CrawlRun
 from app.services.change_history import change_history_counts, reset_change_history
 from app.services.crawl_deployment import (
     deployment_drain_status,
@@ -16,6 +19,10 @@ from app.services.crawl_deployment import (
     wait_for_deployment_drain,
 )
 from app.services.retention_audit import build_retention_audit, cleanup_element_locations
+from app.services.retention_operations import (
+    create_retention_operation,
+    execute_retention_operation,
+)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -56,6 +63,12 @@ def _parser() -> argparse.ArgumentParser:
         "change-history-audit",
         help="Toon read-only aantallen in de wijzigingshistorie",
     )
+    retention_all = commands.add_parser(
+        "retention-all",
+        help="Maak en hervat retentieoperaties voor alle websites",
+    )
+    retention_all.add_argument("--batch-size", type=int, default=10_000)
+    retention_all.add_argument("--max-rows-per-operation", type=int, default=50_000)
     reset_changes = commands.add_parser(
         "reset-change-history",
         help="Verwijder wijzigingsrecords zonder snapshots, issues of crawls te verwijderen",
@@ -104,6 +117,39 @@ def main() -> int:
         with SessionLocal() as db:
             result = change_history_counts(db)
         print(json.dumps(result, indent=2, ensure_ascii=False))
+        return 0
+    if args.command == "retention-all":
+        with SessionLocal() as db:
+            latest_runs = list(
+                db.scalars(
+                    select(CrawlRun)
+                    .where(
+                        CrawlRun.crawl_type == "full_site_crawl",
+                        CrawlRun.status.in_(["succeeded", "partially_succeeded"]),
+                    )
+                    .order_by(CrawlRun.website_id, CrawlRun.started_at.desc())
+                )
+            )
+            operations = []
+            seen = set()
+            for run in latest_runs:
+                if run.website_id in seen:
+                    continue
+                seen.add(run.website_id)
+                operation = create_retention_operation(db, run.id)
+                if operation is not None:
+                    operations.append(str(operation.id))
+        results = [
+            asdict(
+                execute_retention_operation(
+                    operation_id,
+                    batch_size=args.batch_size,
+                    max_rows=args.max_rows_per_operation,
+                )
+            )
+            for operation_id in operations
+        ]
+        print(json.dumps({"operations": results}, indent=2, ensure_ascii=False))
         return 0
     if args.command == "reset-change-history":
         if not args.confirm_delete:

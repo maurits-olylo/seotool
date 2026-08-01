@@ -871,3 +871,20 @@ technisch begrensd op één miljoen.
 
 Gevolg: opschoning is hervatbaar, meetbaar en gefaseerd uit te rollen. Er wordt pas op productie
 verwijderd na een geslaagde stagingproef en een actuele back-up.
+
+## 2026-08-01 — Automatische retentie is persistent en per website geserialiseerd
+
+Probleem: autovacuum maakt verwijderde ruimte herbruikbaar, maar verwijdert geen historische
+applicatierijen. Handmatige elementlocatie-cleanup met website-ID's is veilig maar niet duurzaam en
+te foutgevoelig bij terminalonderbrekingen.
+
+Besluit: iedere afgeronde volledige crawl maakt idempotent één `retention_operation` aan. De
+scheduler zet verschuldigd en onderbroken werk op een afzonderlijke maintenancequeue. De bestaande
+integration-worker verwerkt begrensde batches en bewaart na iedere commit voortgang in PostgreSQL.
+Cleanup en crawl gebruiken dezelfde websiterijlock; een actieve crawl voor dezelfde website stelt
+cleanup uit. Nieuwste crawl- en snapshotbewijs, actieve crawls en issuebewijs blijven beschermd.
+
+Gevolg: onderbroken werk kan zonder dubbele verwijdering worden hervat, een grote website
+monopoliseert de worker niet onbeperkt en andere websites blijven beschikbaar. GSC- en
+interne-linkretentie blijven afzonderlijke beleidsbesluiten. Migratie `0035` voegt alleen een lege
+operatietabel en indexes toe en vereist daarom geen extra productieback-up.

@@ -9,7 +9,8 @@ FastAPI, PostgreSQL en Redis/RQ en draait als acht losse Docker Compose-services
 
 - `api`: REST API en OpenAPI-documentatie.
 - `worker` en `crawl-worker-2`: maximaal twee websites gecontroleerd parallel crawlen.
-- `integration-worker`: GSC-, GA4- en Bing-imports op een afzonderlijke queue.
+- `integration-worker`: GSC-, GA4- en Bing-imports en automatische retentie op afzonderlijke
+  queues.
 - `export-worker`: exports op een afzonderlijke queue.
 - `scheduler`: dagelijkse sitemap/light checks en wekelijkse sitecrawls.
 - `postgres`: blijvende configuratie, URL-register, snapshots en issues.
@@ -80,6 +81,26 @@ uitvoeren of herstellen, bijvoorbeeld bij datatransformatie, destructieve schema
 moeilijk omkeerbare bulkmutatie. Leg deze afweging per release vast. Migratie `0034` wijzigde alleen
 omkeerbare tabelopties voor autovacuum, verwijderde geen data en vereiste daarom geen nieuwe
 back-up. Controleer na iedere update wel `/health`, containerstatus en logs.
+
+Migratie `0035` voegt uitsluitend de nieuwe, lege tabel `retention_operations` met indexes en
+foreign keys toe. Zij wijzigt of verwijdert geen bestaande crawldata en vereist daarom geen extra
+releaseback-up.
+
+## Automatische retentie
+
+Na iedere geslaagde of gedeeltelijk geslaagde volledige crawl wordt één persistente
+retentieoperatie aangemaakt. De scheduler plaatst deze op de maintenancequeue. De
+integration-worker verwijdert per uitvoering maximaal 50.000 oude, probleemvrije
+`element_locations` in batches van 10.000. Een actieve crawl voor dezelfde website laat de operatie
+wachten; een onderbreking wordt vanuit PostgreSQL hervat.
+
+Handmatig alle laatste operaties aanmaken of hervatten:
+
+```bash
+docker compose exec api python -m app.maintenance retention-all
+```
+
+GSC- en interne-linkretentie vallen niet onder deze automatische cleanup.
 
 ## Productie op Synology
 

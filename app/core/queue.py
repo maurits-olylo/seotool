@@ -12,6 +12,7 @@ LEGACY_CRAWL_QUEUE = "crawls"
 INTEGRATION_QUEUE = "integrations"
 EXPORT_QUEUE = "exports"
 VERIFICATION_QUEUE = "verifications"
+MAINTENANCE_QUEUE = "maintenance"
 
 
 @dataclass(frozen=True)
@@ -73,8 +74,7 @@ def crawl_queue_state(job_id: str, *, job_type: str) -> CrawlQueueState:
         None,
     )
     workers = sum(
-        queue_name in _worker_queue_names(worker)
-        for worker in Worker.all(connection=connection)
+        queue_name in _worker_queue_names(worker) for worker in Worker.all(connection=connection)
     )
     return CrawlQueueState(position=position, queued_jobs=len(queued_ids), workers=workers)
 
@@ -98,5 +98,15 @@ def enqueue_integration_sync(
         *args,
         retry=Retry(max=3, interval=[60, 300, 900]),
         job_id=job_id,
+        job_timeout=21_600,
+    )
+
+
+def enqueue_retention_operation(operation_id: str, *, attempt: int = 0) -> None:
+    get_queue(MAINTENANCE_QUEUE).enqueue(
+        "app.services.retention_operations.execute_retention_operation",
+        operation_id,
+        retry=Retry(max=3, interval=[60, 300, 900]),
+        job_id=f"retention-{operation_id}-{attempt}",
         job_timeout=21_600,
     )

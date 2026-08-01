@@ -295,6 +295,24 @@ def _latest_location_snapshot_ids(website_id: UUID):  # type: ignore[no-untyped-
     return select(ranked.c.snapshot_id).where(ranked.c.position == 1)
 
 
+def element_location_candidate_ids(db: Session, website_id: UUID, *, limit: int):
+    """Return the current safe deletion candidates for one website."""  # type: ignore[no-untyped-def]
+    protected_run_ids = set(_protected_crawl_runs(db).get(website_id, {}))
+    latest_snapshot_ids = _latest_location_snapshot_ids(website_id)
+    conditions = [
+        ElementLocation.website_id == website_id,
+        func.json_array_length(ElementLocation.issue_types) == 0,
+        ~ElementLocation.snapshot_id.in_(latest_snapshot_ids),
+    ]
+    if protected_run_ids:
+        conditions.append(~ElementLocation.crawl_run_id.in_(protected_run_ids))
+    return tuple(
+        db.scalars(
+            select(ElementLocation.id).where(*conditions).order_by(ElementLocation.id).limit(limit)
+        ).all()
+    )
+
+
 def _metric_age_audit(
     db: Session,
     model: type[SearchConsoleMetric] | type[SearchConsoleQueryMetric],
