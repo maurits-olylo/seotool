@@ -1247,9 +1247,9 @@ friends-and-family-release. De functionele scope, beveiligingskeuze, testmatrix 
 
 ## Friends-and-family-release
 
-Status: gepland als besloten mijlpaal; voorlopig doelvenster november 2026, zonder harde
-releasedatum. Neem in oktober 2026 een expliciet go/no-go-besluit op basis van onderstaande
-acceptatiecriteria. Kwaliteit en herstelbaarheid gaan voor de kalenderdatum.
+Status: geblokkeerd totdat de volledige roadmapscope die op 1 augustus 2026 in commit `71d732a`
+stond is afgerond, gedeployed en waar relevant operationeel gevalideerd, of een onderdeel door de
+gebruiker expliciet uit die scope is verwijderd. Er geldt geen kalenderdatum voor de release.
 
 ### Ontwikkeltijdraming
 
@@ -1261,30 +1261,37 @@ Basis van de raming op 1 augustus 2026:
 - Commitvolume is geen urendeclaratie. Integraties, migraties, gebruikersproeven en operationele
   acceptatie verlopen langzamer en onregelmatiger dan de eerste technische bouwfase.
 
-Resterende actieve ontwikkeltijd tot een verantwoorde friends-and-family-release:
+De eerdere raming van 28–44 actieve werkdagen gold alleen voor de toen geselecteerde minimale
+releasegates en is geen geldige releasedatum meer. Omdat nu de volledige huidige roadmap eerst moet
+worden voltooid, geldt als grove planningsorde:
 
-- Volledige onboardingworkflow afronden en valideren: circa 6–10 werkdagen; zie
-  `docs/onboarding-friends-family.md`.
-- Publieke website-inschatting en pakketadvies: circa 3–5 werkdagen.
-- Openstaande productievalidaties en begrijpelijkheidsverbeteringen: circa 5–8 werkdagen.
-- Afzonderlijk Linux-workerproject en capaciteitsmeting: circa 2–4 werkdagen.
-- VPS-capaciteit, migratie, monitoring, back-up en herstelproef: circa 4–7 werkdagen.
-- Integrale acceptatie, beveiligingscontrole en pilotvoorbereiding: circa 4–6 werkdagen.
+- circa vier tot zeven maanden verdere ontwikkeling vanaf 1 augustus 2026;
+- een eerste volledige readiness-audit indicatief tussen december 2026 en maart 2027;
+- geen release zolang één bestaand roadmaponderdeel nog `gepland`, `toekomstig`, `in uitvoering`,
+  alleen lokaal geïmplementeerd of nog niet operationeel gevalideerd is.
 
-Brutoraming: 24–40 actieve werkdagen. Gebruik inclusief integratie- en herstelbuffer een
-planningsbandbreedte van 28–44 actieve werkdagen. Bij een duurzame inzet van vier tot vijf actieve
-ontwikkeldagen per week is dat ongeveer zeven tot elf kalenderweken.
+Dit is een voortschrijdende raming, geen toezegging. Herbereken haar na iedere afgeronde hoofdfase.
+Nieuwe wensen die later aan de roadmap worden toegevoegd blokkeren de release alleen wanneer de
+gebruiker ze expliciet onderdeel maakt van dezelfde friends-and-family-scope.
 
-Voorgestelde planning:
+### Readinessbesluit door de gebruiker
 
-- September 2026: onboarding, publieke inschatting, openstaande validaties en Linux-worker.
-- Oktober 2026: VPS-migratie, herstelproef, integrale acceptatie en go/no-go.
-- November 2026: besloten release aan drie tot vijf deelnemers.
+- Codex stelt niet zelfstandig vast dat de release doorgaat.
+- Zodra Codex op basis van een volledige roadmapaudit denkt dat het project ver genoeg is, vraagt
+  Codex de gebruiker expliciet of die vindt dat de friends-and-family-release mag worden voorbereid.
+- Die vraag bevat altijd afzonderlijk redenen vóór release, redenen tegen release, resterende
+  risico's, test- en productie-evidence en een duidelijke eigen aanbeveling.
+- De gebruiker neemt het definitieve go/no-go-besluit. Zonder expliciet `ja` blijft de release
+  geblokkeerd.
 
-Een zeer intensief tempo kan een releasekandidaat in oktober opleveren. November blijft de
-realistische doelmaand omdat de laatste fase ruimte nodig heeft voor onbekende fouten en
-niet-technische gebruikerstests. Herbereken de raming na afronding van onboarding en opnieuw na de
-eerste volledige VPS-herstelproef.
+Redenen vóór release omvatten minimaal: alle afgesproken roadmapitems aantoonbaar afgerond,
+geslaagde volledige tests, gezonde staging en productie, geslaagde onboardingproeven, bewezen
+multi-clientisolatie, herstelbare back-ups en voldoende gemeten capaciteit.
+
+Redenen tegen release omvatten minimaal: openstaande roadmapstatussen, bekende datarisico's of
+ernstige fouten, handmatige onboardingstappen, onvoldoende begrijpelijkheid, onbewezen restore of
+rollback, ontbrekende monitoring, onvoldoende VPS-capaciteit of onduidelijke privacy- en
+toegangsafhandeling.
 
 Doel:
 
