@@ -1246,6 +1246,28 @@ friends-and-family-release. De functionele scope, beveiligingskeuze, testmatrix 
 - Valideer de volledige flow met minimaal twee niet-technische proefgebruikers.
 - Start deze implementatie pas als een afzonderlijke ontwikkelfase expliciet wordt gekozen.
 
+## Pakketdefinitie, prijzen en gratis gebruikstermijn
+
+Status: bewust uitgesteld tot de volledige bestaande roadmap gereed is en de
+friends-and-family-readiness wordt beoordeeld. Werk dit niet eerder uit of publiceer het niet
+gedeeltelijk op de homepage.
+
+Vóór een friends-and-family-release:
+
+- definieer per pakket het paginavolume, de crawlfrequentie, inbegrepen functies, ondersteuning en
+  grenzen;
+- bepaal en motiveer een gratis gebruikstermijn van twee of drie maanden;
+- toon in één duidelijke tabel zowel de gratis termijn als de reguliere kosten daarna;
+- bepaal of prijzen inclusief of exclusief btw worden gecommuniceerd en laat commerciële en
+  juridische teksten controleren;
+- leg vast wat na afloop gebeurt met toegang, crawls, data, exports en verwijdering;
+- voorkom automatische betaalde omzetting zonder een expliciete keuze van de gebruiker;
+- laat de publieke website-inschatting pas een pakket adviseren wanneer deze definities definitief
+  zijn en op dezelfde bronconfiguratie berusten als de prijstabel.
+
+De bestaande indicatieve bedragen en grenzen zijn werkmateriaal en mogen tot dit besluit niet als
+definitief aanbod op de homepage verschijnen.
+
 ## Friends-and-family-release
 
 Status: geblokkeerd totdat de volledige roadmapscope die op 1 augustus 2026 in commit `71d732a`

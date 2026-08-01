@@ -1,9 +1,10 @@
 import httpx
 import pytest
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
 from app.api.routes.public_estimates import _enforce_rate_limit, _requests
-from app.services.public_estimate import estimate_public_website, package_for_pages
+from app.services.public_estimate import PublicEstimate, estimate_public_website, package_for_pages
 
 
 def _transport(responses: dict[str, tuple[int, str, str]]) -> httpx.MockTransport:
@@ -90,3 +91,28 @@ def test_public_estimate_rate_limit() -> None:
     with pytest.raises(HTTPException) as exc_info:
         _enforce_rate_limit("test-client")
     assert exc_info.value.status_code == 429
+
+
+def test_public_estimate_endpoint_is_available(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _requests.clear()
+    monkeypatch.setattr(
+        "app.api.routes.public_estimates.estimate_public_website",
+        lambda _: PublicEstimate(
+            normalized_url="https://example.com/",
+            estimated_pages=250,
+            package="growth",
+            method="sitemap",
+            confidence="high",
+            sitemap_documents=1,
+            capped=False,
+            explanation="Schatting uit sitemap.",
+        ),
+    )
+
+    response = client.post("/api/v1/public/website-estimate", json={"url": "https://example.com"})
+
+    assert response.status_code == 200
+    assert response.json()["estimated_pages"] == 250
+    assert response.json()["package"] == "growth"
