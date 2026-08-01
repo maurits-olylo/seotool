@@ -16,6 +16,8 @@ Werk terminal-first, inspecteer eerst de bestaande projectmap, hergebruik bruikb
 onbekende wijzigingen en werk naar een getest resultaat. Gebruik migrations voor databasewijzigingen
 en bewaar nooit secrets in een repository of documentatie. Noem of bewaar geen serienummers,
 MAC-adressen, netwerkadressen, DDNS-gegevens, wachtwoorden, tokens of privésleutels.
+Uitzondering: gebruik voor NAS-releaseuploads standaard streaming SSH via
+`ssh thact@192.168.2.20` totdat een betere methode of hostalias is ingevoerd.
 
 Mijn Mac is mijn primaire ontwikkelomgeving. Mijn Synology NAS wordt terminal-first beheerd. Een
 Linux-worker is gepland als afzonderlijk infrastructuurproject en hoort niet bij de SEO-tool. Voeg
