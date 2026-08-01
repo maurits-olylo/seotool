@@ -169,6 +169,15 @@ de succesvolle stagingproef bewust geen nieuwe productieback-up gemaakt. Een bes
 geverifieerde back-up bleef beschikbaar. Dit voorbeeld is geen vrijstelling voor migraties die wel
 data wijzigen of moeilijk herstelbaar zijn.
 
+### Wachttijd bij asynchrone productiecontroles
+
+Baseer een `sleep` na een achtergrondjob op een eerder gemeten doorlooptijd en rond slechts beperkt
+naar boven af. De HUMAN-sitemapimport van 193 documenten duurde op 1 augustus 2026 circa 49
+seconden; een eerste statuscontrole na `sleep 60` is daarom passend. Wanneer de job dan nog
+`pending` of `running` is, herhaal de muterende startopdracht niet. Wacht aanvullend 30 seconden en
+controleer uitsluitend read-only opnieuw. Gebruik geen ruimere wachttijd alleen om afronding te
+garanderen wanneer tussentijdse statuscontrole veilig mogelijk is.
+
 ## Back-up en restore
 
 Plan `scripts/backup.sh` dagelijks via Synology Taakplanner. Stel `PROJECT_DIR`, `BACKUP_DIR` en

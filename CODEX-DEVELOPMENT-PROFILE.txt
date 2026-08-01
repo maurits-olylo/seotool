@@ -51,6 +51,9 @@ TERMINALWERKWIJZE
   controleer eerst read-only de status, logs, markers of aantallen.
 - Voeg een passend `sleep <seconden>` toe wanneer een achtergrondproces of service aantoonbaar
   stabilisatietijd nodig heeft voordat de volgende stap betrouwbaar is.
+- Baseer de duur van `sleep` bij voorkeur op een eerder gemeten doorlooptijd, rond beperkt naar
+  boven af en controleer daarna read-only. Als het proces nog loopt, wacht kort aanvullend en
+  herhaal nooit de muterende startopdracht.
 - Vermeld dat `sleep` bewust blokkeert en laat pas doorgaan nadat de prompt terugkomt.
 - Voeg geen cosmetische `sleep` toe na een synchroon commando dat zelf pas terugkeert wanneer het
   werk klaar is.

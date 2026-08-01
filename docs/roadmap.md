@@ -109,7 +109,7 @@ Status: in uitvoering.
 
 ### Betrouwbare sitemapjobs
 
-Status: technisch geïmplementeerd; deployment en productievalidatie volgen.
+Status: geïmplementeerd, gedeployed en op 1 augustus 2026 in productie gevalideerd.
 
 - Ingestelde sitemaps aanvullen met sitemapverwijzingen uit `robots.txt`.
 - Zonder verwijzing gecontroleerd `/sitemap.xml` proberen.
@@ -120,6 +120,9 @@ Status: technisch geïmplementeerd; deployment en productievalidatie volgen.
   van HUMAN volledig worden ingelezen.
 - Bij overschrijding van de veiligheidslimiet nooit stil afkappen, maar de job als deels geslaagd
   markeren met het aantal nog niet verwerkte documenten.
+- De productievalidatie met HUMAN verwerkte 193 sitemapdocumenten in circa 49 seconden en vond
+  3.745 unieke URL's. De eerdere limiet van 100 documenten vond slechts 2.789 URL's; de correctie
+  maakte daardoor 956 aanvullende URL's zichtbaar.
 
 ### Visuele vernieuwing publieke website
 

@@ -10,7 +10,9 @@ Bij terminalcommando's: noem het juiste bestaande terminalvenster, geef één di
 genummerd blok per stap, vermeld of het commando blokkeert of interactief is, geef de verwachte
 duur, normaal gedrag tijdens het wachten, het gereed-signaal en wanneer ik uitvoer moet delen. Voeg
 alleen een passend sleep-commando toe als een achtergrondproces werkelijk stabilisatietijd nodig
-heeft. Laat mij bij fouten stoppen en controleer na een afgebroken muterend commando eerst de status.
+heeft. Baseer de duur bij voorkeur op gemeten doorlooptijd, rond beperkt naar boven af en controleer
+daarna read-only; herhaal een muterende startopdracht nooit omdat een job nog loopt. Laat mij bij
+fouten stoppen en controleer na een afgebroken muterend commando eerst de status.
 
 Werk terminal-first, inspecteer eerst de bestaande projectmap, hergebruik bruikbare code, respecteer
 onbekende wijzigingen en werk naar een getest resultaat. Gebruik migrations voor databasewijzigingen
