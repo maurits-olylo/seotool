@@ -6,15 +6,15 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 
 ## Huidige status
 
-- Actieve ontwikkellijn: Release 1 voor retentie en productie-integriteit. Publieke
+- Actieve ontwikkellijn: Release 2 voor queuecapaciteit en operationele stabiliteit. Publieke
   website-inschatting en friends-and-family volgen in Release 13.
-- Productie en de geïsoleerde NAS-stagingomgeving zijn gezond en staan op migratie `0035`.
+- Productie en de geïsoleerde NAS-stagingomgeving zijn gezond en staan op migratie `0036`.
 - De elementlocatie-cleanup is op 1 augustus 2026 afgerond en operationeel gecontroleerd.
 - Automatische elementlocatieretentie is op 1 augustus 2026 in productie gevalideerd: vijf
   persistente operaties zijn geslaagd en één operatie hervatte zichzelf begrensd via scheduler en
   maintenancequeue.
-- Laatste volledige lokale kwaliteitscontrole vóór de autovacuumrelease: 318 tests geslaagd;
-  gerichte crawl-deployment- en retentiontests zijn na de statuscorrectie opnieuw geslaagd.
+- Laatste volledige lokale kwaliteitscontrole: 337 tests geslaagd; de productiehotfix voor
+  begrensd PostgreSQL-parallelisme is aanvullend met acht gerichte retentietests gevalideerd.
 - Multi-client domeinisolatie is op 2026-07-19 in productie bevestigd: `jobsatpearle.be` komt niet
   meer als actieve URL van `werkenbijgrandvision.nl` voor.
 
@@ -26,9 +26,10 @@ releasevolgorde is leidend voor planning en deployment. Interne mijlpalen worden
 gedeployed; per release volgt één integrale kwaliteitscontrole, stagingproef en productiedeployment.
 
 1. **Retentie en productie-integriteit** — versieerbaar beleid, volledige audit, veilige
-   multi-datasetretentie en bewijsbehoud. Status: lokaal geïmplementeerd en met migratie `0036` op
-   staging gevalideerd; productievalidatie volgt. Alle negen stagingoperaties eindigden als
-   `succeeded`, de audit werd opgeslagen en API en database bleven gezond.
+   multi-datasetretentie en bewijsbehoud. Status: afgerond en op 2 augustus 2026 met migratie
+   `0036` op staging en productie gevalideerd. Alle 45 productieoperaties voor vijf websites en
+   negen datasets eindigden als `succeeded`; 185.741 oude, onbeschermde elementlocaties zijn
+   verwijderd, de audit is opgeslagen, API en database zijn gezond en de crawl-drain is opgeheven.
 2. **Queuecapaciteit en operationele stabiliteit** — admission, prioriteiten, backpressure,
    dead-letter-afhandeling, sitemapregressies en resterend runbook.
 3. **URL Inspection, hreflang en canonical-integriteit.**
