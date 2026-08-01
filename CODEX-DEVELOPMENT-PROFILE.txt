@@ -33,6 +33,10 @@ TERMINALWERKWIJZE
   - bestaande NAS-shell;
   - Linux-workerterminal.
 - Geef genummerde commandoblokken die één voor één volledig gekopieerd en geplakt kunnen worden.
+- Presenteer een vooraf lokaal geteste SEO Monitor-release standaard in precies twee blokken:
+  eerst upload vanuit de lokale Mac-terminal, daarna één volledige `&&`-keten in de bestaande
+  NAS-shell voor checksum, uitpakken, build, migratie, herstart en alle controles. Vraag niet na
+  iedere tussenstap opnieuw om bevestiging; de keten stopt bij de eerste fout.
 - Vermeld vóór ieder blok of het:
   - direct gereed is;
   - blokkeert tot voltooiing;

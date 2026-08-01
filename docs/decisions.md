@@ -888,3 +888,18 @@ Gevolg: onderbroken werk kan zonder dubbele verwijdering worden hervat, een grot
 monopoliseert de worker niet onbeperkt en andere websites blijven beschikbaar. GSC- en
 interne-linkretentie blijven afzonderlijke beleidsbesluiten. Migratie `0035` voegt alleen een lege
 operatietabel en indexes toe en vereist daarom geen extra productieback-up.
+## 2026-08-02 — Releases worden als twee gecontroleerde terminalblokken aangeboden
+
+Context: stapsgewijze bevestiging na checksum, uitpakken, build, migratie en healthchecks maakte
+een aantoonbaar geteste release onnodig traag. De stagingrelease van migratie `0036` is succesvol
+uitgevoerd met één uploadblok en één NAS-keten.
+
+Besluit: presenteer een vooraf lokaal geteste release standaard in twee blokken. Het eerste blok
+streamt het exacte `git archive` vanuit de lokale Mac-terminal. Het tweede blok draait in de al
+geopende NAS-shell als één `&&`-keten en bevat checksum, uitpakken, omgevingsspecifieke Compose-
+configuratie, build, migratie, herstart, passende wachttijd, status, inhoudelijke controle en
+healthcheck. Productie activeert vóór mutaties altijd de veilige crawl-drain.
+
+Gevolg: de keten stopt automatisch bij de eerste fout en vraagt niet na iedere geslaagde stap om
+bevestiging. Checks worden niet overgeslagen; ze worden juist in één reproduceerbare releasegang
+gebundeld. Workerherstarts gebruiken minimaal `sleep 30`.

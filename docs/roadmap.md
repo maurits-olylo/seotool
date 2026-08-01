@@ -26,8 +26,9 @@ releasevolgorde is leidend voor planning en deployment. Interne mijlpalen worden
 gedeployed; per release volgt één integrale kwaliteitscontrole, stagingproef en productiedeployment.
 
 1. **Retentie en productie-integriteit** — versieerbaar beleid, volledige audit, veilige
-   multi-datasetretentie en bewijsbehoud. Status: lokaal geïmplementeerd en getest; staging- en
-   productievalidatie volgen.
+   multi-datasetretentie en bewijsbehoud. Status: lokaal geïmplementeerd en met migratie `0036` op
+   staging gevalideerd; productievalidatie volgt. Alle negen stagingoperaties eindigden als
+   `succeeded`, de audit werd opgeslagen en API en database bleven gezond.
 2. **Queuecapaciteit en operationele stabiliteit** — admission, prioriteiten, backpressure,
    dead-letter-afhandeling, sitemapregressies en resterend runbook.
 3. **URL Inspection, hreflang en canonical-integriteit.**

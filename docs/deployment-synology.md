@@ -142,6 +142,26 @@ Werk met twee vaste terminalvensters: één lokale Mac-shell voor archief en upl
 geopende interactieve NAS-shell voor alle controles en Docker-handelingen. Na de upload is dus
 geen tweede SSH-login nodig.
 
+### Voorkeursvorm: twee blokken per release
+
+Presenteer een vooraf lokaal geteste release voortaan in precies twee kopieerbare blokken:
+
+1. **Lokale Mac-terminal:** stream het definitieve `git archive` naar `/tmp` op de NAS.
+2. **Bestaande NAS-shell:** voer checksumcontrole, uitpakken, Compose-configuratie, build,
+   migratie, herstart, passende stabilisatiewachtijd, containerstatus, inhoudelijke validatie en
+   healthcheck uit als één `&&`-keten.
+
+Door `&&` stopt de keten bij de eerste fout. Vraag niet na iedere geslaagde tussenstap opnieuw om
+bevestiging. De gebruiker controleert de getoonde checksum zelf en deelt bij succes alleen de
+relevante uitvoer vanaf migratie of inhoudelijke validatie. Gebruik na een workerherstart minimaal
+`sleep 30`; kies voor andere services een aantoonbaar passende wachttijd en laat de afsluitende
+healthcheck beslissend zijn.
+
+De keten verschilt per omgeving en release: staging gebruikt `.env.staging` en
+`compose.staging.yaml`; productie gebruikt `compose.yaml` plus `compose.prod.yaml` en altijd eerst
+de veilige crawl-drain. Herbouw alleen geraakte services en voeg een inhoudelijke controle toe die
+de nieuwe functionaliteit daadwerkelijk raakt.
+
 ```bash
 git archive --format=tar.gz --output=/tmp/<release>.tar.gz <commit>
 shasum -a 256 /tmp/<release>.tar.gz

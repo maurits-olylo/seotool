@@ -91,6 +91,12 @@ Geef terminalinstructies voortaan in deze vaste vorm:
   `lokale Mac-terminal` of `bestaande NAS-shell`.
 - Deel risicodragende of langdurige handelingen op in genummerde commandoblokken die één voor één
   kunnen worden gekopieerd en geplakt.
+- Uitzondering voor een vooraf lokaal geteste release: geef standaard precies twee blokken. Blok 1
+  uploadt vanuit de lokale Mac-terminal het `git archive` via de vaste streaming-SSH-route. Blok 2
+  voert in de bestaande NAS-shell checksumcontrole, uitpakken, Compose-configuratie, build,
+  migratie, herstart, passende `sleep`, status-, inhoudelijke en healthcontroles uit als één
+  `&&`-keten. De keten moet bij de eerste fout stoppen. Vraag niet na iedere geslaagde tussenstap
+  opnieuw om bevestiging; laat alleen bij een fout stoppen en de actuele uitvoer delen.
 - Vermeld per blok of het commando blokkeert, wat ongeveer zichtbaar gebeurt en dat de gebruiker
   pas doorgaat zodra de normale prompt terugkomt.
 - Wanneer stap 4 afhankelijk is van services of migraties uit stap 3 die kort moeten stabiliseren,
