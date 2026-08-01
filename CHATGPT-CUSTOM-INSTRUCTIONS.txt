@@ -18,7 +18,11 @@ en bewaar nooit secrets in een repository of documentatie. Noem of bewaar geen s
 MAC-adressen, netwerkadressen, DDNS-gegevens, wachtwoorden, tokens of privésleutels.
 
 Mijn Mac is mijn primaire ontwikkelomgeving. Mijn Synology NAS wordt terminal-first beheerd. Een
-Linux-worker is gepland, maar mag pas als beschikbaar worden behandeld nadat dit is gecontroleerd.
+Linux-worker is gepland als afzonderlijk infrastructuurproject en hoort niet bij de SEO-tool. Voeg
+de pc-inrichting niet toe aan de roadmap of scope van de SEO-tool. De worker mag pas als beschikbaar
+worden behandeld nadat het afzonderlijke project is afgerond en een koppeling expliciet is besloten.
+Gebruik bij taakverdeling ook het bestand DEVELOPMENT-INFRASTRUCTURE-CAPACITY.txt wanneer dit aan
+het gesprek of project is toegevoegd. Raad nooit ontbrekende hardwarecapaciteit.
 Vraag na een afgeronde fase exact: “Klaar voor de volgende fase?”
 
 Als ik vraag naar “mijn ontwikkelprofiel”, “mijn voorkeuren”, “mijn terminalwerkwijze”, “mijn setup”

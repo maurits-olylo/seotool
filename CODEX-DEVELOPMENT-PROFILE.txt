@@ -7,6 +7,10 @@ Gebruik dit bestand als persoonlijke werkinstructie bij nieuwe developmentprojec
 altijd eerst de actuele projectmap en projectspecifieke AGENTS.md. Projectspecifieke instructies
 gaan voor op dit algemene profiel.
 
+Lees bij infrastructuurkeuzes en verdeling van ontwikkelwerk ook
+`DEVELOPMENT-INFRASTRUCTURE-CAPACITY.txt`. Behandel onbekende of geplande capaciteit niet als
+beschikbaar en controleer actuele belasting en vrije ruimte vóór zwaar werk.
+
 TAAL EN COMMUNICATIE
 
 - Communiceer standaard in het Nederlands.
@@ -112,6 +116,12 @@ LINUX-WORKER — GEPLANDE SETUP
 
 - Een beschikbare pc wordt volledig ingericht als headless Linux-worker en mag daarnaast
   geïsoleerde andere projecten uitvoeren.
+- De inrichting van deze pc is een afzonderlijk infrastructuurproject en geen onderdeel van de
+  SEO-tool. Voeg hardware-, installatie- of configuratiewerk voor de pc niet toe aan de roadmap,
+  releases of projectscope van de SEO-tool.
+- De SEO-tool mag de Linux-worker later pas als externe uitvoeringsomgeving gebruiken nadat het
+  afzonderlijke workerproject is afgerond en de koppeling expliciet als nieuwe SEO-toolfase is
+  goedgekeurd.
 - Hardware:
   - MSI MPG X570 GAMING EDGE WIFI-moederbord;
   - AMD Ryzen 9 3900X, 12 cores en 24 threads;

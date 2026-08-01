@@ -1,0 +1,93 @@
+DEVELOPMENT INFRASTRUCTURE CAPACITY
+Versie: 2026-08-01
+
+DOEL
+
+Gebruik deze inventaris samen met CODEX-DEVELOPMENT-PROFILE.txt om ontwikkel-, test-, build-,
+productie-, staging- en back-uptaken later optimaal over de beschikbare systemen te verdelen.
+Controleer actuele vrije opslag, belasting en bereikbaarheid altijd opnieuw vóór zwaar werk.
+
+AFBAKENING
+
+- Noteer geen serienummers, MAC-adressen, IP-adressen, DDNS-gegevens of secrets.
+- Een geplande rol is geen bewijs dat het systeem al voor die rol is ingericht.
+- De pc/Linux-worker is een afzonderlijk infrastructuurproject en geen onderdeel van de SEO-tool.
+- Een toekomstige koppeling tussen projecten vereist een afzonderlijk, expliciet besluit.
+
+MACBOOK — PRIMAIRE ONTWIKKELOMGEVING
+
+Status: actief en lokaal gecontroleerd op 1 augustus 2026.
+
+- Model: MacBook Pro.
+- Modelidentificatie: MacBookPro15,4.
+- CPU: 4 cores; exact processormodel nog niet vastgelegd.
+- Werkgeheugen: 8 GB.
+- Lokale rootopslag: bestandssysteem rapporteerde 113 GiB totale capaciteit en 11 GiB beschikbaar
+  tijdens de meting; APFS-volume- en fysieke SSD-capaciteit moeten nog afzonderlijk worden
+  geïnventariseerd.
+- Rol: primaire werkplek voor Codex, broncode, Git, releasearchieven en terminalbeheer.
+- Capaciteitsadvies: geschikt voor ontwikkeling, review en lichte lokale controles; zware Docker-
+  builds, volledige crawls en omvangrijke databases bij voorkeur elders uitvoeren.
+
+SYNOLOGY NAS — HUIDIGE PRODUCTIE EN STAGING
+
+Status: actief voor de SEO-tool.
+
+- Fabrikant/platform: Synology NAS; exact model en CPU nog niet vastgelegd in deze inventaris.
+- Werkgeheugen: nog te inventariseren.
+- HDD's: aantal, merk, model, nominale capaciteit, RAID/SHR-indeling en vrije ruimte nog te
+  inventariseren.
+- SSD's/cache: aanwezigheid, merk, model, nominale capaciteit en vrije ruimte nog te inventariseren.
+- Applicatiecapaciteit: draait momenteel productie en geïsoleerde staging via Docker Compose.
+- Bekende operationele grens: NAS-CPU is de huidige begrenzende factor; staging heeft lagere
+  relatieve CPU-prioriteit en harde geheugenlimieten.
+- Rol: huidige productie, staging, persistente opslag, back-ups en herstelproeven.
+- Toekomstige rol: staging-, back-up- en herstelplatform nadat publieke productie naar een VPS is
+  verhuisd.
+
+PC — GEPLANDE HEADLESS LINUX-WORKER
+
+Status: hardware beschikbaar; Windows 11 is momenteel geïnstalleerd. Linux-inrichting is een
+afzonderlijk, nog niet uitgevoerd project.
+
+- Fabrikant/model: Micro-Star International, MS-7C37.
+- Moederbord: MSI MPG X570 GAMING EDGE WIFI, versie 1.0.
+- CPU: AMD Ryzen 9 3900X, 12 cores en 24 threads, opgegeven maximum 3.800 MHz.
+- Virtualisatie: ondersteund.
+- Werkgeheugen: 31,9 GB, praktisch 32 GB.
+- GPU: NVIDIA GeForce RTX 2080 SUPER.
+- Opslagmedium: Samsung SSD 970 EVO, 1 TB nominaal, NVMe, status gezond.
+- Windows-volume: 930,6 GB bruikbaar en 588 GB vrij tijdens de aangeleverde meting.
+- Netwerk: bedrade aansluiting is voorzien; actuele snelheid moet na Linux-installatie worden
+  gemeten.
+- Beoogde rol na afzonderlijke inrichting: builds, volledige tests, linting, migration- en
+  herstelproeven, zware crawlexperimenten en later eventueel CI, Playwright of lokale AI.
+- Gebruik voor meerdere projecten gescheiden mappen, Compose-projecten, volumes, netwerken,
+  environmentbestanden en resourcegrenzen.
+
+VPS — TOEKOMSTIGE PUBLIEKE PRODUCTIE
+
+Status: toekomstige omgeving; concrete provider en capaciteit zijn nog niet vastgelegd.
+
+- Besturingssysteem/bediening: Ubuntu met Plesk is voorzien.
+- CPU/vCPU: nog te inventariseren.
+- Werkgeheugen: nog te inventariseren.
+- Opslagtype, nominale capaciteit en vrije ruimte: nog te inventariseren.
+- Netwerkcapaciteit, datalimiet en back-upvoorziening: nog te inventariseren.
+- Rol: later de volledige publieke productiestack; geen verdeling van één productiestack over VPS
+  en NAS.
+- NAS-afhankelijkheid: publieke productie moet na migratie blijven functioneren bij uitval van NAS
+  of thuisverbinding.
+
+LATERE CAPACITEITSPLANNING
+
+Meet voor een optimale taakverdeling minimaal:
+
+1. CPU-, geheugen-, schijf- en netwerkbelasting tijdens builds, tests en crawls.
+2. Crawlduur en databasegroei per 100, 1.000 en 10.000 relevante URL's.
+3. Vrije opslag, I/O-latency en herstelduur per omgeving.
+4. Gelijktijdige belasting waarbij productie gezond blijft.
+
+Werk deze inventaris bij zodra NAS- of VPS-specificaties beschikbaar zijn of de pc als Linux-worker
+is ingericht. Bewaar bij metingen altijd de datum en maak onderscheid tussen nominale, bruikbare en
+actueel beschikbare capaciteit.
