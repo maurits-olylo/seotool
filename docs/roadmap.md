@@ -6,8 +6,8 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 
 ## Huidige status
 
-- Actieve ontwikkellijn: publieke website-inschatting en pakketadvies, gevolgd door voorbereiding
-  van een besloten friends-and-family-release.
+- Actieve ontwikkellijn: gebundelde Release A voor productieafronding en operationele
+  betrouwbaarheid. Publieke website-inschatting en friends-and-family volgen in Release F.
 - Productie en de geïsoleerde NAS-stagingomgeving zijn gezond en staan op migratie `0035`.
 - De elementlocatie-cleanup is op 1 augustus 2026 afgerond en operationeel gecontroleerd.
 - Automatische elementlocatieretentie is op 1 augustus 2026 in productie gevalideerd: vijf
@@ -17,6 +17,47 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
   gerichte crawl-deployment- en retentiontests zijn na de statuscorrectie opnieuw geslaagd.
 - Multi-client domeinisolatie is op 2026-07-19 in productie bevestigd: `jobsatpearle.be` komt niet
   meer als actieve URL van `werkenbijgrandvision.nl` voor.
+
+## Gebundelde uitvoeringsplanning vanaf 2 augustus 2026
+
+De resterende roadmap wordt voortaan in grotere, samenhangende releases uitgevoerd. De bestaande
+secties hieronder blijven de inhoudelijke specificatie en behouden hun gerealiseerde status. Deze
+releasevolgorde is leidend voor planning en deployment. Interne mijlpalen worden niet afzonderlijk
+gedeployed; per release volgt één integrale kwaliteitscontrole, stagingproef en productiedeployment.
+
+1. **Release A — Productieafronding en operationele betrouwbaarheid**
+   - Rond retentie per datatype, multi-clientvalidatie, crawl-admission, queuebeleid,
+     sitemapregressies en het operationele runbook af.
+   - Valideer tevens exports, URL-overzicht, live elementlocaties, periodieke volledige crawls en
+     resterende taak- en verificatieworkflows die technisch al bestaan.
+2. **Release B — Technische SEO-dekking**
+   - Lever URL Inspection, hreflang, soft 404, canonical-integriteit, begrensde
+     JavaScript-rendering, sitemap-/robotskwaliteit en het asset- en mediaregister als één pakket.
+   - Voeg Lighthouse/CrUX en contextuele structured data toe waar de databronnen en quotas dit
+     betrouwbaar toelaten.
+3. **Release C — Begrijpelijk actieplatform**
+   - Rond diagnoses, aanbevelingen, uitvoeringstaken, centrale URL-weergave, crawldiepte,
+     gerichte exports, notificaties en UX/UI-polish gezamenlijk af.
+4. **Release D — Analytics, content en opportunities**
+   - Voeg Matomo, analytics-meetkwaliteit, zoekintentie, contentkwaliteit en -veroudering,
+     kannibalisatie, interne-linkkansen, opportunity-engine en contextuele data-assistent samen.
+5. **Release E — Externe marktdata en resultaatmeting**
+   - Introduceer het genormaliseerde externe-linkmodel, één eerste betaalde dataprovider,
+     SERP-/concurrentiedata, verklaarbare prioritering, effectmeting en klant-/managementrapportage.
+6. **Release F — Publieke ervaring en onboarding**
+   - Rond website-inschatting, publieke vraagassistent, eerlijke toolvergelijkingen,
+     invitation-only onboarding, websiteverificatie en meetvalidatie af.
+   - Pakketdefinitie en commerciële teksten volgen pas na de bestaande readinessgates.
+7. **Release G — Begrensde generatieve AI**
+   - Bouw eerst providerabstractie, gebruiksregistratie, budgetten, prijsbevestiging, audit en
+     veiligheidsregels; activeer daarna alleen de goedgekeurde kleine generatieve functies.
+
+Grote releases betekenen niet dat onverenigbare risico's ongescheiden worden uitgevoerd. Iedere
+migratie blijft herhaalbaar en controleerbaar. Destructieve dataverwerking, providerkosten en
+commerciële prijsbesluiten krijgen binnen de release een expliciete gate. De volledige vergelijking
+met de aangeleverde roadmap staat in `docs/roadmap-coverage-2026-08-02.md`. De daarin gemarkeerde
+uitbreidingen, nieuwe modules en aanvullende acceptatieregels zijn een normatieve bijlage bij deze
+roadmap en behoren tot de resterende scope.
 
 ## Schaalbaarheid — crawl-admission en derde worker
 
