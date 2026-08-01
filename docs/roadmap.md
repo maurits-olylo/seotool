@@ -1250,6 +1250,47 @@ Voorlopige pakketten:
 - Maatwerk: meer dan 10.000 pagina's of afwijkende frequentie, opslag en verwerking.
 - Frequentere monitoring blijft een add-on en dwingt geen groter paginapakket af.
 
+## Publieke vraagassistent en eerlijke doorverwijzing
+
+Status: gepland na de publieke website-inschatting en vóór de definitieve homepageafronding. Dit
+onderdeel staat op de roadmap, maar is niet automatisch een friends-and-family-releasegate zonder
+een afzonderlijk expliciet scopebesluit.
+
+- Voeg op de homepage een compacte zoekbalk toe voor natuurlijke vragen over SEO, crawling,
+  content, monitoring, rapportage, AI-search en aanverwante onderwerpen.
+- Gebruik een redactioneel beheerde, versieerbare kennisbank als feitelijke bron. Leg per intentie
+  uitleg, doelgroep, beschikbare SEO Monitor-functies, beperkingen, roadmapstatus, alternatieven en
+  laatste inhoudelijke controle vast.
+- Begin zonder generatieve AI: normaliseer invoer, herken synoniemen en typefouten, weeg matches in
+  vraag en onderwerp zwaarder dan losse verwante termen en toon een beperkt aantal relevante
+  vervolgvragen.
+- Gebruik AI later alleen optioneel voor intentieherkenning, verduidelijkingsvragen en natuurlijke
+  formulering. AI mag geen productmogelijkheden, roadmapstatus, concurrenteigenschappen of
+  actuele prijzen zelfstandig bedenken.
+- Maak altijd zichtbaar of iets `nu beschikbaar`, `deels beschikbaar`, `gepland` of `niet door SEO
+  Monitor ondersteund` is.
+- Verwijs bij een duidelijke mismatch eerlijk naar een geschiktere toolcategorie en, wanneer
+  redactioneel actueel gecontroleerd, naar concrete alternatieven. Toon commerciële relaties of
+  affiliatebelangen expliciet.
+- Stel bij lage herkenningszekerheid één verduidelijkingsvraag of meld dat er onvoldoende basis is
+  voor een betrouwbaar antwoord; geef nooit schijnzekerheid om toch volledig te lijken.
+- Maak belangrijke antwoorden ook als gewone indexeerbare content beschikbaar. Een uitsluitend
+  client-side zoekvenster geldt niet als vervanging voor inhoudelijke landings- of uitlegpagina's.
+- Gebruik geanonimiseerde zoek- en geen-resultaatstatistieken om kennishiaten te vinden; sla geen
+  onnodige persoonsgegevens of volledige gevoelige vragen op.
+
+Acceptatie:
+
+- Een vraag over crawling legt correct uit wat SEO Monitor doet, voor wie dat relevant is, welke
+  grenzen gelden en wanneer een specialistische crawler geschikter is.
+- Een vraag buiten de productscope levert een eerlijke afbakening en bruikbaar alternatief op,
+  zonder een roadmapfunctie als beschikbaar te presenteren.
+- Ieder antwoord is terug te leiden naar beheerde kennisblokken met status en controledatum.
+- Dezelfde vraag levert zonder AI dezelfde feitelijke kern op; optionele AI verandert alleen
+  interpretatie of formulering en kan bij onzekerheid veilig terugvallen.
+- De homepage toont maximaal vijf overzichtelijke resultaten en blijft snel, toegankelijk en
+  bruikbaar op mobiel.
+
 ## Invitation-only onboardingworkflow
 
 Status: gepland; nog niet in uitvoering. Dit is een verplichte, releaseblokkerende fase vóór de
