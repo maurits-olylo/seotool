@@ -1162,12 +1162,15 @@ de NAS blijft staging-, back-up- en herstelplatform. Het beoogde toekomstige dom
 
 ## Databaseonderhoud na retentionpilot
 
-Status: Floris-pilot afgerond; tabelspecifieke autovacuumrelease gereed voor staging.
+Status: Floris-pilot en eerste Schipper-venster afgerond; tabelspecifiek autovacuum actief in
+staging en productie.
 
 - Activeer voor `element_locations` eerder vacuüm en analyse via migratie `0034`.
-- Ruim daarna per afzonderlijk onderhoudsvenster op: Schipper, Amsterdam Economic Board,
+- Schipper: 100.000 verwijderd via twee begrensde aanroepen; 727.605 kandidaten resteren.
+- Ruim daarna per afzonderlijk onderhoudsvenster verder op: Schipper, Amsterdam Economic Board,
   GrandVision en human.nl; begin steeds met 50.000 en begrens een venster op 250.000 rijen.
 - Meet na iedere run health, databasebelasting, dode rijen, tabelomvang en laatste autovacuum.
+- Herhaal een onderbroken verwijdercommando nooit zonder eerst read-only na te tellen.
 - Ontwerp GSC-retentie afzonderlijk; verwijder nog geen historische GSC-rijen.
 
 Acceptatie:

@@ -217,11 +217,22 @@ sudo docker compose -f compose.yaml -f compose.prod.yaml exec -T api \
 ```
 
 De productiepilot voor Floris is afgerond: 95.295 kandidaten zijn verwijderd en 28.312 beschermde
-locaties bleven behouden. Behandel de overige websites in afzonderlijke onderhoudsvensters, in deze
-volgorde: Schipper Kozijnen, Amsterdam Economic Board, werkenbijgrandvision.nl en human.nl. Begin
-ook per website met 50.000 rijen. Verhoog een venster alleen na een gezonde controle en nooit boven
-250.000 rijen. Maak vóór ieder venster een geverifieerde back-up, pauzeer crawls, controleer na elke
-run `/health` en databasebelasting, en hervat crawls ook wanneer `limit_reached=false` is bereikt.
+locaties bleven behouden. Bij Schipper zijn op 1 augustus 2026 door twee afzonderlijke aanroepen
+100.000 kandidaten verwijderd; daarna resteerden 1.025.150 locaties, waarvan 727.605
+opruimkandidaten. De dubbele aanroep ontstond doordat het commando na een terminalonderbreking
+opnieuw werd uitgevoerd, niet doordat één aanroep de ingestelde limiet overschreed.
+
+Behandel de resterende websites in afzonderlijke onderhoudsvensters, in deze volgorde: Schipper
+Kozijnen, Amsterdam Economic Board, werkenbijgrandvision.nl en human.nl. Begin per website met
+50.000 rijen. Verhoog een venster alleen na een gezonde controle en nooit boven 250.000 rijen.
+Pauzeer crawls, controleer na elke run `/health` en databasebelasting, en hervat crawls ook wanneer
+`limit_reached=false` is bereikt. Pas het releasegebonden back-upbeleid hierboven toe; maak niet
+automatisch voor ieder opschoningsvenster een nieuwe back-up.
+
+Wanneer de terminalverbinding tijdens of na een verwijdercommando wordt onderbroken, geldt de
+aanroep als mogelijk uitgevoerd. Herhaal het commando niet. Controleer eerst read-only het totale
+aantal en voer `retention-audit` opnieuw uit. Start pas een nieuw, bewust benoemd venster nadat het
+effect van de vorige aanroep is vastgesteld en vastgelegd.
 
 Controleer na migratie `0034` en na ieder onderhoudsvenster de tabelinstellingen en autovacuum:
 

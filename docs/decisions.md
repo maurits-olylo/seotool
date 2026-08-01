@@ -652,6 +652,11 @@ de productiemigratie bewust geen nieuwe back-up gemaakt; de bestaande geverifiee
 beschikbaar. Datatransformaties, destructieve schemawijzigingen en moeilijk omkeerbare
 bulkmutaties vereisen wel een nieuwe, geverifieerde back-up.
 
+Operationele vervolgmeting: bij Schipper zijn door twee handmatige aanroepen elk exact 50.000
+kandidaten verwijderd. De tweede aanroep volgde na een terminalonderbreking. Daarom wordt een
+onderbroken verwijdercommando voortaan altijd als mogelijk uitgevoerd beschouwd. Eerst volgt een
+read-only telling en nieuwe retentionaudit; direct opnieuw uitvoeren is niet toegestaan.
+
 ## Compacte GSC-deduplicatiesleutels
 
 De unieke GSC-indexen bevatten volledige URL- en zoektermteksten en zijn daardoor groter dan nodig.
