@@ -912,8 +912,9 @@ operationeel auditregister.
 
 Besluit: leg één versieerbaar beleid vast met waarschuwing, admissiongrens, retries en time-out per
 queue. Een lager prioriteitsgetal gaat voor. Bewaar gekozen queue en prioriteit op de crawljob en
-registreer definitieve uitval idempotent in `queue_dead_letters`. De renderqueue blijft uitgeschakeld
-totdat begrensde rendering onderdeel van een latere release is.
+registreer definitieve uitval idempotent in `queue_dead_letters`. De renderqueue blijft zonder
+expliciete featureflag en apart Compose-profiel effectief uitgeschakeld totdat begrensde rendering
+gecontroleerd wordt geactiveerd.
 
 Gevolg: fase 2 kan backpressure en herstel afdwingen zonder queuegedrag uit losse codeconstanten af
 te leiden. Een Redis-reset verwijdert het operationele bewijs van definitieve taakuitval niet.
@@ -928,3 +929,18 @@ Operationeel beheer: openstaande dead letters degraderen de systeemstatus en zij
 superuser zichtbaar. Opnieuw aanbieden gebruikt uitsluitend bekende taaktypen en blijvende ID's,
 controleert de actuele gekoppelde taak en doorloopt opnieuw de queuegrens. Willekeurige functies of
 payloads kunnen niet vanuit het dead-letterrecord worden uitgevoerd.
+
+## 2026-08-02 — Browserrendering is optioneel en verplaatsbaar
+
+Context: Chromium is zwaarder en risicovoller dan een gewone HTTP-crawl. De huidige NAS heeft
+beperkte CPU-capaciteit; de gaming-pc is nog geen ingerichte Linux-worker en mag daarom niet als
+beschikbare capaciteit worden aangenomen.
+
+Besluit: plaats rendering in een eigen container, queue en Compose-profiel. Begrens iedere taak en
+controleer alle browserrequests opnieuw op SSRF. Nieuwe taken vereisen daarnaast expliciet
+`RENDERING_ENABLED=true`. Houd het uitvoercontract vrij van NAS-specifieke paden, zodat dezelfde
+container later na afzonderlijke infrastructuurgoedkeuring op de Linux-worker kan draaien.
+
+Gevolg: normale crawls en de API krijgen geen browserdependency of browserbelasting. Een eerste
+NAS-proef kan klein blijven en latere verplaatsing naar de gaming-pc vereist geen herschrijving van
+de analyse- of databaselogica.

@@ -52,6 +52,12 @@ services:
     mem_limit: 256m
     restart: unless-stopped
 
+  render-worker:
+    env_file: ${STAGING_ENV_FILE:-.env.staging}
+    cpu_shares: 128
+    mem_limit: 768m
+    restart: unless-stopped
+
 volumes:
   staging_postgres_data:
     name: seo-monitor-staging-postgres-data

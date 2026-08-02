@@ -7,6 +7,7 @@ from app.core.config import get_settings
 from app.services.queue_policy import (
     DEFAULT_WEBSITE_PRIORITY,
     MIN_WEBSITE_PRIORITY,
+    QUEUE_POLICY_VERSION,
     queue_policy,
 )
 
@@ -19,6 +20,7 @@ EXPORT_QUEUE = "exports"
 VERIFICATION_QUEUE = "verifications"
 MAINTENANCE_QUEUE = "maintenance"
 SITEMAP_QUEUE = "sitemaps"
+RENDER_QUEUE = "renders"
 
 
 @dataclass(frozen=True)
@@ -71,7 +73,7 @@ def _enqueue(
         job_timeout=policy.job_timeout_seconds,
         at_front=priority == MIN_WEBSITE_PRIORITY,
         meta={
-            "queue_policy_version": "2026-08-02-v1",
+            "queue_policy_version": QUEUE_POLICY_VERSION,
             "priority": priority,
             "max_attempts": len(policy.retry_intervals) + 1,
             **(meta or {}),
@@ -184,5 +186,24 @@ def enqueue_export(export_id: str, *, website_id: str) -> bool:
             "website_id": website_id,
             "job_type": "generate_export",
             "export_id": export_id,
+        },
+    )
+
+
+def enqueue_render_observation(
+    observation_id: str, *, website_id: str, priority: int = DEFAULT_WEBSITE_PRIORITY
+) -> bool:
+    if not get_settings().rendering_enabled:
+        return False
+    return _enqueue(
+        RENDER_QUEUE,
+        "app.services.render_executor.execute_render_observation",
+        observation_id,
+        job_id=f"render-{observation_id}",
+        priority=priority,
+        meta={
+            "website_id": website_id,
+            "job_type": "render_observation",
+            "render_observation_id": observation_id,
         },
     )

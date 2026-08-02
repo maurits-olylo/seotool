@@ -100,6 +100,34 @@ services:
       timeout: 5s
       retries: 3
     restart: unless-stopped
+  render-worker:
+    profiles: ["rendering"]
+    build:
+      context: .
+      dockerfile: Dockerfile.render
+    env_file: .env
+    environment:
+      WORKER_QUEUES: renders
+      WORKER_NAME: render-1
+    command: python -m app.worker
+    init: true
+    shm_size: 256mb
+    pids_limit: 256
+    mem_limit: 1g
+    cpu_shares: 256
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "from app.worker import worker_is_registered; assert worker_is_registered()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
   scheduler:
     build: .
     env_file: .env

@@ -12,6 +12,8 @@ services:
     restart: always
   export-worker:
     restart: always
+  render-worker:
+    restart: always
   scheduler:
     restart: always
   postgres:

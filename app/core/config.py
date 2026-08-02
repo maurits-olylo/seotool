@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     token_encryption_key: str = ""
     initial_superuser_email: str = ""
     initial_superuser_password: str = ""
+    rendering_enabled: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

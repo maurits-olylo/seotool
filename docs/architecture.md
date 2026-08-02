@@ -77,9 +77,16 @@ rendercapaciteit inneemt.
 
 `render_observations` bewaart de browserwaarneming apart en verwijst naar exact één bronsnapshot.
 De vergelijking legt verschillen vast in hoofdcontent, interne links, canonical, robots en
-structured data. Alleen materiële verschillen leveren uitlegbare issues op. De `renders`-queue
-blijft standaard uitgeschakeld totdat een geïsoleerde browserexecutor met tijd-, netwerk- en
-capaciteitsgrenzen beschikbaar en getest is.
+structured data. Alleen materiële verschillen leveren uitlegbare issues op. De aparte
+`render-worker` verwerkt maximaal één RQ-taak tegelijk en begrenst tijd, HTML-grootte, aanvragen,
+downloads en zware resources. Iedere browseraanvraag wordt opnieuw op publieke HTTP(S)-adressen
+gecontroleerd. De worker draait alleen met het Compose-profiel `rendering`; daarnaast blokkeert
+`RENDERING_ENABLED=false` standaard alle nieuwe rendertaken.
+
+De container is niet aan de NAS gebonden. Zodra de geplande gaming-pc in een afzonderlijk project
+als beveiligde Linux-worker is ingericht en de koppeling expliciet is goedgekeurd, kan juist deze
+renderworker daar draaien met dezelfde database- en Redis-contracten. Tot dat moment geldt de pc
+niet als beschikbare capaciteit en blijft een eventuele NAS-proef klein en gecontroleerd.
 
 `category` beschrijft het technische onderwerp van een issue, zoals bereikbaarheid of interne
 links. De afgeleide `scope` beschrijft hoe het product het signaal presenteert: SEO, SEO+UX,

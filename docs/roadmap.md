@@ -75,6 +75,12 @@ gedeployed; per release volgt één integrale kwaliteitscontrole, stagingproef e
    bewaart renderwaarnemingen los van gewone snapshots. De vergelijking verklaart verschillen in
    hoofdcontent, links, canonical, robots en structured data. De renderqueue blijft uit totdat de
    browserexecutor en operationele limieten in de volgende fase integraal zijn gevalideerd.
+   Fase 4 is lokaal geïmplementeerd: een afzonderlijke Chromium-worker heeft een wachtrijlimiet van
+   tien, een taaktime-out van vijf minuten en grenzen voor navigatietijd, aanvragen en HTML-grootte.
+   Downloads en zware resources worden geblokkeerd en ieder netwerkdoel doorloopt opnieuw de
+   SSRF-controle. Activering vereist zowel het Compose-profiel `rendering` als
+   `RENDERING_ENABLED=true`. De container kan later ongewijzigd naar de geplande Linux-worker op
+   de gaming-pc verhuizen; die capaciteit geldt pas na de afzonderlijke inrichting en goedkeuring.
 5. **Lighthouse/CrUX, contextuele structured data en sitemap-/robotskwaliteit.**
 6. **Begrijpelijk actieplatform** — diagnoses, taken, URL-overzicht, crawldiepte, exports,
    notificaties en UX/UI-polish.

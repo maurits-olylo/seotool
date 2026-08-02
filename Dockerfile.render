@@ -1,0 +1,11 @@
+FROM mcr.microsoft.com/playwright/python:v1.61.0-noble
+
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir ".[render]"
+COPY --chown=pwuser:pwuser . .
+
+USER pwuser
+CMD ["python", "-m", "app.worker"]
