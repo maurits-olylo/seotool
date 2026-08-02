@@ -13,6 +13,7 @@ from app.models.integrations import (
 )
 from app.models.issues import Change, Issue
 from app.services.google_integrations import get_google_access_token
+from app.services.url_inspection_analysis import analyze_url_inspection_result
 
 URL_INSPECTION_ENDPOINT = "https://searchconsole.googleapis.com/v1/urlInspection/index:inspect"
 DEFAULT_INSPECTION_LIMIT = 25
@@ -71,13 +72,14 @@ async def sync_url_inspection(
                     {"url": url.normalized_url, "status_code": str(response.status_code)}
                 )
                 continue
-            db.add(
-                inspection_result_from_response(
-                    website_id=website_id,
-                    url_id=url.id,
-                    payload=response.json(),
-                )
+            result = inspection_result_from_response(
+                website_id=website_id,
+                url_id=url.id,
+                payload=response.json(),
             )
+            db.add(result)
+            db.flush()
+            analyze_url_inspection_result(db, result)
             inspected += 1
     mapping.settings = {
         **mapping.settings,

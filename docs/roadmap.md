@@ -49,6 +49,11 @@ gedeployed; per release volgt één integrale kwaliteitscontrole, stagingproef e
    Resultaten jonger dan zeven dagen worden overgeslagen, handmatige batches zijn hard begrensd
    op 200 en historische indexstatus, Google-crawl, robots-, canonical- en rich-resultinformatie
    is via de beveiligde API beschikbaar. De Google-propertylimiet blijft 2.000 per dag.
+   Fase 4 is lokaal geïmplementeerd: actuele Google-observaties worden vergeleken met de nieuwste
+   crawl, sitemapintentie, robotsstatus en opgegeven canonical. Niet-indexering, fetch- en
+   robotsproblemen en een afwijkende Google-canonical leveren uitlegbare issues en bestaande
+   aanbevelingstaken op. Een relevante wijziging na Googles laatste crawl onderdrukt het harde
+   conflict totdat Google de nieuwe toestand heeft kunnen waarnemen.
 4. **Soft 404, begrensde JavaScript-rendering en asset-/mediaregister.**
 5. **Lighthouse/CrUX, contextuele structured data en sitemap-/robotskwaliteit.**
 6. **Begrijpelijk actieplatform** — diagnoses, taken, URL-overzicht, crawldiepte, exports,

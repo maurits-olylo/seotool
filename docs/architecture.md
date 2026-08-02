@@ -182,6 +182,13 @@ worden maximaal 25 URL's per uitvoering en nooit meer dan 200 per handmatige bat
 Iedere observatie blijft historisch bewaard. De API gebruikt dezelfde read-only OAuth-scope als
 de GSC-import en doet nadrukkelijk geen live-indexeerbaarheidstest.
 
+Na opslag vergelijkt de issue-engine de observatie met de nieuwste snapshot en sitemapintentie.
+Alleen belangrijke of in de sitemap opgenomen 200-pagina's met een indexeerbare crawlerstatus
+kunnen een hard Google-conflict krijgen. Wanneer een relevante canonical-, robots-, status- of
+indexeerbaarheidswijziging nieuwer is dan Googles laatste crawl, blijft de afwijking context totdat
+Google opnieuw heeft gecrawld. Een volgende geslaagde inspectie doorloopt de normale issue-lifecycle
+naar opgelost en daarna geverifieerd.
+
 ## Crawl-diepte
 
 Een volledige sitecrawl start op de genormaliseerde basis-URL met diepte 0 en verwerkt interne

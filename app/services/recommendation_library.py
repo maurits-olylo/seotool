@@ -81,7 +81,7 @@ DEFINITIONS = (
     RecommendationDefinition(
         "resolve_server_or_fetch_failure",
         "1",
-        frozenset({"http_5xx", "crawl_timeout", "server_error_incident"}),
+        frozenset({"http_5xx", "crawl_timeout", "server_error_incident", "google_fetch_failed"}),
         "Los server- of bereikbaarheidsfouten op",
         "development",
         (),
@@ -113,7 +113,15 @@ DEFINITIONS = (
     RecommendationDefinition(
         "correct_indexability",
         "2",
-        frozenset({"unexpected_noindex", "conflicting_robots", "robots_txt_blocked"}),
+        frozenset(
+            {
+                "unexpected_noindex",
+                "conflicting_robots",
+                "robots_txt_blocked",
+                "google_not_indexed",
+                "google_robots_blocked",
+            }
+        ),
         "Corrigeer onverwachte indexatieblokkade",
         "seo_analytics",
         ("development",),
@@ -127,7 +135,13 @@ DEFINITIONS = (
     RecommendationDefinition(
         "correct_canonical",
         "2",
-        frozenset({"canonical_other_url", "canonical_other_url_clusters"}),
+        frozenset(
+            {
+                "canonical_other_url",
+                "canonical_other_url_clusters",
+                "google_canonical_mismatch",
+            }
+        ),
         "Corrigeer de canonical",
         "development",
         ("seo_analytics",),

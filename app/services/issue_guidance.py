@@ -79,6 +79,10 @@ SOURCES = {
         "https://web.dev/articles/optimize-lcp",
         "web.dev",
     ),
+    "url_inspection": GuidanceSource(
+        "Google URL Inspection API",
+        "https://developers.google.com/webmaster-tools/v1/urlInspection.index/inspect",
+    ),
 }
 
 SOURCE_KEYS_BY_TYPE = {
@@ -90,8 +94,12 @@ SOURCE_KEYS_BY_TYPE = {
     "missing_h1": ("title",), "multiple_h1": ("title",),
     "missing_meta_description": ("snippet",), "duplicate_meta_description": ("snippet",),
     "canonical_other_url": ("canonical",), "duplicate_content": ("canonical",),
+    "google_canonical_mismatch": ("url_inspection", "canonical"),
     "near_duplicate_content": ("canonical",), "conflicting_robots": ("robots",),
     "unexpected_noindex": ("robots",), "robots_txt_blocked": ("robots_txt",),
+    "google_not_indexed": ("url_inspection",),
+    "google_robots_blocked": ("url_inspection", "robots_txt"),
+    "google_fetch_failed": ("url_inspection", "http"),
     "sitemap_redirect": ("sitemap", "redirect"), "sitemap_404": ("sitemap", "http"),
     "invalid_json_ld": ("structured_data",),
     "missing_breadcrumb_schema": ("breadcrumb",),
@@ -228,6 +236,18 @@ VERIFICATION_BY_TYPE = {
     "multiple_h1": "De volgende crawl vindt de bewust gekozen kopstructuur met één primaire H1.",
     "canonical_other_url": (
         "De canonical wijst na controle bewust naar de gewenste indexeerbare URL."
+    ),
+    "google_canonical_mismatch": (
+        "Een nieuwe URL Inspection-observatie bevestigt de gewenste Google-selected canonical."
+    ),
+    "google_not_indexed": (
+        "Een nieuwe URL Inspection-observatie bevestigt dat Google de bedoelde pagina indexeert."
+    ),
+    "google_robots_blocked": (
+        "Google meldt na een nieuwe inspectie geen robots.txt-blokkade meer."
+    ),
+    "google_fetch_failed": (
+        "Google meldt na een nieuwe inspectie een geslaagde page fetch."
     ),
     "conflicting_robots": (
         "Meta robots en X-Robots-Tag bevatten bij de volgende crawl geen conflict."
