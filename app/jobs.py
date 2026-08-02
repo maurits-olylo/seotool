@@ -23,6 +23,7 @@ from app.services.http_crawler import CrawlError, fetch_metadata, fetch_url
 from app.services.indexation_analysis import analyze_indexation_consistency
 from app.services.internal_link_analysis import analyze_internal_link_quality, detect_orphan_pages
 from app.services.internal_redirect_analysis import analyze_internal_redirect_patterns
+from app.services.international_indexation import analyze_international_indexation
 from app.services.issue_engine import reconcile_issues
 from app.services.job_identifier_analysis import analyze_job_identifier_risk
 from app.services.pagination_analysis import analyze_pagination_series
@@ -556,6 +557,8 @@ def _analyze_stored_site_results(
     analyze_internal_redirect_patterns(db, website_id=website_id, crawl_run_id=crawl_run_id)
     _check_crawl_control(db, job, progress_run)
     analyze_indexation_consistency(db, website_id=website_id, crawl_run_id=crawl_run_id)
+    _check_crawl_control(db, job, progress_run)
+    analyze_international_indexation(db, website_id=website_id, crawl_run_id=crawl_run_id)
     _check_crawl_control(db, job, progress_run)
     analyze_sitemap_redirect_patterns(db, website_id=website_id, crawl_run_id=crawl_run_id)
     _check_crawl_control(db, job, progress_run)

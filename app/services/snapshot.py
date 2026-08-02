@@ -83,6 +83,28 @@ def store_fetch_result(
     url.current_final_url = normalize_url(result.final_url, options=normalization)
     url.is_indexable = is_indexable
     if page:
+        for alternate in page.hreflang_links:
+            try:
+                normalized_alternate = normalize_url(alternate.target_url, options=normalization)
+            except InvalidUrlError:
+                continue
+            if (
+                website
+                and is_url_in_website_scope(
+                    normalized_alternate,
+                    base_url=website.base_url,
+                    allowed_subdomains=allowed_subdomains,
+                )
+                and not is_excluded_url(normalized_alternate, excluded_url_patterns)
+            ):
+                register_url(
+                    db,
+                    website_id=url.website_id,
+                    raw_url=normalized_alternate,
+                    source_type="hreflang",
+                    source_url=url.normalized_url,
+                    ignored_query_parameters=ignored_query_parameters,
+                )
         for link in page.links:
             try:
                 normalized_target = normalize_url(link.target_url, options=normalization)

@@ -70,6 +70,23 @@ def test_metadata_hash_changes_when_hreflang_changes() -> None:
     assert first.metadata_hash != second.metadata_hash
 
 
+def test_preserves_duplicate_canonical_declarations_as_evidence() -> None:
+    page = extract_page(
+        """
+        <html><head>
+          <link rel="canonical" href="/page">
+          <link rel="canonical" href="/page">
+        </head></html>
+        """,
+        "https://example.com/page",
+    )
+
+    assert page.canonical_urls == [
+        "https://example.com/page",
+        "https://example.com/page",
+    ]
+
+
 def test_uses_complete_body_when_page_contains_multiple_article_cards() -> None:
     html = """
     <html><body>

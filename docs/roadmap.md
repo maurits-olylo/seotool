@@ -40,6 +40,10 @@ gedeployed; per release volgt één integrale kwaliteitscontrole, stagingproef e
    snapshots bewaren alle canonical-tags en hreflangverwijzingen, wijzigingen tellen mee in de
    metadatahash en migratie `0038` voegt een historisch URL Inspection-resultaatmodel toe. Externe
    Google-aanroepen, selectiebeleid, validatie en issuegroepering volgen in de volgende fasen.
+   Fase 2 is lokaal geïmplementeerd: volledige crawls valideren canonicaldoelen, ketens, loops,
+   dubbele declarations, hreflangcodes, zelf- en retourverwijzingen, doelstatus,
+   indexeerbaarheid en canonicalconsistentie. Interne hreflangdoelen worden als crawlbron
+   geregistreerd en herhaalde fouten worden door de bestaande template-engine gegroepeerd.
 4. **Soft 404, begrensde JavaScript-rendering en asset-/mediaregister.**
 5. **Lighthouse/CrUX, contextuele structured data en sitemap-/robotskwaliteit.**
 6. **Begrijpelijk actieplatform** — diagnoses, taken, URL-overzicht, crawldiepte, exports,

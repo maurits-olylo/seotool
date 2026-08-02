@@ -158,7 +158,7 @@ def _extract_canonical_urls(soup: BeautifulSoup, page_url: str) -> list[str]:
         if not href:
             continue
         target = _resolve_page_url(page_url, str(href), element="canonical")
-        if target and target not in values:
+        if target:
             values.append(target)
     return values
 
