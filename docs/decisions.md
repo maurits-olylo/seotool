@@ -923,3 +923,8 @@ Crawls blijven bij capaciteitsgebrek duurzaam wachten; integraties worden in een
 schedulercyclus opnieuw aangeboden en interactieve exports of verificaties krijgen een duidelijke
 capaciteitsfout. Alleen definitief mislukte jobs komen in het dead-letterregister. Sitemapwerk is
 gescheiden van overige light checks, maar gebruikt op de NAS dezelfde begrensde lichte worker.
+
+Operationeel beheer: openstaande dead letters degraderen de systeemstatus en zijn alleen voor de
+superuser zichtbaar. Opnieuw aanbieden gebruikt uitsluitend bekende taaktypen en blijvende ID's,
+controleert de actuele gekoppelde taak en doorloopt opnieuw de queuegrens. Willekeurige functies of
+payloads kunnen niet vanuit het dead-letterrecord worden uitgevoerd.

@@ -1045,8 +1045,12 @@ function renderSystemStatus() {
   const crawl = status?.queues?.crawls || unavailable;
   const lightCrawls = status?.queues?.crawls_light || unavailable;
   const fullCrawls = status?.queues?.crawls_full || unavailable;
+  const sitemaps = status?.queues?.sitemaps || unavailable;
+  const verifications = status?.queues?.verifications || unavailable;
   const integrations = status?.queues?.integrations || unavailable;
+  const maintenance = status?.queues?.maintenance || unavailable;
   const exports = status?.queues?.exports || unavailable;
+  const deadLetters = Number(status?.dead_letters?.unresolved || 0);
   const healthy = status?.status === "ok";
   $("#system-status-summary").textContent = healthy ? "Alles operationeel" : "Aandacht nodig";
   $("#system-status-summary").className = `system-summary ${healthy ? "ok" : "degraded"}`;
@@ -1055,13 +1059,18 @@ function renderSystemStatus() {
     : "Workercapaciteit is momenteel niet beschikbaar.";
   $("#crawl-capacity").classList.toggle("degraded", crawl.status !== "ok");
   const entries = [
-    ["API & database", status?.api === "ok" && status?.database === "ok", status?.database === "ok" ? "Bereikbaar" : "Database niet bereikbaar"],
-    ["Light checks", lightCrawls.status === "ok", `${lightCrawls.workers} worker · ${lightCrawls.queued_jobs} in wachtrij`],
-    ["Volledige crawls", fullCrawls.status === "ok", `${fullCrawls.workers} worker · ${fullCrawls.queued_jobs} in wachtrij`],
-    ["Data-importworker", integrations.status === "ok", `${integrations.workers} beschikbaar · ${integrations.queued_jobs} in wachtrij`],
-    ["Exportworker", exports.status === "ok", `${exports.workers} beschikbaar · ${exports.queued_jobs} in wachtrij`],
+    ["API & database", status?.api === "ok" && status?.database === "ok" ? "ok" : "unavailable", status?.database === "ok" ? "Bereikbaar" : "Database niet bereikbaar"],
+    ["Light checks", lightCrawls.status, `${lightCrawls.workers} worker · ${lightCrawls.queued_jobs} in wachtrij`],
+    ["Volledige crawls", fullCrawls.status, `${fullCrawls.workers} worker · ${fullCrawls.queued_jobs} in wachtrij`],
+    ["Sitemaps", sitemaps.status, `${sitemaps.workers} worker · ${sitemaps.queued_jobs} in wachtrij`],
+    ["Verificaties", verifications.status, `${verifications.workers} worker · ${verifications.queued_jobs} in wachtrij`],
+    ["Data-importworker", integrations.status, `${integrations.workers} beschikbaar · ${integrations.queued_jobs} in wachtrij`],
+    ["Onderhoud", maintenance.status, `${maintenance.workers} worker · ${maintenance.queued_jobs} in wachtrij`],
+    ["Exportworker", exports.status, `${exports.workers} beschikbaar · ${exports.queued_jobs} in wachtrij`],
+    ["Definitief mislukte taken", deadLetters === 0 ? "ok" : "blocked", deadLetters ? `${deadLetters} vraagt beoordeling` : "Geen openstaande dead letters"],
   ];
-  $("#system-status-grid").innerHTML = entries.map(([label, ok, detail]) => `<article><span>${label}</span><strong class="${ok ? "ok" : "degraded"}">${ok ? "Operationeel" : "Niet beschikbaar"}</strong><small>${detail}</small></article>`).join("");
+  const statusLabel = {ok: "Operationeel", warning: "Bijna vol", blocked: "Geblokkeerd", degraded: "Aandacht nodig", unavailable: "Niet beschikbaar"};
+  $("#system-status-grid").innerHTML = entries.map(([label, queueStatus, detail]) => `<article><span>${label}</span><strong class="${queueStatus === "ok" ? "ok" : "degraded"}">${statusLabel[queueStatus] || "Aandacht nodig"}</strong><small>${detail}</small></article>`).join("");
 }
 
 function durationLabel(run) {

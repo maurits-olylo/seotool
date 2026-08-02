@@ -88,11 +88,11 @@ releaseback-up.
 
 ## Automatische retentie
 
-Na iedere geslaagde of gedeeltelijk geslaagde volledige crawl wordt één persistente
-retentieoperatie aangemaakt. De scheduler plaatst deze op de maintenancequeue. De
-integration-worker verwijdert per uitvoering maximaal 50.000 oude, probleemvrije
-`element_locations` in batches van 10.000. Een actieve crawl voor dezelfde website laat de operatie
-wachten; een onderbreking wordt vanuit PostgreSQL hervat.
+Na iedere geslaagde of gedeeltelijk geslaagde volledige crawl worden per automatisch datatype
+persistente retentieoperaties aangemaakt. De scheduler plaatst deze op de maintenancequeue. De
+integration-worker verwerkt begrensde batches. Een actieve crawl voor dezelfde website laat de
+operaties wachten; een onderbreking wordt vanuit PostgreSQL hervat. Issue-, taak-, verificatie- en
+auditgeschiedenis blijft permanent bewaard zolang de klant bestaat.
 
 Handmatig alle laatste operaties aanmaken of hervatten:
 
@@ -100,7 +100,9 @@ Handmatig alle laatste operaties aanmaken of hervatten:
 docker compose exec api python -m app.maintenance retention-all
 ```
 
-GSC- en interne-linkretentie vallen niet onder deze automatische cleanup.
+Het actuele versieerbare beleid bewaart GSC-, GA4- en Bing-dagdata 1.098 dagen en interne
+linkdetails 180 dagen, met behoud van actuele runs en bewijs. Snapshots, changes en crawlruns worden
+alleen geaudit en nog niet automatisch verwijderd. Zie `docs/retention-policy.md`.
 
 ## Productie op Synology
 

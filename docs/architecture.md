@@ -142,6 +142,12 @@ begrensd tot vijf worden verhoogd. Sitemapwerk gebruikt een eigen `sitemaps`-que
 worker. Definitieve RQ-uitval roept één idempotente callback aan die het dead-letterrecord bewaart;
 een fout waarvoor nog een retry resteert wordt niet als definitieve uitval geregistreerd.
 
+De interne systeemstatus toont per actieve queue workers, backlog, waarschuwingsgrens en
+admissiongrens. Openstaande dead letters maken de totaalstatus `degraded`. Alleen de superuser kan
+dead letters opvragen, met toelichting afsluiten of gecontroleerd opnieuw aanbieden. Herstel zoekt
+altijd eerst de blijvende crawl-, integratie-, retentie-, export- of verificatietaak op en voert
+opnieuw admission uit; de payload is bewijs en nooit zelfstandig uitvoerbare code.
+
 ## Automatische retentie
 
 Iedere geslaagde of gedeeltelijk geslaagde volledige crawl maakt idempotent één

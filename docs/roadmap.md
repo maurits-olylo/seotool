@@ -35,7 +35,9 @@ gedeployed; per release volgt één integrale kwaliteitscontrole, stagingproef e
    geïmplementeerd: versieerbaar queuebeleid, websiteprioriteit en -limiet, routebewijs op
    crawljobs en een duurzaam dead-lettermodel in migratie `0037`. Fase 2 is lokaal geïmplementeerd:
    centrale admission, backpressure, prioriteitsgestuurd hervatten, aparte sitemapqueue en
-   definitieve dead-letterregistratie. Operationele ontsluiting en regressieafronding volgen.
+   definitieve dead-letterregistratie. Fase 3 is lokaal geïmplementeerd: superuserbeheer voor
+   dead letters, queuegrenzen en uitval in systeemstatus, operationele UI, vier vaste
+   sitemapregressies en het complete incidentrunbook. Integrale releasevalidatie volgt in fase 4.
 3. **URL Inspection, hreflang en canonical-integriteit.**
 4. **Soft 404, begrensde JavaScript-rendering en asset-/mediaregister.**
 5. **Lighthouse/CrUX, contextuele structured data en sitemap-/robotskwaliteit.**

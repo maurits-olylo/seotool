@@ -109,7 +109,11 @@ def enqueue_recommendation_verification(
         verification_id,
         job_id=f"recommendation-verification-{verification_id}",
         priority=priority,
-        meta={"website_id": website_id, "job_type": "recommendation_verification"},
+        meta={
+            "website_id": website_id,
+            "job_type": "recommendation_verification",
+            "verification_id": verification_id,
+        },
     )
 
 
@@ -152,7 +156,11 @@ def enqueue_integration_sync(
         "app.services.integration_sync.synchronize_website_integrations",
         *args,
         job_id=job_id,
-        meta={"website_id": website_id, "job_type": "integration_sync"},
+        meta={
+            "website_id": website_id,
+            "job_type": "integration_sync",
+            "days": days,
+        },
     )
 
 
@@ -162,7 +170,7 @@ def enqueue_retention_operation(operation_id: str, *, attempt: int = 0) -> bool:
         "app.services.retention_operations.execute_retention_operation",
         operation_id,
         job_id=f"retention-{operation_id}-{attempt}",
-        meta={"job_type": "retention_operation"},
+        meta={"job_type": "retention_operation", "operation_id": operation_id},
     )
 
 
@@ -172,5 +180,9 @@ def enqueue_export(export_id: str, *, website_id: str) -> bool:
         "app.services.exports.generate_export",
         export_id,
         job_id=f"export-{export_id}",
-        meta={"website_id": website_id, "job_type": "generate_export"},
+        meta={
+            "website_id": website_id,
+            "job_type": "generate_export",
+            "export_id": export_id,
+        },
     )
