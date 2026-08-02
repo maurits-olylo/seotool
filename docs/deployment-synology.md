@@ -59,8 +59,10 @@ komt uit de environment.
 ## Afzonderlijke staging op dezelfde NAS
 
 Staging gebruikt uitsluitend `compose.staging.yaml`, `.env.staging` en de vaste Compose-projectnaam
-`seo-monitor-staging`. De stack bevat alleen API, PostgreSQL en Redis. Er zijn bewust geen workers
-of scheduler opgenomen.
+`seo-monitor-staging`. De standaardstack bevat alleen API, PostgreSQL en Redis. Er zijn bewust geen
+actieve crawlworkers of scheduler opgenomen. Alleen voor een gecontroleerde browserproef kan de
+afzonderlijke renderworker tijdelijk met het profiel `rendering` worden gestart; de featureflag
+blijft daarbij standaard uit.
 
 Maak na het uitpakken van een release in de interactieve NAS-shell een eigen configuratie. Gebruik
 andere geheimen dan productie en plaats uitsluitend synthetische testdata in deze database:
@@ -80,7 +82,7 @@ sudo docker compose --env-file .env.staging -f compose.staging.yaml config \
   | grep -E '127\.0\.0\.1|seo-monitor-staging-(postgres|redis|exports)-data'
 ```
 
-De eerste opdracht moet exact `api`, `postgres` en `redis` tonen. Start daarna eerst de
+De eerste opdracht moet zonder profiel exact `api`, `postgres` en `redis` tonen. Start daarna eerst de
 gegevensdiensten, voer de migraties uit en start de API:
 
 ```bash
