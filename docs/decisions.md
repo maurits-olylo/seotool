@@ -917,3 +917,9 @@ totdat begrensde rendering onderdeel van een latere release is.
 
 Gevolg: fase 2 kan backpressure en herstel afdwingen zonder queuegedrag uit losse codeconstanten af
 te leiden. Een Redis-reset verwijdert het operationele bewijs van definitieve taakuitval niet.
+
+Implementatie: alle enqueuehelpers gebruiken hetzelfde beleid en weigeren boven de admissiongrens.
+Crawls blijven bij capaciteitsgebrek duurzaam wachten; integraties worden in een volgende
+schedulercyclus opnieuw aangeboden en interactieve exports of verificaties krijgen een duidelijke
+capaciteitsfout. Alleen definitief mislukte jobs komen in het dead-letterregister. Sitemapwerk is
+gescheiden van overige light checks, maar gebruikt op de NAS dezelfde begrensde lichte worker.

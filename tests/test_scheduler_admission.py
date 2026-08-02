@@ -8,7 +8,11 @@ from app.models.crawl import CrawlRun
 from app.models.discovery import CrawlJob
 from app.models.system import RetentionOperation
 from app.models.website import Website, WebsiteSettings
-from app.scheduler import schedule_due_jobs, schedule_pending_retention_operations
+from app.scheduler import (
+    dispatch_waiting_crawl_jobs,
+    schedule_due_jobs,
+    schedule_pending_retention_operations,
+)
 
 
 def test_scheduler_creates_only_one_due_job_per_website(monkeypatch) -> None:
@@ -136,3 +140,53 @@ def test_scheduler_requeues_due_retention_operation(monkeypatch) -> None:
 
     assert schedule_pending_retention_operations() == 1
     assert queued == [(operation_id, 1)]
+
+
+def test_waiting_crawls_are_dispatched_in_priority_order(monkeypatch) -> None:
+    queued: list[str] = []
+
+    def enqueue(job_id: str, **_kwargs: object) -> bool:
+        queued.append(job_id)
+        return True
+
+    monkeypatch.setattr("app.scheduler.enqueue_crawl_job", enqueue)
+    with SessionLocal() as db:
+        low = Website(
+            client=Client(name="Low priority client"),
+            name="Low priority website",
+            base_url="https://low-priority.test/",
+        )
+        low.settings = WebsiteSettings(queue_priority=80)
+        high = Website(
+            client=Client(name="High priority client"),
+            name="High priority website",
+            base_url="https://high-priority.test/",
+        )
+        high.settings = WebsiteSettings(queue_priority=10)
+        db.add_all([low, high])
+        db.flush()
+        low_job = CrawlJob(
+            website_id=low.id,
+            job_type="full_site_crawl",
+            status="waiting_for_capacity",
+            queue_priority=80,
+        )
+        high_job = CrawlJob(
+            website_id=high.id,
+            job_type="full_site_crawl",
+            status="waiting_for_capacity",
+            queue_priority=10,
+        )
+        db.add_all([low_job, high_job])
+        db.commit()
+        low_job_id = low_job.id
+        high_job_id = high_job.id
+        low_id = str(low_job_id)
+        high_id = str(high_job_id)
+
+    assert dispatch_waiting_crawl_jobs() == 2
+    assert queued == [high_id, low_id]
+
+    with SessionLocal() as db:
+        assert db.get(CrawlJob, high_job_id).status == "pending"
+        assert db.get(CrawlJob, low_job_id).status == "pending"

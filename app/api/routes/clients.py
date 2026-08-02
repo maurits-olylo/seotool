@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.queue import enqueue_crawl_job
+from app.core.queue import crawl_queue_name, enqueue_crawl_job
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.client import Client
@@ -108,6 +108,8 @@ def onboard_client(
                 "max_response_size": payload.settings.max_response_size,
                 "respect_robots_txt": payload.settings.respect_robots_txt,
             },
+            queue_name=crawl_queue_name("full_site_crawl"),
+            queue_priority=payload.settings.queue_priority,
         )
         db.add(crawl_job)
         if principal.user_id and principal.role != "superuser":
@@ -120,7 +122,15 @@ def onboard_client(
     db.refresh(website)
     db.refresh(crawl_job)
     if get_settings().app_env != "test":
-        enqueue_crawl_job(str(crawl_job.id), job_type=crawl_job.job_type)
+        queued = enqueue_crawl_job(
+            str(crawl_job.id),
+            job_type=crawl_job.job_type,
+            priority=crawl_job.queue_priority,
+            website_id=str(crawl_job.website_id),
+        )
+        if queued is False:
+            crawl_job.status = "waiting_for_capacity"
+            db.commit()
     return {"client": client, "website": website, "crawl_job": crawl_job}
 
 

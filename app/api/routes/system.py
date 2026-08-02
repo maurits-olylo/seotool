@@ -95,7 +95,22 @@ def system_status(
                     "workers": 0,
                     "queued_jobs": 0,
                 },
+                "sitemaps": {
+                    "status": "unavailable",
+                    "workers": 0,
+                    "queued_jobs": 0,
+                },
+                "verifications": {
+                    "status": "unavailable",
+                    "workers": 0,
+                    "queued_jobs": 0,
+                },
                 "integrations": {
+                    "status": "unavailable",
+                    "workers": 0,
+                    "queued_jobs": 0,
+                },
+                "maintenance": {
                     "status": "unavailable",
                     "workers": 0,
                     "queued_jobs": 0,

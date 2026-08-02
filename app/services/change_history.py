@@ -9,6 +9,7 @@ from app.models.issues import Change
 from app.models.website import Website
 
 ACTIVE_CRAWL_STATUSES = {
+    "waiting_for_capacity",
     "pending",
     "running",
     "pause_requested",

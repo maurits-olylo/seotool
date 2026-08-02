@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.queue import enqueue_integration_sync
+from app.core.queue import INTEGRATION_QUEUE, enqueue_integration_sync, queue_has_capacity
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.client import Client
@@ -470,6 +470,8 @@ def synchronize_integration_history(
     principal: Principal = Depends(require_api_key),
 ) -> dict[str, str | int]:
     require_website_access(db, principal, website_id, admin=True)
+    if not queue_has_capacity(INTEGRATION_QUEUE):
+        raise HTTPException(status_code=503, detail="De integratiewachtrij is tijdelijk vol")
     now = datetime.now(UTC).isoformat()
     mappings = list(
         db.scalars(

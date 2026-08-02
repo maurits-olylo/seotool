@@ -9,6 +9,7 @@ from app.models.client import Client
 from app.models.discovery import CrawlJob
 from app.models.system import QueueDeadLetter
 from app.models.website import Website, WebsiteSettings
+from app.services.queue_failures import record_dead_letter
 from app.services.queue_policy import QUEUE_POLICIES, queue_policy, serialized_queue_policy
 
 SessionLocal = sessionmaker(bind=engine)
@@ -86,3 +87,69 @@ def test_crawl_job_priority_enforces_bounds() -> None:
         )
         with pytest.raises(IntegrityError):
             db.commit()
+
+
+def test_terminal_queue_failure_is_persisted_once() -> None:
+    class FailedJob:
+        id = "failed-job"
+        origin = "crawls_full"
+        func_name = "app.jobs.execute_crawl_job"
+        should_retry = False
+        meta = {"job_type": "full_site_crawl", "max_attempts": 4}
+
+    record_dead_letter(FailedJob(), None, RuntimeError, RuntimeError("crawl failed"), None)
+    record_dead_letter(FailedJob(), None, RuntimeError, RuntimeError("crawl failed"), None)
+
+    with SessionLocal() as db:
+        records = db.query(QueueDeadLetter).all()
+    assert len(records) == 1
+    assert records[0].attempt_count == 4
+    assert records[0].error_message == "crawl failed"
+
+
+def test_retryable_queue_failure_is_not_dead_lettered() -> None:
+    class RetryableJob:
+        id = "retry-job"
+        origin = "crawls_full"
+        func_name = "app.jobs.execute_crawl_job"
+        should_retry = True
+        meta = {"job_type": "full_site_crawl", "max_attempts": 4}
+
+    record_dead_letter(RetryableJob(), None, RuntimeError, RuntimeError("temporary"), None)
+
+    with SessionLocal() as db:
+        assert db.query(QueueDeadLetter).count() == 0
+
+
+def test_configured_website_crawl_queue_limit_is_enforced(client) -> None:  # type: ignore[no-untyped-def]
+    customer = client.post("/api/v1/clients", json={"name": "Queue limit client"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": customer["id"],
+            "name": "Queue limit website",
+            "base_url": "https://queue-limit.test/",
+        },
+    ).json()
+    settings = client.get(f"/api/v1/websites/{website['id']}/settings").json()
+    settings["crawl_queue_limit"] = 2
+    updated = client.put(f"/api/v1/websites/{website['id']}/settings", json=settings)
+    assert updated.status_code == 200
+
+    first = client.post(
+        "/api/v1/crawl-jobs",
+        json={"website_id": website["id"], "job_type": "fetch_sitemap"},
+    )
+    second = client.post(
+        "/api/v1/crawl-jobs",
+        json={"website_id": website["id"], "job_type": "light_check"},
+    )
+    blocked = client.post(
+        "/api/v1/crawl-jobs",
+        json={"website_id": website["id"], "job_type": "full_site_crawl"},
+    )
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"] == "De crawlwachtrijlimiet is bereikt"

@@ -194,7 +194,7 @@ def test_recommendation_task_api_lifecycle(client, monkeypatch) -> None:  # type
     queued: list[str] = []
     monkeypatch.setattr(
         "app.services.recommendation_verifications.enqueue_recommendation_verification",
-        queued.append,
+        lambda verification_id, **_kwargs: queued.append(verification_id),
     )
     customer = client.post("/api/v1/clients", json={"name": "Task API client"}).json()
     website = client.post(

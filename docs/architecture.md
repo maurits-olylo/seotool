@@ -135,6 +135,13 @@ werk onafhankelijk van Redis, zodat beoordeling en gecontroleerd opnieuw aanbied
 blijven. De renderqueue staat in de eerste beleidsversie expliciet uit totdat begrensde rendering
 wordt geïmplementeerd.
 
+Enqueueing loopt centraal door dit beleid. Een volle queue accepteert geen extra werk. Crawlwerk
+blijft dan in PostgreSQL als `waiting_for_capacity` staan en wordt door de scheduler opnieuw
+aangeboden in websiteprioriteitsvolgorde. De standaardlimiet blijft één crawl per website en kan
+begrensd tot vijf worden verhoogd. Sitemapwerk gebruikt een eigen `sitemaps`-queue op de lichte
+worker. Definitieve RQ-uitval roept één idempotente callback aan die het dead-letterrecord bewaart;
+een fout waarvoor nog een retry resteert wordt niet als definitieve uitval geregistreerd.
+
 ## Automatische retentie
 
 Iedere geslaagde of gedeeltelijk geslaagde volledige crawl maakt idempotent één

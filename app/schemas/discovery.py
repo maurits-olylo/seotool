@@ -62,6 +62,8 @@ class CrawlJobRead(Timestamped):
     started_at: datetime | None
     finished_at: datetime | None
     attempt_count: int
+    queue_name: str | None = None
+    queue_priority: int = 50
     error_message: str | None
     settings_snapshot: dict[str, object]
     queue_position: int | None = None

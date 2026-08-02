@@ -32,7 +32,14 @@ from app.services.retention_audit import (
 from app.services.retention_policy import AUTOMATIC_DATASETS, POLICIES, POLICY_VERSION
 
 logger = structlog.get_logger()
-ACTIVE_CRAWL_STATUSES = ("pending", "running", "pause_requested", "paused", "cancel_requested")
+ACTIVE_CRAWL_STATUSES = (
+    "waiting_for_capacity",
+    "pending",
+    "running",
+    "pause_requested",
+    "paused",
+    "cancel_requested",
+)
 RETRY_DELAY = timedelta(minutes=10)
 RUNNING_TIMEOUT = timedelta(hours=1)
 DATE_MODELS = {

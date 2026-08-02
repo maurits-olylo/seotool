@@ -5,6 +5,7 @@ from app.core.queue import (
     INTEGRATION_QUEUE,
     LIGHT_CRAWL_QUEUE,
     MAINTENANCE_QUEUE,
+    SITEMAP_QUEUE,
     enqueue_crawl_job,
     enqueue_integration_sync,
     enqueue_retention_operation,
@@ -13,6 +14,7 @@ from app.core.queue import (
 
 def test_light_crawl_jobs_use_bounded_light_queue(monkeypatch) -> None:
     queue = Mock()
+    queue.count = 0
     get_queue = Mock(return_value=queue)
     monkeypatch.setattr("app.core.queue.get_queue", get_queue)
 
@@ -27,6 +29,7 @@ def test_light_crawl_jobs_use_bounded_light_queue(monkeypatch) -> None:
 
 def test_full_site_crawls_use_bounded_full_queue(monkeypatch) -> None:
     queue = Mock()
+    queue.count = 0
     get_queue = Mock(return_value=queue)
     monkeypatch.setattr("app.core.queue.get_queue", get_queue)
 
@@ -37,6 +40,7 @@ def test_full_site_crawls_use_bounded_full_queue(monkeypatch) -> None:
 
 def test_integration_syncs_use_dedicated_queue(monkeypatch) -> None:
     queue = Mock()
+    queue.count = 0
     get_queue = Mock(return_value=queue)
     monkeypatch.setattr("app.core.queue.get_queue", get_queue)
 
@@ -52,6 +56,7 @@ def test_integration_syncs_use_dedicated_queue(monkeypatch) -> None:
 
 def test_retention_uses_dedicated_maintenance_queue(monkeypatch) -> None:
     queue = Mock()
+    queue.count = 0
     get_queue = Mock(return_value=queue)
     monkeypatch.setattr("app.core.queue.get_queue", get_queue)
 
@@ -63,3 +68,25 @@ def test_retention_uses_dedicated_maintenance_queue(monkeypatch) -> None:
         "operation-id",
     )
     assert queue.enqueue.call_args.kwargs["job_id"] == "retention-operation-id-2"
+
+
+def test_sitemap_jobs_use_separate_queue(monkeypatch) -> None:
+    queue = Mock()
+    queue.count = 0
+    get_queue = Mock(return_value=queue)
+    monkeypatch.setattr("app.core.queue.get_queue", get_queue)
+
+    assert enqueue_crawl_job("crawl-id", job_type="fetch_sitemap", priority=0)
+
+    get_queue.assert_called_once_with(SITEMAP_QUEUE)
+    assert queue.enqueue.call_args.kwargs["at_front"] is True
+    assert queue.enqueue.call_args.kwargs["on_failure"].endswith("record_dead_letter")
+
+
+def test_queue_backpressure_refuses_new_work(monkeypatch) -> None:
+    queue = Mock()
+    queue.count = 25
+    monkeypatch.setattr("app.core.queue.get_queue", Mock(return_value=queue))
+
+    assert not enqueue_crawl_job("crawl-id", job_type="full_site_crawl")
+    queue.enqueue.assert_not_called()

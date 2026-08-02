@@ -8,7 +8,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.queue import EXPORT_QUEUE, get_queue
+from app.core.queue import enqueue_export, queue_has_capacity
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.exports import Export
@@ -27,6 +27,8 @@ def create_export(
 ) -> Export:
     require_write_access(principal)
     require_website_access(db, principal, payload.website_id)
+    if get_settings().app_env != "test" and not queue_has_capacity("exports"):
+        raise HTTPException(status_code=503, detail="De exportwachtrij is tijdelijk vol")
     existing = db.scalar(
         select(Export.id).where(
             Export.website_id == payload.website_id,
@@ -50,11 +52,12 @@ def create_export(
     db.commit()
     db.refresh(export)
     if get_settings().app_env != "test":
-        get_queue(EXPORT_QUEUE).enqueue(
-            "app.services.exports.generate_export",
-            str(export.id),
-            job_id=f"export-{export.id}",
-        )
+        queued = enqueue_export(str(export.id), website_id=str(export.website_id))
+        if not queued:
+            export.status = "failed"
+            export.error_message = "De exportwachtrij is tijdelijk vol"
+            db.commit()
+            raise HTTPException(status_code=503, detail=export.error_message)
     return export
 
 

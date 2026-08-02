@@ -23,9 +23,9 @@ def test_build_queue_status_reports_workers_and_backlog(monkeypatch) -> None:
     monkeypatch.setattr(
         "app.services.system_status.Worker.all",
         lambda connection: [
-            FakeWorker("crawls_light"),
+            FakeWorker("sitemaps", "crawls_light", "verifications"),
             FakeWorker("crawls_full"),
-            FakeWorker("integrations"),
+            FakeWorker("integrations", "maintenance"),
             FakeWorker("exports"),
         ],
     )
@@ -35,7 +35,10 @@ def test_build_queue_status_reports_workers_and_backlog(monkeypatch) -> None:
             self.count = {
                 "crawls_light": 2,
                 "crawls_full": 1,
+                "sitemaps": 0,
+                "verifications": 0,
                 "integrations": 3,
+                "maintenance": 0,
                 "exports": 1,
             }[name]
 
@@ -52,22 +55,54 @@ def test_build_queue_status_reports_workers_and_backlog(monkeypatch) -> None:
         "status": "ok",
         "workers": 1,
         "queued_jobs": 2,
+        "warning_backlog": 25,
+        "admission_backlog": 100,
     }
     assert result["queues"]["crawls_full"] == {
         "status": "ok",
         "workers": 1,
         "queued_jobs": 1,
+        "warning_backlog": 10,
+        "admission_backlog": 25,
     }
     assert result["queues"]["integrations"] == {
         "status": "ok",
         "workers": 1,
         "queued_jobs": 3,
+        "warning_backlog": 10,
+        "admission_backlog": 50,
     }
     assert result["queues"]["exports"] == {
         "status": "ok",
         "workers": 1,
         "queued_jobs": 1,
+        "warning_backlog": 10,
+        "admission_backlog": 50,
     }
+
+
+def test_queue_status_reports_warning_and_blocked_backlog(monkeypatch) -> None:
+    redis = Mock()
+    monkeypatch.setattr(
+        "app.services.system_status.Worker.all",
+        lambda connection: [
+            FakeWorker("sitemaps", "crawls_light", "verifications"),
+            FakeWorker("crawls_full"),
+            FakeWorker("integrations", "maintenance"),
+            FakeWorker("exports"),
+        ],
+    )
+
+    class BusyQueue:
+        def __init__(self, name: str, connection: object) -> None:
+            self.count = {"crawls_light": 25, "crawls_full": 25}.get(name, 0)
+
+    monkeypatch.setattr("app.services.system_status.Queue", BusyQueue)
+    result = build_queue_status(redis)
+
+    assert result["queues"]["crawls_light"]["status"] == "warning"
+    assert result["queues"]["crawls_full"]["status"] == "blocked"
+    assert result["queues"]["crawls"]["status"] == "degraded"
 
 
 def test_system_status_endpoint_payload(monkeypatch) -> None:

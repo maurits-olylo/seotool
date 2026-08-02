@@ -1,11 +1,11 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.queue import crawl_queue_state, enqueue_crawl_job
+from app.core.queue import crawl_queue_name, crawl_queue_state, enqueue_crawl_job
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.common import utc_now
@@ -238,14 +238,26 @@ def create_crawl_job(
         raise HTTPException(
             status_code=503, detail="Crawls zijn tijdelijk gepauzeerd voor deployment"
         )
-    running = db.scalar(
-        select(CrawlJob.id).where(
-            CrawlJob.website_id == payload.website_id,
-            CrawlJob.status.in_(["pending", "running", "pause_requested", "paused"]),
+    queued_count = int(
+        db.scalar(
+            select(func.count(CrawlJob.id)).where(
+                CrawlJob.website_id == payload.website_id,
+                CrawlJob.status.in_(
+                    [
+                        "waiting_for_capacity",
+                        "pending",
+                        "running",
+                        "pause_requested",
+                        "paused",
+                        "cancel_requested",
+                    ]
+                ),
+            )
         )
+        or 0
     )
-    if running:
-        raise HTTPException(status_code=409, detail="A crawl is already pending or running")
+    if queued_count >= website.settings.crawl_queue_limit:
+        raise HTTPException(status_code=409, detail="De crawlwachtrijlimiet is bereikt")
     data = payload.model_dump()
     if not data["settings_snapshot"]:
         data["settings_snapshot"] = {
@@ -256,12 +268,24 @@ def create_crawl_job(
             "max_response_size": website.settings.max_response_size,
             "respect_robots_txt": website.settings.respect_robots_txt,
         }
-    job = CrawlJob(**data)
+    job = CrawlJob(
+        **data,
+        queue_name=crawl_queue_name(payload.job_type),
+        queue_priority=website.settings.queue_priority,
+    )
     db.add(job)
     db.commit()
     db.refresh(job)
     if get_settings().app_env != "test":
-        enqueue_crawl_job(str(job.id), job_type=job.job_type)
+        queued = enqueue_crawl_job(
+            str(job.id),
+            job_type=job.job_type,
+            priority=job.queue_priority,
+            website_id=str(job.website_id),
+        )
+        if queued is False:
+            job.status = "waiting_for_capacity"
+            db.commit()
     return _crawl_job_read(job)
 
 
@@ -310,15 +334,29 @@ def resume_crawl_job(
         .limit(1)
     ):
         raise HTTPException(status_code=409, detail="Deze crawl heeft geen hervatbare voortgang")
-    db.scalar(select(Website.id).where(Website.id == job.website_id).with_for_update())
-    competing = db.scalar(
-        select(CrawlJob.id).where(
-            CrawlJob.website_id == job.website_id,
-            CrawlJob.id != job.id,
-            CrawlJob.status.in_(["pending", "running", "pause_requested", "paused"]),
+    website = db.scalar(select(Website).where(Website.id == job.website_id).with_for_update())
+    if website is None:
+        raise HTTPException(status_code=404, detail="Website not found")
+    competing_count = int(
+        db.scalar(
+            select(func.count(CrawlJob.id)).where(
+                CrawlJob.website_id == job.website_id,
+                CrawlJob.id != job.id,
+                CrawlJob.status.in_(
+                    [
+                        "waiting_for_capacity",
+                        "pending",
+                        "running",
+                        "pause_requested",
+                        "paused",
+                        "cancel_requested",
+                    ]
+                ),
+            )
         )
+        or 0
     )
-    if competing:
+    if competing_count >= website.settings.crawl_queue_limit:
         raise HTTPException(
             status_code=409,
             detail="Er staat al een andere crawl voor deze website",
@@ -328,11 +366,16 @@ def resume_crawl_job(
     job.error_message = None
     db.commit()
     if get_settings().app_env != "test":
-        enqueue_crawl_job(
+        queued = enqueue_crawl_job(
             str(job.id),
             job_type=job.job_type,
             attempt=job.attempt_count + 1,
+            priority=job.queue_priority,
+            website_id=str(job.website_id),
         )
+        if queued is False:
+            job.status = "waiting_for_capacity"
+            db.commit()
     db.refresh(job)
     return _crawl_job_read(job)
 
@@ -344,10 +387,16 @@ def cancel_crawl_job(
     principal: Principal = Depends(require_api_key),
 ) -> CrawlJobRead:
     job = _crawl_job_or_404(job_id, db, principal)
-    if job.status not in {"pending", "running", "pause_requested", "paused"}:
+    if job.status not in {
+        "waiting_for_capacity",
+        "pending",
+        "running",
+        "pause_requested",
+        "paused",
+    }:
         raise HTTPException(status_code=409, detail="Deze crawl kan niet worden gestopt")
     run = db.scalar(select(CrawlRun).where(CrawlRun.crawl_job_id == job.id))
-    if job.status in {"pending", "paused"}:
+    if job.status in {"waiting_for_capacity", "pending", "paused"}:
         finished = utc_now()
         job.status = "cancelled"
         job.finished_at = finished
@@ -386,7 +435,14 @@ def get_active_crawl_job(
         .where(
             CrawlJob.website_id == website_id,
             CrawlJob.status.in_(
-                ["pending", "running", "pause_requested", "paused", "cancel_requested"]
+                [
+                    "waiting_for_capacity",
+                    "pending",
+                    "running",
+                    "pause_requested",
+                    "paused",
+                    "cancel_requested",
+                ]
             ),
         )
         .order_by(CrawlJob.created_at.desc())

@@ -4,12 +4,13 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 import structlog
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.api.routes.reports import build_client_report
 from app.core.logging import configure_logging
 from app.core.queue import (
+    crawl_queue_name,
     enqueue_crawl_job,
     enqueue_integration_sync,
     enqueue_retention_operation,
@@ -19,11 +20,18 @@ from app.models.discovery import CrawlJob
 from app.models.integrations import WebsiteIntegration
 from app.models.reporting import MonthlyReportSnapshot
 from app.models.system import RetentionOperation
-from app.models.website import Website
+from app.models.website import Website, WebsiteSettings
 from app.services.crawl_deployment import crawl_deployment_is_active
 
 logger = structlog.get_logger()
-ACTIVE_CRAWL_STATUSES = ("pending", "running", "pause_requested", "paused", "cancel_requested")
+ACTIVE_CRAWL_STATUSES = (
+    "waiting_for_capacity",
+    "pending",
+    "running",
+    "pause_requested",
+    "paused",
+    "cancel_requested",
+)
 CRAWL_SCHEDULE = (
     ("full_site_crawl", timedelta(days=7)),
     ("fetch_sitemap", timedelta(days=1)),
@@ -39,19 +47,27 @@ def schedule_due_jobs() -> int:
             logger.info("crawl_scheduling_skipped_deployment_drain")
             return 0
         website_ids = list(
-            db.scalars(select(Website.id).where(Website.status == "active").order_by(Website.id))
+            db.scalars(
+                select(Website.id)
+                .join(WebsiteSettings, WebsiteSettings.website_id == Website.id)
+                .where(Website.status == "active")
+                .order_by(WebsiteSettings.queue_priority, Website.id)
+            )
         )
         for website_id in website_ids:
             website = db.scalar(select(Website).where(Website.id == website_id).with_for_update())
             if website is None:
                 continue
-            active = db.scalar(
-                select(CrawlJob.id).where(
-                    CrawlJob.website_id == website.id,
-                    CrawlJob.status.in_(ACTIVE_CRAWL_STATUSES),
+            active_count = int(
+                db.scalar(
+                    select(func.count(CrawlJob.id)).where(
+                        CrawlJob.website_id == website.id,
+                        CrawlJob.status.in_(ACTIVE_CRAWL_STATUSES),
+                    )
                 )
+                or 0
             )
-            if active:
+            if active_count >= website.settings.crawl_queue_limit:
                 db.commit()
                 continue
             job_type = _next_due_crawl_type(db, website.id, now)
@@ -67,12 +83,59 @@ def schedule_due_jobs() -> int:
                     "request_timeout_seconds": website.settings.request_timeout_seconds,
                     "max_response_size": website.settings.max_response_size,
                 },
+                queue_name=crawl_queue_name(job_type),
+                queue_priority=website.settings.queue_priority,
             )
             db.add(job)
             db.commit()
-            enqueue_crawl_job(str(job.id), job_type=job.job_type)
+            queued = enqueue_crawl_job(
+                str(job.id),
+                job_type=job.job_type,
+                priority=job.queue_priority,
+                website_id=str(job.website_id),
+            )
+            if queued is False:
+                job.status = "waiting_for_capacity"
+                db.commit()
+                logger.warning(
+                    "crawl_waiting_for_queue_capacity",
+                    crawl_job_id=str(job.id),
+                    website_id=str(job.website_id),
+                    queue_name=job.queue_name,
+                )
             created += 1
     return created
+
+
+def dispatch_waiting_crawl_jobs(limit: int = 20) -> int:
+    """Offer durable waiting crawls in website-priority order when capacity returns."""
+    queued_count = 0
+    with SessionLocal() as db:
+        if crawl_deployment_is_active(db):
+            return 0
+        jobs = list(
+            db.scalars(
+                select(CrawlJob)
+                .where(CrawlJob.status == "waiting_for_capacity")
+                .order_by(CrawlJob.queue_priority, CrawlJob.created_at)
+                .limit(limit)
+                .with_for_update(skip_locked=True)
+            )
+        )
+        for job in jobs:
+            queued = enqueue_crawl_job(
+                str(job.id),
+                job_type=job.job_type,
+                attempt=job.attempt_count,
+                priority=job.queue_priority,
+                website_id=str(job.website_id),
+            )
+            if queued is not True:
+                continue
+            job.status = "pending"
+            queued_count += 1
+        db.commit()
+    return queued_count
 
 
 def _next_due_crawl_type(db: Session, website_id: UUID, now: datetime) -> str | None:
@@ -141,13 +204,29 @@ def schedule_integration_syncs() -> int:
             )
             if recent_queue:
                 continue
-            for mapping in mappings:
-                mapping.settings = {**mapping.settings, "sync_queued_at": now.isoformat()}
-            db.commit()
-            enqueue_integration_sync(
+            queued = enqueue_integration_sync(
                 str(website_id),
                 job_id=f"integration-sync-{website_id}-{now.date().isoformat()}",
             )
+            for mapping in mappings:
+                settings = {
+                    key: value
+                    for key, value in mapping.settings.items()
+                    if key not in {"sync_queued_at", "sync_queue_status"}
+                }
+                if queued:
+                    settings["sync_queued_at"] = now.isoformat()
+                    settings["sync_queue_status"] = "queued"
+                else:
+                    settings["sync_queue_status"] = "waiting_for_capacity"
+                mapping.settings = settings
+            db.commit()
+            if not queued:
+                logger.warning(
+                    "integration_sync_waiting_for_queue_capacity",
+                    website_id=str(website_id),
+                )
+                continue
             created += 1
     return created
 
@@ -250,6 +329,7 @@ def main() -> None:
     configure_logging()
     while True:
         try:
+            waiting_count = dispatch_waiting_crawl_jobs()
             crawl_count = schedule_due_jobs()
             integration_count = schedule_integration_syncs()
             report_count = schedule_monthly_report_snapshots()
@@ -257,6 +337,7 @@ def main() -> None:
             logger.info(
                 "scheduler_cycle",
                 jobs_created=crawl_count,
+                waiting_crawls_queued=waiting_count,
                 integration_syncs_created=integration_count,
                 report_snapshots_created=report_count,
                 retention_operations_queued=retention_count,

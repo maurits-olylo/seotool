@@ -7,7 +7,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.queue import enqueue_recommendation_verification
+from app.core.config import get_settings
+from app.core.queue import (
+    VERIFICATION_QUEUE,
+    enqueue_recommendation_verification,
+    queue_has_capacity,
+)
 from app.core.security import Principal
 from app.db.session import SessionLocal
 from app.models.common import utc_now
@@ -62,6 +67,8 @@ def request_verification(
     )
     if existing:
         raise RecommendationTaskError("Voor deze taak loopt al een verificatie.")
+    if get_settings().app_env != "test" and not queue_has_capacity(VERIFICATION_QUEUE):
+        raise RecommendationTaskError("De verificatiewachtrij is tijdelijk vol.")
 
     task_urls = list(
         db.scalars(
@@ -84,10 +91,14 @@ def request_verification(
         for item in task_urls
     ]
     before_ids = _latest_snapshot_ids(db, {item.url_id for item in task_urls})
+    website = db.get(Website, task.website_id)
+    priority = website.settings.queue_priority if website and website.settings else 50
     job = CrawlJob(
         website_id=task.website_id,
         job_type="recommendation_verification",
         settings_snapshot={"verification_scope": scope_urls},
+        queue_name=VERIFICATION_QUEUE,
+        queue_priority=priority,
     )
     db.add(job)
     db.flush()
@@ -132,7 +143,13 @@ def request_verification(
         raise RecommendationTaskError("Voor deze taak loopt al een verificatie.") from exc
     db.refresh(verification)
     try:
-        enqueue_recommendation_verification(str(verification.id))
+        queued = enqueue_recommendation_verification(
+            str(verification.id),
+            website_id=str(task.website_id),
+            priority=priority,
+        )
+        if queued is False:
+            raise RuntimeError("De verificatiewachtrij is tijdelijk vol.")
     except Exception:
         verification.status = "error"
         verification.error_message = "De verificatie kon niet aan de wachtrij worden toegevoegd."

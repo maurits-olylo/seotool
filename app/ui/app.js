@@ -19,7 +19,7 @@ const labels = {
   accepted: "Geaccepteerd", planned: "Gepland", in_progress: "Bezig",
   waiting_for_client: "Wacht op klant", resolved: "Opgelost", verified: "Geverifieerd",
   ignored: "Genegeerd", accepted_risk: "Risico geaccepteerd",
-  pending: "In wachtrij", running: "Bezig", succeeded: "Geslaagd",
+  waiting_for_capacity: "Wacht op capaciteit", pending: "In wachtrij", running: "Bezig", succeeded: "Geslaagd",
   partially_succeeded: "Deels geslaagd", failed: "Mislukt", cancelled: "Geannuleerd",
   pause_requested: "Pauze wordt voorbereid", paused: "Gepauzeerd",
   cancel_requested: "Stop wordt voorbereid", connected: "Gekoppeld", error: "Fout",
@@ -1179,7 +1179,7 @@ function renderOperations() {
   } : null;
   const controlledRun = activeRun || pendingRun || (state.crawlRuns[0]?.status === "failed" ? state.crawlRuns[0] : null);
   const crawlStatus = state.activeCrawlJob?.status || controlledRun?.status;
-  const hasBlockingCrawlJob = ["pending", "running", "pause_requested", "paused", "cancel_requested"]
+  const hasBlockingCrawlJob = ["waiting_for_capacity", "pending", "running", "pause_requested", "paused", "cancel_requested"]
     .includes(state.activeCrawlJob?.status);
   $("#crawl-live-status").classList.toggle("hidden", !controlledRun);
   $("#start-light-check").disabled = hasBlockingCrawlJob;
@@ -1282,7 +1282,7 @@ async function startPageExport({buttonSelector, exportType, itemIds, filters}) {
       body: JSON.stringify({website_id: $("#website-select").value, export_type: exportType, item_ids: itemIds, filters}),
     });
     let current = created;
-    for (let attempt = 0; attempt < 120 && ["pending", "running"].includes(current.status); attempt += 1) {
+    for (let attempt = 0; attempt < 120 && ["waiting_for_capacity", "pending", "running"].includes(current.status); attempt += 1) {
       await new Promise((resolve) => window.setTimeout(resolve, 1000));
       current = await api(`/api/v1/exports/${created.id}`);
     }

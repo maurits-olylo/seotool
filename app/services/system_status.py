@@ -9,8 +9,12 @@ from app.core.queue import (
     FULL_CRAWL_QUEUE,
     INTEGRATION_QUEUE,
     LIGHT_CRAWL_QUEUE,
+    MAINTENANCE_QUEUE,
+    SITEMAP_QUEUE,
+    VERIFICATION_QUEUE,
     get_redis,
 )
+from app.services.queue_policy import queue_policy
 
 
 def _worker_queue_names(worker: Worker) -> set[str]:
@@ -26,19 +30,38 @@ def build_queue_status(redis: Redis | None = None) -> dict[str, Any]:
     connection.ping()
     workers = Worker.all(connection=connection)
     queues: dict[str, dict[str, int | str]] = {}
-    for name in (*sorted(CRAWL_QUEUES), INTEGRATION_QUEUE, EXPORT_QUEUE):
+    for name in (
+        SITEMAP_QUEUE,
+        *sorted(CRAWL_QUEUES),
+        VERIFICATION_QUEUE,
+        INTEGRATION_QUEUE,
+        MAINTENANCE_QUEUE,
+        EXPORT_QUEUE,
+    ):
         worker_count = sum(name in _worker_queue_names(worker) for worker in workers)
+        queued_jobs = Queue(name, connection=connection).count
+        policy = queue_policy(name)
+        if not worker_count:
+            status = "unavailable"
+        elif queued_jobs >= policy.admission_backlog:
+            status = "blocked"
+        elif queued_jobs >= policy.warning_backlog:
+            status = "warning"
+        else:
+            status = "ok"
         queues[name] = {
-            "status": "ok" if worker_count else "unavailable",
+            "status": status,
             "workers": worker_count,
-            "queued_jobs": Queue(name, connection=connection).count,
+            "queued_jobs": queued_jobs,
+            "warning_backlog": policy.warning_backlog,
+            "admission_backlog": policy.admission_backlog,
         }
     queues["crawls"] = {
         "status": (
             "ok"
             if queues[LIGHT_CRAWL_QUEUE]["status"] == "ok"
             and queues[FULL_CRAWL_QUEUE]["status"] == "ok"
-            else "unavailable"
+            else "degraded"
         ),
         "workers": sum(
             any(queue_name in _worker_queue_names(worker) for queue_name in CRAWL_QUEUES)

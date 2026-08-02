@@ -9,7 +9,7 @@ from app.models.common import utc_now
 from app.models.discovery import CrawlJob
 from app.models.system import CrawlDeploymentControl
 
-STATUSES_TO_PAUSE = ("pending", "running")
+STATUSES_TO_PAUSE = ("waiting_for_capacity", "pending", "running")
 UNSAFE_STATUSES = ("running", "pause_requested")
 
 
