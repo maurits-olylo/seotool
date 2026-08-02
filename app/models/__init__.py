@@ -35,7 +35,7 @@ from app.models.recommendations import (
     RecommendationVerification,
 )
 from app.models.reporting import MonthlyReportSnapshot
-from app.models.system import CrawlDeploymentControl, RetentionOperation
+from app.models.system import CrawlDeploymentControl, QueueDeadLetter, RetentionOperation
 from app.models.user import ClientMembership, User, UserInvitation
 from app.models.website import Website, WebsiteSettings
 
@@ -49,6 +49,7 @@ __all__ = [
     "ElementLocation",
     "CrawlDeploymentControl",
     "RetentionOperation",
+    "QueueDeadLetter",
     "Export",
     "Issue",
     "IssueComment",

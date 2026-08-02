@@ -45,3 +45,5 @@ class WebsiteSettingsData(ORMModel):
     respect_robots_txt: bool = True
     light_check_interval: str = "daily"
     full_crawl_interval: str = "weekly"
+    queue_priority: int = Field(default=50, ge=0, le=100)
+    crawl_queue_limit: int = Field(default=1, ge=1, le=5)

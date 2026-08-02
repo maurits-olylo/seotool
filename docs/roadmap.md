@@ -31,7 +31,9 @@ gedeployed; per release volgt één integrale kwaliteitscontrole, stagingproef e
    negen datasets eindigden als `succeeded`; 185.741 oude, onbeschermde elementlocaties zijn
    verwijderd, de audit is opgeslagen, API en database zijn gezond en de crawl-drain is opgeheven.
 2. **Queuecapaciteit en operationele stabiliteit** — admission, prioriteiten, backpressure,
-   dead-letter-afhandeling, sitemapregressies en resterend runbook.
+   dead-letter-afhandeling, sitemapregressies en resterend runbook. Fase 1 is lokaal
+   geïmplementeerd: versieerbaar queuebeleid, websiteprioriteit en -limiet, routebewijs op
+   crawljobs en een duurzaam dead-lettermodel in migratie `0037`. Handhaving volgt in fase 2.
 3. **URL Inspection, hreflang en canonical-integriteit.**
 4. **Soft 404, begrensde JavaScript-rendering en asset-/mediaregister.**
 5. **Lighthouse/CrUX, contextuele structured data en sitemap-/robotskwaliteit.**

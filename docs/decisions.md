@@ -903,3 +903,17 @@ healthcheck. Productie activeert vóór mutaties altijd de veilige crawl-drain.
 Gevolg: de keten stopt automatisch bij de eerste fout en vraagt niet na iedere geslaagde stap om
 bevestiging. Checks worden niet overgeslagen; ze worden juist in één reproduceerbare releasegang
 gebundeld. Workerherstarts gebruiken minimaal `sleep 30`.
+
+## 2026-08-02 — Queuebeleid is versieerbaar en uitval blijft buiten Redis bewaard
+
+Context: RQ bewaart de actuele uitvoering, maar leverde nog geen productbeleid voor queuegrenzen,
+websiteprioriteit of duurzaam herstel nadat retries zijn uitgeput. Redis alleen is onvoldoende als
+operationeel auditregister.
+
+Besluit: leg één versieerbaar beleid vast met waarschuwing, admissiongrens, retries en time-out per
+queue. Een lager prioriteitsgetal gaat voor. Bewaar gekozen queue en prioriteit op de crawljob en
+registreer definitieve uitval idempotent in `queue_dead_letters`. De renderqueue blijft uitgeschakeld
+totdat begrensde rendering onderdeel van een latere release is.
+
+Gevolg: fase 2 kan backpressure en herstel afdwingen zonder queuegedrag uit losse codeconstanten af
+te leiden. Een Redis-reset verwijdert het operationele bewijs van definitieve taakuitval niet.

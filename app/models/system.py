@@ -62,3 +62,26 @@ class RetentionOperation(UUIDTimestampMixin, Base):
     error_message: Mapped[str | None] = mapped_column(Text)
     before_report: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
     after_report: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+
+
+class QueueDeadLetter(UUIDTimestampMixin, Base):
+    """Durable record for a queue job that exhausted automatic recovery."""
+
+    __tablename__ = "queue_dead_letters"
+    __table_args__ = (
+        UniqueConstraint("queue_name", "original_job_id", name="uq_dead_letter_queue_job"),
+    )
+
+    website_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("websites.id", ondelete="SET NULL"), index=True
+    )
+    queue_name: Mapped[str] = mapped_column(String(50), index=True)
+    original_job_id: Mapped[str] = mapped_column(String(255))
+    job_type: Mapped[str] = mapped_column(String(80), index=True)
+    status: Mapped[str] = mapped_column(String(30), default="unresolved", index=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0)
+    failed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    error_message: Mapped[str] = mapped_column(Text)
+    payload: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resolution: Mapped[str | None] = mapped_column(Text)

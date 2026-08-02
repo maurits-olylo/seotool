@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
@@ -64,6 +65,10 @@ class CrawlJob(UUIDTimestampMixin, Base):
             postgresql_where=text("status = 'running'"),
             sqlite_where=text("status = 'running'"),
         ),
+        CheckConstraint(
+            "queue_priority BETWEEN 0 AND 100",
+            name="ck_crawl_jobs_queue_priority",
+        ),
     )
 
     website_id: Mapped[uuid.UUID] = mapped_column(
@@ -75,5 +80,7 @@ class CrawlJob(UUIDTimestampMixin, Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     attempt_count: Mapped[int] = mapped_column(Integer, default=0)
+    queue_name: Mapped[str | None] = mapped_column(String(50), index=True)
+    queue_priority: Mapped[int] = mapped_column(Integer, default=50, index=True)
     error_message: Mapped[str | None] = mapped_column(Text)
     settings_snapshot: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)

@@ -1,6 +1,15 @@
 import uuid
 
-from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CheckConstraint,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -25,6 +34,16 @@ class Website(UUIDTimestampMixin, Base):
 
 class WebsiteSettings(Base):
     __tablename__ = "website_settings"
+    __table_args__ = (
+        CheckConstraint(
+            "queue_priority BETWEEN 0 AND 100",
+            name="ck_website_settings_queue_priority",
+        ),
+        CheckConstraint(
+            "crawl_queue_limit BETWEEN 1 AND 5",
+            name="ck_website_settings_crawl_queue_limit",
+        ),
+    )
 
     website_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("websites.id", ondelete="CASCADE"), primary_key=True
@@ -41,3 +60,5 @@ class WebsiteSettings(Base):
     respect_robots_txt: Mapped[bool] = mapped_column(Boolean, default=True)
     light_check_interval: Mapped[str] = mapped_column(Text, default="daily")
     full_crawl_interval: Mapped[str] = mapped_column(Text, default="weekly")
+    queue_priority: Mapped[int] = mapped_column(Integer, default=50)
+    crawl_queue_limit: Mapped[int] = mapped_column(Integer, default=1)

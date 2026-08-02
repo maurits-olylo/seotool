@@ -127,6 +127,14 @@ De FIFO-wachtrijpositie en actuele workercapaciteit worden bij de actieve crawlj
 Een derde crawlworker is configureerbaar voor een gecontroleerde NAS-capaciteitstest, maar wordt
 niet impliciet gestart door alleen de configuratie te deployen.
 
+Het versieerbare queuebeleid legt per queue waarschuwings- en admissiongrenzen, retry-intervallen
+en time-outs vast. Een lager prioriteitsgetal wordt eerder behandeld. Website-instellingen bewaren
+de prioriteit en maximaal toegestane crawlwachtrij; iedere crawljob bewaart de gekozen queue en de
+toegepaste prioriteit als historisch bewijs. `queue_dead_letters` bewaart definitief uitgevallen
+werk onafhankelijk van Redis, zodat beoordeling en gecontroleerd opnieuw aanbieden later mogelijk
+blijven. De renderqueue staat in de eerste beleidsversie expliciet uit totdat begrensde rendering
+wordt geïmplementeerd.
+
 ## Automatische retentie
 
 Iedere geslaagde of gedeeltelijk geslaagde volledige crawl maakt idempotent één
