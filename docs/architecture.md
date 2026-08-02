@@ -67,6 +67,20 @@ controle. Daardoor ontstaat geen tweede URL-register en blijven discovery, scope
 centraal. Nieuwe volledige crawls vullen het register; bestaande snapshots worden niet destructief
 herschreven. De tenantbeveiligde API kan per website, type en status filteren.
 
+## Begrensde JavaScript-rendercontrole
+
+Een gewone HTML-snapshot blijft altijd de primaire meetbron. Alleen actieve, indexeerbare
+HTML-pagina's met concreet risico komen in aanmerking voor rendering: belangrijke URL's, vrijwel
+lege statische content of ontbrekende basismetadata. De selectie is maximaal tien URL's en kiest
+naast prioriteit ook verschillende padtemplates, zodat één dynamische template niet de hele
+rendercapaciteit inneemt.
+
+`render_observations` bewaart de browserwaarneming apart en verwijst naar exact één bronsnapshot.
+De vergelijking legt verschillen vast in hoofdcontent, interne links, canonical, robots en
+structured data. Alleen materiële verschillen leveren uitlegbare issues op. De `renders`-queue
+blijft standaard uitgeschakeld totdat een geïsoleerde browserexecutor met tijd-, netwerk- en
+capaciteitsgrenzen beschikbaar en getest is.
+
 `category` beschrijft het technische onderwerp van een issue, zoals bereikbaarheid of interne
 links. De afgeleide `scope` beschrijft hoe het product het signaal presenteert: SEO, SEO+UX,
 kwaliteitscontrole, performance of redactioneel. Scope wordt centraal uit het issuetype afgeleid,

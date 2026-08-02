@@ -12,11 +12,15 @@ ISSUE_SCOPE_BY_TYPE: dict[str, IssueScope] = {
     "functional_image_alt_empty": "quality",
     "generic_internal_anchor_text": "quality",
     "image_delivery_quality": "performance",
+    "javascript_dependent_content": "performance",
+    "javascript_only_links": "quality",
+    "javascript_metadata_conflict": "quality",
     "media_delivery_quality": "performance",
     "multiple_h1": "quality",
     "oversized_document": "performance",
     "oversized_image": "performance",
     "possibly_outdated_content": "editorial",
+    "rendered_content_missing": "quality",
 }
 
 ISSUE_NATURE_BY_TYPE: dict[str, IssueNature] = {

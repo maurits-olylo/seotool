@@ -36,6 +36,7 @@ from app.models.recommendations import (
     RecommendationTaskUrl,
     RecommendationVerification,
 )
+from app.models.rendering import RenderObservation
 from app.models.reporting import MonthlyReportSnapshot
 from app.models.system import CrawlDeploymentControl, QueueDeadLetter, RetentionOperation
 from app.models.user import ClientMembership, User, UserInvitation
@@ -66,6 +67,7 @@ __all__ = [
     "RecommendationTaskIssue",
     "RecommendationTaskUrl",
     "RecommendationVerification",
+    "RenderObservation",
     "IntegrationConnection",
     "BingPageMetric",
     "BingQueryMetric",

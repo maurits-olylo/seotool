@@ -70,6 +70,11 @@ gedeployed; per release volgt één integrale kwaliteitscontrole, stagingproef e
    één-op-één voortbouwt op URL-identiteit. Nieuwe assetmetingen actualiseren type, MIME-type,
    status, eind-URL, grootte en cachemetadata; historische toestand blijft in snapshots. De
    beveiligde website-API ondersteunt filters op assettype en status zonder tenantdata te mengen.
+   Fase 3 is lokaal geïmplementeerd: een vast maximum van tien renderkandidaten per selectie,
+   risicogestuurde prioriteit en templatediversiteit begrenzen browserwerk vooraf. Migratie `0040`
+   bewaart renderwaarnemingen los van gewone snapshots. De vergelijking verklaart verschillen in
+   hoofdcontent, links, canonical, robots en structured data. De renderqueue blijft uit totdat de
+   browserexecutor en operationele limieten in de volgende fase integraal zijn gevalideerd.
 5. **Lighthouse/CrUX, contextuele structured data en sitemap-/robotskwaliteit.**
 6. **Begrijpelijk actieplatform** — diagnoses, taken, URL-overzicht, crawldiepte, exports,
    notificaties en UX/UI-polish.
