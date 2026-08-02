@@ -83,10 +83,15 @@ SOURCES = {
         "Google URL Inspection API",
         "https://developers.google.com/webmaster-tools/v1/urlInspection.index/inspect",
     ),
+    "soft_404": GuidanceSource(
+        "Problemen met soft 404's oplossen",
+        "https://developers.google.com/search/docs/crawling-indexing/troubleshoot-crawling-errors",
+    ),
 }
 
 SOURCE_KEYS_BY_TYPE = {
     "http_404": ("http",), "http_410": ("http",), "http_5xx": ("http",),
+    "soft_404": ("soft_404", "http"), "possible_soft_404": ("soft_404",),
     "crawl_timeout": ("http",), "unreachable_url_target": ("http",),
     "redirect_loop": ("redirect",), "long_redirect_chain": ("redirect",),
     "internally_linked_redirect": ("redirect", "links"),
@@ -225,6 +230,12 @@ VERIFICATION_BY_TYPE = {
     ),
     "http_410": (
         "De verwijdering is bewust en er bestaan geen ongewenste sitemap- of interne links meer."
+    ),
+    "soft_404": (
+        "De URL geeft na hercontrole de inhoud en status die bij de bedoelde paginatoestand horen."
+    ),
+    "possible_soft_404": (
+        "De resultaatpagina is bewust beoordeeld en heeft de bedoelde indexeerbaarheid en status."
     ),
     "http_5xx": "De URL reageert bij de volgende crawl stabiel zonder serverfout.",
     "crawl_timeout": "De URL reageert binnen de ingestelde time-out tijdens de volgende controle.",

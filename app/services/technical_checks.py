@@ -52,6 +52,8 @@ SNAPSHOT_ISSUE_TYPES = {
     "robots_txt_blocked",
     "cms_link_placeholder",
     "broken_application_cta",
+    "soft_404",
+    "possible_soft_404",
 }
 
 

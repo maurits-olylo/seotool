@@ -43,6 +43,8 @@ CLUSTERABLE_ISSUE_TYPES = {
     "multiple_h1",
     "multiple_redirected_internal_links",
     "orphan_page",
+    "possible_soft_404",
+    "soft_404",
     "thin_content",
     "cms_link_placeholder",
 }
@@ -87,6 +89,8 @@ MINIMUM_CLUSTER_SIZE = {
     "multiple_h1": 5,
     "multiple_redirected_internal_links": 2,
     "orphan_page": 2,
+    "possible_soft_404": 2,
+    "soft_404": 2,
     "thin_content": 5,
     "cms_link_placeholder": 2,
 }

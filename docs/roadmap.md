@@ -61,7 +61,11 @@ gedeployed; per release volgt één integrale kwaliteitscontrole, stagingproef e
    meetbronnen. JavaScript, migratie `0038`, productie- en stagingconfiguratie, Ruff en de volledige
    testsuite zijn geslaagd. De productiecontrole bevestigde het datamodel, policygrenzen,
    validators, UI, API- en databasehealth en een correct opgeheven crawl-drain.
-4. **Soft 404, begrensde JavaScript-rendering en asset-/mediaregister.**
+4. **Soft 404, begrensde JavaScript-rendering en asset-/mediaregister.** Fase 1 is lokaal
+   geïmplementeerd: statische soft-404-detectie combineert status 200 met fouttekst in title/H1 of
+   hoofdcontent, zeer weinig inhoud, afwijkende canonical en historische 404/410-status. Alleen
+   meerdere sterke signalen leveren een hard issue; lege zoek- en filterresultaten blijven een
+   review met lage zekerheid. Issues doorlopen lifecycle, aanbevelingen en templategroepering.
 5. **Lighthouse/CrUX, contextuele structured data en sitemap-/robotskwaliteit.**
 6. **Begrijpelijk actieplatform** — diagnoses, taken, URL-overzicht, crawldiepte, exports,
    notificaties en UX/UI-polish.

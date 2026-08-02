@@ -52,6 +52,12 @@ Na opslag vergelijkt de analyse-engine een snapshot met zijn voorganger en schri
 Verdwenen signalen worden `resolved`, een volgende schone controle kan ze `verified` maken en een
 terugkerend signaal opent hetzelfde issue opnieuw. `issue_occurrences` bewaart bewijs per crawl.
 
+Soft-404-detectie behandelt een korte pagina nooit zelfstandig als fout. Een hard signaal vereist
+status 200 plus meerdere onafhankelijke aanwijzingen uit fouttekst, vrijwel lege hoofdcontent,
+afwijkende canonical of een eerdere 404/410-status. Lege zoek- en filterresultaten krijgen alleen
+een contextuele review met lage zekerheid. Redirects, noindexpagina's en niet-HTML-responses vallen
+buiten deze controle. Herhaalde templatepatronen worden via de bestaande clusteranalyse gebundeld.
+
 `category` beschrijft het technische onderwerp van een issue, zoals bereikbaarheid of interne
 links. De afgeleide `scope` beschrijft hoe het product het signaal presenteert: SEO, SEO+UX,
 kwaliteitscontrole, performance of redactioneel. Scope wordt centraal uit het issuetype afgeleid,

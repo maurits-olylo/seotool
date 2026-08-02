@@ -35,6 +35,7 @@ ISSUE_NATURE_BY_TYPE: dict[str, IssueNature] = {
     "missing_meta_description": "optimization",
     "near_duplicate_content": "review",
     "pagination_series_review": "review",
+    "possible_soft_404": "review",
     "robots_txt_blocked": "review",
     "server_error_incident": "review",
     "sitemap_redirect_patterns": "review",

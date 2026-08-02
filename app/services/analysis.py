@@ -16,6 +16,7 @@ from app.services.element_issues import ELEMENT_ISSUE_TYPES, inspect_element_loc
 from app.services.issue_engine import reconcile_issues
 from app.services.job_listings import update_job_listing
 from app.services.job_posting import inspect_job_posting, is_job_page_context
+from app.services.soft_404 import inspect_soft_404
 from app.services.technical_checks import (
     SNAPSHOT_ISSUE_TYPES,
     IssueSignal,
@@ -72,6 +73,7 @@ def analyze_snapshot(
             )
         )
     signals = inspect_snapshot(snapshot)
+    signals.extend(inspect_soft_404(snapshot, previous=previous))
     signals = _prefer_contextual_404(db, url=url, signals=signals)
     if discovery_only:
         signals = [

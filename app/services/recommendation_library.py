@@ -79,6 +79,27 @@ DEFINITIONS = (
         ("old",),
     ),
     RecommendationDefinition(
+        "resolve_soft_404",
+        "1",
+        frozenset({"soft_404", "possible_soft_404"}),
+        "Beoordeel en herstel de soft-404-status",
+        "seo_analytics",
+        ("development", "content"),
+        "high",
+        (20, 90),
+        "needs_manual_review",
+        (
+            "Bevestig of de URL inhoud hoort te tonen, vervangen is of niet hoort te bestaan.",
+            "Herstel inhoud en canonical, stel een relevante redirect in, of geef 404/410.",
+            "Controleer de uiteindelijke status en zichtbare inhoud opnieuw.",
+        ),
+        (
+            "HTTP-status en paginainhoud spreken elkaar niet meer tegen.",
+            "Een lege zoek- of filtertoestand is bewust niet-indexeerbaar waar nodig.",
+        ),
+        ("changed",),
+    ),
+    RecommendationDefinition(
         "resolve_server_or_fetch_failure",
         "1",
         frozenset({"http_5xx", "crawl_timeout", "server_error_incident", "google_fetch_failed"}),
