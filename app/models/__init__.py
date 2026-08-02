@@ -15,6 +15,7 @@ from app.models.integrations import (
     IntegrationConnection,
     SearchConsoleMetric,
     SearchConsoleQueryMetric,
+    UrlInspectionResult,
     WebsiteIntegration,
 )
 from app.models.issues import (
@@ -75,6 +76,7 @@ __all__ = [
     "GoogleAnalyticsLandingPageEventMetric",
     "SearchConsoleMetric",
     "SearchConsoleQueryMetric",
+    "UrlInspectionResult",
     "Url",
     "UrlLink",
     "UrlSnapshot",

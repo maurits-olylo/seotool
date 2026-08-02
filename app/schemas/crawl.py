@@ -51,6 +51,8 @@ class UrlSnapshotRead(ORMModel):
     title: str | None
     meta_description: str | None
     canonical: str | None
+    canonical_urls: list[str]
+    hreflang_links: list[dict[str, str]]
     meta_robots: str | None
     x_robots_tag: str | None
     html_lang: str | None

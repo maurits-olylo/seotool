@@ -36,7 +36,10 @@ gedeployed; per release volgt één integrale kwaliteitscontrole, stagingproef e
    hervatten, duurzame dead letters, superuserherstel, systeemstatus, operationele UI,
    sitemapregressies en het incidentrunbook zijn actief. De productievalidatie bevestigde
    policyversie `2026-08-02-v1`, een gezonde API en database en een correct opgeheven crawl-drain.
-3. **URL Inspection, hreflang en canonical-integriteit.**
+3. **URL Inspection, hreflang en canonical-integriteit.** Fase 1 is lokaal geïmplementeerd:
+   snapshots bewaren alle canonical-tags en hreflangverwijzingen, wijzigingen tellen mee in de
+   metadatahash en migratie `0038` voegt een historisch URL Inspection-resultaatmodel toe. Externe
+   Google-aanroepen, selectiebeleid, validatie en issuegroepering volgen in de volgende fasen.
 4. **Soft 404, begrensde JavaScript-rendering en asset-/mediaregister.**
 5. **Lighthouse/CrUX, contextuele structured data en sitemap-/robotskwaliteit.**
 6. **Begrijpelijk actieplatform** — diagnoses, taken, URL-overzicht, crawldiepte, exports,

@@ -73,6 +73,33 @@ class WebsiteIntegration(UUIDTimestampMixin, Base):
     settings: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
 
 
+class UrlInspectionResult(UUIDTimestampMixin, Base):
+    """Immutable Google URL Inspection observation for one registered URL."""
+
+    __tablename__ = "url_inspection_results"
+
+    website_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("websites.id", ondelete="CASCADE"), index=True
+    )
+    url_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("urls.id", ondelete="CASCADE"), index=True
+    )
+    inspected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    inspection_result_link: Mapped[str | None] = mapped_column(String(2048))
+    verdict: Mapped[str | None] = mapped_column(String(40), index=True)
+    coverage_state: Mapped[str | None] = mapped_column(String(255))
+    indexing_state: Mapped[str | None] = mapped_column(String(80))
+    page_fetch_state: Mapped[str | None] = mapped_column(String(80))
+    robots_txt_state: Mapped[str | None] = mapped_column(String(80))
+    last_crawl_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    google_canonical: Mapped[str | None] = mapped_column(String(2048))
+    user_canonical: Mapped[str | None] = mapped_column(String(2048))
+    referring_urls: Mapped[list[str]] = mapped_column(JSON, default=list)
+    sitemap_urls: Mapped[list[str]] = mapped_column(JSON, default=list)
+    rich_results: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    raw_response: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+
+
 class SearchConsoleMetric(UUIDTimestampMixin, Base):
     __tablename__ = "search_console_metrics"
     __table_args__ = (

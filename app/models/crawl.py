@@ -57,6 +57,8 @@ class UrlSnapshot(Base):
     title: Mapped[str | None] = mapped_column(Text)
     meta_description: Mapped[str | None] = mapped_column(Text)
     canonical: Mapped[str | None] = mapped_column(String(2048))
+    canonical_urls: Mapped[list[str]] = mapped_column(JSON, default=list)
+    hreflang_links: Mapped[list[dict[str, str]]] = mapped_column(JSON, default=list)
     meta_robots: Mapped[str | None] = mapped_column(String(512))
     x_robots_tag: Mapped[str | None] = mapped_column(String(512))
     html_lang: Mapped[str | None] = mapped_column(String(50))

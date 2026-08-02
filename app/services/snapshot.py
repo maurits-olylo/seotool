@@ -45,6 +45,15 @@ def store_fetch_result(
         title=page.title if page else None,
         meta_description=page.meta_description if page else None,
         canonical=page.canonical if page else None,
+        canonical_urls=page.canonical_urls if page else [],
+        hreflang_links=(
+            [
+                {"language": link.language, "target_url": link.target_url}
+                for link in page.hreflang_links
+            ]
+            if page
+            else []
+        ),
         meta_robots=page.meta_robots if page else None,
         x_robots_tag=x_robots,
         html_lang=page.html_lang if page else None,

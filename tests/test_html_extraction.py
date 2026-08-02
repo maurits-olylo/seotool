@@ -31,6 +31,45 @@ def test_content_change_only_changes_relevant_hashes() -> None:
     assert first.main_content_hash != second.main_content_hash
 
 
+def test_extracts_all_canonicals_and_hreflang_alternates() -> None:
+    page = extract_page(
+        """
+        <html><head>
+          <link rel="canonical" href="/primary">
+          <link rel="canonical" href="https://example.com/secondary">
+          <link rel="alternate" hreflang="nl-NL" href="/nl/page">
+          <link rel="alternate" hreflang="EN-gb" href="https://example.com/en/page">
+          <link rel="alternate" hreflang="x-default" href="/page">
+        </head><body></body></html>
+        """,
+        "https://example.com/source",
+    )
+
+    assert page.canonical == "https://example.com/primary"
+    assert page.canonical_urls == [
+        "https://example.com/primary",
+        "https://example.com/secondary",
+    ]
+    assert [(item.language, item.target_url) for item in page.hreflang_links] == [
+        ("nl-nl", "https://example.com/nl/page"),
+        ("en-gb", "https://example.com/en/page"),
+        ("x-default", "https://example.com/page"),
+    ]
+
+
+def test_metadata_hash_changes_when_hreflang_changes() -> None:
+    first = extract_page(
+        '<html><head><link rel="alternate" hreflang="nl" href="/nl"></head></html>',
+        "https://example.com/page",
+    )
+    second = extract_page(
+        '<html><head><link rel="alternate" hreflang="nl" href="/anders"></head></html>',
+        "https://example.com/page",
+    )
+
+    assert first.metadata_hash != second.metadata_hash
+
+
 def test_uses_complete_body_when_page_contains_multiple_article_cards() -> None:
     html = """
     <html><body>

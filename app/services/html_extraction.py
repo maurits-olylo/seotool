@@ -27,6 +27,12 @@ class ExtractedLink:
 
 
 @dataclass(frozen=True)
+class ExtractedHreflang:
+    language: str
+    target_url: str
+
+
+@dataclass(frozen=True)
 class ExtractedElement:
     element_type: str
     target_url: str | None
@@ -49,6 +55,8 @@ class ExtractedPage:
     title: str | None
     meta_description: str | None
     canonical: str | None
+    canonical_urls: list[str]
+    hreflang_links: list[ExtractedHreflang]
     meta_robots: str | None
     html_lang: str | None
     headings: dict[str, list[str]]
@@ -70,14 +78,9 @@ def extract_page(html: str, page_url: str) -> ExtractedPage:
     title = _text(soup.title)
     description = _meta_content(soup, "description")
     robots = _meta_content(soup, "robots")
-    canonical_tag = soup.find("link", rel=lambda value: value and "canonical" in value)
-    canonical = None
-    if canonical_tag and canonical_tag.get("href"):
-        canonical = _resolve_page_url(
-            page_url,
-            str(canonical_tag.get("href")),
-            element="canonical",
-        )
+    canonical_urls = _extract_canonical_urls(soup, page_url)
+    canonical = canonical_urls[0] if canonical_urls else None
+    hreflang_links = _extract_hreflang_links(soup, page_url)
     headings = {
         level: [_clean_text(tag.get_text(" ", strip=True)) for tag in soup.find_all(level)]
         for level in ("h1", "h2", "h3", "h4", "h5", "h6")
@@ -100,6 +103,11 @@ def extract_page(html: str, page_url: str) -> ExtractedPage:
         "title": title,
         "description": description,
         "canonical": canonical,
+        "canonical_urls": canonical_urls,
+        "hreflang_links": [
+            {"language": link.language, "target_url": link.target_url}
+            for link in hreflang_links
+        ],
         "robots": robots,
         "headings": headings,
     }
@@ -124,6 +132,8 @@ def extract_page(html: str, page_url: str) -> ExtractedPage:
         title=title,
         meta_description=description,
         canonical=canonical,
+        canonical_urls=canonical_urls,
+        hreflang_links=hreflang_links,
         meta_robots=robots,
         html_lang=soup.html.get("lang") if soup.html else None,
         headings=headings,
@@ -139,6 +149,34 @@ def extract_page(html: str, page_url: str) -> ExtractedPage:
         links_hash=stable_hash(link_data),
         schema_hash=stable_hash(stable_schema_data),
     )
+
+
+def _extract_canonical_urls(soup: BeautifulSoup, page_url: str) -> list[str]:
+    values: list[str] = []
+    for tag in soup.find_all("link", rel=lambda value: value and "canonical" in value):
+        href = tag.get("href")
+        if not href:
+            continue
+        target = _resolve_page_url(page_url, str(href), element="canonical")
+        if target and target not in values:
+            values.append(target)
+    return values
+
+
+def _extract_hreflang_links(soup: BeautifulSoup, page_url: str) -> list[ExtractedHreflang]:
+    values: list[ExtractedHreflang] = []
+    seen: set[tuple[str, str]] = set()
+    for tag in soup.find_all("link", rel=lambda value: value and "alternate" in value):
+        language = _clean_text(str(tag.get("hreflang") or "")).lower()
+        href = tag.get("href")
+        if not language or not href:
+            continue
+        target = _resolve_page_url(page_url, str(href), element="hreflang")
+        if not target or (language, target) in seen:
+            continue
+        seen.add((language, target))
+        values.append(ExtractedHreflang(language=language, target_url=target))
+    return values
 
 
 def _text(tag: object) -> str | None:
