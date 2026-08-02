@@ -6,14 +6,15 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 
 ## Huidige status
 
-- Actieve ontwikkellijn: Release 3 voor URL Inspection, hreflang en canonical-integriteit. Publieke
+- Actieve ontwikkellijn: Release 4 voor soft 404, begrensde JavaScript-rendering en het
+  asset-/mediaregister. Publieke
   website-inschatting en friends-and-family volgen in Release 13.
-- Productie en de geïsoleerde NAS-stagingomgeving zijn gezond en staan op migratie `0037`.
+- Productie en de geïsoleerde NAS-stagingomgeving zijn gezond en staan op migratie `0038`.
 - De elementlocatie-cleanup is op 1 augustus 2026 afgerond en operationeel gecontroleerd.
 - Automatische elementlocatieretentie is op 1 augustus 2026 in productie gevalideerd: vijf
   persistente operaties zijn geslaagd en één operatie hervatte zichzelf begrensd via scheduler en
   maintenancequeue.
-- Laatste volledige lokale kwaliteitscontrole: 352 tests geslaagd en Ruff zonder bevindingen.
+- Laatste volledige lokale kwaliteitscontrole: 365 tests geslaagd en Ruff zonder bevindingen.
 - Multi-client domeinisolatie is op 2026-07-19 in productie bevestigd: `jobsatpearle.be` komt niet
   meer als actieve URL van `werkenbijgrandvision.nl` voor.
 
@@ -36,7 +37,8 @@ gedeployed; per release volgt één integrale kwaliteitscontrole, stagingproef e
    hervatten, duurzame dead letters, superuserherstel, systeemstatus, operationele UI,
    sitemapregressies en het incidentrunbook zijn actief. De productievalidatie bevestigde
    policyversie `2026-08-02-v1`, een gezonde API en database en een correct opgeheven crawl-drain.
-3. **URL Inspection, hreflang en canonical-integriteit.** Fase 1 is lokaal geïmplementeerd:
+3. **URL Inspection, hreflang en canonical-integriteit.** Status: afgerond en op 2 augustus 2026
+   met migratie `0038` op staging en productie gevalideerd. Fase 1:
    snapshots bewaren alle canonical-tags en hreflangverwijzingen, wijzigingen tellen mee in de
    metadatahash en migratie `0038` voegt een historisch URL Inspection-resultaatmodel toe. Externe
    Google-aanroepen, selectiebeleid, validatie en issuegroepering volgen in de volgende fasen.
@@ -54,10 +56,11 @@ gedeployed; per release volgt één integrale kwaliteitscontrole, stagingproef e
    robotsproblemen en een afwijkende Google-canonical leveren uitlegbare issues en bestaande
    aanbevelingstaken op. Een relevante wijziging na Googles laatste crawl onderdrukt het harde
    conflict totdat Google de nieuwe toestand heeft kunnen waarnemen.
-   Fase 5 is lokaal geïmplementeerd en integraal gevalideerd: het URL-detail toont crawlerstatus,
+   Fase 5 is integraal gevalideerd: het URL-detail toont crawlerstatus,
    alle opgegeven canonicals, hreflangdoelen en de nieuwste Google-indexobservatie als afzonderlijke
    meetbronnen. JavaScript, migratie `0038`, productie- en stagingconfiguratie, Ruff en de volledige
-   testsuite zijn geslaagd. Staging- en productievalidatie volgen als afsluiting van Release 3.
+   testsuite zijn geslaagd. De productiecontrole bevestigde het datamodel, policygrenzen,
+   validators, UI, API- en databasehealth en een correct opgeheven crawl-drain.
 4. **Soft 404, begrensde JavaScript-rendering en asset-/mediaregister.**
 5. **Lighthouse/CrUX, contextuele structured data en sitemap-/robotskwaliteit.**
 6. **Begrijpelijk actieplatform** — diagnoses, taken, URL-overzicht, crawldiepte, exports,
