@@ -951,21 +951,38 @@ function renderUrls() {
 async function showUrl(urlId) {
   const url = state.urlRecords.find((item) => item.id === urlId);
   if (!url) return;
-  const [snapshots, route] = await Promise.all([
+  const websiteId = $("#website-select").value;
+  const [snapshots, route, inspections] = await Promise.all([
     api(`/api/v1/urls/${urlId}/snapshots?limit=1`),
     api(`/api/v1/urls/${urlId}/crawl-route`),
+    api(`/api/v1/websites/${websiteId}/integrations/url_inspection/results?url_id=${urlId}&limit=1`).catch(() => []),
   ]);
   const snapshot = snapshots[0];
+  const inspection = inspections[0];
   const issues = state.issues.filter((issue) => issue.url_id === urlId && ACTIVE_STATUSES.has(issue.status));
   $("#url-detail-link").textContent = url.normalized_url;
   $("#url-detail-link").href = url.normalized_url;
   $("#url-detail-status").textContent = `${url.current_status_code ?? "Niet gecontroleerd"}${url.current_final_url && url.current_final_url !== url.normalized_url ? ` → ${url.current_final_url}` : ""}`;
   $("#url-detail-indexation").textContent = {indexable: "Indexeerbaar", blocked: "Niet indexeerbaar", unknown: "Onbekend"}[urlIndexState(url)];
+  $("#url-detail-canonical").textContent = snapshot?.canonical_urls?.length ? snapshot.canonical_urls.join("\n") : snapshot?.canonical || "Geen canonical gevonden.";
+  $("#url-detail-hreflang").textContent = snapshot?.hreflang_links?.length ? snapshot.hreflang_links.map((item) => `${item.language}: ${item.target_url}`).join("\n") : "Geen hreflang gevonden.";
+  $("#url-detail-google").textContent = inspection ? formatGoogleInspection(inspection) : "Nog geen Google URL Inspection-meting beschikbaar.";
   $("#url-detail-crawl").textContent = `Crawl-diepte: ${url.crawl_depth ?? "onbekend"} · ${url.crawl_depth_context || "Geen meetcontext"} · Paginatype: ${url.page_type || "onbekend"}`;
   $("#url-detail-route").textContent = route.route.length ? route.route.join("\n→ ") : route.context;
   $("#url-detail-snapshot").textContent = snapshot ? `${new Date(snapshot.checked_at).toLocaleString("nl-NL")} · ${snapshot.response_size ?? 0} bytes · ${snapshot.response_time_ms ?? "—"} ms · ${snapshot.word_count ?? "—"} woorden` : "Geen snapshot beschikbaar.";
   $("#url-detail-issues").textContent = issues.length ? issues.map((issue) => `${labels[issue.severity] || issue.severity}: ${issue.title}`).join("\n") : "Geen actieve issues.";
   $("#url-dialog").showModal();
+}
+
+function formatGoogleInspection(inspection) {
+  const verdict = {PASS: "Geïndexeerd", NEUTRAL: "Niet bevestigd als geïndexeerd", FAIL: "Probleem vastgesteld", PARTIAL: "Gedeeltelijk"}[inspection.verdict] || inspection.verdict || "Onbekend";
+  const values = [
+    `${verdict} · gemeten ${new Date(inspection.inspected_at).toLocaleString("nl-NL")}`,
+    inspection.coverage_state ? `Google-dekking: ${inspection.coverage_state}` : null,
+    inspection.last_crawl_time ? `Laatste Google-crawl: ${new Date(inspection.last_crawl_time).toLocaleString("nl-NL")}` : "Laatste Google-crawl: onbekend",
+    inspection.google_canonical ? `Google-canonical: ${inspection.google_canonical}` : null,
+  ];
+  return values.filter(Boolean).join("\n");
 }
 
 async function loadDashboard() {

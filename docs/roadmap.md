@@ -54,6 +54,10 @@ gedeployed; per release volgt één integrale kwaliteitscontrole, stagingproef e
    robotsproblemen en een afwijkende Google-canonical leveren uitlegbare issues en bestaande
    aanbevelingstaken op. Een relevante wijziging na Googles laatste crawl onderdrukt het harde
    conflict totdat Google de nieuwe toestand heeft kunnen waarnemen.
+   Fase 5 is lokaal geïmplementeerd en integraal gevalideerd: het URL-detail toont crawlerstatus,
+   alle opgegeven canonicals, hreflangdoelen en de nieuwste Google-indexobservatie als afzonderlijke
+   meetbronnen. JavaScript, migratie `0038`, productie- en stagingconfiguratie, Ruff en de volledige
+   testsuite zijn geslaagd. Staging- en productievalidatie volgen als afsluiting van Release 3.
 4. **Soft 404, begrensde JavaScript-rendering en asset-/mediaregister.**
 5. **Lighthouse/CrUX, contextuele structured data en sitemap-/robotskwaliteit.**
 6. **Begrijpelijk actieplatform** — diagnoses, taken, URL-overzicht, crawldiepte, exports,
