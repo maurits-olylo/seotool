@@ -6,15 +6,15 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 
 ## Huidige status
 
-- Actieve ontwikkellijn: Release 4 voor soft 404, begrensde JavaScript-rendering en het
-  asset-/mediaregister. Publieke
-  website-inschatting en friends-and-family volgen in Release 13.
-- Productie en de geïsoleerde NAS-stagingomgeving zijn gezond en staan op migratie `0038`.
+- Ontwikkeling is na afronding van Release 4 tijdelijk gepauzeerd voor de afzonderlijke inrichting
+  van de gaming-pc als Linux-worker. Release 5 start pas na een expliciet hervattingsbesluit.
+  Publieke website-inschatting en friends-and-family volgen in Release 13.
+- Productie en de geïsoleerde NAS-stagingomgeving zijn gezond en staan op migratie `0040`.
 - De elementlocatie-cleanup is op 1 augustus 2026 afgerond en operationeel gecontroleerd.
 - Automatische elementlocatieretentie is op 1 augustus 2026 in productie gevalideerd: vijf
   persistente operaties zijn geslaagd en één operatie hervatte zichzelf begrensd via scheduler en
   maintenancequeue.
-- Laatste volledige lokale kwaliteitscontrole: 365 tests geslaagd en Ruff zonder bevindingen.
+- Laatste volledige lokale kwaliteitscontrole: volledige testsuite en Ruff zonder bevindingen.
 - Multi-client domeinisolatie is op 2026-07-19 in productie bevestigd: `jobsatpearle.be` komt niet
   meer als actieve URL van `werkenbijgrandvision.nl` voor.
 
@@ -81,6 +81,11 @@ gedeployed; per release volgt één integrale kwaliteitscontrole, stagingproef e
    SSRF-controle. Activering vereist zowel het Compose-profiel `rendering` als
    `RENDERING_ENABLED=true`. De container kan later ongewijzigd naar de geplande Linux-worker op
    de gaming-pc verhuizen; die capaciteit geldt pas na de afzonderlijke inrichting en goedkeuring.
+   Status: afgerond en op 2 augustus 2026 met exact releasecommit `99f242c` op staging en productie
+   gevalideerd. Staging bevestigde de Chromium-runtime; productie bevestigde migratie `0040`,
+   queuebeleid v2, alle geraakte workers, API- en databasehealth en een correct opgeheven
+   crawl-drain. Rendering blijft met `RENDERING_ENABLED=false` bewust inactief totdat de nieuwe
+   Linux-worker afzonderlijk is ingericht en de productkoppeling expliciet wordt goedgekeurd.
 5. **Lighthouse/CrUX, contextuele structured data en sitemap-/robotskwaliteit.**
 6. **Begrijpelijk actieplatform** — diagnoses, taken, URL-overzicht, crawldiepte, exports,
    notificaties en UX/UI-polish.
