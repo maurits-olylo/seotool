@@ -15,6 +15,7 @@ from app.models.website import Website
 from app.services.analysis import analyze_snapshot
 from app.services.asset_checks import ASSET_ISSUE_TYPES, HTML_ONLY_ISSUE_TYPES, inspect_asset
 from app.services.asset_quality_analysis import analyze_asset_quality
+from app.services.asset_registry import update_asset_record
 from app.services.content_similarity import detect_duplicate_content
 from app.services.contextual_404 import classify_404_issues
 from app.services.crawl_deployment import pause_job_if_deployment_active
@@ -694,6 +695,7 @@ def _audit_asset(db, job: CrawlJob, run: CrawlRun, url: Url) -> None:  # type: i
         )
         db.add(snapshot)
         db.flush()
+        update_asset_record(db, url=url, snapshot=snapshot)
         run.asset_urls += 1
         asset_signals = inspect_asset(
             result.final_url,

@@ -1,3 +1,4 @@
+from app.models.assets import Asset
 from app.models.client import Client
 from app.models.crawl import CrawlRun, ElementLocation, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url, UrlSource
@@ -42,6 +43,7 @@ from app.models.website import Website, WebsiteSettings
 
 __all__ = [
     "Client",
+    "Asset",
     "ClientMembership",
     "Change",
     "ActivityLog",

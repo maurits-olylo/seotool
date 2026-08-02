@@ -8,11 +8,13 @@ from app.core.config import get_settings
 from app.core.queue import crawl_queue_name, crawl_queue_state, enqueue_crawl_job
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
+from app.models.assets import Asset
 from app.models.common import utc_now
 from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url
 from app.models.issues import Issue
 from app.models.website import Website
+from app.schemas.assets import AssetRead
 from app.schemas.discovery import CrawlJobCreate, CrawlJobRead, CrawlRouteRead, UrlRead, UrlRegister
 from app.services.authorization import require_website_access
 from app.services.crawl_deployment import crawl_deployment_is_active
@@ -31,6 +33,33 @@ ACTIVE_ISSUE_STATUSES = {
     "waiting_for_client",
 }
 SEVERITY_RANK = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+
+
+@router.get("/websites/{website_id}/assets", response_model=list[AssetRead])
+def list_assets(
+    website_id: UUID,
+    kind: str | None = Query(default=None, pattern="^(image|document|video|audio)$"),
+    status_code: int | None = Query(default=None, ge=100, le=599),
+    limit: int = Query(default=100, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> list[AssetRead]:
+    require_website_access(db, principal, website_id)
+    query = (
+        select(Asset, Url.normalized_url)
+        .join(Url, Url.id == Asset.url_id)
+        .where(Asset.website_id == website_id)
+        .order_by(Asset.kind, Url.normalized_url)
+    )
+    if kind is not None:
+        query = query.where(Asset.kind == kind)
+    if status_code is not None:
+        query = query.where(Asset.status_code == status_code)
+    return [
+        AssetRead.model_validate({**asset.__dict__, "url": url})
+        for asset, url in db.execute(query.offset(offset).limit(limit))
+    ]
 
 
 @router.get("/websites/{website_id}/urls", response_model=list[UrlRead])

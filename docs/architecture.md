@@ -58,6 +58,15 @@ afwijkende canonical of een eerdere 404/410-status. Lege zoek- en filterresultat
 een contextuele review met lage zekerheid. Redirects, noindexpagina's en niet-HTML-responses vallen
 buiten deze controle. Herhaalde templatepatronen worden via de bestaande clusteranalyse gebundeld.
 
+## Asset- en mediaregister
+
+Afbeeldingen, documenten, video en audio behouden hun bestaande identiteit in `urls` en hun
+historische meetmomenten in `url_snapshots`. `assets` is een één-op-één productsamenvatting per
+URL met actueel type, MIME-type, status, eind-URL, bestandsgrootte, ETag, Last-Modified en laatste
+controle. Daardoor ontstaat geen tweede URL-register en blijven discovery, scope en normalisatie
+centraal. Nieuwe volledige crawls vullen het register; bestaande snapshots worden niet destructief
+herschreven. De tenantbeveiligde API kan per website, type en status filteren.
+
 `category` beschrijft het technische onderwerp van een issue, zoals bereikbaarheid of interne
 links. De afgeleide `scope` beschrijft hoe het product het signaal presenteert: SEO, SEO+UX,
 kwaliteitscontrole, performance of redactioneel. Scope wordt centraal uit het issuetype afgeleid,

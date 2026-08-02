@@ -66,6 +66,10 @@ gedeployed; per release volgt één integrale kwaliteitscontrole, stagingproef e
    hoofdcontent, zeer weinig inhoud, afwijkende canonical en historische 404/410-status. Alleen
    meerdere sterke signalen leveren een hard issue; lege zoek- en filterresultaten blijven een
    review met lage zekerheid. Issues doorlopen lifecycle, aanbevelingen en templategroepering.
+   Fase 2 is lokaal geïmplementeerd: migratie `0039` voegt een blijvend assetregister toe dat
+   één-op-één voortbouwt op URL-identiteit. Nieuwe assetmetingen actualiseren type, MIME-type,
+   status, eind-URL, grootte en cachemetadata; historische toestand blijft in snapshots. De
+   beveiligde website-API ondersteunt filters op assettype en status zonder tenantdata te mengen.
 5. **Lighthouse/CrUX, contextuele structured data en sitemap-/robotskwaliteit.**
 6. **Begrijpelijk actieplatform** — diagnoses, taken, URL-overzicht, crawldiepte, exports,
    notificaties en UX/UI-polish.

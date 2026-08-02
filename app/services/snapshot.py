@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.models.crawl import ElementLocation, UrlLink, UrlSnapshot
 from app.models.discovery import Url
 from app.models.website import Website
+from app.services.asset_registry import update_asset_record
 from app.services.html_extraction import extract_page
 from app.services.http_crawler import FetchResult
 from app.services.url_filtering import is_excluded_url
@@ -71,6 +72,8 @@ def store_fetch_result(
     )
     db.add(snapshot)
     db.flush()
+    if page is None:
+        update_asset_record(db, url=url, snapshot=snapshot)
     url.current_status_code = result.status_code
     website = db.get(Website, url.website_id)
     settings = website.settings if website else None
