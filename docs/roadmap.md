@@ -6,15 +6,14 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 
 ## Huidige status
 
-- Actieve ontwikkellijn: Release 2 voor queuecapaciteit en operationele stabiliteit. Publieke
+- Actieve ontwikkellijn: Release 3 voor URL Inspection, hreflang en canonical-integriteit. Publieke
   website-inschatting en friends-and-family volgen in Release 13.
-- Productie en de geïsoleerde NAS-stagingomgeving zijn gezond en staan op migratie `0036`.
+- Productie en de geïsoleerde NAS-stagingomgeving zijn gezond en staan op migratie `0037`.
 - De elementlocatie-cleanup is op 1 augustus 2026 afgerond en operationeel gecontroleerd.
 - Automatische elementlocatieretentie is op 1 augustus 2026 in productie gevalideerd: vijf
   persistente operaties zijn geslaagd en één operatie hervatte zichzelf begrensd via scheduler en
   maintenancequeue.
-- Laatste volledige lokale kwaliteitscontrole: 337 tests geslaagd; de productiehotfix voor
-  begrensd PostgreSQL-parallelisme is aanvullend met acht gerichte retentietests gevalideerd.
+- Laatste volledige lokale kwaliteitscontrole: 352 tests geslaagd en Ruff zonder bevindingen.
 - Multi-client domeinisolatie is op 2026-07-19 in productie bevestigd: `jobsatpearle.be` komt niet
   meer als actieve URL van `werkenbijgrandvision.nl` voor.
 
@@ -31,13 +30,12 @@ gedeployed; per release volgt één integrale kwaliteitscontrole, stagingproef e
    negen datasets eindigden als `succeeded`; 185.741 oude, onbeschermde elementlocaties zijn
    verwijderd, de audit is opgeslagen, API en database zijn gezond en de crawl-drain is opgeheven.
 2. **Queuecapaciteit en operationele stabiliteit** — admission, prioriteiten, backpressure,
-   dead-letter-afhandeling, sitemapregressies en resterend runbook. Fase 1 is lokaal
-   geïmplementeerd: versieerbaar queuebeleid, websiteprioriteit en -limiet, routebewijs op
-   crawljobs en een duurzaam dead-lettermodel in migratie `0037`. Fase 2 is lokaal geïmplementeerd:
-   centrale admission, backpressure, prioriteitsgestuurd hervatten, aparte sitemapqueue en
-   definitieve dead-letterregistratie. Fase 3 is lokaal geïmplementeerd: superuserbeheer voor
-   dead letters, queuegrenzen en uitval in systeemstatus, operationele UI, vier vaste
-   sitemapregressies en het complete incidentrunbook. Integrale releasevalidatie volgt in fase 4.
+   dead-letter-afhandeling, sitemapregressies en resterend runbook. Status: afgerond en op
+   2 augustus 2026 met migratie `0037` op staging en productie gevalideerd. Het versieerbare
+   queuebeleid, websiteprioriteiten, toelatingsgrenzen, aparte sitemapqueue, prioriteitsgestuurd
+   hervatten, duurzame dead letters, superuserherstel, systeemstatus, operationele UI,
+   sitemapregressies en het incidentrunbook zijn actief. De productievalidatie bevestigde
+   policyversie `2026-08-02-v1`, een gezonde API en database en een correct opgeheven crawl-drain.
 3. **URL Inspection, hreflang en canonical-integriteit.**
 4. **Soft 404, begrensde JavaScript-rendering en asset-/mediaregister.**
 5. **Lighthouse/CrUX, contextuele structured data en sitemap-/robotskwaliteit.**
