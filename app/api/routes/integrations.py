@@ -21,6 +21,7 @@ from app.models.integrations import (
     IntegrationConnection,
     SearchConsoleMetric,
     SearchConsoleQueryMetric,
+    UrlInspectionResult,
     WebsiteIntegration,
 )
 from app.models.website import Website
@@ -32,6 +33,7 @@ from app.schemas.integrations import (
     GooglePropertiesRead,
     IntegrationConnectionCreate,
     IntegrationConnectionRead,
+    UrlInspectionResultRead,
     WebsiteIntegrationCreate,
     WebsiteIntegrationRead,
     WebsiteIntegrationUpsert,
@@ -55,6 +57,7 @@ from app.services.oauth import (
     parse_oauth_state,
 )
 from app.services.search_console import sync_search_console
+from app.services.url_inspection import sync_url_inspection
 
 router = APIRouter(tags=["integrations"])
 oauth_router = APIRouter(tags=["integrations"])
@@ -583,6 +586,40 @@ async def synchronize_search_console(
     require_website_access(db, principal, website_id, admin=True)
     try:
         return await sync_search_console(db, website_id, days)
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.get(
+    "/websites/{website_id}/integrations/url_inspection/results",
+    response_model=list[UrlInspectionResultRead],
+)
+def list_url_inspection_results(
+    website_id: UUID,
+    url_id: UUID | None = None,
+    limit: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> list[UrlInspectionResult]:
+    require_website_access(db, principal, website_id)
+    query = select(UrlInspectionResult).where(UrlInspectionResult.website_id == website_id)
+    if url_id is not None:
+        query = query.where(UrlInspectionResult.url_id == url_id)
+    return list(
+        db.scalars(query.order_by(UrlInspectionResult.inspected_at.desc()).limit(limit))
+    )
+
+
+@router.post("/websites/{website_id}/integrations/url_inspection/sync")
+async def synchronize_url_inspection(
+    website_id: UUID,
+    limit: int = Query(default=25, ge=1, le=200),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, object]:
+    require_website_access(db, principal, website_id, admin=True)
+    try:
+        return await sync_url_inspection(db, website_id, limit=limit)
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

@@ -49,6 +49,24 @@ class WebsiteIntegrationUpsert(BaseModel):
     external_property_name: str | None = Field(default=None, max_length=512)
 
 
+class UrlInspectionResultRead(Timestamped):
+    website_id: UUID
+    url_id: UUID
+    inspected_at: datetime
+    inspection_result_link: str | None
+    verdict: str | None
+    coverage_state: str | None
+    indexing_state: str | None
+    page_fetch_state: str | None
+    robots_txt_state: str | None
+    last_crawl_time: datetime | None
+    google_canonical: str | None
+    user_canonical: str | None
+    referring_urls: list[str]
+    sitemap_urls: list[str]
+    rich_results: dict[str, object]
+
+
 class GoogleProperty(BaseModel):
     id: str
     name: str

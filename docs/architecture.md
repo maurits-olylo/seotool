@@ -175,6 +175,13 @@ landingspagina-, event- en landingspagina-eventmetrics. Inserts worden in batche
 5.000 mappings uitgevoerd. Iedere synchronisatie bewaart totale, API- en databaseduur zodat
 productieverschillen meetbaar blijven.
 
+De dagelijkse Search Console-synchronisatie inspecteert daarnaast een kleine selectie URL's uit
+Googles bestaande index. De selectie geeft voorrang aan handmatig belangrijke URL's, actieve
+indexatieproblemen en recente wijzigingen. Een resultaat blijft zeven dagen geldig; standaard
+worden maximaal 25 URL's per uitvoering en nooit meer dan 200 per handmatige batch opgevraagd.
+Iedere observatie blijft historisch bewaard. De API gebruikt dezelfde read-only OAuth-scope als
+de GSC-import en doet nadrukkelijk geen live-indexeerbaarheidstest.
+
 ## Crawl-diepte
 
 Een volledige sitecrawl start op de genormaliseerde basis-URL met diepte 0 en verwerkt interne

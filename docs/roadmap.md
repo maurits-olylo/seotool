@@ -44,6 +44,11 @@ gedeployed; per release volgt één integrale kwaliteitscontrole, stagingproef e
    dubbele declarations, hreflangcodes, zelf- en retourverwijzingen, doelstatus,
    indexeerbaarheid en canonicalconsistentie. Interne hreflangdoelen worden als crawlbron
    geregistreerd en herhaalde fouten worden door de bestaande template-engine gegroepeerd.
+   Fase 3 is lokaal geïmplementeerd: de bestaande read-only Search Console-toestemming voert
+   dagelijks maximaal 25 gerichte inspecties uit op belangrijke, verdachte en gewijzigde URL's.
+   Resultaten jonger dan zeven dagen worden overgeslagen, handmatige batches zijn hard begrensd
+   op 200 en historische indexstatus, Google-crawl, robots-, canonical- en rich-resultinformatie
+   is via de beveiligde API beschikbaar. De Google-propertylimiet blijft 2.000 per dag.
 4. **Soft 404, begrensde JavaScript-rendering en asset-/mediaregister.**
 5. **Lighthouse/CrUX, contextuele structured data en sitemap-/robotskwaliteit.**
 6. **Begrijpelijk actieplatform** — diagnoses, taken, URL-overzicht, crawldiepte, exports,

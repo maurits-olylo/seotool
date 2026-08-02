@@ -17,6 +17,7 @@ from app.models.integrations import (
 from app.services.bing_integrations import sync_bing_webmaster
 from app.services.google_analytics import sync_google_analytics
 from app.services.search_console import sync_search_console
+from app.services.url_inspection import sync_url_inspection
 
 logger = structlog.get_logger()
 
@@ -45,6 +46,10 @@ async def _synchronize_website_integrations(website_id: UUID, days: int | None =
             try:
                 result = await sync_search_console(db, website_id, days)
                 logger.info("search_console_sync_succeeded", website_id=str(website_id), **result)
+                inspection = await sync_url_inspection(db, website_id)
+                logger.info(
+                    "url_inspection_sync_succeeded", website_id=str(website_id), **inspection
+                )
             except Exception as exc:
                 db.rollback()
                 logger.exception("search_console_sync_failed", website_id=str(website_id))
