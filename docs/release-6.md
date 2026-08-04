@@ -1,7 +1,8 @@
 # Release 6 — lokale releasecandidate
 
-Status: lokaal afgerond en op 4 augustus 2026 succesvol naar staging uitgerold vanaf exact
-releasecommit `edf9e5f`; productie nog niet uitgevoerd.
+Status: afgerond en op 4 augustus 2026 succesvol naar staging en productie uitgerold. Staging
+gebruikte releasecommit `edf9e5f`; productie gebruikte het definitieve documentatie-archief uit
+commit `76b1d9e` met dezelfde applicatiecode.
 
 ## Scope
 
@@ -44,3 +45,6 @@ releasecommit `edf9e5f`; productie nog niet uitgevoerd.
 - Staging: migration `0042`, gezonde API en database, aanwezige tabellen `task_notifications` en
   `task_notification_receipts`, geladen taakcentruminterface, `PAGESPEED_ENABLED=false` en
   `RENDERING_ENABLED=false` bevestigd.
+- Productie: migration `0042`, gezonde API, database en geraakte workers, aanwezige
+  meldingstabellen en geladen taakcentruminterface bevestigd. PageSpeed en JavaScript-rendering
+  blijven uitgeschakeld. De veilige crawl-drain is opgeheven met nul actieve of wachtende taken.
