@@ -12,7 +12,7 @@ const TASK_TRANSITIONS = {
   closed: ["open"],
 };
 const taskStatusLabels = {open: "Open", planned: "Gepland", in_progress: "In uitvoering", waiting_for_input: "Wacht op input", implemented: "Uitgevoerd", closed: "Afgesloten"};
-const taskRoleLabels = {content: "Content", development: "Development", seo_analytics: "SEO & analytics", project_management: "Projectmanagement"};
+const taskRoleLabels = {content: "Content", development: "Development", seo_analytics: "SEO & analytics", project_management: "Projectmanagement", content_editor: "Contentredactie", ux_ui_design: "UX/UI-design", web_development: "Webdevelopment", seo_specialist: "SEO-specialist", analytics_specialist: "Analytics-specialist", website_management: "Websitebeheer"};
 const closeReasonLabels = {verified: "Geverifieerd", manually_accepted: "Handmatig akkoord", rejected: "Afgewezen", superseded: "Vervangen door andere taak", no_longer_relevant: "Niet meer relevant"};
 const labels = {
   critical: "Kritiek", high: "Hoog", normal: "Normaal", medium: "Middel", low: "Laag", new: "Nieuw", review: "Te beoordelen",
@@ -24,8 +24,8 @@ const labels = {
   pause_requested: "Pauze wordt voorbereid", paused: "Gepauzeerd",
   cancel_requested: "Stop wordt voorbereid", connected: "Gekoppeld", error: "Fout",
 };
-const state = { currentUser: null, currentView: "dashboard", clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], changesRequestId: 0, jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], showCrawlArchive: false, activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, operationsRequestId: 0, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, selectedRecommendationTask: null, recommendationFeedback: [], recommendationDefinitions: null, googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
-const VIEW_HASHES = {dashboard: "overzicht", actions: "analyse/acties", urls: "analyse/urls", changes: "analyse/wijzigingen", insights: "analyse/inzichten", vacancies: "analyse/vacatures", reports: "rapportages", operations: "crawls-exports", clients: "instellingen/klanten-websites", team: "instellingen/team-toegang", integrations: "instellingen/integraties"};
+const state = { currentUser: null, currentView: "dashboard", clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], changesRequestId: 0, jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], showCrawlArchive: false, activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, operationsRequestId: 0, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], urlCoverage: null, filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, selectedRecommendationTask: null, recommendationFeedback: [], recommendationDefinitions: null, recommendationTasks: [], taskNotifications: [], taskMembers: [], googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
+const VIEW_HASHES = {dashboard: "overzicht", tasks: "taken", actions: "analyse/acties", urls: "analyse/urls", changes: "analyse/wijzigingen", insights: "analyse/inzichten", vacancies: "analyse/vacatures", reports: "rapportages", operations: "crawls-exports", clients: "instellingen/klanten-websites", team: "instellingen/team-toegang", integrations: "instellingen/integraties"};
 const LEGACY_HASHES = {rapportage: "reports", urls: "urls", wijzigingen: "changes", inzichten: "insights", vacatures: "vacancies", beheer: "operations", organisatie: "clients", integraties: "integrations", acties: "actions"};
 const ANALYSIS_VIEWS = new Set(["actions", "urls", "changes", "insights", "vacancies"]);
 const SETTINGS_VIEWS = new Set(["clients", "team", "integrations"]);
@@ -242,6 +242,8 @@ function applyRolePermissions() {
   $("#crawl-operation-card").classList.toggle("hidden", !canAdmin);
   $("#dashboard-nav").classList.toggle("hidden", isClient);
   $("#analysis-nav").classList.toggle("hidden", isClient);
+  $("#tasks-nav").classList.toggle("hidden", isClient);
+  $(".notification-area").classList.toggle("hidden", isClient);
   for (const selector of ["#actions-nav", "#urls-nav", "#changes-nav", "#insights-nav", "#vacancies-nav", "#operations-nav"]) $(selector).classList.toggle("hidden", isClient);
   $("#detail-status").classList.toggle("hidden", isClient);
   $("#save-status").classList.toggle("hidden", isClient);
@@ -724,13 +726,14 @@ function showView(view, updateHash = true) {
   if (state.currentUser?.role === "client") view = "reports";
   state.currentView = view;
   const visibleView = view === "reports" ? "actions" : ["clients", "team"].includes(view) ? "organization" : view;
-  for (const name of ["dashboard", "actions", "insights", "urls", "changes", "vacancies", "operations", "organization", "integrations"]) {
+  for (const name of ["dashboard", "tasks", "actions", "insights", "urls", "changes", "vacancies", "operations", "organization", "integrations"]) {
     $(`#${name}-view`).classList.toggle("hidden", name !== visibleView);
   }
   updateNavigation(view);
   $("#context-bar").classList.toggle("hidden", ["clients", "team"].includes(view));
   applyOverviewPresentation(view === "reports");
   if (view === "dashboard") loadDashboard();
+  if (view === "tasks") loadTaskCenter();
   if (view === "reports") {
     loadClientReport().catch(() => { $("#report-conclusion").textContent = "Rapportage kon niet worden geladen."; });
     loadReportSnapshots().catch(() => { $("#report-archive-list").innerHTML = "<p>Rapportagehistorie kon niet worden geladen.</p>"; });
@@ -759,7 +762,7 @@ function viewFromHash() {
 function updateNavigation(view) {
   const analysisActive = ANALYSIS_VIEWS.has(view);
   const settingsActive = SETTINGS_VIEWS.has(view);
-  for (const name of ["dashboard", "reports", "operations"]) $(`#${name}-nav`).classList.toggle("nav-active", name === view);
+  for (const name of ["dashboard", "tasks", "reports", "operations"]) $(`#${name}-nav`).classList.toggle("nav-active", name === view);
   $("#analysis-nav").classList.toggle("nav-active", analysisActive);
   $("#settings-nav").classList.toggle("nav-active", settingsActive);
   for (const group of ["analysis", "settings"]) {
@@ -801,6 +804,84 @@ function stopOperationsPolling() {
   operationsPollTimer = null;
 }
 
+const verificationStatusLabels = {not_requested:"Nog niet gecontroleerd", queued:"In wachtrij", running:"Wordt gecontroleerd", passed:"Geslaagd", likely_passed:"Waarschijnlijk geslaagd", manual_review:"Handmatige controle", failed:"Niet geslaagd", error:"Controle mislukt", cancelled:"Geannuleerd"};
+
+function taskOwnerLabel(userId) {
+  if (!userId) return "Nog niet toegewezen";
+  const member = state.taskMembers.find((item) => item.id === userId);
+  return member?.display_name || member?.email || "Toegewezen";
+}
+
+function formatTaskEffort(task) {
+  if (task.effort_min_minutes == null) return "Nog niet ingeschat";
+  if (task.effort_max_minutes === task.effort_min_minutes || task.effort_max_minutes == null) return `${task.effort_min_minutes} min`;
+  return `${task.effort_min_minutes}–${task.effort_max_minutes} min`;
+}
+
+async function loadTaskNotifications() {
+  const websiteId = $("#website-select").value;
+  state.taskNotifications = websiteId ? await api(`/api/v1/websites/${websiteId}/task-notifications?limit=50`) : [];
+  renderTaskNotifications();
+}
+
+function renderTaskNotifications() {
+  const unread = state.taskNotifications.filter((item) => !item.read_at);
+  $("#notification-count").textContent = unread.length > 99 ? "99+" : unread.length;
+  $("#notification-count").classList.toggle("hidden", unread.length === 0);
+  $("#notification-summary").textContent = unread.length ? `${unread.length} ongelezen` : "Alles gelezen";
+  $("#tasks-nav-count").textContent = unread.length > 99 ? "99+" : unread.length;
+  $("#tasks-nav-count").classList.toggle("hidden", unread.length === 0);
+  $("#notification-list").innerHTML = state.taskNotifications.length ? state.taskNotifications.slice(0, 12).map((item) => `<button class="notification-item ${item.read_at ? "" : "unread"}" type="button" data-notification-id="${item.id}" data-task-id="${item.task_id}"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.message)}</span><time>${escapeHtml(new Date(item.created_at).toLocaleString("nl-NL"))}</time></button>`).join("") : `<p class="notification-empty">Er zijn nog geen taakmeldingen.</p>`;
+}
+
+async function loadTaskCenter() {
+  const websiteId = $("#website-select").value;
+  if (!websiteId) { state.recommendationTasks = []; renderTaskCenter(); return; }
+  $("#task-center-message").textContent = "Taken worden geladen…";
+  try {
+    const params = new URLSearchParams({status: $("#task-status-filter").value || "active", limit:"500"});
+    const filters = [["primary_role", "#task-role-filter"], ["priority", "#task-priority-filter"], ["assigned_to_user_id", "#task-owner-filter"], ["verification_status", "#task-verification-filter"], ["search", "#task-search"]];
+    for (const [name, selector] of filters) { const value = $(selector).value.trim(); if (value) params.set(name, value); }
+    const clientId = $("#client-select").value;
+    const [tasks, notifications, members] = await Promise.all([
+      api(`/api/v1/websites/${websiteId}/recommendation-tasks?${params}`),
+      api(`/api/v1/websites/${websiteId}/task-notifications?limit=50`),
+      ["superuser", "admin"].includes(state.currentUser?.role) ? api(`/api/v1/clients/${clientId}/members`).catch(() => []) : Promise.resolve([]),
+    ]);
+    state.recommendationTasks = tasks; state.taskNotifications = notifications; state.taskMembers = members;
+    const roles = [...new Set(tasks.map((task) => task.primary_role))].sort();
+    const selectedRole = $("#task-role-filter").value;
+    $("#task-role-filter").innerHTML = `<option value="">Alle vakgebieden</option>${roles.map((role) => `<option value="${escapeHtml(role)}">${escapeHtml(taskRoleLabels[role] || role)}</option>`).join("")}`;
+    $("#task-role-filter").value = selectedRole;
+    const selectedOwner = $("#task-owner-filter").value;
+    $("#task-owner-filter").innerHTML = `<option value="">Iedereen</option>${members.map((member) => `<option value="${member.id}">${escapeHtml(member.display_name || member.email)}</option>`).join("")}`;
+    $("#task-owner-filter").value = selectedOwner;
+    renderTaskCenter(); renderTaskNotifications(); $("#task-center-message").textContent = "";
+  } catch (error) { $("#task-center-message").textContent = `Taken konden niet worden geladen: ${error.message}`; }
+}
+
+function renderTaskCenter() {
+  const tasks = state.recommendationTasks;
+  const counts = {open:0, in_progress:0, waiting_for_input:0, verification:0};
+  for (const task of tasks) { if (task.status === "open" || task.status === "planned") counts.open += 1; if (task.status === "in_progress") counts.in_progress += 1; if (task.status === "waiting_for_input") counts.waiting_for_input += 1; if (["queued","running","manual_review"].includes(task.verification_status)) counts.verification += 1; }
+  $("#task-summary").innerHTML = [[counts.open,"Te plannen","Open en gepland"],[counts.in_progress,"In uitvoering","Actief opgepakt"],[counts.waiting_for_input,"Wacht op input","Besluit of informatie nodig"],[counts.verification,"In controle","Automatisch of handmatig"]].map(([count,title,detail]) => `<article class="card"><strong>${count}</strong><span>${title}</span><small>${detail}</small></article>`).join("");
+  $("#task-result-count").textContent = `${tasks.length} ${tasks.length === 1 ? "taak" : "taken"}`;
+  $("#task-empty").classList.toggle("hidden", tasks.length !== 0);
+  $("#task-list").innerHTML = tasks.map((task) => `<article class="task-center-item"><div class="task-center-main"><span class="task-priority ${escapeHtml(task.priority)}">${escapeHtml(labels[task.priority] || task.priority)} · ${escapeHtml(taskRoleLabels[task.primary_role] || task.primary_role)}</span><h3>${escapeHtml(task.title)}</h3><p>${escapeHtml(task.action)}</p></div><div class="task-center-meta"><strong>${escapeHtml(taskOwnerLabel(task.assigned_to_user_id))}</strong><small>${escapeHtml(formatTaskEffort(task))}</small></div><div class="task-center-state"><span class="task-status status-${escapeHtml(task.status)}">${escapeHtml(taskStatusLabels[task.status] || task.status)}</span><small>${escapeHtml(verificationStatusLabels[task.verification_status] || task.verification_status)}</small></div><button class="detail-button" type="button" data-task-issue-id="${task.primary_issue_id || ""}">Open taak</button></article>`).join("");
+}
+
+async function openTaskNotification(notificationId, taskId) {
+  const notification = state.taskNotifications.find((item) => item.id === notificationId);
+  if (notification && !notification.read_at) {
+    await api(`/api/v1/task-notifications/${notificationId}/read`, {method:"POST"});
+    notification.read_at = new Date().toISOString(); renderTaskNotifications();
+  }
+  $("#notification-popover").classList.add("hidden"); $("#notification-toggle").setAttribute("aria-expanded", "false");
+  showView("tasks");
+  const task = state.recommendationTasks.find((item) => item.id === taskId) || await api(`/api/v1/recommendation-tasks/${taskId}`).catch(() => null);
+  if (task?.primary_issue_id) await showIssue(task.primary_issue_id);
+}
+
 async function loadIssues() {
   const websiteId = $("#website-select").value;
   if (!websiteId) {
@@ -815,9 +896,10 @@ async function loadIssues() {
   const status = $("#status-filter").value || "active";
   const canAdmin = ["superuser", "admin"].includes(state.currentUser?.role);
   const clientId = $("#client-select").value;
-  const [issues, urls, suppressions, integrationHealth] = await Promise.all([
+  const [issues, urls, coverage, suppressions, integrationHealth] = await Promise.all([
     api(`/api/v1/websites/${websiteId}/issues?status=${encodeURIComponent(status)}`),
     loadAllUrls(websiteId),
+    api(`/api/v1/websites/${websiteId}/url-coverage`),
     api(`/api/v1/websites/${websiteId}/issue-suppressions`),
     canAdmin ? Promise.all([
       api(`/api/v1/clients/${clientId}/integrations`),
@@ -830,6 +912,7 @@ async function loadIssues() {
   state.selectedIssueIds.clear();
   state.selectedSuppressionIds.clear();
   state.urlRecords = urls;
+  state.urlCoverage = coverage;
   state.urls = new Map(urls.map((url) => [url.id, url.normalized_url]));
   const types = [...new Set(issues.map((issue) => issue.issue_type))].sort();
   $("#type-filter").innerHTML = `<option value="">Alle issue-types</option>${types.map((type) => `<option value="${escapeHtml(type)}">${escapeHtml(type)}</option>`).join("")}`;
@@ -838,6 +921,7 @@ async function loadIssues() {
   await Promise.all([
     loadClientReport(),
     loadReportSnapshots(),
+    loadTaskNotifications().catch(() => { state.taskNotifications = []; renderTaskNotifications(); }),
     state.currentUser?.role === "client" ? Promise.resolve() : loadJobListings(),
   ]);
 }
@@ -918,14 +1002,18 @@ function renderUrls() {
   const query = $("#url-search").value.trim().toLowerCase();
   const status = $("#url-status-filter").value;
   const indexation = $("#url-index-filter").value;
+  const source = $("#url-source-filter").value;
   const depth = $("#url-depth-filter").value;
   state.urlFiltered = state.urlRecords.filter((url) => {
     const code = url.current_status_code;
     const statusMatch = !status || (status === "none" ? code === null : code >= Number(status[0]) * 100 && code < (Number(status[0]) + 1) * 100);
     const indexMatch = !indexation || urlIndexState(url) === indexation;
+    const currentSources = url.current_source_types || [];
+    const sourceMatch = !source || (source === "historical_only" ? (url.source_types || []).length > 0 && currentSources.length === 0 : source === "no_source" ? (url.source_types || []).length === 0 : currentSources.includes(source));
     const depthMatch = !depth || (depth === "none" ? url.crawl_depth === null : depth === "0-2" ? url.crawl_depth >= 0 && url.crawl_depth <= 2 : depth === "3-4" ? url.crawl_depth >= 3 && url.crawl_depth <= 4 : url.crawl_depth >= 5);
-    return statusMatch && indexMatch && depthMatch && (!query || url.normalized_url.toLowerCase().includes(query));
+    return statusMatch && indexMatch && sourceMatch && depthMatch && (!query || url.normalized_url.toLowerCase().includes(query));
   });
+  renderUrlCoverage();
   const pages = Math.max(1, Math.ceil(state.urlFiltered.length / URL_PAGE_SIZE));
   state.urlPage = Math.min(state.urlPage, pages);
   const start = (state.urlPage - 1) * URL_PAGE_SIZE;
@@ -939,13 +1027,27 @@ function renderUrls() {
     const issueTitle = url.active_issue_titles?.[0];
     const issueCount = url.active_issue_count || 0;
     const issueSignal = issueTitle ? `<div class="url-signal"><span class="severity ${escapeHtml(url.highest_issue_severity || "low")}">${escapeHtml(labels[url.highest_issue_severity] || url.highest_issue_severity || "Signaal")}</span><span class="url-signal-title">${escapeHtml(issueTitle)}${issueCount > 1 ? ` <small>+${issueCount - 1}</small>` : ""}</span></div>` : `<span class="url-signal-empty">Geen actief signaal</span>`;
-    return `<tr><td><a class="url-address" href="${escapeHtml(url.normalized_url)}" target="_blank" rel="noopener">${escapeHtml(url.normalized_url)}</a></td><td><span class="status-code">${url.current_status_code ?? "—"}</span></td><td><span class="index-state ${indexState}">${indexLabel}</span></td><td>${issueSignal}</td><td title="${escapeHtml(url.crawl_depth_context || "")}">${depthLabel}</td><td>${checked}</td><td><button class="detail-button" data-url-id="${url.id}">Bekijk</button></td></tr>`;
+    const currentSources = url.current_source_types || [];
+    const historicalSources = (url.source_types || []).filter((item) => !currentSources.includes(item));
+    const sourceLabels = {sitemap:"Sitemap", internal_link:"Interne link", known:"Bekend", manual:"Handmatig", hreflang:"Hreflang", structured_data:"Structured data"};
+    const sources = [...currentSources.map((item) => `<span class="url-source">${escapeHtml(sourceLabels[item] || item)}</span>`), ...historicalSources.map((item) => `<span class="url-source historical" title="Niet teruggevonden in de laatste volledige crawl">${escapeHtml(sourceLabels[item] || item)} · historisch</span>`)].join("") || `<span class="url-source-empty">Geen bron</span>`;
+    return `<tr><td><a class="url-address" href="${escapeHtml(url.normalized_url)}" target="_blank" rel="noopener">${escapeHtml(url.normalized_url)}</a></td><td><div class="url-source-list">${sources}</div></td><td><span class="status-code">${url.current_status_code ?? "—"}</span></td><td><span class="index-state ${indexState}">${indexLabel}</span></td><td>${issueSignal}</td><td title="${escapeHtml(url.crawl_depth_context || "")}">${depthLabel}</td><td>${checked}</td><td><button class="detail-button" data-url-id="${url.id}">Bekijk</button></td></tr>`;
   }).join("");
   $("#url-result-count").textContent = `${state.urlFiltered.length} URLs`;
   $("#url-page-label").textContent = `Pagina ${state.urlPage} van ${pages}`;
   $("#url-previous-page").disabled = state.urlPage === 1;
   $("#url-next-page").disabled = state.urlPage === pages;
   $("#url-empty").classList.toggle("hidden", rows.length !== 0);
+}
+
+function renderUrlCoverage() {
+  const coverage = state.urlCoverage;
+  if (!coverage) { $("#url-coverage-summary").innerHTML = ""; $("#url-coverage-context").textContent = "Dekking wordt geladen…"; return; }
+  const current = coverage.current_source_counts || {};
+  const metrics = [[coverage.total_active_urls,"Actieve URL’s"],[current.sitemap || 0,"In sitemap"],[current.internal_link || 0,"Intern gevonden"],[coverage.historical_only_urls || 0,"Alleen historisch"]];
+  $("#url-coverage-summary").innerHTML = metrics.map(([value,label]) => `<article class="card"><strong>${Number(value).toLocaleString("nl-NL")}</strong><span>${label}</span></article>`).join("");
+  $("#url-coverage-context").textContent = `${coverage.context}. ${coverage.multi_source_urls} URL’s zijn via meerdere actuele bronnen gevonden; ${coverage.no_source_urls} hebben geen bronregistratie.`;
+  $("#url-coverage-context").classList.toggle("provisional", !coverage.reliable);
 }
 
 async function showUrl(urlId) {
@@ -1330,7 +1432,23 @@ function exportUrls() {
       zoekopdracht: $("#url-search").value.trim() || "Geen",
       status: selectedText("#url-status-filter", "Alle statuscodes"),
       indexatie: selectedText("#url-index-filter", "Alle indexatiestatussen"),
+      bron: selectedText("#url-source-filter", "Alle bronnen"),
       crawldiepte: selectedText("#url-depth-filter", "Alle crawl-dieptes"),
+    },
+  });
+}
+
+function exportTasks() {
+  startPageExport({
+    buttonSelector: "#export-tasks", exportType: "tasks",
+    itemIds: state.recommendationTasks.map((task) => task.id),
+    filters: {
+      zoekopdracht: $("#task-search").value.trim() || "Geen",
+      status: selectedText("#task-status-filter", "Alle open taken"),
+      prioriteit: selectedText("#task-priority-filter", "Alle prioriteiten"),
+      vakgebied: selectedText("#task-role-filter", "Alle vakgebieden"),
+      eigenaar: selectedText("#task-owner-filter", "Iedereen"),
+      controle: selectedText("#task-verification-filter", "Alle controles"),
     },
   });
 }
@@ -2264,6 +2382,7 @@ $("#recommendation-task-content").addEventListener("submit", (event) => {
   if (event.target.closest("#task-scope-form")) saveTaskScope(event);
 });
 $("#dashboard-nav").addEventListener("click", () => showView("dashboard"));
+$("#tasks-nav").addEventListener("click", () => showView("tasks"));
 $("#actions-nav").addEventListener("click", () => showView("actions"));
 $("#reports-nav").addEventListener("click", () => showView("reports"));
 $("#insights-nav").addEventListener("click", () => showView("insights"));
@@ -2274,6 +2393,13 @@ $("#operations-nav").addEventListener("click", () => showView("operations"));
 $("#clients-nav").addEventListener("click", () => showView("clients"));
 $("#team-nav").addEventListener("click", () => showView("team"));
 $("#integrations-nav").addEventListener("click", () => showView("integrations"));
+$("#notification-toggle").addEventListener("click", () => { const open = $("#notification-popover").classList.toggle("hidden") === false; $("#notification-toggle").setAttribute("aria-expanded", String(open)); });
+$("#notification-all-tasks").addEventListener("click", () => { $("#notification-popover").classList.add("hidden"); $("#notification-toggle").setAttribute("aria-expanded", "false"); showView("tasks"); });
+$("#notification-list").addEventListener("click", (event) => { const button = event.target.closest("[data-notification-id]"); if (button) openTaskNotification(button.dataset.notificationId, button.dataset.taskId); });
+for (const selector of ["#task-status-filter", "#task-priority-filter", "#task-role-filter", "#task-owner-filter", "#task-verification-filter"]) $(selector).addEventListener("change", loadTaskCenter);
+let taskSearchTimer = null;
+$("#task-search").addEventListener("input", () => { window.clearTimeout(taskSearchTimer); taskSearchTimer = window.setTimeout(loadTaskCenter, 250); });
+$("#task-list").addEventListener("click", (event) => { const button = event.target.closest("[data-task-issue-id]"); if (button?.dataset.taskIssueId) showIssue(button.dataset.taskIssueId); });
 for (const group of ["analysis", "settings"]) $(`#${group}-nav`).addEventListener("click", () => { const subnav = $(`#${group}-subnav`); const open = subnav.classList.toggle("hidden") === false; $(`#${group}-nav`).setAttribute("aria-expanded", String(open)); });
 $(".dashboard-grid").addEventListener("click", (event) => { const button = event.target.closest("[data-dashboard-view]"); if (button) showView(button.dataset.dashboardView); });
 $("#dashboard-priorities").addEventListener("click", (event) => {
@@ -2304,7 +2430,7 @@ function handleClientDirectoryClick(event) {
 }
 for (const selector of ["#client-rows", "#client-cards"]) $(selector).addEventListener("click", handleClientDirectoryClick);
 $("#copy-invitation").addEventListener("click", async () => { await navigator.clipboard.writeText($("#invitation-link").value); $("#invitation-form-message").textContent = "Link gekopieerd."; });
-for (const selector of ["#url-status-filter", "#url-index-filter", "#url-depth-filter"]) $(selector).addEventListener("change", () => { state.urlPage = 1; renderUrls(); });
+for (const selector of ["#url-status-filter", "#url-index-filter", "#url-source-filter", "#url-depth-filter"]) $(selector).addEventListener("change", () => { state.urlPage = 1; renderUrls(); });
 $("#url-search").addEventListener("input", () => { state.urlPage = 1; renderUrls(); });
 $("#url-previous-page").addEventListener("click", () => { state.urlPage -= 1; renderUrls(); });
 $("#url-next-page").addEventListener("click", () => { state.urlPage += 1; renderUrls(); });
@@ -2335,6 +2461,7 @@ $("#crawl-run-cards").addEventListener("click", (event) => { const button = even
 $("#close-crawl-failures").addEventListener("click", () => $("#crawl-failure-panel").classList.add("hidden"));
 $("#current-export-download").addEventListener("click", () => window.setTimeout(loadOperations, 2000));
 $("#export-urls").addEventListener("click", exportUrls);
+$("#export-tasks").addEventListener("click", exportTasks);
 $("#export-changes").addEventListener("click", exportChanges);
 $("#export-vacancies").addEventListener("click", exportVacancies);
 $("#save-search-console").addEventListener("click", () => saveProperty("search_console", "#search-console-property", "#save-search-console", "#search-console-message", state.googleConnectionId));

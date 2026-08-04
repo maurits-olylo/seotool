@@ -11,7 +11,7 @@ from app.core.config import get_settings
 from app.core.security import create_session_token, hash_password
 from app.db.session import SessionLocal
 from app.models.crawl import CrawlRun, ElementLocation, UrlLink, UrlSnapshot
-from app.models.discovery import CrawlJob, Url
+from app.models.discovery import CrawlJob, Url, UrlSource
 from app.models.integrations import (
     GoogleAnalyticsEventMetric,
     GoogleAnalyticsMetric,
@@ -153,10 +153,17 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
 def test_operations_status_ignores_stale_website_responses(client: TestClient) -> None:
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
-    assert 'src="/ui/assets/app.js?v=20260802-1"' in page.text
+    assert 'src="/ui/assets/app.js?v=20260804-3"' in page.text
     assert 'href="/ui/assets/actionable.css?v=20260731-4"' in page.text
     assert 'id="recommendation-task-section"' in page.text
     assert 'id="recommendation-task-content"' in page.text
+    assert 'id="tasks-view"' in page.text
+    assert 'id="notification-popover"' in page.text
+    assert 'href="/ui/assets/task-center.css?v=20260804-1"' in page.text
+    assert 'href="/ui/assets/urls.css?v=20260804-1"' in page.text
+    assert 'id="url-coverage-summary"' in page.text
+    assert 'id="url-source-filter"' in page.text
+    assert 'id="export-tasks"' in page.text
 
     script = client.get("/ui/assets/app.js")
     assert script.status_code == 200
@@ -173,6 +180,10 @@ def test_operations_status_ignores_stale_website_responses(client: TestClient) -
     assert "state.activeCrawlJob = null;" in script.text
     assert "state.exports = [];" in script.text
     assert "function loadIssueRecommendation" in script.text
+    assert "function loadTaskCenter" in script.text
+    assert "function renderTaskNotifications" in script.text
+    assert "function renderUrlCoverage" in script.text
+    assert "function exportTasks" in script.text
     assert "function createRecommendationTask" in script.text
     assert "function saveRecommendationTask" in script.text
     assert "function saveRecommendationFeedback" in script.text
@@ -1774,6 +1785,67 @@ def test_url_overview_marks_depth_from_failed_crawl_as_unreliable(client: TestCl
     assert item["crawl_depth"] == 2
     assert item["crawl_depth_reliable"] is False
     assert "niet voltooid" in item["crawl_depth_context"]
+
+
+def test_url_coverage_distinguishes_current_and_historical_sources(client: TestClient) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "URL coverage"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={"client_id": customer["id"], "name": "Coverage", "base_url": "https://coverage.test"},
+    ).json()
+    website_id = UUID(website["id"])
+    crawl_started = datetime(2026, 8, 4, 10, tzinfo=UTC)
+    with SessionLocal() as db:
+        current = Url(website_id=website_id, normalized_url="https://coverage.test/current")
+        historical = Url(website_id=website_id, normalized_url="https://coverage.test/historical")
+        no_source = Url(website_id=website_id, normalized_url="https://coverage.test/no-source")
+        job = CrawlJob(website_id=website_id, job_type="full_site_crawl", status="succeeded")
+        db.add_all([current, historical, no_source, job])
+        db.flush()
+        db.add_all(
+            [
+                CrawlRun(
+                    crawl_job_id=job.id,
+                    website_id=website_id,
+                    crawl_type="full_site_crawl",
+                    status="succeeded",
+                    started_at=crawl_started,
+                ),
+                UrlSource(
+                    url_id=current.id,
+                    source_type="sitemap",
+                    source_url="https://coverage.test/sitemap.xml",
+                    last_seen_at=crawl_started + timedelta(minutes=1),
+                ),
+                UrlSource(
+                    url_id=current.id,
+                    source_type="internal_link",
+                    source_url="https://coverage.test/",
+                    last_seen_at=crawl_started + timedelta(minutes=2),
+                ),
+                UrlSource(
+                    url_id=historical.id,
+                    source_type="sitemap",
+                    source_url="https://coverage.test/sitemap.xml",
+                    last_seen_at=crawl_started - timedelta(days=7),
+                ),
+            ]
+        )
+        db.commit()
+
+    urls = client.get(f"/api/v1/websites/{website_id}/urls").json()
+    by_path = {item["normalized_url"].rsplit("/", 1)[-1]: item for item in urls}
+    assert by_path["current"]["current_source_types"] == ["internal_link", "sitemap"]
+    assert by_path["historical"]["source_types"] == ["sitemap"]
+    assert by_path["historical"]["current_source_types"] == []
+
+    coverage = client.get(f"/api/v1/websites/{website_id}/url-coverage").json()
+    assert coverage["reliable"] is True
+    assert coverage["total_active_urls"] == 3
+    assert coverage["current_source_counts"] == {"internal_link": 1, "sitemap": 1}
+    assert coverage["multi_source_urls"] == 1
+    assert coverage["historical_only_urls"] == 1
+    assert coverage["no_source_urls"] == 1
 
 
 def test_url_overview_includes_active_issue_summary(client: TestClient) -> None:

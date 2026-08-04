@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.security import Principal, require_api_key
@@ -15,6 +15,8 @@ from app.models.recommendations import (
     RecommendationTaskIssue,
     RecommendationTaskUrl,
     RecommendationVerification,
+    TaskNotification,
+    TaskNotificationReceipt,
 )
 from app.schemas.recommendations import (
     RecommendationDefinitionRead,
@@ -27,6 +29,7 @@ from app.schemas.recommendations import (
     RecommendationTaskUrlRead,
     RecommendationVerificationPlanRead,
     RecommendationVerificationRead,
+    TaskNotificationRead,
 )
 from app.services.authorization import require_website_access, require_write_access
 from app.services.recommendation_library import DEFINITIONS
@@ -77,6 +80,13 @@ def create_recommendation_task(
 def list_recommendation_tasks(
     website_id: UUID,
     task_status: str = Query(default="active", alias="status"),
+    primary_role: str | None = None,
+    priority: str | None = Query(default=None, pattern="^(critical|high|normal|low)$"),
+    assigned_to_user_id: UUID | None = None,
+    verification_status: str | None = None,
+    search: str | None = Query(default=None, max_length=200),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> list[RecommendationTask]:
@@ -90,7 +100,77 @@ def list_recommendation_tasks(
         query = query.where(RecommendationTask.status != "closed")
     elif task_status != "all":
         query = query.where(RecommendationTask.status == task_status)
-    return list(db.scalars(query))
+    if primary_role is not None:
+        query = query.where(RecommendationTask.primary_role == primary_role)
+    if priority is not None:
+        query = query.where(RecommendationTask.priority == priority)
+    if assigned_to_user_id is not None:
+        query = query.where(RecommendationTask.assigned_to_user_id == assigned_to_user_id)
+    if verification_status is not None:
+        query = query.where(RecommendationTask.verification_status == verification_status)
+    if search:
+        pattern = f"%{search.strip()}%"
+        query = query.where(
+            or_(
+                RecommendationTask.title.ilike(pattern),
+                RecommendationTask.action.ilike(pattern),
+            )
+        )
+    return list(db.scalars(query.offset(offset).limit(limit)))
+
+
+@router.get(
+    "/websites/{website_id}/task-notifications",
+    response_model=list[TaskNotificationRead],
+)
+def list_task_notifications(
+    website_id: UUID,
+    unread_only: bool = False,
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> list[dict[str, object]]:
+    require_website_access(db, principal, website_id)
+    query = (
+        select(TaskNotification, TaskNotificationReceipt.read_at)
+        .outerjoin(
+            TaskNotificationReceipt,
+            (TaskNotificationReceipt.notification_id == TaskNotification.id)
+            & (TaskNotificationReceipt.user_id == principal.user_id),
+        )
+        .where(TaskNotification.website_id == website_id)
+        .order_by(TaskNotification.created_at.desc())
+        .limit(limit)
+    )
+    if unread_only and principal.user_id is not None:
+        query = query.where(TaskNotificationReceipt.notification_id.is_(None))
+    return [
+        {**TaskNotificationRead.model_validate(notification).model_dump(), "read_at": read_at}
+        for notification, read_at in db.execute(query)
+    ]
+
+
+@router.post("/task-notifications/{notification_id}/read", status_code=204)
+def mark_task_notification_read(
+    notification_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> None:
+    if principal.user_id is None:
+        raise HTTPException(status_code=403, detail="Een gebruikerssessie is vereist")
+    notification = db.get(TaskNotification, notification_id)
+    if notification is None:
+        raise HTTPException(status_code=404, detail="Melding niet gevonden")
+    require_website_access(db, principal, notification.website_id)
+    receipt = db.get(TaskNotificationReceipt, (notification.id, principal.user_id))
+    if receipt is None:
+        db.add(
+            TaskNotificationReceipt(
+                notification_id=notification.id,
+                user_id=principal.user_id,
+            )
+        )
+        db.commit()
 
 
 @router.get(

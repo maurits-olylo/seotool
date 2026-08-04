@@ -11,10 +11,12 @@ from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
 from app.models.crawl import CrawlRun, UrlLink
-from app.models.discovery import Url
+from app.models.discovery import Url, UrlSource
 from app.models.exports import Export
 from app.models.issues import Change, Issue
 from app.models.jobs import JobListing
+from app.models.recommendations import RecommendationTask
+from app.models.user import User
 from app.models.website import Website
 from app.services.job_posting import ACTIVE_JOB_ISSUE_STATUSES, JOB_ISSUE_TYPES
 
@@ -71,6 +73,13 @@ def _datasets(
             .order_by(JobListing.valid_through.asc().nullslast(), JobListing.title)
         )
     )
+    tasks = list(
+        db.scalars(
+            select(RecommendationTask)
+            .where(RecommendationTask.website_id == website_id)
+            .order_by(RecommendationTask.updated_at.desc())
+        )
+    )
     if item_ids is not None:
         if selected_type == "urls":
             urls = [url for url in urls if url.id in selected_ids]
@@ -80,6 +89,30 @@ def _datasets(
             changes = [change for change in changes if change.id in selected_ids]
         elif selected_type == "vacancies":
             job_listings = [listing for listing in job_listings if listing.id in selected_ids]
+        elif selected_type == "tasks":
+            tasks = [task for task in tasks if task.id in selected_ids]
+    source_rows = (
+        list(db.scalars(select(UrlSource).where(UrlSource.url_id.in_(url_ids))))
+        if url_ids
+        else []
+    )
+    sources_by_url: dict[object, list[UrlSource]] = {}
+    for source in source_rows:
+        sources_by_url.setdefault(source.url_id, []).append(source)
+    latest_full_run = db.scalar(
+        select(CrawlRun)
+        .where(CrawlRun.website_id == website_id, CrawlRun.crawl_type == "full_site_crawl")
+        .order_by(CrawlRun.started_at.desc())
+        .limit(1)
+    )
+    assigned_user_ids = {
+        task.assigned_to_user_id for task in tasks if task.assigned_to_user_id
+    }
+    users = {
+        user.id: user
+        for user in db.scalars(select(User).where(User.id.in_(assigned_user_ids)))
+    }
+    issues_by_id = {issue.id: issue for issue in issues}
     job_issues_by_url = {
         listing.url_id: [
             issue
@@ -131,6 +164,14 @@ def _datasets(
                 "is_indexable",
                 "first_seen_at",
                 "last_seen_at",
+                "final_url",
+                "page_type",
+                "crawl_depth",
+                "all_sources",
+                "current_sources",
+                "historical_sources",
+                "last_light_checked_at",
+                "last_full_analyzed_at",
             ],
             [
                 [
@@ -140,6 +181,22 @@ def _datasets(
                     url.is_indexable,
                     url.first_seen_at,
                     url.last_seen_at,
+                    url.current_final_url,
+                    url.page_type,
+                    url.crawl_depth,
+                    " | ".join(
+                        sorted(
+                            {source.source_type for source in sources_by_url.get(url.id, [])}
+                        )
+                    ),
+                    " | ".join(
+                        _current_source_types(sources_by_url.get(url.id, []), latest_full_run)
+                    ),
+                    " | ".join(
+                        _historical_source_types(sources_by_url.get(url.id, []), latest_full_run)
+                    ),
+                    url.last_light_checked_at,
+                    url.last_full_analyzed_at,
                 ]
                 for url in urls
             ],
@@ -254,7 +311,79 @@ def _datasets(
                 for listing in job_listings
             ],
         ),
+        "tasks": (
+            [
+                "title",
+                "action",
+                "issue_url",
+                "category",
+                "priority",
+                "priority_reason",
+                "status",
+                "primary_role",
+                "supporting_roles",
+                "assigned_to",
+                "effort_min_minutes",
+                "effort_max_minutes",
+                "verification_status",
+                "required_input",
+                "acceptance_criteria",
+                "created_at",
+                "updated_at",
+            ],
+            [
+                [
+                    task.title,
+                    task.action,
+                    url_by_id.get(issues_by_id[task.primary_issue_id].url_id)
+                    if task.primary_issue_id in issues_by_id
+                    else None,
+                    task.category,
+                    task.priority,
+                    task.priority_reason,
+                    task.status,
+                    task.primary_role,
+                    " | ".join(task.supporting_roles or []),
+                    _user_label(users.get(task.assigned_to_user_id)),
+                    task.effort_min_minutes,
+                    task.effort_max_minutes,
+                    task.verification_status,
+                    " | ".join(task.required_input or []),
+                    " | ".join(task.acceptance_criteria or []),
+                    task.created_at,
+                    task.updated_at,
+                ]
+                for task in tasks
+            ],
+        ),
     }
+
+
+def _current_source_types(sources: list[UrlSource], run: CrawlRun | None) -> list[str]:
+    return sorted(
+        {
+            source.source_type
+            for source in sources
+            if source.source_type == "manual"
+            or run is None
+            or _seen_since(source.last_seen_at, run.started_at)
+        }
+    )
+
+
+def _historical_source_types(sources: list[UrlSource], run: CrawlRun | None) -> list[str]:
+    current = set(_current_source_types(sources, run))
+    return sorted({source.source_type for source in sources} - current)
+
+
+def _seen_since(seen_at: datetime, started_at: datetime) -> bool:
+    return seen_at.replace(tzinfo=None) >= started_at.replace(tzinfo=None)
+
+
+def _user_label(user: User | None) -> str:
+    if user is None:
+        return ""
+    return user.display_name or user.email
 
 
 def _job_validation_status(listing: JobListing, issues: list[Issue]) -> str:

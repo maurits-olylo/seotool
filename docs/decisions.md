@@ -991,3 +991,17 @@ voorbeelden per bevindingstype.
 Gevolg: de sitemapgenerator en robotsconfiguratie krijgen concrete, dedupliceerbare acties zonder
 extra netwerkronde, database-migration of generieke kwaliteitsscore. Een volgende schone import
 lost het issue via de bestaande lifecycle op.
+
+## 2026-08-04 — In-app taakmeldingen scheiden gebeurtenis en leesstatus
+
+Context: taak- en verificatiehistorie was persistent, maar alleen vanuit een geopend issuedetail
+bereikbaar. Een globale melding direct als gelezen of ongelezen opslaan zou de status van alle
+gebruikers binnen dezelfde klant beïnvloeden.
+
+Besluit: bewaar de websitegebonden melding één keer en leg leesstatus in een afzonderlijk record
+per gebruiker vast. Gebruik dezelfde tenantautorisatie als taakroutes. API-keyverkeer mag lezen,
+maar niet namens een gebruiker afvinken. E-mail en externe kanalen blijven buiten deze release.
+
+Gevolg: taak- en verificatiewerk blijft zichtbaar nadat een browser is gesloten, zonder gedeelde
+leesstatus tussen gebruikers of tenants. Migration `0042` voegt tabellen toe en verruimt alleen de
+rollenconstraint; bestaande taakdata wordt niet herschreven.

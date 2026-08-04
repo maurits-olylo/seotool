@@ -11,11 +11,18 @@ from app.db.session import get_db
 from app.models.assets import Asset
 from app.models.common import utc_now
 from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
-from app.models.discovery import CrawlJob, Url
+from app.models.discovery import CrawlJob, Url, UrlSource
 from app.models.issues import Issue
 from app.models.website import Website
 from app.schemas.assets import AssetRead
-from app.schemas.discovery import CrawlJobCreate, CrawlJobRead, CrawlRouteRead, UrlRead, UrlRegister
+from app.schemas.discovery import (
+    CrawlJobCreate,
+    CrawlJobRead,
+    CrawlRouteRead,
+    UrlCoverageRead,
+    UrlRead,
+    UrlRegister,
+)
 from app.services.authorization import require_website_access
 from app.services.crawl_deployment import crawl_deployment_is_active
 from app.services.url_filtering import is_excluded_url
@@ -83,16 +90,68 @@ def list_urls(
         .limit(1)
     )
     issue_summaries = _active_issue_summaries(db, [url.id for url in urls])
+    source_summaries = _url_source_summaries(db, [url.id for url in urls], latest_full_run)
     return [
-        _url_read_with_depth_context(url, latest_full_run, issue_summaries.get(url.id))
+        _url_read_with_depth_context(
+            url,
+            latest_full_run,
+            issue_summaries.get(url.id),
+            source_summaries.get(url.id),
+        )
         for url in urls
     ]
+
+
+@router.get("/websites/{website_id}/url-coverage", response_model=UrlCoverageRead)
+def get_url_coverage(
+    website_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> UrlCoverageRead:
+    require_website_access(db, principal, website_id)
+    latest_full_run = db.scalar(
+        select(CrawlRun)
+        .where(CrawlRun.website_id == website_id, CrawlRun.crawl_type == "full_site_crawl")
+        .order_by(CrawlRun.started_at.desc())
+        .limit(1)
+    )
+    url_ids = list(db.scalars(select(Url.id).where(Url.website_id == website_id, Url.is_active)))
+    summaries = _url_source_summaries(db, url_ids, latest_full_run)
+    source_counts: dict[str, int] = {}
+    current_counts: dict[str, int] = {}
+    for summary in summaries.values():
+        for source_type in summary["source_types"]:
+            source_counts[source_type] = source_counts.get(source_type, 0) + 1
+        for source_type in summary["current_source_types"]:
+            current_counts[source_type] = current_counts.get(source_type, 0) + 1
+    reliable = latest_full_run is not None and latest_full_run.status == "succeeded"
+    context = (
+        f"Actuele dekking uit voltooide crawl van {latest_full_run.started_at.date().isoformat()}"
+        if reliable
+        else "Nog geen voltooide volledige crawl; actuele dekking is voorlopig"
+    )
+    return UrlCoverageRead(
+        total_active_urls=len(url_ids),
+        source_counts=source_counts,
+        current_source_counts=current_counts,
+        multi_source_urls=sum(len(item["current_source_types"]) > 1 for item in summaries.values()),
+        historical_only_urls=sum(
+            bool(item["source_types"]) and not item["current_source_types"]
+            for item in summaries.values()
+        ),
+        no_source_urls=sum(not item["source_types"] for item in summaries.values()),
+        latest_full_crawl_status=latest_full_run.status if latest_full_run else None,
+        latest_full_crawl_started_at=latest_full_run.started_at if latest_full_run else None,
+        reliable=reliable,
+        context=context,
+    )
 
 
 def _url_read_with_depth_context(
     url: Url,
     run: CrawlRun | None,
     issue_summary: dict[str, object] | None = None,
+    source_summary: dict[str, object] | None = None,
 ) -> UrlRead:
     data = UrlRead.model_validate(url).model_dump()
     if run is None:
@@ -116,7 +175,44 @@ def _url_read_with_depth_context(
     data["crawl_depth_context"] = context
     if issue_summary:
         data.update(issue_summary)
+    if source_summary:
+        data.update(source_summary)
     return UrlRead.model_validate(data)
+
+
+def _url_source_summaries(
+    db: Session,
+    url_ids: list[UUID],
+    run: CrawlRun | None,
+) -> dict[UUID, dict[str, object]]:
+    if not url_ids:
+        return {}
+    grouped: dict[UUID, list[UrlSource]] = {}
+    for source in db.scalars(
+        select(UrlSource)
+        .where(UrlSource.url_id.in_(url_ids))
+        .order_by(UrlSource.url_id, UrlSource.source_type, UrlSource.source_url)
+    ):
+        grouped.setdefault(source.url_id, []).append(source)
+    summaries: dict[UUID, dict[str, object]] = {}
+    for url_id in url_ids:
+        sources = grouped.get(url_id, [])
+        source_types = sorted({source.source_type for source in sources})
+        current_types = sorted(
+            {
+                source.source_type
+                for source in sources
+                if source.source_type == "manual"
+                or run is None
+                or source.last_seen_at >= run.started_at
+            }
+        )
+        summaries[url_id] = {
+            "source_types": source_types,
+            "current_source_types": current_types,
+            "source_last_seen_at": max((source.last_seen_at for source in sources), default=None),
+        }
+    return summaries
 
 
 def _active_issue_summaries(db: Session, url_ids: list[UUID]) -> dict[UUID, dict[str, object]]:

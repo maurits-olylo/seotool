@@ -17,6 +17,7 @@ from app.models.recommendations import (
     RecommendationTaskIssue,
     RecommendationTaskUrl,
     RecommendationVerification,
+    TaskNotification,
 )
 from app.models.user import ClientMembership, User
 from app.models.website import Website, WebsiteSettings
@@ -497,6 +498,9 @@ def test_targeted_broken_link_verification_only_fetches_selected_urls(
         assert run.crawl_type == "recommendation_verification"
         assert db.query(UrlSnapshot).filter_by(crawl_run_id=run.id).count() == 1
         assert db.get(Website, website.id).settings.full_crawl_interval == interval_before
+        notification = db.query(TaskNotification).one()
+        assert notification.notification_type == "verification_finished"
+        assert notification.verification_id == verification.id
 
     execute_verification(str(verification_id))
     assert fetched == ["https://example.com/source"]

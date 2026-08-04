@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="/ui/assets/integrations.css?v=20260725-1">
   <link rel="stylesheet" href="/ui/assets/oauth.css">
   <link rel="stylesheet" href="/ui/assets/properties.css">
-  <link rel="stylesheet" href="/ui/assets/urls.css?v=20260722-1">
+  <link rel="stylesheet" href="/ui/assets/urls.css?v=20260804-1">
   <link rel="stylesheet" href="/ui/assets/changes.css?v=20260722-1">
   <link rel="stylesheet" href="/ui/assets/operations.css?v=20260725-1">
   <link rel="stylesheet" href="/ui/assets/crawl-failures.css?v=20260728-1">
@@ -24,6 +24,7 @@
   <link rel="stylesheet" href="/ui/assets/insights.css">
   <link rel="stylesheet" href="/ui/assets/information-architecture.css?v=20260725-1">
   <link rel="stylesheet" href="/ui/assets/analysis-consistency.css?v=20260722-1">
+  <link rel="stylesheet" href="/ui/assets/task-center.css?v=20260804-1">
 </head>
 <body>
   <div id="app" class="app-shell hidden">
@@ -31,6 +32,7 @@
       <div class="sidebar-brand"><span class="eyebrow">THACT</span><h2>SEO Monitor</h2></div><button id="mobile-nav-toggle" class="mobile-nav-toggle" type="button" aria-label="Navigatie openen" aria-expanded="false">Menu</button>
       <nav class="primary-navigation" aria-label="Hoofdnavigatie">
         <button id="dashboard-nav" class="nav-item nav-active">Overzicht</button>
+        <button id="tasks-nav" class="nav-item">Taken <span id="tasks-nav-count" class="nav-count hidden">0</span></button>
         <section class="nav-group" data-nav-group="analysis"><button id="analysis-nav" class="nav-item nav-group-toggle" type="button" aria-expanded="false">Analyse <span aria-hidden="true">⌄</span></button><div id="analysis-subnav" class="subnav hidden"><button id="actions-nav">Acties</button><button id="urls-nav">URL’s</button><button id="changes-nav">Wijzigingen</button><button id="insights-nav">Inzichten</button><button id="vacancies-nav">Vacatures</button></div></section>
         <button id="reports-nav" class="nav-item">Rapportages</button>
         <button id="operations-nav" class="nav-item">Crawls &amp; exports</button>
@@ -39,7 +41,7 @@
       <div class="profile-menu"><button id="profile-toggle" class="profile-toggle" type="button" aria-expanded="false"><span class="profile-avatar" aria-hidden="true">M</span><span id="current-user"></span><span aria-hidden="true">⌃</span></button><div id="profile-popover" class="profile-popover hidden"><button id="logout" type="button">Uitloggen</button></div></div>
     </aside>
     <main>
-      <section id="context-bar" class="context-bar"><label><span>Klant</span><select id="client-select" aria-label="Klant"></select></label><span class="context-divider" aria-hidden="true">/</span><label><span>Website</span><select id="website-select" aria-label="Website"></select></label></section>
+      <section id="context-bar" class="context-bar"><label><span>Klant</span><select id="client-select" aria-label="Klant"></select></label><span class="context-divider" aria-hidden="true">/</span><label><span>Website</span><select id="website-select" aria-label="Website"></select></label><div class="notification-area"><button id="notification-toggle" class="notification-toggle" type="button" aria-label="Meldingen openen" aria-expanded="false"><span aria-hidden="true">●</span><span id="notification-count" class="notification-count hidden">0</span></button><section id="notification-popover" class="notification-popover hidden" aria-label="Meldingen"><header><strong>Meldingen</strong><span id="notification-summary"></span></header><div id="notification-list"></div><button id="notification-all-tasks" type="button">Bekijk alle taken</button></section></div></section>
       <section id="dashboard-view">
         <header><div><span class="eyebrow">OVERZICHT</span><h1>Dashboard</h1><p class="intro">De belangrijkste SEO-signalen en operationele status in één oogopslag.</p></div></header>
         <section id="integration-warning" class="integration-warning hidden" role="alert"><div><span class="eyebrow">KOPPELING CONTROLEREN</span><strong id="integration-warning-title"></strong><p id="integration-warning-detail"></p></div><button id="integration-warning-action" class="detail-button" type="button">Naar integraties</button></section>
@@ -109,6 +111,24 @@
         <section class="suppression-section"><button id="toggle-suppressions" class="text-button" type="button" aria-expanded="false">Afgehandelde regels bekijken</button><div id="suppression-panel" class="hidden"><div class="suppression-tools"><strong id="suppression-selection-count">0 regels geselecteerd</strong><button id="select-all-suppressions" class="text-button" type="button">Selecteer alles</button><button id="restore-selected-suppressions" class="detail-button" type="button" disabled>Herstel geselecteerde regels</button></div><div class="table-wrap"><table><thead><tr><th class="selection-cell"><input id="select-suppressions" type="checkbox" aria-label="Selecteer alle afgehandelde regels"></th><th>Issue-type en URL</th><th>Afgehandeld door</th><th>Toelichting</th><th>Datum</th><th></th></tr></thead><tbody id="suppression-rows"></tbody></table></div><p id="suppression-empty" class="empty hidden">Geen blijvend afgehandelde regels.</p></div></section>
       </section>
       </section>
+      <section id="tasks-view" class="hidden">
+        <header><div><span class="eyebrow">UITVOERING</span><h1>Taken</h1><p class="intro">Plan, verdeel en controleer concrete verbeteracties voor deze website.</p></div></header>
+        <section id="task-summary" class="cards task-summary"></section>
+        <section class="panel task-center-panel">
+          <div class="panel-head"><div><span class="eyebrow">TAAKCENTRUM</span><h2>Werkvoorraad</h2></div><div class="panel-tools"><span id="task-result-count" class="result-count"></span><button id="export-tasks" class="detail-button" type="button">Exporteer CSV</button></div></div>
+          <div class="task-filters">
+            <input id="task-search" type="search" placeholder="Zoek op taak of actie" aria-label="Zoek taken">
+            <select id="task-status-filter" aria-label="Taakstatus"><option value="active">Alle open taken</option><option value="open">Open</option><option value="planned">Gepland</option><option value="in_progress">In uitvoering</option><option value="waiting_for_input">Wacht op input</option><option value="implemented">Uitgevoerd</option><option value="closed">Afgesloten</option><option value="all">Volledige historie</option></select>
+            <select id="task-priority-filter" aria-label="Prioriteit"><option value="">Alle prioriteiten</option><option value="critical">Kritiek</option><option value="high">Hoog</option><option value="normal">Normaal</option><option value="low">Laag</option></select>
+            <select id="task-role-filter" aria-label="Vakgebied"><option value="">Alle vakgebieden</option></select>
+            <select id="task-owner-filter" aria-label="Eigenaar"><option value="">Iedereen</option></select>
+            <select id="task-verification-filter" aria-label="Controle"><option value="">Alle controles</option><option value="not_requested">Nog niet aangevraagd</option><option value="queued">In wachtrij</option><option value="running">Wordt gecontroleerd</option><option value="passed">Geslaagd</option><option value="likely_passed">Waarschijnlijk geslaagd</option><option value="manual_review">Handmatige controle</option><option value="failed">Niet geslaagd</option><option value="error">Controle mislukt</option></select>
+          </div>
+          <div id="task-list" class="task-center-list"></div>
+          <p id="task-empty" class="empty hidden" role="status">Geen taken binnen de huidige filters.</p>
+          <p id="task-center-message" class="operation-message" role="status"></p>
+        </section>
+      </section>
       <section id="insights-view" class="hidden">
         <header><div><span class="eyebrow">ANALYSE</span><h1>Inzichten</h1><p class="intro">Kansen en afwijkingen uit Search Console, GA4 en actuele crawldata.</p></div><label class="insight-period">Periode<select id="insight-period"><option value="28">28 dagen</option><option value="90">90 dagen</option></select></label></header>
         <section id="insight-summary" class="cards"></section>
@@ -120,10 +140,12 @@
       </section>
       <section id="urls-view" class="hidden">
         <header><div><span class="eyebrow">ANALYSE</span><h1>URL’s</h1><p class="intro">Bekijk bereikbaarheid, indexatie, crawl-diepte en actieve signalen per URL.</p></div></header>
+        <section id="url-coverage-summary" class="cards url-coverage-summary"></section>
+        <section id="url-coverage-context" class="coverage-context" role="status"></section>
         <section class="panel urls-panel">
           <div class="panel-head"><div><span class="eyebrow">INVENTARIS</span><h2>Bekende URLs</h2></div><div class="panel-tools"><span id="url-result-count" class="result-count"></span><button id="export-urls" class="detail-button">Exporteer CSV</button></div></div>
-          <div class="url-filters"><input id="url-search" type="search" placeholder="Zoek op URL" aria-label="Zoek op URL"><select id="url-status-filter"><option value="">Alle statuscodes</option><option value="2xx">2xx</option><option value="3xx">3xx</option><option value="4xx">4xx</option><option value="5xx">5xx</option><option value="none">Niet gecontroleerd</option></select><select id="url-index-filter"><option value="">Alle indexatiestatussen</option><option value="indexable">Indexeerbaar</option><option value="blocked">Niet indexeerbaar</option><option value="unknown">Onbekend</option></select><select id="url-depth-filter"><option value="">Alle crawl-dieptes</option><option value="0-2">Diepte 0–2</option><option value="3-4">Diepte 3–4</option><option value="5+">Diepte 5+</option><option value="none">Geen interne route</option></select></div>
-          <div class="table-wrap"><table class="url-table"><thead><tr><th>URL</th><th>Status</th><th>Indexatie</th><th>Signaal</th><th>Diepte</th><th>Laatst geanalyseerd</th><th></th></tr></thead><tbody id="url-rows"></tbody></table></div>
+          <div class="url-filters"><input id="url-search" type="search" placeholder="Zoek op URL" aria-label="Zoek op URL"><select id="url-status-filter"><option value="">Alle statuscodes</option><option value="2xx">2xx</option><option value="3xx">3xx</option><option value="4xx">4xx</option><option value="5xx">5xx</option><option value="none">Niet gecontroleerd</option></select><select id="url-index-filter"><option value="">Alle indexatiestatussen</option><option value="indexable">Indexeerbaar</option><option value="blocked">Niet indexeerbaar</option><option value="unknown">Onbekend</option></select><select id="url-source-filter"><option value="">Alle bronnen</option><option value="sitemap">Sitemap</option><option value="internal_link">Interne link</option><option value="manual">Handmatig</option><option value="hreflang">Hreflang</option><option value="structured_data">Structured data</option><option value="historical_only">Alleen historisch</option><option value="no_source">Geen bronregistratie</option></select><select id="url-depth-filter"><option value="">Alle crawl-dieptes</option><option value="0-2">Diepte 0–2</option><option value="3-4">Diepte 3–4</option><option value="5+">Diepte 5+</option><option value="none">Geen interne route</option></select></div>
+          <div class="table-wrap"><table class="url-table"><thead><tr><th>URL</th><th>Bronnen</th><th>Status</th><th>Indexatie</th><th>Signaal</th><th>Diepte</th><th>Laatst geanalyseerd</th><th></th></tr></thead><tbody id="url-rows"></tbody></table></div>
           <p id="url-empty" class="empty hidden" role="status">Geen URL’s binnen de huidige filters.</p>
           <footer class="pager"><button id="url-previous-page" class="page-button">Vorige</button><span id="url-page-label"></span><button id="url-next-page" class="page-button">Volgende</button></footer>
         </section>
@@ -201,6 +223,6 @@
     <dl><div><dt>Vergeleken meetmomenten</dt><dd id="change-detail-date"></dd></div><div><dt>Mogelijke relevantie</dt><dd id="change-detail-relevance"></dd></div><div><dt>Aanbevolen controle</dt><dd id="change-detail-action"></dd></div></dl>
     <div id="change-group-details"></div>
   </dialog>
-  <script src="/ui/assets/app.js?v=20260802-1" defer></script>
+  <script src="/ui/assets/app.js?v=20260804-3" defer></script>
 </body>
 </html>

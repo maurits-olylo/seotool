@@ -21,7 +21,18 @@ from app.models.common import UUIDTimestampMixin, utc_now
 
 TASK_STATUSES = ("open", "planned", "in_progress", "waiting_for_input", "implemented", "closed")
 CLOSE_REASONS = ("verified", "manually_accepted", "rejected", "superseded", "no_longer_relevant")
-TASK_ROLES = ("content", "development", "seo_analytics", "project_management")
+TASK_ROLES = (
+    "content",
+    "development",
+    "seo_analytics",
+    "project_management",
+    "content_editor",
+    "ux_ui_design",
+    "web_development",
+    "seo_specialist",
+    "analytics_specialist",
+    "website_management",
+)
 TASK_PRIORITIES = ("critical", "high", "normal", "low")
 VERIFICATION_STATUSES = (
     "not_requested",
@@ -123,9 +134,7 @@ class RecommendationTaskUrl(Base):
     task_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("recommendation_tasks.id", ondelete="CASCADE"), index=True
     )
-    url_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("urls.id", ondelete="CASCADE"), index=True
-    )
+    url_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("urls.id", ondelete="CASCADE"), index=True)
     role: Mapped[str] = mapped_column(String(30), index=True)
     is_user_supplied: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
@@ -234,3 +243,33 @@ class RecommendationVerification(UUIDTimestampMixin, Base):
     error_message: Mapped[str | None] = mapped_column(Text)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class TaskNotification(UUIDTimestampMixin, Base):
+    __tablename__ = "task_notifications"
+
+    website_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("websites.id", ondelete="CASCADE"), index=True
+    )
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("recommendation_tasks.id", ondelete="CASCADE"), index=True
+    )
+    verification_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("recommendation_verifications.id", ondelete="SET NULL"), index=True
+    )
+    notification_type: Mapped[str] = mapped_column(String(50), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    message: Mapped[str] = mapped_column(Text)
+    details: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+
+
+class TaskNotificationReceipt(Base):
+    __tablename__ = "task_notification_receipts"
+
+    notification_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("task_notifications.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

@@ -30,6 +30,12 @@ membership op. Admins kunnen alleen users uitnodigen; alleen de superuser kan ad
 
 ## URL-discovery
 
+Het URL-overzicht combineert de blijvende URL-identiteit met de geregistreerde ontdekbronnen.
+`source_types` toont alle ooit waargenomen bronnen; `current_source_types` bevat alleen bronnen die
+sinds de start van de laatste volledige crawl opnieuw zijn gezien. Handmatig geregistreerde URL's
+blijven actueel totdat ze expliciet worden verwijderd. De dekkingssamenvatting is pas betrouwbaar
+na een geslaagde volledige crawl en noemt anders expliciet dat het beeld voorlopig is.
+
 `urls` bewaart één blijvende URL-identiteit per website; `url_sources` legt vast of een URL via
 sitemap, interne link of een eerdere crawl bekend is. Normalisatie gebeurt vóór opslag. Een
 verdwenen bron verwijdert het URL-record niet. `crawl_jobs` vormt de persistente basis voor werk
@@ -164,6 +170,16 @@ schrijfroute gebruikt bestaande tenantautorisatie; gebruikers met de klantrol ho
 leestoegang. Statusovergangen worden centraal gevalideerd en als taakevent en globale activiteit
 vastgelegd.
 
+Het websiteoverzicht ondersteunt aanvullende filters op uitvoerdersrol, prioriteit, toegewezen
+gebruiker, verificatiestatus en vrije zoektekst. De rollenconstraint accepteert naast de bestaande
+compacte rollen afzonderlijke rollen voor contentredactie, UX/UI, webdevelopment, SEO, analytics
+en websitebeheer. Bestaande taken worden niet herschreven.
+
+`task_notifications` bewaart websitegebonden taak- en verificatiegebeurtenissen. Een afzonderlijk
+`task_notification_receipts`-record bewaart de leesstatus per gebruiker. Daardoor blijft dezelfde
+melding voor een andere bevoegde gebruiker ongelezen. API-keyverkeer kan de feed tenantveilig
+lezen, maar niet namens een gebruiker afvinken. E-mail en externe kanalen zijn niet gekoppeld.
+
 De eerste interface-integratie staat in het bestaande issuedetail. Diagnose en technische
 onderbouwing blijven bovenaan staan; de afzonderlijke uitvoeringstaak toont rol, effort-band,
 stappen, gereedcriteria en alleen de toegestane volgende statussen. Dit voorkomt dat een menselijke
@@ -195,8 +211,10 @@ crawl per website toe. Worker-recovery laat jobs
 die aantoonbaar door een andere live RQ-worker worden verwerkt ongemoeid. GSC-, GA4- en Bing-imports
 gebruiken de afzonderlijke queue `integrations`; exports gebruiken `exports`. Hierdoor blokkeren
 langdurige data-imports geen crawls. RQ verzorgt retries met oplopende wachttijd. CSV-exporten leveren
-één dataset; Excel bevat metadata
-en aparte tabbladen voor URL's, issues, wijzigingen, interne links en vacatures. Het vacaturetabblad
+één dataset en kunnen de exacte zichtbare selectie van URL's, wijzigingen, vacatures of taken
+behouden. De taakexport bevat uitvoeringsrol, eigenaar, inspanning, status en verificatiecontext.
+De URL-export bevat naast de crawltoestand ook actuele en historische ontdekbronnen. Excel bevat
+metadata en aparte tabbladen voor URL's, issues, wijzigingen, interne links, vacatures en taken. Het vacaturetabblad
 bevat lifecycle, Google for Jobs-status, datums, sollicitatiegegevens, interne links en actieve
 bevindingen, maar geen technische database-ID's. Bestanden staan in een gedeeld volume.
 

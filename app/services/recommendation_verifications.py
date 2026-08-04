@@ -36,6 +36,7 @@ from app.services.recommendation_tasks import (
 )
 from app.services.robots import RobotsRules
 from app.services.snapshot import store_fetch_result
+from app.services.task_notifications import add_task_notification
 from app.services.technical_checks import _robots_conflict
 from app.services.url_normalization import NormalizationOptions, normalize_url
 
@@ -71,15 +72,11 @@ def request_verification(
         raise RecommendationTaskError("De verificatiewachtrij is tijdelijk vol.")
 
     task_urls = list(
-        db.scalars(
-            select(RecommendationTaskUrl).where(RecommendationTaskUrl.task_id == task.id)
-        )
+        db.scalars(select(RecommendationTaskUrl).where(RecommendationTaskUrl.task_id == task.id))
     )
     urls = {
         item.id: item
-        for item in db.scalars(
-            select(Url).where(Url.id.in_({item.url_id for item in task_urls}))
-        )
+        for item in db.scalars(select(Url).where(Url.id.in_({item.url_id for item in task_urls})))
     }
     scope_urls = [
         {
@@ -200,9 +197,7 @@ def execute_verification(verification_id: str) -> None:
             roles = _roles(db, scope)
             fetch_urls = _fetch_urls(task.recommendation_type, roles)
             fetched_ids: set[uuid.UUID] = set(
-                db.scalars(
-                    select(UrlSnapshot.url_id).where(UrlSnapshot.crawl_run_id == run.id)
-                )
+                db.scalars(select(UrlSnapshot.url_id).where(UrlSnapshot.crawl_run_id == run.id))
             )
             for url in fetch_urls:
                 if url.id in fetched_ids:
@@ -232,9 +227,7 @@ def execute_verification(verification_id: str) -> None:
                 "checked_url_ids": [
                     str(item)
                     for item in db.scalars(
-                        select(UrlSnapshot.url_id).where(
-                            UrlSnapshot.crawl_run_id == run.id
-                        )
+                        select(UrlSnapshot.url_id).where(UrlSnapshot.crawl_run_id == run.id)
                     )
                 ],
                 "rule_counts": {
@@ -365,9 +358,7 @@ def _evaluate(
 ) -> list[dict[str, object]]:
     snapshots = {
         item.url_id: item
-        for item in db.scalars(
-            select(UrlSnapshot).where(UrlSnapshot.crawl_run_id == run_id)
-        )
+        for item in db.scalars(select(UrlSnapshot).where(UrlSnapshot.crawl_run_id == run_id))
     }
     primary_role = {
         "restore_or_redirect_missing_page": "old",
@@ -408,10 +399,7 @@ def _evaluate(
                         if still_linked
                         else (
                             "passed"
-                            if all(
-                                item and item.status_code == 200
-                                for item in source_snapshots
-                            )
+                            if all(item and item.status_code == 200 for item in source_snapshots)
                             else "error"
                         )
                     ),
@@ -446,10 +434,7 @@ def _evaluate(
                         if still_linked
                         else (
                             "passed"
-                            if all(
-                                item and item.status_code == 200
-                                for item in source_snapshots
-                            )
+                            if all(item and item.status_code == 200 for item in source_snapshots)
                             else "error"
                         )
                     ),
@@ -492,9 +477,7 @@ def _evaluate(
                     "old_status_code": old_snapshot.status_code if old_snapshot else None,
                     "old_final_url": old_snapshot.final_url if old_snapshot else None,
                     "replacement_url": new_url.normalized_url if new_url else None,
-                    "replacement_status_code": (
-                        new_snapshot.status_code if new_snapshot else None
-                    ),
+                    "replacement_status_code": (new_snapshot.status_code if new_snapshot else None),
                 },
             }
         )
@@ -575,9 +558,7 @@ def _evaluate(
                 {
                     "rule": "single_expected_canonical",
                     "status": (
-                        "passed"
-                        if canonical == expected
-                        else ("failed" if source else "error")
+                        "passed" if canonical == expected else ("failed" if source else "error")
                     ),
                     "evidence": {"canonical": canonical, "expected_canonical": expected},
                 },
@@ -615,8 +596,7 @@ def _evaluate(
                 "rule": "title_unique_in_scope",
                 "status": (
                     "passed"
-                    if normalized_titles
-                    and len(normalized_titles) == len(set(normalized_titles))
+                    if normalized_titles and len(normalized_titles) == len(set(normalized_titles))
                     else "failed"
                 ),
                 "evidence": {"compared_titles": normalized_titles},
@@ -648,9 +628,7 @@ def _evaluate(
             if item and item.status_code == 200 and item.meta_description
         ]
         normalized_descriptions = [
-            item.meta_description.strip().casefold()
-            for item in compared
-            if item.meta_description
+            item.meta_description.strip().casefold() for item in compared if item.meta_description
         ]
         rules.extend(
             [
@@ -679,8 +657,7 @@ def _evaluate(
             snapshot = snapshots.get(url.id)
             invalid_blocks = (
                 sum(
-                    isinstance(value, dict)
-                    and value.get(INVALID_JSON_LD_MARKER) is True
+                    isinstance(value, dict) and value.get(INVALID_JSON_LD_MARKER) is True
                     for value in (snapshot.schema_data or [])
                 )
                 if snapshot
@@ -709,9 +686,7 @@ def _evaluate(
                     "evidence": {
                         "invalid_json_ld_blocks": invalid_blocks,
                         "schema_types": snapshot.schema_types if snapshot else [],
-                        "required_type": (
-                            "BreadcrumbList" if breadcrumb_required else None
-                        ),
+                        "required_type": ("BreadcrumbList" if breadcrumb_required else None),
                     },
                 }
             )
@@ -839,6 +814,18 @@ def _finish(
             },
         )
     )
+    task = db.get(RecommendationTask, verification.task_id)
+    if task is not None:
+        outcome = str(verification.result.get("outcome") or verification.status)
+        add_task_notification(
+            db,
+            task=task,
+            verification=verification,
+            notification_type="verification_finished",
+            title=f"Controle afgerond: {task.title}",
+            message=f"De gerichte controle eindigde met uitkomst {outcome}.",
+            details={"outcome": outcome, "status": verification.status},
+        )
     db.commit()
 
 
@@ -856,6 +843,15 @@ def _fail(
     verification.finished_at = utc_now()
     if task:
         task.verification_status = "error"
+        add_task_notification(
+            db,
+            task=task,
+            verification=verification,
+            notification_type="verification_failed",
+            title=f"Controle mislukt: {task.title}",
+            message="De gerichte controle kon niet worden afgerond.",
+            details={"status": "error"},
+        )
     if job:
         job.status = "failed"
         job.error_message = message[:4000]

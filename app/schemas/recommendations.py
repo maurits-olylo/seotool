@@ -21,7 +21,18 @@ CloseReason = Literal[
     "superseded",
     "no_longer_relevant",
 ]
-TaskRole = Literal["content", "development", "seo_analytics", "project_management"]
+TaskRole = Literal[
+    "content",
+    "development",
+    "seo_analytics",
+    "project_management",
+    "content_editor",
+    "ux_ui_design",
+    "web_development",
+    "seo_specialist",
+    "analytics_specialist",
+    "website_management",
+]
 TaskPriority = Literal["critical", "high", "normal", "low"]
 EffortBand = Literal[
     "under_15",
@@ -205,3 +216,14 @@ class RecommendationVerificationRead(Timestamped):
     error_message: str | None
     started_at: datetime | None
     finished_at: datetime | None
+
+
+class TaskNotificationRead(Timestamped):
+    website_id: UUID
+    task_id: UUID
+    verification_id: UUID | None
+    notification_type: str
+    title: str
+    message: str
+    details: dict[str, object]
+    read_at: datetime | None = None

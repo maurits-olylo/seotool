@@ -25,8 +25,24 @@ class UrlRead(ORMModel):
     active_issue_count: int = 0
     highest_issue_severity: str | None = None
     active_issue_titles: list[str] = Field(default_factory=list)
+    source_types: list[str] = Field(default_factory=list)
+    current_source_types: list[str] = Field(default_factory=list)
+    source_last_seen_at: datetime | None = None
     last_light_checked_at: datetime | None
     last_full_analyzed_at: datetime | None
+
+
+class UrlCoverageRead(BaseModel):
+    total_active_urls: int
+    source_counts: dict[str, int]
+    current_source_counts: dict[str, int]
+    multi_source_urls: int
+    historical_only_urls: int
+    no_source_urls: int
+    latest_full_crawl_status: str | None
+    latest_full_crawl_started_at: datetime | None
+    reliable: bool
+    context: str
 
 
 class UrlRegister(BaseModel):

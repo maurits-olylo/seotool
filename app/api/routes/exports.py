@@ -115,6 +115,7 @@ def download_export(
         "urls": "URLs",
         "changes": "Wijzigingen",
         "vacancies": "Vacatures",
+        "tasks": "Taken",
     }
     label = labels.get(export.export_type, export.export_type.title())
     filename = f"Export {label} - {website_name} - {export_date} - SEOMonitor{path.suffix}"

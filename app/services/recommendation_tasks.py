@@ -22,6 +22,7 @@ from app.services.recommendation_library import (
     get_recommendation_definition,
     recommendation_for_issue_type,
 )
+from app.services.task_notifications import add_task_notification
 from app.services.url_normalization import InvalidUrlError, normalize_url
 from app.services.url_registry import register_url
 from app.services.url_scope import is_url_in_website_scope
@@ -180,6 +181,7 @@ def update_task(
     values = payload.model_dump(exclude_unset=True, exclude={"comment"})
     new_status = values.get("status")
     previous_status = task.status
+    previous_assignee_id = task.assigned_to_user_id
     if new_status and new_status != previous_status:
         if new_status not in ALLOWED_TRANSITIONS[previous_status]:
             raise RecommendationTaskError(
@@ -231,6 +233,28 @@ def update_task(
                 },
             )
         )
+        add_task_notification(
+            db,
+            task=task,
+            notification_type="task_status_changed",
+            title=f"Taakstatus gewijzigd: {task.title}",
+            message=f"De taak ging van {previous_status} naar {task.status}.",
+            details={"from": previous_status, "to": task.status},
+        )
+    if "assigned_to_user_id" in values and values["assigned_to_user_id"] != previous_assignee_id:
+        add_task_notification(
+            db,
+            task=task,
+            notification_type="task_assigned",
+            title=f"Taak toegewezen: {task.title}",
+            message="De uitvoerder van deze taak is gewijzigd.",
+            details={
+                "from": str(previous_assignee_id) if previous_assignee_id else None,
+                "to": (
+                    str(values["assigned_to_user_id"]) if values["assigned_to_user_id"] else None
+                ),
+            },
+        )
     db.commit()
     db.refresh(task)
     return task
@@ -259,9 +283,7 @@ def record_feedback(
     db.flush()
     label = actor_label(db, principal)
     structured_details = {
-        key: value
-        for key, value in values.items()
-        if key != "notes" and value is not None
+        key: value for key, value in values.items() if key != "notes" and value is not None
     }
     db.add_all(
         [
@@ -294,11 +316,7 @@ def verification_scope_plan(
     definition = get_recommendation_definition(task.recommendation_type)
     required_roles = list(definition.verification_scope)
     task_urls = list(
-        db.scalars(
-            select(RecommendationTaskUrl).where(
-                RecommendationTaskUrl.task_id == task.id
-            )
-        )
+        db.scalars(select(RecommendationTaskUrl).where(RecommendationTaskUrl.task_id == task.id))
     )
     present_roles = sorted({item.role for item in task_urls})
     missing_roles = [role for role in required_roles if role not in present_roles]
@@ -309,9 +327,7 @@ def verification_scope_plan(
     elif task.status != "implemented":
         blocking_reason = "De taak moet eerst als uitgevoerd zijn gemarkeerd."
     elif missing_roles:
-        blocking_reason = (
-            "De verificatiescope mist URL-rollen: " + ", ".join(missing_roles) + "."
-        )
+        blocking_reason = "De verificatiescope mist URL-rollen: " + ", ".join(missing_roles) + "."
     return {
         "task_id": task.id,
         "verification_type": task.recommendation_type,
@@ -359,9 +375,7 @@ def add_task_url(
         raw_url=normalized,
         source_type="manual",
         source_url=f"recommendation_task:{task.id}",
-        ignored_query_parameters=frozenset(
-            settings.ignored_query_parameters if settings else []
-        ),
+        ignored_query_parameters=frozenset(settings.ignored_query_parameters if settings else []),
     )
     existing = db.scalar(
         select(RecommendationTaskUrl).where(
@@ -500,7 +514,7 @@ def _task_url_scope_from_issue(
     if verification_type == "repair_broken_internal_link":
         if issue.issue_type == "multiple_broken_internal_links":
             scope.append((issue.url_id, "source"))
-            for item in (occurrence.evidence.get("broken_links", []) if occurrence else []):
+            for item in occurrence.evidence.get("broken_links", []) if occurrence else []:
                 if isinstance(item, dict) and isinstance(item.get("target_url"), str):
                     target = _existing_url(db, issue.website_id, item["target_url"])
                     if target:

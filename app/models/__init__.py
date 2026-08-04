@@ -36,6 +36,8 @@ from app.models.recommendations import (
     RecommendationTaskIssue,
     RecommendationTaskUrl,
     RecommendationVerification,
+    TaskNotification,
+    TaskNotificationReceipt,
 )
 from app.models.rendering import RenderObservation
 from app.models.reporting import MonthlyReportSnapshot
@@ -69,6 +71,8 @@ __all__ = [
     "RecommendationTaskIssue",
     "RecommendationTaskUrl",
     "RecommendationVerification",
+    "TaskNotification",
+    "TaskNotificationReceipt",
     "RenderObservation",
     "IntegrationConnection",
     "BingPageMetric",
