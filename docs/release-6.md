@@ -1,6 +1,7 @@
 # Release 6 — lokale releasecandidate
 
-Status: lokaal afgerond; staging en productie nog niet uitgevoerd.
+Status: lokaal afgerond en op 4 augustus 2026 succesvol naar staging uitgerold vanaf exact
+releasecommit `edf9e5f`; productie nog niet uitgevoerd.
 
 ## Scope
 
@@ -40,3 +41,6 @@ Status: lokaal afgerond; staging en productie nog niet uitgevoerd.
 - JavaScript-syntax en diff-controle: geslaagd.
 - Alembic: één head op `0042`, lineair vanaf `0041`.
 - Development-, productie- en staging-Compose-configuratie: geldig.
+- Staging: migration `0042`, gezonde API en database, aanwezige tabellen `task_notifications` en
+  `task_notification_receipts`, geladen taakcentruminterface, `PAGESPEED_ENABLED=false` en
+  `RENDERING_ENABLED=false` bevestigd.
