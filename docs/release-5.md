@@ -1,7 +1,7 @@
 # Release 5 — lokale releasecandidate
 
-Status: lokaal geïmplementeerd en integraal getest op 4 augustus 2026. Nog niet op staging of
-productie gedeployed.
+Status: lokaal geïmplementeerd, integraal getest en op 4 augustus 2026 succesvol naar staging
+uitgerold. Nog niet op productie gedeployed.
 
 ## Scope
 
@@ -39,4 +39,6 @@ productie gedeployed.
 - Volledige testsuite: 404 tests geslaagd; alleen de bestaande Starlette/httpx-waarschuwing.
 - Alembic: één head op `0041`, lineair vanaf `0040`.
 - Development-, productie- en staging-Compose-configuratie: geldig.
-- Staging- en productieacceptatie volgen afzonderlijk via de terminal-first releaseprocedure.
+- Staging: migration `0041`, gezonde API en database, aanwezige tabel
+  `performance_observations`, `PAGESPEED_ENABLED=false` en `RENDERING_ENABLED=false` bevestigd.
+- Productieacceptatie volgt afzonderlijk via de terminal-first releaseprocedure.
