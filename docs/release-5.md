@@ -1,7 +1,7 @@
 # Release 5 — lokale releasecandidate
 
-Status: lokaal geïmplementeerd, integraal getest en op 4 augustus 2026 succesvol naar staging
-uitgerold. Nog niet op productie gedeployed.
+Status: afgerond en op 4 augustus 2026 succesvol naar staging en productie uitgerold vanaf exact
+releasecommit `ec06c64`.
 
 ## Scope
 
@@ -41,4 +41,6 @@ uitgerold. Nog niet op productie gedeployed.
 - Development-, productie- en staging-Compose-configuratie: geldig.
 - Staging: migration `0041`, gezonde API en database, aanwezige tabel
   `performance_observations`, `PAGESPEED_ENABLED=false` en `RENDERING_ENABLED=false` bevestigd.
-- Productieacceptatie volgt afzonderlijk via de terminal-first releaseprocedure.
+- Productie: migration `0041`, aanwezige tabel `performance_observations`, gezonde API, database,
+  workers en scheduler bevestigd. PageSpeed en JavaScript-rendering blijven uitgeschakeld. De
+  veilige crawl-drain is opgeheven met nul actieve of wachtende taken.
