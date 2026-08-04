@@ -21,6 +21,7 @@ VERIFICATION_QUEUE = "verifications"
 MAINTENANCE_QUEUE = "maintenance"
 SITEMAP_QUEUE = "sitemaps"
 RENDER_QUEUE = "renders"
+PERFORMANCE_QUEUE = "performance"
 
 
 @dataclass(frozen=True)
@@ -205,5 +206,30 @@ def enqueue_render_observation(
             "website_id": website_id,
             "job_type": "render_observation",
             "render_observation_id": observation_id,
+        },
+    )
+
+
+def enqueue_performance_sync(
+    website_id: str,
+    *,
+    strategy: str,
+    limit: int,
+    job_id: str,
+) -> bool:
+    if not get_settings().pagespeed_enabled:
+        return False
+    return _enqueue(
+        PERFORMANCE_QUEUE,
+        "app.services.performance_sync.execute_performance_sync",
+        website_id,
+        strategy,
+        limit,
+        job_id=job_id,
+        meta={
+            "website_id": website_id,
+            "job_type": "performance_sync",
+            "strategy": strategy,
+            "limit": limit,
         },
     )

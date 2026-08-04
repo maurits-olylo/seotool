@@ -90,22 +90,36 @@ SOURCES = {
 }
 
 SOURCE_KEYS_BY_TYPE = {
-    "http_404": ("http",), "http_410": ("http",), "http_5xx": ("http",),
-    "soft_404": ("soft_404", "http"), "possible_soft_404": ("soft_404",),
-    "crawl_timeout": ("http",), "unreachable_url_target": ("http",),
-    "redirect_loop": ("redirect",), "long_redirect_chain": ("redirect",),
+    "http_404": ("http",),
+    "http_410": ("http",),
+    "http_5xx": ("http",),
+    "soft_404": ("soft_404", "http"),
+    "possible_soft_404": ("soft_404",),
+    "crawl_timeout": ("http",),
+    "unreachable_url_target": ("http",),
+    "redirect_loop": ("redirect",),
+    "long_redirect_chain": ("redirect",),
     "internally_linked_redirect": ("redirect", "links"),
-    "missing_title": ("title",), "duplicate_title": ("title",),
-    "missing_h1": ("title",), "multiple_h1": ("title",),
-    "missing_meta_description": ("snippet",), "duplicate_meta_description": ("snippet",),
-    "canonical_other_url": ("canonical",), "duplicate_content": ("canonical",),
+    "missing_title": ("title",),
+    "duplicate_title": ("title",),
+    "missing_h1": ("title",),
+    "multiple_h1": ("title",),
+    "missing_meta_description": ("snippet",),
+    "duplicate_meta_description": ("snippet",),
+    "canonical_other_url": ("canonical",),
+    "duplicate_content": ("canonical",),
     "google_canonical_mismatch": ("url_inspection", "canonical"),
-    "near_duplicate_content": ("canonical",), "conflicting_robots": ("robots",),
-    "unexpected_noindex": ("robots",), "robots_txt_blocked": ("robots_txt",),
+    "near_duplicate_content": ("canonical",),
+    "conflicting_robots": ("robots",),
+    "unexpected_noindex": ("robots",),
+    "robots_txt_blocked": ("robots_txt",),
     "google_not_indexed": ("url_inspection",),
     "google_robots_blocked": ("url_inspection", "robots_txt"),
     "google_fetch_failed": ("url_inspection", "http"),
-    "sitemap_redirect": ("sitemap", "redirect"), "sitemap_404": ("sitemap", "http"),
+    "sitemap_redirect": ("sitemap", "redirect"),
+    "sitemap_404": ("sitemap", "http"),
+    "sitemap_document_quality": ("sitemap",),
+    "robots_sitemap_configuration": ("robots_txt", "sitemap"),
     "invalid_json_ld": ("structured_data",),
     "missing_breadcrumb_schema": ("breadcrumb",),
     "job_posting_schema_missing": ("job_posting",),
@@ -125,7 +139,8 @@ SOURCE_KEYS_BY_TYPE = {
     "multiple_redirected_internal_links": ("links", "redirect"),
     "patterned_404_urls": ("links", "http"),
     "pagination_series_review": ("canonical", "title", "snippet", "links"),
-    "orphan_page": ("links",), "deep_page": ("links",),
+    "orphan_page": ("links",),
+    "deep_page": ("links",),
     "image_alt_missing": ("image_alt",),
     "functional_image_alt_empty": ("image_alt",),
     "important_page_few_internal_links": ("links",),
@@ -134,10 +149,22 @@ SOURCE_KEYS_BY_TYPE = {
     "image_delivery_quality": ("image_alt", "performance"),
     "media_delivery_quality": ("performance", "helpful_content"),
     "cms_link_placeholder": ("links",),
-    "thin_content": ("helpful_content",), "possibly_outdated_content": ("helpful_content",),
+    "thin_content": ("helpful_content",),
+    "possibly_outdated_content": ("helpful_content",),
     "broken_image": ("helpful_content",),
-    "oversized_image": ("performance",), "oversized_document": ("performance",),
+    "oversized_image": ("performance",),
+    "oversized_document": ("performance",),
     "template_signal_clusters": ("canonical", "title", "snippet", "links", "helpful_content"),
+    "lighthouse_cache_policy": ("performance",),
+    "lighthouse_font_and_third_party_delivery": ("performance",),
+    "lighthouse_image_delivery": ("performance",),
+    "lighthouse_lcp_delivery": ("performance",),
+    "lighthouse_render_blocking_resources": ("performance",),
+    "lighthouse_unused_css": ("performance",),
+    "lighthouse_unused_javascript": ("performance",),
+    "structured_data_image_unreachable": ("structured_data",),
+    "structured_data_required_fields_missing": ("structured_data",),
+    "structured_data_visible_content_mismatch": ("structured_data",),
 }
 
 
@@ -156,6 +183,9 @@ CATEGORY_RELEVANCE = {
     ),
     "content": (
         "De inhoud vraagt menselijke beoordeling op volledigheid, actualiteit of zoekintentie."
+    ),
+    "performance": (
+        "Deze meting wijst op een concrete laadoorzaak die de gebruikservaring kan vertragen."
     ),
 }
 
@@ -257,9 +287,7 @@ VERIFICATION_BY_TYPE = {
     "google_robots_blocked": (
         "Google meldt na een nieuwe inspectie geen robots.txt-blokkade meer."
     ),
-    "google_fetch_failed": (
-        "Google meldt na een nieuwe inspectie een geslaagde page fetch."
-    ),
+    "google_fetch_failed": ("Google meldt na een nieuwe inspectie een geslaagde page fetch."),
     "conflicting_robots": (
         "Meta robots en X-Robots-Tag bevatten bij de volgende crawl geen conflict."
     ),
@@ -293,12 +321,44 @@ VERIFICATION_BY_TYPE = {
     "sitemap_redirect_patterns": (
         "De volgende volledige crawl vindt de definitieve 200-URL's rechtstreeks in de sitemap."
     ),
+    "sitemap_document_quality": (
+        "De volgende sitemapimport vindt geen ontbrekende, dubbele of ongeldige URL-informatie."
+    ),
+    "robots_sitemap_configuration": (
+        "De volgende sitemapimport vindt alleen unieke, geldige sitemapdeclaraties in robots.txt."
+    ),
     "server_error_incident": (
         "Een nieuwe light check geeft voor alle betrokken URL's een stabiele niet-5xx-status."
     ),
     "template_signal_clusters": (
         "De volgende volledige crawl werkt ieder aangepast cluster bij zonder dezelfde "
         "onbedoelde herhaling."
+    ),
+    "lighthouse_cache_policy": "Dezelfde meting vindt de cache-audit niet meer als actief bewijs.",
+    "lighthouse_font_and_third_party_delivery": (
+        "Dezelfde meting vindt de betrokken font- of externe-resourceaudit niet meer."
+    ),
+    "lighthouse_image_delivery": (
+        "Dezelfde meting vindt de betrokken afbeeldingsaudit niet meer als actief bewijs."
+    ),
+    "lighthouse_lcp_delivery": (
+        "Een nieuwe meting bevestigt dat de genoemde LCP- of serveroorzaak is verbeterd."
+    ),
+    "lighthouse_render_blocking_resources": (
+        "Dezelfde meting vindt de betrokken resource niet meer als render-blocking oorzaak."
+    ),
+    "lighthouse_unused_css": "Dezelfde meting toont de betrokken ongebruikte CSS niet meer.",
+    "lighthouse_unused_javascript": (
+        "Dezelfde meting toont de betrokken ongebruikte JavaScript-belasting niet meer."
+    ),
+    "structured_data_image_unreachable": (
+        "De volgende crawl vindt voor iedere genoemde schema-afbeelding een bereikbare status."
+    ),
+    "structured_data_required_fields_missing": (
+        "De volgende crawl vindt de genoemde velden met inhoud die bij de pagina past."
+    ),
+    "structured_data_visible_content_mismatch": (
+        "De volgende crawl vindt dezelfde primaire naam of headline in markup en zichtbare inhoud."
     ),
 }
 

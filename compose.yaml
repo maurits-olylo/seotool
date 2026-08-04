@@ -71,7 +71,7 @@ services:
     build: .
     env_file: .env
     environment:
-      WORKER_QUEUES: integrations,maintenance
+      WORKER_QUEUES: integrations,maintenance,performance
       WORKER_NAME: integrations-1
     command: python -m app.worker
     depends_on:

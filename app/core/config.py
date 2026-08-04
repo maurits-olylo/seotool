@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     initial_superuser_email: str = ""
     initial_superuser_password: str = ""
     rendering_enabled: bool = False
+    pagespeed_enabled: bool = False
+    pagespeed_api_key: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -29,6 +31,8 @@ class Settings(BaseSettings):
     def validate_production_secrets(self) -> "Settings":
         if self.app_env == "production" and self.api_key in {"", "change-me"}:
             raise ValueError("API_KEY must be changed in production")
+        if self.pagespeed_enabled and not self.pagespeed_api_key:
+            raise ValueError("PAGESPEED_API_KEY is required when PageSpeed is enabled")
         return self
 
 

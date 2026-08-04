@@ -18,6 +18,9 @@ class SitemapUrl:
 class SitemapDocument:
     urls: tuple[SitemapUrl, ...]
     child_sitemaps: tuple[str, ...]
+    missing_location_count: int = 0
+    duplicate_locations: tuple[str, ...] = ()
+    invalid_last_modified_locations: tuple[str, ...] = ()
 
 
 def parse_sitemap(content: bytes, *, max_entries: int = 50_000) -> SitemapDocument:
@@ -39,19 +42,34 @@ def parse_sitemap(content: bytes, *, max_entries: int = 50_000) -> SitemapDocume
 
     urls: list[SitemapUrl] = []
     children: list[str] = []
+    missing_location_count = 0
+    duplicate_locations: list[str] = []
+    invalid_last_modified_locations: list[str] = []
+    seen_locations: set[str] = set()
     for entry in entries:
         locations = entry.xpath("./*[local-name()='loc']/text()")
         if not locations or not locations[0].strip():
+            missing_location_count += 1
             continue
         location = locations[0].strip()
+        if location in seen_locations:
+            duplicate_locations.append(location)
+        seen_locations.add(location)
         if etree.QName(entry).localname == "sitemap":
             children.append(location)
             continue
         modified_values = entry.xpath("./*[local-name()='lastmod']/text()")
-        urls.append(
-            SitemapUrl(location, _parse_datetime(modified_values[0]) if modified_values else None)
-        )
-    return SitemapDocument(tuple(urls), tuple(children))
+        last_modified = _parse_datetime(modified_values[0]) if modified_values else None
+        if modified_values and last_modified is None:
+            invalid_last_modified_locations.append(location)
+        urls.append(SitemapUrl(location, last_modified))
+    return SitemapDocument(
+        tuple(urls),
+        tuple(children),
+        missing_location_count,
+        tuple(dict.fromkeys(duplicate_locations)),
+        tuple(dict.fromkeys(invalid_last_modified_locations)),
+    )
 
 
 def _parse_datetime(value: str) -> datetime | None:

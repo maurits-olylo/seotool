@@ -1,4 +1,4 @@
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import structlog
 from sqlalchemy.orm import Session
@@ -9,6 +9,7 @@ from app.models.website import Website
 from app.services.asset_registry import update_asset_record
 from app.services.html_extraction import extract_page
 from app.services.http_crawler import FetchResult
+from app.services.structured_data_analysis import schema_image_urls
 from app.services.url_filtering import is_excluded_url
 from app.services.url_normalization import InvalidUrlError, NormalizationOptions, normalize_url
 from app.services.url_registry import register_url
@@ -211,6 +212,30 @@ def store_fetch_result(
                         source_url=url.normalized_url,
                         ignored_query_parameters=ignored_query_parameters,
                     )
+        for schema_image in schema_image_urls(page.schema_data):
+            try:
+                normalized_schema_image = normalize_url(
+                    urljoin(result.final_url, schema_image), options=normalization
+                )
+            except InvalidUrlError:
+                continue
+            if (
+                website
+                and is_url_in_website_scope(
+                    normalized_schema_image,
+                    base_url=website.base_url,
+                    allowed_subdomains=allowed_subdomains,
+                )
+                and not is_excluded_url(normalized_schema_image, excluded_url_patterns)
+            ):
+                register_url(
+                    db,
+                    website_id=url.website_id,
+                    raw_url=normalized_schema_image,
+                    source_type="structured_data",
+                    source_url=url.normalized_url,
+                    ignored_query_parameters=ignored_query_parameters,
+                )
     from app.services.analysis import analyze_snapshot
 
     analyze_snapshot(db, snapshot)

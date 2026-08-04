@@ -21,6 +21,13 @@ ISSUE_SCOPE_BY_TYPE: dict[str, IssueScope] = {
     "oversized_image": "performance",
     "possibly_outdated_content": "editorial",
     "rendered_content_missing": "quality",
+    "lighthouse_cache_policy": "performance",
+    "lighthouse_font_and_third_party_delivery": "performance",
+    "lighthouse_image_delivery": "performance",
+    "lighthouse_lcp_delivery": "performance",
+    "lighthouse_render_blocking_resources": "performance",
+    "lighthouse_unused_css": "performance",
+    "lighthouse_unused_javascript": "performance",
 }
 
 ISSUE_NATURE_BY_TYPE: dict[str, IssueNature] = {
@@ -43,8 +50,18 @@ ISSUE_NATURE_BY_TYPE: dict[str, IssueNature] = {
     "robots_txt_blocked": "review",
     "server_error_incident": "review",
     "sitemap_redirect_patterns": "review",
+    "sitemap_document_quality": "review",
+    "robots_sitemap_configuration": "review",
     "thin_content": "review",
     "template_signal_clusters": "review",
+    "lighthouse_cache_policy": "optimization",
+    "lighthouse_font_and_third_party_delivery": "optimization",
+    "lighthouse_image_delivery": "optimization",
+    "lighthouse_lcp_delivery": "optimization",
+    "lighthouse_render_blocking_resources": "optimization",
+    "lighthouse_unused_css": "optimization",
+    "lighthouse_unused_javascript": "optimization",
+    "structured_data_visible_content_mismatch": "review",
 }
 
 

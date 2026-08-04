@@ -339,6 +339,96 @@ DEFINITIONS = (
         ("De belangrijke pagina ontvangt relevante crawlbare inkomende links.",),
         (),
     ),
+    RecommendationDefinition(
+        "improve_measured_page_performance",
+        "1",
+        frozenset(
+            {
+                "lighthouse_cache_policy",
+                "lighthouse_cache_policy_clusters",
+                "lighthouse_font_and_third_party_delivery",
+                "lighthouse_font_and_third_party_delivery_clusters",
+                "lighthouse_image_delivery",
+                "lighthouse_image_delivery_clusters",
+                "lighthouse_lcp_delivery",
+                "lighthouse_lcp_delivery_clusters",
+                "lighthouse_render_blocking_resources",
+                "lighthouse_render_blocking_resources_clusters",
+                "lighthouse_unused_css",
+                "lighthouse_unused_css_clusters",
+                "lighthouse_unused_javascript",
+                "lighthouse_unused_javascript_clusters",
+            }
+        ),
+        "Verbeter de gemeten laadoorzaak",
+        "development",
+        ("content",),
+        "normal",
+        (30, 240),
+        "needs_technical_research",
+        (
+            "Open het technische bewijs en bepaal de gedeelde resource, component of template.",
+            "Voer alleen de aanpassing uit die bij de genoemde audit en bestanden past.",
+            "Herhaal dezelfde mobiele of desktopmeting op de betrokken voorbeelden.",
+        ),
+        (
+            "De concrete Lighthouse-audit is op de aangepaste voorbeelden niet meer actief.",
+            "De relevante lab- of veldmeting verslechtert niet door de wijziging.",
+        ),
+        (),
+    ),
+    RecommendationDefinition(
+        "correct_contextual_structured_data",
+        "1",
+        frozenset(
+            {
+                "structured_data_image_unreachable",
+                "structured_data_image_unreachable_clusters",
+                "structured_data_required_fields_missing",
+                "structured_data_required_fields_missing_clusters",
+                "structured_data_visible_content_mismatch",
+                "structured_data_visible_content_mismatch_clusters",
+            }
+        ),
+        "Corrigeer structured data voor dit paginatype",
+        "development",
+        ("content", "seo_analytics"),
+        "normal",
+        (30, 120),
+        "needs_content_input",
+        (
+            "Controleer het herkende paginatype en de genoemde velden of afbeeldingen.",
+            "Pas de markupgenerator of het betrokken template aan.",
+            "Maak naam, headline en afbeeldingen gelijk aan de zichtbare pagina-inhoud.",
+        ),
+        (
+            "Alle genoemde verplichte velden bevatten passende waarden.",
+            "Schema-inhoud en zichtbare inhoud spreken elkaar niet tegen.",
+            "Genoemde interne schema-afbeeldingen zijn bereikbaar.",
+        ),
+        (),
+    ),
+    RecommendationDefinition(
+        "repair_sitemap_configuration",
+        "1",
+        frozenset({"sitemap_document_quality", "robots_sitemap_configuration"}),
+        "Corrigeer sitemap- en robotsconfiguratie",
+        "development",
+        ("seo_analytics",),
+        "normal",
+        (20, 90),
+        "needs_technical_research",
+        (
+            "Controleer de genoemde sitemapdocumenten en robots.txt-declaraties.",
+            "Corrigeer de centrale sitemapgenerator of robotsconfiguratie.",
+            "Publiceer alleen unieke, geldige URL's binnen de bedoelde websitescope.",
+        ),
+        (
+            "De sitemapimport vindt geen ongeldige of ontbrekende URL-informatie.",
+            "Robots.txt declareert iedere geldige sitemap precies één keer.",
+        ),
+        (),
+    ),
 )
 
 DEFINITIONS_BY_KEY = {definition.key: definition for definition in DEFINITIONS}

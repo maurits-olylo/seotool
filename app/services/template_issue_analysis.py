@@ -47,6 +47,16 @@ CLUSTERABLE_ISSUE_TYPES = {
     "soft_404",
     "thin_content",
     "cms_link_placeholder",
+    "lighthouse_cache_policy",
+    "lighthouse_font_and_third_party_delivery",
+    "lighthouse_image_delivery",
+    "lighthouse_lcp_delivery",
+    "lighthouse_render_blocking_resources",
+    "lighthouse_unused_css",
+    "lighthouse_unused_javascript",
+    "structured_data_image_unreachable",
+    "structured_data_required_fields_missing",
+    "structured_data_visible_content_mismatch",
 }
 TEMPLATE_CLUSTER_DIAGNOSIS_TYPES = {
     TEMPLATE_CLUSTER_ISSUE_TYPE,
@@ -93,6 +103,16 @@ MINIMUM_CLUSTER_SIZE = {
     "soft_404": 2,
     "thin_content": 5,
     "cms_link_placeholder": 2,
+    "lighthouse_cache_policy": 2,
+    "lighthouse_font_and_third_party_delivery": 2,
+    "lighthouse_image_delivery": 2,
+    "lighthouse_lcp_delivery": 2,
+    "lighthouse_render_blocking_resources": 2,
+    "lighthouse_unused_css": 2,
+    "lighthouse_unused_javascript": 2,
+    "structured_data_image_unreachable": 2,
+    "structured_data_required_fields_missing": 2,
+    "structured_data_visible_content_mismatch": 2,
 }
 HIERARCHICAL_ISSUE_TYPES = {
     "deep_page",
@@ -268,6 +288,12 @@ def _cluster_key(issue_type: str, evidence: dict[str, object], url: str) -> str 
         return f"canonical:{_path_family(str(canonical))}" if canonical else None
     if issue_type == "cms_link_placeholder":
         return f"elements:{evidence.get('element_count', 0)}:{path}"
+    if issue_type.startswith("lighthouse_"):
+        cause_key = evidence.get("cause_key")
+        return f"cause:{cause_key}" if cause_key else path
+    if issue_type.startswith("structured_data_"):
+        cause_key = evidence.get("cause_key")
+        return f"cause:{cause_key}" if cause_key else path
     if issue_type == "job_posting_missing_fields":
         fields = evidence.get("missing_fields", [])
         if not isinstance(fields, list):
@@ -305,6 +331,15 @@ def _compact_evidence(evidence: dict[str, object]) -> dict[str, object]:
         "threshold",
         "value",
         "word_count",
+        "audit_ids",
+        "cause_key",
+        "potential_savings_ms",
+        "resources",
+        "strategy",
+        "wasted_bytes",
+        "images",
+        "mismatches",
+        "schemas",
     }
     return {key: value for key, value in evidence.items() if key in allowed_keys}
 

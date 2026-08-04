@@ -10,7 +10,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.queue import INTEGRATION_QUEUE, enqueue_integration_sync, queue_has_capacity
+from app.core.queue import (
+    INTEGRATION_QUEUE,
+    PERFORMANCE_QUEUE,
+    enqueue_integration_sync,
+    enqueue_performance_sync,
+    queue_has_capacity,
+)
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.client import Client
@@ -24,6 +30,7 @@ from app.models.integrations import (
     UrlInspectionResult,
     WebsiteIntegration,
 )
+from app.models.performance import PerformanceObservation
 from app.models.website import Website
 from app.schemas.integrations import (
     BingBacklinkCsvImport,
@@ -33,6 +40,7 @@ from app.schemas.integrations import (
     GooglePropertiesRead,
     IntegrationConnectionCreate,
     IntegrationConnectionRead,
+    PerformanceObservationRead,
     UrlInspectionResultRead,
     WebsiteIntegrationCreate,
     WebsiteIntegrationRead,
@@ -622,6 +630,59 @@ async def synchronize_url_inspection(
         return await sync_url_inspection(db, website_id, limit=limit)
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.get(
+    "/websites/{website_id}/integrations/pagespeed/results",
+    response_model=list[PerformanceObservationRead],
+)
+def list_pagespeed_results(
+    website_id: UUID,
+    url_id: UUID | None = None,
+    strategy: str | None = Query(default=None, pattern="^(mobile|desktop)$"),
+    limit: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> list[PerformanceObservation]:
+    require_website_access(db, principal, website_id)
+    query = select(PerformanceObservation).where(
+        PerformanceObservation.website_id == website_id
+    )
+    if url_id is not None:
+        query = query.where(PerformanceObservation.url_id == url_id)
+    if strategy is not None:
+        query = query.where(PerformanceObservation.strategy == strategy)
+    return list(
+        db.scalars(query.order_by(PerformanceObservation.analyzed_at.desc()).limit(limit))
+    )
+
+
+@router.post(
+    "/websites/{website_id}/integrations/pagespeed/sync",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def synchronize_pagespeed(
+    website_id: UUID,
+    strategy: str = Query(default="mobile", pattern="^(mobile|desktop)$"),
+    limit: int = Query(default=10, ge=1, le=10),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, object]:
+    require_website_access(db, principal, website_id, admin=True)
+    settings = get_settings()
+    if not settings.pagespeed_enabled:
+        raise HTTPException(status_code=503, detail="PageSpeed is not enabled")
+    if not queue_has_capacity(PERFORMANCE_QUEUE):
+        raise HTTPException(status_code=503, detail="De performancewachtrij is tijdelijk vol")
+    queued = enqueue_performance_sync(
+        str(website_id),
+        strategy=strategy,
+        limit=limit,
+        job_id=f"performance-{website_id}-{strategy}-{uuid.uuid4()}",
+    )
+    if not queued:
+        raise HTTPException(status_code=503, detail="De performancewachtrij is tijdelijk vol")
+    return {"status": "queued", "strategy": strategy, "limit": limit}
 
 
 @router.post("/websites/{website_id}/integrations/ga4/sync")

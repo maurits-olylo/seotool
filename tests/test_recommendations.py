@@ -78,8 +78,8 @@ def _task_fixture(db):  # type: ignore[no-untyped-def]
 
 
 def test_library_contains_compact_unique_mvp() -> None:
-    assert len(DEFINITIONS) == 17
-    assert len({definition.key for definition in DEFINITIONS}) == 17
+    assert len(DEFINITIONS) == 20
+    assert len({definition.key for definition in DEFINITIONS}) == 20
     assert recommendation_for_issue_type("internally_linked_404").key == (
         "repair_broken_internal_link"
     )
@@ -131,9 +131,7 @@ def test_orphan_task_requires_structure_decision_before_link_advice(client) -> N
     assert all("Voeg contextuele links" not in step for step in task["steps"])
     detail = client.get(f"/api/v1/recommendation-tasks/{task['id']}").json()
     assert detail["urls"][0]["role"] == "changed"
-    plan = client.get(
-        f"/api/v1/recommendation-tasks/{task['id']}/verification-plan"
-    ).json()
+    plan = client.get(f"/api/v1/recommendation-tasks/{task['id']}/verification-plan").json()
     assert plan["supported"] is False
 
 
@@ -226,7 +224,7 @@ def test_recommendation_task_api_lifecycle(client, monkeypatch) -> None:  # type
 
     definitions = client.get("/api/v1/recommendation-types")
     assert definitions.status_code == 200
-    assert len(definitions.json()) == 17
+    assert len(definitions.json()) == 20
 
     created = client.post(f"/api/v1/issues/{issue_id}/recommendation-task")
     assert created.status_code == 201
@@ -237,9 +235,7 @@ def test_recommendation_task_api_lifecycle(client, monkeypatch) -> None:  # type
     assert task["priority"] == "high"
     assert task["status"] == "open"
     assert task["verification_status"] == "not_requested"
-    initial_plan = client.get(
-        f"/api/v1/recommendation-tasks/{task_id}/verification-plan"
-    )
+    initial_plan = client.get(f"/api/v1/recommendation-tasks/{task_id}/verification-plan")
     assert initial_plan.status_code == 200
     assert initial_plan.json()["supported"] is True
     assert initial_plan.json()["scope_version"] == "2"
@@ -248,10 +244,7 @@ def test_recommendation_task_api_lifecycle(client, monkeypatch) -> None:  # type
     assert initial_plan.json()["missing_roles"] == ["source"]
     assert initial_plan.json()["can_request"] is False
     assert "eerst als uitgevoerd" in initial_plan.json()["blocking_reason"]
-    assert (
-        client.get(f"/api/v1/recommendation-tasks/{task_id}/verifications").json()
-        == []
-    )
+    assert client.get(f"/api/v1/recommendation-tasks/{task_id}/verifications").json() == []
 
     duplicate = client.post(f"/api/v1/issues/{issue_id}/recommendation-task")
     assert duplicate.status_code == 409
@@ -296,9 +289,7 @@ def test_recommendation_task_api_lifecycle(client, monkeypatch) -> None:  # type
     )
     assert implemented.status_code == 200
     assert implemented.json()["implemented_at"] is not None
-    incomplete_plan = client.get(
-        f"/api/v1/recommendation-tasks/{task_id}/verification-plan"
-    ).json()
+    incomplete_plan = client.get(f"/api/v1/recommendation-tasks/{task_id}/verification-plan").json()
     assert incomplete_plan["can_request"] is False
     assert "source" in incomplete_plan["blocking_reason"]
     invalid_role = client.post(
@@ -324,9 +315,7 @@ def test_recommendation_task_api_lifecycle(client, monkeypatch) -> None:  # type
         json={"role": "source", "url": "https://example.com/source"},
     )
     assert duplicate_scope.status_code == 422
-    complete_plan = client.get(
-        f"/api/v1/recommendation-tasks/{task_id}/verification-plan"
-    ).json()
+    complete_plan = client.get(f"/api/v1/recommendation-tasks/{task_id}/verification-plan").json()
     assert complete_plan["can_request"] is True
     assert complete_plan["missing_roles"] == []
     assert complete_plan["url_count"] == 2
@@ -335,9 +324,9 @@ def test_recommendation_task_api_lifecycle(client, monkeypatch) -> None:  # type
     )
     assert removed_scope.status_code == 204
     assert (
-        client.get(
-            f"/api/v1/recommendation-tasks/{task_id}/verification-plan"
-        ).json()["can_request"]
+        client.get(f"/api/v1/recommendation-tasks/{task_id}/verification-plan").json()[
+            "can_request"
+        ]
         is False
     )
     restored_scope = client.post(
@@ -345,15 +334,11 @@ def test_recommendation_task_api_lifecycle(client, monkeypatch) -> None:  # type
         json={"role": "source", "url": "https://example.com/source"},
     )
     assert restored_scope.status_code == 201
-    requested = client.post(
-        f"/api/v1/recommendation-tasks/{task_id}/verifications"
-    )
+    requested = client.post(f"/api/v1/recommendation-tasks/{task_id}/verifications")
     assert requested.status_code == 202
     assert requested.json()["status"] == "queued"
     assert queued == [requested.json()["id"]]
-    duplicate_verification = client.post(
-        f"/api/v1/recommendation-tasks/{task_id}/verifications"
-    )
+    duplicate_verification = client.post(f"/api/v1/recommendation-tasks/{task_id}/verifications")
     assert duplicate_verification.status_code == 409
     feedback = client.post(
         f"/api/v1/recommendation-tasks/{task_id}/feedback",
@@ -388,14 +373,11 @@ def test_recommendation_task_api_lifecycle(client, monkeypatch) -> None:  # type
         assert event.details["actual_effort_band"] == "30_60"
         assert "notes" not in event.details
         assert "notes" not in activity.details
-    recorded_feedback = client.get(
-        f"/api/v1/recommendation-tasks/{task_id}/feedback"
-    )
+    recorded_feedback = client.get(f"/api/v1/recommendation-tasks/{task_id}/feedback")
     assert recorded_feedback.status_code == 200
     assert [item["id"] for item in recorded_feedback.json()] == [feedback.json()["id"]]
     assert (
-        client.post(f"/api/v1/recommendation-tasks/{task_id}/feedback", json={}).status_code
-        == 422
+        client.post(f"/api/v1/recommendation-tasks/{task_id}/feedback", json={}).status_code == 422
     )
     missing_close_reason = client.patch(
         f"/api/v1/recommendation-tasks/{task_id}",
@@ -409,9 +391,7 @@ def test_recommendation_task_api_lifecycle(client, monkeypatch) -> None:  # type
     assert closed.status_code == 200
     assert closed.json()["close_reason"] == "verified"
     assert closed.json()["closed_at"] is not None
-    assert (
-        client.get(f"/api/v1/websites/{website['id']}/recommendation-tasks").json() == []
-    )
+    assert client.get(f"/api/v1/websites/{website['id']}/recommendation-tasks").json() == []
 
     reopen_without_comment = client.patch(
         f"/api/v1/recommendation-tasks/{task_id}",
@@ -753,9 +733,7 @@ def test_redirect_and_canonical_verification_validate_destination_quality() -> N
         assert {rule["status"] for rule in canonical_rules} == {"passed"}
 
         destination = (
-            db.query(UrlSnapshot)
-            .filter_by(crawl_run_id=run.id, url_id=expected.id)
-            .one_or_none()
+            db.query(UrlSnapshot).filter_by(crawl_run_id=run.id, url_id=expected.id).one_or_none()
         )
         assert destination is not None
         destination.is_indexable = False
@@ -830,11 +808,7 @@ def test_grouped_broken_link_evidence_enriches_verification_scope(client) -> Non
             IssueOccurrence(
                 issue_id=issue.id,
                 crawl_run_id=run.id,
-                evidence={
-                    "broken_links": [
-                        {"target_url": "https://scope.example.com/missing"}
-                    ]
-                },
+                evidence={"broken_links": [{"target_url": "https://scope.example.com/missing"}]},
             )
         )
         db.commit()
@@ -905,31 +879,14 @@ def test_client_role_can_read_but_not_change_recommendation_tasks(client) -> Non
         ).status_code
         == 204
     )
-    assert (
-        browser.get(f"/api/v1/websites/{website_id}/recommendation-tasks").status_code
-        == 200
-    )
+    assert browser.get(f"/api/v1/websites/{website_id}/recommendation-tasks").status_code == 200
     assert browser.get(f"/api/v1/recommendation-tasks/{task_id}").status_code == 200
+    assert browser.get(f"/api/v1/recommendation-tasks/{task_id}/feedback").status_code == 200
     assert (
-        browser.get(f"/api/v1/recommendation-tasks/{task_id}/feedback").status_code
-        == 200
+        browser.get(f"/api/v1/recommendation-tasks/{task_id}/verification-plan").status_code == 200
     )
-    assert (
-        browser.get(
-            f"/api/v1/recommendation-tasks/{task_id}/verification-plan"
-        ).status_code
-        == 200
-    )
-    assert (
-        browser.get(
-            f"/api/v1/recommendation-tasks/{task_id}/verifications"
-        ).status_code
-        == 200
-    )
-    assert (
-        browser.post(f"/api/v1/issues/{issue_id}/recommendation-task").status_code
-        == 403
-    )
+    assert browser.get(f"/api/v1/recommendation-tasks/{task_id}/verifications").status_code == 200
+    assert browser.post(f"/api/v1/issues/{issue_id}/recommendation-task").status_code == 403
     assert (
         browser.patch(
             f"/api/v1/recommendation-tasks/{task_id}",
@@ -949,8 +906,7 @@ def test_client_role_can_read_but_not_change_recommendation_tasks(client) -> Non
     )
     assert (
         browser.delete(
-            f"/api/v1/recommendation-tasks/{task_id}/urls/"
-            "00000000-0000-0000-0000-000000000001"
+            f"/api/v1/recommendation-tasks/{task_id}/urls/00000000-0000-0000-0000-000000000001"
         ).status_code
         == 403
     )

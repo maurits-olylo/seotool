@@ -67,6 +67,28 @@ class UrlInspectionResultRead(Timestamped):
     rich_results: dict[str, object]
 
 
+class PerformanceObservationRead(Timestamped):
+    website_id: UUID
+    url_id: UUID
+    analyzed_at: datetime
+    strategy: str
+    status: str
+    source: str
+    requested_url: str
+    final_url: str | None
+    lighthouse_version: str | None
+    fetch_time: datetime | None
+    category_scores: dict[str, float | None]
+    lab_metrics: dict[str, object]
+    field_metrics: dict[str, object]
+    origin_field_metrics: dict[str, object]
+    failed_audits: list[dict[str, object]]
+    field_scope: str | None
+    collection_period_days: int | None
+    error_code: str | None
+    error_message: str | None
+
+
 class GoogleProperty(BaseModel):
     id: str
     name: str

@@ -32,9 +32,20 @@ from app.services.retention_operations import create_retention_operations
 from app.services.robots import RobotsRules
 from app.services.server_error_analysis import analyze_server_error_incident
 from app.services.sitemap import InvalidSitemapError, parse_sitemap
+from app.services.sitemap_quality_analysis import (
+    SitemapQualityReport,
+    is_absolute_http_url,
+    reconcile_sitemap_quality,
+    record_robots_sitemaps,
+    record_sitemap_document,
+    record_sitemap_roots,
+)
 from app.services.sitemap_redirect_analysis import analyze_sitemap_redirect_patterns
 from app.services.snapshot import store_fetch_result
-from app.services.structured_data_analysis import analyze_breadcrumb_consistency
+from app.services.structured_data_analysis import (
+    analyze_breadcrumb_consistency,
+    analyze_contextual_structured_data,
+)
 from app.services.technical_checks import (
     CRAWL_ERROR_ISSUE_TYPES,
     IssueSignal,
@@ -247,8 +258,30 @@ def _import_sitemaps(db, job: CrawlJob, run: CrawlRun) -> SitemapImportResult:  
         raise RuntimeError("Website does not exist")
     configured = list(website.settings.sitemap_urls)
     robots = _load_robots_rules(db, job)
+    quality_report = SitemapQualityReport()
+    record_robots_sitemaps(
+        quality_report,
+        robots,
+        base_url=website.base_url,
+        allowed_subdomains=website.settings.allowed_subdomains,
+    )
     robots_sitemaps = list(robots.sitemaps()) if robots else []
-    pending = list(dict.fromkeys([*configured, *robots_sitemaps]))
+    record_sitemap_roots(
+        quality_report,
+        configured,
+        base_url=website.base_url,
+        allowed_subdomains=website.settings.allowed_subdomains,
+    )
+    pending = [
+        url
+        for url in dict.fromkeys([*configured, *robots_sitemaps])
+        if is_absolute_http_url(url)
+        and is_url_in_website_scope(
+            url,
+            base_url=website.base_url,
+            allowed_subdomains=website.settings.allowed_subdomains,
+        )
+    ]
     fallback_url = urljoin(website.base_url, "/sitemap.xml")
     fallback_only = not pending
     if fallback_only:
@@ -280,6 +313,12 @@ def _import_sitemaps(db, job: CrawlJob, run: CrawlRun) -> SitemapImportResult:  
                 )
                 continue
             raise
+        record_sitemap_document(
+            quality_report,
+            document,
+            base_url=website.base_url,
+            allowed_subdomains=website.settings.allowed_subdomains,
+        )
         if (
             sitemap_url in configured
             or sitemap_url in robots_sitemaps
@@ -287,16 +326,20 @@ def _import_sitemaps(db, job: CrawlJob, run: CrawlRun) -> SitemapImportResult:  
         ):
             successful_roots.append(sitemap_url)
         for child in document.child_sitemaps:
-            if child in queued or not is_url_in_website_scope(
-                child,
-                base_url=website.base_url,
-                allowed_subdomains=website.settings.allowed_subdomains,
+            if (
+                child in quality_report.invalid_url_locations
+                or child in queued
+                or not is_url_in_website_scope(
+                    child,
+                    base_url=website.base_url,
+                    allowed_subdomains=website.settings.allowed_subdomains,
+                )
             ):
                 continue
             pending.append(child)
             queued.add(child)
         for item in document.urls[: website.settings.max_urls]:
-            if not is_url_in_website_scope(
+            if item.location in quality_report.invalid_url_locations or not is_url_in_website_scope(
                 item.location,
                 base_url=website.base_url,
                 allowed_subdomains=website.settings.allowed_subdomains,
@@ -335,6 +378,12 @@ def _import_sitemaps(db, job: CrawlJob, run: CrawlRun) -> SitemapImportResult:  
     if successful_roots:
         website.settings.sitemap_urls = list(dict.fromkeys(successful_roots))
     run.discovered_urls = len(registered_url_ids)
+    reconcile_sitemap_quality(
+        db,
+        website_id=website.id,
+        crawl_run_id=run.id,
+        report=quality_report,
+    )
     db.commit()
     documents = len(visited) if successful_roots else 0
     return SitemapImportResult(
@@ -566,6 +615,8 @@ def _analyze_stored_site_results(
     analyze_server_error_incident(db, website_id=website_id, crawl_run_id=crawl_run_id)
     _check_crawl_control(db, job, progress_run)
     analyze_breadcrumb_consistency(db, website_id=website_id, crawl_run_id=crawl_run_id)
+    _check_crawl_control(db, job, progress_run)
+    analyze_contextual_structured_data(db, website_id=website_id, crawl_run_id=crawl_run_id)
     _check_crawl_control(db, job, progress_run)
     detect_duplicate_content(db, website_id=website_id, crawl_run_id=crawl_run_id)
     _check_crawl_control(db, job, progress_run)

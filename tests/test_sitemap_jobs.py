@@ -5,6 +5,7 @@ from app.jobs import execute_crawl_job
 from app.models.client import Client
 from app.models.crawl import CrawlRun
 from app.models.discovery import CrawlJob
+from app.models.issues import Issue
 from app.models.website import Website, WebsiteSettings
 
 
@@ -124,6 +125,43 @@ def test_sitemap_job_reports_document_limit_without_silent_truncation(monkeypatc
         assert run.crawled_urls == 2
 
 
+def test_sitemap_job_never_fetches_invalid_or_out_of_scope_roots(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    fetched: list[str] = []
+
+    def fetch(url: str, **kwargs):  # type: ignore[no-untyped-def]
+        fetched.append(url)
+        if url.endswith("robots.txt"):
+            return SimpleNamespace(status_code=200, content=b"User-agent: *")
+        assert url == "https://example.com/sitemap.xml"
+        return SimpleNamespace(
+            status_code=200,
+            content=_urlset(["https://example.com/page"]),
+        )
+
+    monkeypatch.setattr("app.jobs.fetch_url", fetch)
+    job_id, website_id = _website_and_job(
+        "https://example.com/",
+        sitemap_urls=["/relative.xml", "https://outside.example/sitemap.xml"],
+    )
+
+    execute_crawl_job(str(job_id))
+
+    with SessionLocal() as db:
+        issue = (
+            db.query(Issue)
+            .filter(
+                Issue.website_id == website_id,
+                Issue.issue_type == "sitemap_document_quality",
+            )
+            .one()
+        )
+        assert issue.status == "new"
+    assert fetched == [
+        "https://example.com/robots.txt",
+        "https://example.com/sitemap.xml",
+    ]
+
+
 def _sitemap_index(urls: list[str]) -> bytes:
     entries = "".join(f"<sitemap><loc>{url}</loc></sitemap>" for url in urls)
     return f'<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{entries}</sitemapindex>'.encode()
@@ -136,11 +174,11 @@ def _urlset(urls: list[str]) -> bytes:
     )
 
 
-def _website_and_job(base_url: str):  # type: ignore[no-untyped-def]
+def _website_and_job(base_url: str, *, sitemap_urls: list[str] | None = None):  # type: ignore[no-untyped-def]
     with SessionLocal() as db:
         client = Client(name=f"Sitemap {base_url}")
         website = Website(client=client, name="Sitemapsite", base_url=base_url)
-        website.settings = WebsiteSettings(sitemap_urls=[])
+        website.settings = WebsiteSettings(sitemap_urls=sitemap_urls or [])
         db.add(website)
         db.flush()
         job = CrawlJob(

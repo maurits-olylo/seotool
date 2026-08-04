@@ -5,7 +5,7 @@ from sqlalchemy import select
 from app.db.session import SessionLocal
 from app.models.client import Client
 from app.models.crawl import CrawlRun, ElementLocation, UrlLink
-from app.models.discovery import CrawlJob, Url
+from app.models.discovery import CrawlJob, Url, UrlSource
 from app.models.issues import Change, Issue
 from app.models.website import Website, WebsiteSettings
 from app.services.http_crawler import FetchResult
@@ -163,6 +163,60 @@ def test_internal_discovery_applies_query_and_exclusion_settings() -> None:
             "https://example.com/search?filter=all",
         ]
         assert links[-1].target_url_id is None
+
+
+def test_registers_internal_schema_image_as_structured_data_source() -> None:
+    html = b"""
+    <html><head><title>Article</title>
+      <script type="application/ld+json">
+        {"@type":"Article","headline":"Article","datePublished":"2026-08-04",
+         "image":"/schema-image.jpg"}
+      </script>
+    </head><body><main><h1>Article</h1></main></body></html>
+    """
+    with SessionLocal() as db:
+        website = Website(
+            client=Client(name="Schema discovery client"),
+            name="Schema discovery site",
+            base_url="https://example.com",
+        )
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        page = Url(website_id=website.id, normalized_url="https://example.com/article")
+        job = CrawlJob(website_id=website.id, job_type="full_site_crawl")
+        db.add_all([page, job])
+        db.flush()
+        run = CrawlRun(
+            crawl_job_id=job.id,
+            website_id=website.id,
+            crawl_type="full_site_crawl",
+        )
+        db.add(run)
+        db.flush()
+
+        store_fetch_result(
+            db,
+            url=page,
+            crawl_run_id=run.id,
+            result=FetchResult(
+                requested_url=page.normalized_url,
+                final_url=page.normalized_url,
+                status_code=200,
+                redirect_chain=[],
+                headers={"content-type": "text/html"},
+                content=html,
+                response_time_ms=4,
+            ),
+        )
+        db.flush()
+
+        image = db.scalar(
+            select(Url).where(Url.normalized_url == "https://example.com/schema-image.jpg")
+        )
+        source = db.scalar(select(UrlSource).where(UrlSource.url_id == image.id))
+        assert source.source_type == "structured_data"
+        assert source.source_url == page.normalized_url
 
 
 def test_discovery_only_page_keeps_links_without_page_issues_or_changes() -> None:

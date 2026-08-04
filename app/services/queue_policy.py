@@ -1,6 +1,6 @@
 from dataclasses import asdict, dataclass
 
-QUEUE_POLICY_VERSION = "2026-08-02-v2"
+QUEUE_POLICY_VERSION = "2026-08-04-v3"
 DEFAULT_WEBSITE_PRIORITY = 50
 MIN_WEBSITE_PRIORITY = 0
 MAX_WEBSITE_PRIORITY = 100
@@ -35,6 +35,7 @@ QUEUE_POLICIES = {
     "verifications": QueuePolicy("verifications", 25, 100, (10, 30, 90), 3_600),
     "maintenance": QueuePolicy("maintenance", 10, 50, (60, 300, 900), 21_600),
     "renders": QueuePolicy("renders", 3, 10, (60, 300, 900), 300),
+    "performance": QueuePolicy("performance", 3, 10, (60, 300, 900), 1_200),
 }
 
 

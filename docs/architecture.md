@@ -67,6 +67,50 @@ controle. Daardoor ontstaat geen tweede URL-register en blijven discovery, scope
 centraal. Nieuwe volledige crawls vullen het register; bestaande snapshots worden niet destructief
 herschreven. De tenantbeveiligde API kan per website, type en status filteren.
 
+## Contextuele structured data
+
+De volledige siteanalyse valideert alleen schematypen die als zelfstandig top-level object of
+`@graph`-onderdeel op de pagina aanwezig zijn. Geneste organisaties, locaties of aanbiedingen
+worden niet ten onrechte als zelfstandig paginatype behandeld. De eerste contextregels dekken
+`Product`, `Article`-varianten, `Organization`, `LocalBusiness`, `Event` en `VideoObject`.
+
+Per herkend type worden alleen relevante verplichte velden en `one of`-vereisten gecontroleerd.
+De primaire `name` of `headline` wordt conservatief vergeleken met title, H1 en hoofdcontent;
+afwijkingen blijven een review met gemiddelde zekerheid. Interne afbeeldingen uit `image`, `logo`
+en `thumbnailUrl` worden als `structured_data`-bron aan het bestaande URL- en assetregister
+toegevoegd. Alleen een werkelijk gemeten foutstatus levert een hard afbeeldingssignaal op;
+onbekende of externe beelden worden niet als fout aangenomen of onbeperkt opgehaald. Herhaalde
+veld-, inhouds- en afbeeldingsproblemen gebruiken de bestaande templateclustering en lifecycle.
+
+## Begrensde Lighthouse- en CrUX-observaties
+
+PageSpeed Insights is een optionele externe meetbron en staat standaard uit. Alleen belangrijke,
+recent gewijzigde of aantoonbaar probleemverdachte actieve HTML-URL's komen in aanmerking. Eén
+selectie bevat maximaal tien URL's en spreidt eerst over padtemplates. Hierdoor ontstaat geen
+onbegrensde API-, CPU- of opslagbelasting en blijft de gewone crawler de primaire meetbron.
+
+`performance_observations` bewaart per URL, meetmoment en mobiele of desktopstrategie uitsluitend
+genormaliseerd bewijs: Lighthouse-versie, categorieën, labmetingen, CrUX URL- en originmetingen en
+maximaal twintig mislukte audits met begrensde voorbeelden. De volledige providerresponse wordt
+niet bewaard. Lab- en velddata blijven gescheiden en een lage score maakt zonder concreet
+auditbewijs geen issue. De feature vereist zowel `PAGESPEED_ENABLED=true` als een afzonderlijke
+API-key. Externe aanvragen lopen via een eigen `performance`-queue die op de bestaande
+integration-worker bewust met maximaal één uitvoering tegelijk wordt verwerkt. Iedere batch bevat
+maximaal tien URL's; geslaagde observaties jonger dan zeven dagen worden overgeslagen. Resultaten
+worden per URL vastgelegd, zodat een RQ-retry na een gedeeltelijke uitvoering alleen ontbrekende
+metingen uitvoert. HTTP- en parsefouten bewaren een generieke foutcode zonder API-key of volledige
+provider-URL. De queue is technisch aanwezig, maar blijft door `PAGESPEED_ENABLED=false` uit totdat
+Release 5 integraal op staging wordt gevalideerd.
+
+Een geslaagde observatie maakt alleen een performanceactie wanneer een ondersteunde audit concreet
+is mislukt. Scores zonder auditbewijs blijven meetwaarden. De eerste oorzaken zijn afbeeldingen,
+ongebruikte JavaScript/CSS, render-blocking resources, caching, fonts/externe scripts en
+LCP/serverreactie. Iedere actie bewaart strategie, Lighthouse-versie, audit-ID's, begrensde
+resources en mogelijke besparing. Twee URL's met dezelfde audit en gedeelde resources worden via
+de bestaande template-engine één component- of templateactie; de URL-signalen blijven als bewijs
+bestaan. Een volgende schone meting doorloopt dezelfde `resolved`/`verified` lifecycle als andere
+issues.
+
 ## Begrensde JavaScript-rendercontrole
 
 Een gewone HTML-snapshot blijft altijd de primaire meetbron. Alleen actieve, indexeerbare
@@ -224,6 +268,19 @@ kunnen een hard Google-conflict krijgen. Wanneer een relevante canonical-, robot
 indexeerbaarheidswijziging nieuwer is dan Googles laatste crawl, blijft de afwijking context totdat
 Google opnieuw heeft gecrawld. Een volgende geslaagde inspectie doorloopt de normale issue-lifecycle
 naar opgelost en daarna geverifieerd.
+
+## Sitemap- en robotskwaliteit
+
+Iedere sitemapimport bewaart bruikbare URL's, maar registreert daarnaast gegroepeerd bewijs voor
+ontbrekende `loc`-waarden, dubbele URL's binnen en tussen documenten, ongeldige `lastmod`-waarden,
+niet-absolute URL's en URL's buiten de ingestelde websitescope. Maximaal tien voorbeelden per
+bevindingstype worden in het issuebewijs opgeslagen; het totale aantal blijft apart zichtbaar.
+
+Sitemapdeclaraties uit `robots.txt` worden gecontroleerd op duplicaten, absolute HTTP(S)-URL's en
+websitescope. Ongeldige of websitevreemde roots worden nooit als fetchdoel gebruikt. Wanneer geen
+veilige root overblijft, probeert de bestaande import alleen de lokale `/sitemap.xml`-fallback.
+Sitemap- en robotsbevindingen blijven afzonderlijke website-issues en doorlopen de bestaande
+opgelost/gecontroleerd-lifecycle. Een afwijkende URL-vorm of `lastmod` is geen algemene SEO-score.
 
 ## Crawl-diepte
 

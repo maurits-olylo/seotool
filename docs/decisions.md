@@ -944,3 +944,50 @@ container later na afzonderlijke infrastructuurgoedkeuring op de Linux-worker ka
 Gevolg: normale crawls en de API krijgen geen browserdependency of browserbelasting. Een eerste
 NAS-proef kan klein blijven en latere verplaatsing naar de gaming-pc vereist geen herschrijving van
 de analyse- of databaselogica.
+
+## 2026-08-04 — Performancebewijs wordt extern, begrensd en genormaliseerd opgeslagen
+
+Context: lokaal Lighthouse draaien belast de beperkte Mac en NAS, terwijl volledige PageSpeed-
+responses omvangrijk zijn en categoriescores zonder oorzaakinformatie geen bruikbare actie vormen.
+
+Besluit: gebruik later de PageSpeed Insights API voor een risicogestuurde selectie van maximaal
+tien URL's per batch. Bewaar labdata, CrUX-velddata en auditbewijs herkenbaar gescheiden en sla geen
+volledige providerresponse op. De integratie staat standaard uit en vereist een afzonderlijke
+featureflag en API-key. Scores alleen maken geen issue.
+
+Gevolg: migratie `0041` is additief en introduceert alleen lege historische observatietabellen en
+indexes. De externe client gebruikt een eigen begrensde queue op de bestaande integration-worker,
+slaat deelresultaten per URL op en slaat recente successen bij retries over. Issuegroepering volgt
+de bestaande lifecycle: alleen concrete mislukte audits worden acties en een gedeelde audit plus
+resource wordt als template- of componentoorzaak gegroepeerd. Scores alleen blijven bewijs en
+maken geen issue. Rendering en de niet-operationele Linux-worker blijven buiten deze route; de
+featureflag blijft uit tot de integrale stagingvalidatie.
+
+## 2026-08-04 — Structured data wordt alleen binnen aantoonbare paginacontext gevalideerd
+
+Context: generiek eisen dat ieder schematype of aanbevolen veld overal aanwezig is veroorzaakt
+ruis. Geneste `Organization`-, `Offer`- of `Place`-objecten bewijzen bovendien niet dat de pagina
+zelf zo'n paginatype vertegenwoordigt.
+
+Besluit: valideer alleen ondersteunde top-level of `@graph`-typen en controleer per type een kleine
+set noodzakelijke velden, primaire zichtbare naam en bekende interne afbeeldingen. Registreer
+interne schema-afbeeldingen via het bestaande veilige URL-register. Meld bereikbaarheid alleen na
+een echte crawlerstatus en behandel zichtbare-contentverschillen als review.
+
+Gevolg: Product, Article, Organization, LocalBusiness, Event en VideoObject krijgen uitlegbare,
+dedupliceerbare acties zonder algemene ontbrekend-schemawaarschuwingen of extra externe fetches.
+
+## 2026-08-04 — Sitemapkwaliteit wordt apart van URL-status beoordeeld
+
+Context: de import sloeg bruikbare sitemap-URL's op en signaleerde status- en redirectproblemen,
+maar ongeldige `loc`- of `lastmod`-waarden, duplicaten en foutieve robotsdeclaraties verdwenen uit
+beeld. Een geconfigureerde websitevreemde sitemaproot kon bovendien onnodig worden opgehaald.
+
+Besluit: verzamel documentkwaliteit tijdens de bestaande begrensde import en maak twee gegroepeerde
+website-issues: één voor sitemapinhoud en één voor sitemapdeclaraties in robots.txt. Gebruik alleen
+absolute HTTP(S)-roots binnen de ingestelde websitescope als fetchdoel en bewaar hoogstens tien
+voorbeelden per bevindingstype.
+
+Gevolg: de sitemapgenerator en robotsconfiguratie krijgen concrete, dedupliceerbare acties zonder
+extra netwerkronde, database-migration of generieke kwaliteitsscore. Een volgende schone import
+lost het issue via de bestaande lifecycle op.

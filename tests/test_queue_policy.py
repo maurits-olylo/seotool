@@ -19,11 +19,12 @@ SessionLocal = sessionmaker(bind=engine)
 def test_queue_policy_is_versioned_and_bounded() -> None:
     policy = serialized_queue_policy()
 
-    assert policy["version"] == "2026-08-02-v2"
+    assert policy["version"] == "2026-08-04-v3"
     assert policy["priority"]["lower_number_runs_first"] is True
     assert queue_policy("crawls_full").admission_backlog == 25
     assert queue_policy("renders").enabled is True
     assert queue_policy("renders").job_timeout_seconds == 300
+    assert queue_policy("performance").admission_backlog == 10
     assert all(item.warning_backlog <= item.admission_backlog for item in QUEUE_POLICIES.values())
 
 
@@ -45,6 +46,26 @@ def test_render_enqueue_requires_explicit_feature_gate(monkeypatch) -> None:  # 
     )
 
     assert queue.enqueue_render_observation("observation", website_id="website") is False
+
+
+def test_performance_enqueue_requires_explicit_feature_gate(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    from app.core import queue
+
+    monkeypatch.setattr(
+        queue, "get_settings", lambda: SimpleNamespace(pagespeed_enabled=False)
+    )
+    monkeypatch.setattr(
+        queue,
+        "_enqueue",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must stay disabled")),
+    )
+
+    assert (
+        queue.enqueue_performance_sync(
+            "website", strategy="mobile", limit=10, job_id="performance-job"
+        )
+        is False
+    )
 
 
 def test_website_queue_settings_enforce_bounds() -> None:
