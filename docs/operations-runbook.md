@@ -22,7 +22,7 @@ Herhaal een mogelijk onderbroken muterend commando nooit direct. Controleer eers
 
 - Controleer containergezondheid, workerregistratie en de maintenancequeue read-only.
 - Controleer `status`, `next_attempt_at`, `attempt_count` en `error_message` in PostgreSQL.
-- Herstart alleen de geraakte worker; wacht daarna altijd 30 seconden vóór de healthcheck.
+- Herstart alleen de geraakte worker; wacht daarna altijd 40 seconden vóór de eerste healthcheck.
 - Maak geen tweede operatie voor dezelfde crawlrun en hetzelfde datatype.
 
 ## Overvolle queue

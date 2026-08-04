@@ -155,9 +155,9 @@ Presenteer een vooraf lokaal geteste release voortaan in precies twee kopieerbar
 
 Door `&&` stopt de keten bij de eerste fout. Vraag niet na iedere geslaagde tussenstap opnieuw om
 bevestiging. De gebruiker controleert de getoonde checksum zelf en deelt bij succes alleen de
-relevante uitvoer vanaf migratie of inhoudelijke validatie. Gebruik na een workerherstart minimaal
-`sleep 30`; kies voor andere services een aantoonbaar passende wachttijd en laat de afsluitende
-healthcheck beslissend zijn.
+relevante uitvoer vanaf migratie of inhoudelijke validatie. Gebruik na een herstart van SEO
+Monitor-services minimaal `sleep 40` en begin pas daarna met de eerste status- of healthcheck.
+Laat de afsluitende healthcheck beslissend zijn.
 
 De keten verschilt per omgeving en release: staging gebruikt `.env.staging` en
 `compose.staging.yaml`; productie gebruikt `compose.yaml` plus `compose.prod.yaml` en altijd eerst
@@ -193,9 +193,9 @@ data wijzigen of moeilijk herstelbaar zijn.
 
 ### Wachttijd bij asynchrone productiecontroles
 
-Gebruik na het opnieuw starten van een worker altijd `sleep 30` voordat de containerstatus en
-healthcheck worden beoordeeld. Twintig seconden bleek op productie onvoldoende: de worker draaide
-al wel, maar rapporteerde nog `health: starting`.
+Gebruik na het opnieuw starten van SEO Monitor-services altijd `sleep 40` voordat de eerste
+containerstatus of healthcheck wordt beoordeeld. Kortere wachttijden bleken op productie
+onvoldoende: de containers draaiden dan al wel, maar rapporteerden nog `health: starting`.
 
 Baseer een `sleep` na een achtergrondjob op een eerder gemeten doorlooptijd en rond slechts beperkt
 naar boven af. De HUMAN-sitemapimport van 193 documenten duurde op 1 augustus 2026 circa 49
