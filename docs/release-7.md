@@ -1,6 +1,7 @@
 # Release 7 — Matomo en analytics-meetkwaliteit
 
-Status: lokale releasecandidate. Nog niet naar staging of productie uitgerold.
+Status: op 5 augustus 2026 succesvol naar staging uitgerold vanaf commit `c3bd183`.
+Productie-uitrol is nog niet uitgevoerd.
 
 ## Scope
 
@@ -48,5 +49,7 @@ Matomo-site-ID zijn operationele secrets of configuratiewaarden en staan niet in
 - Volledige testsuite: geslaagd; alleen de bestaande Starlette/httpx-waarschuwing.
 - Alembic: één lineaire head op `0045` vanaf `0042`.
 - Diffcontrole: geslaagd.
-- Staging en productie: nog uit te voeren volgens de vaste terminal-first releaseprocedure met
-  `sleep 40` vóór de eerste status- of healthcheck.
+- Staging: migration `0045`, gezonde API en database, aanwezige Matomo-tabellen en nieuwe
+  integratiekolommen, `PAGESPEED_ENABLED=false` en `RENDERING_ENABLED=false` bevestigd.
+- Productie: nog uit te voeren volgens de vaste terminal-first releaseprocedure met `sleep 40`
+  vóór de eerste status- of healthcheck.
