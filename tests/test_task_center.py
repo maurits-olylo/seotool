@@ -68,6 +68,17 @@ def test_task_center_filters_and_user_specific_notification_receipts(client) -> 
     )
     assert matching.status_code == 200
     assert [item["id"] for item in matching.json()] == [task_id]
+    unassigned_update = client.patch(
+        f"/api/v1/recommendation-tasks/{task_id}",
+        json={"assigned_to_user_id": None},
+    )
+    assert unassigned_update.status_code == 200
+    assert unassigned_update.json()["assigned_to_user_id"] is None
+    unassigned = client.get(
+        f"/api/v1/websites/{website_id}/recommendation-tasks",
+        params={"unassigned": True},
+    )
+    assert [item["id"] for item in unassigned.json()] == [task_id]
     assert (
         client.get(
             f"/api/v1/websites/{website_id}/recommendation-tasks",
@@ -101,3 +112,4 @@ def test_task_center_filters_and_user_specific_notification_receipts(client) -> 
         assert db.get(TaskNotificationReceipt, (UUID(notification_id), user_id)) is not None
         task = db.get(RecommendationTask, UUID(task_id))
         assert task is not None and task.primary_role == "content_editor"
+        assert task.assigned_to_user_id is None

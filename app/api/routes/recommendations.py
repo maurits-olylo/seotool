@@ -83,6 +83,7 @@ def list_recommendation_tasks(
     primary_role: str | None = None,
     priority: str | None = Query(default=None, pattern="^(critical|high|normal|low)$"),
     assigned_to_user_id: UUID | None = None,
+    unassigned: bool = False,
     verification_status: str | None = None,
     search: str | None = Query(default=None, max_length=200),
     limit: int = Query(default=100, ge=1, le=500),
@@ -104,7 +105,9 @@ def list_recommendation_tasks(
         query = query.where(RecommendationTask.primary_role == primary_role)
     if priority is not None:
         query = query.where(RecommendationTask.priority == priority)
-    if assigned_to_user_id is not None:
+    if unassigned:
+        query = query.where(RecommendationTask.assigned_to_user_id.is_(None))
+    elif assigned_to_user_id is not None:
         query = query.where(RecommendationTask.assigned_to_user_id == assigned_to_user_id)
     if verification_status is not None:
         query = query.where(RecommendationTask.verification_status == verification_status)

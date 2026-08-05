@@ -17,6 +17,8 @@ commit `705640a` met dezelfde applicatiecode.
   stilzwijgend gecombineerd of als elkaars terugval gebruikt.
 - Beheerinterface voor Matomo-verbinding, siteselectie, synchronisatie en primaire-bronkeuze,
   met herkenbare providericonen en vernieuwde Bing-backlinkupload.
+- Taakeigenaar kan vanuit het taakdetail expliciet worden gekozen of verwijderd. Niet-toegewezen
+  taken blijven een normale werkvoorraad en kunnen afzonderlijk worden gefilterd.
 
 De eerste beoogde website voor de koppeling is `human.nl`. Het serveradres, API-token en de
 Matomo-site-ID zijn operationele secrets of configuratiewaarden en staan niet in Git.

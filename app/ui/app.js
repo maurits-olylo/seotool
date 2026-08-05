@@ -896,7 +896,17 @@ const verificationStatusLabels = {not_requested:"Nog niet gecontroleerd", queued
 function taskOwnerLabel(userId) {
   if (!userId) return "Nog niet toegewezen";
   const member = state.taskMembers.find((item) => item.id === userId);
-  return member?.display_name || member?.email || "Toegewezen";
+  if (member) return member.display_name || member.email;
+  if (state.currentUser?.id === userId) return state.currentUser.display_name || state.currentUser.email || "Jij";
+  return "Toegewezen";
+}
+
+function taskAssigneeOptions() {
+  const members = state.taskMembers.filter((item) => item.is_active && item.client_role !== "client");
+  if (state.currentUser?.id && state.currentUser.role !== "client" && !members.some((item) => item.id === state.currentUser.id)) {
+    members.unshift({id: state.currentUser.id, display_name: state.currentUser.display_name, email: state.currentUser.email, client_role: state.currentUser.role, is_active: true});
+  }
+  return members;
 }
 
 function formatTaskEffort(task) {
@@ -927,8 +937,11 @@ async function loadTaskCenter() {
   $("#task-center-message").textContent = "Taken worden geladen…";
   try {
     const params = new URLSearchParams({status: $("#task-status-filter").value || "active", limit:"500"});
-    const filters = [["primary_role", "#task-role-filter"], ["priority", "#task-priority-filter"], ["assigned_to_user_id", "#task-owner-filter"], ["verification_status", "#task-verification-filter"], ["search", "#task-search"]];
+    const filters = [["primary_role", "#task-role-filter"], ["priority", "#task-priority-filter"], ["verification_status", "#task-verification-filter"], ["search", "#task-search"]];
     for (const [name, selector] of filters) { const value = $(selector).value.trim(); if (value) params.set(name, value); }
+    const ownerFilter = $("#task-owner-filter").value;
+    if (ownerFilter === "unassigned") params.set("unassigned", "true");
+    else if (ownerFilter) params.set("assigned_to_user_id", ownerFilter);
     const clientId = $("#client-select").value;
     const [tasks, notifications, members] = await Promise.all([
       api(`/api/v1/websites/${websiteId}/recommendation-tasks?${params}`),
@@ -941,7 +954,7 @@ async function loadTaskCenter() {
     $("#task-role-filter").innerHTML = `<option value="">Alle vakgebieden</option>${roles.map((role) => `<option value="${escapeHtml(role)}">${escapeHtml(taskRoleLabels[role] || role)}</option>`).join("")}`;
     $("#task-role-filter").value = selectedRole;
     const selectedOwner = $("#task-owner-filter").value;
-    $("#task-owner-filter").innerHTML = `<option value="">Iedereen</option>${members.map((member) => `<option value="${member.id}">${escapeHtml(member.display_name || member.email)}</option>`).join("")}`;
+    $("#task-owner-filter").innerHTML = `<option value="">Iedereen</option><option value="unassigned">Niet toegewezen</option>${taskAssigneeOptions().map((member) => `<option value="${member.id}">${escapeHtml(member.display_name || member.email)}${member.id === state.currentUser?.id ? " (jij)" : ""}</option>`).join("")}`;
     $("#task-owner-filter").value = selectedOwner;
     renderTaskCenter(); renderTaskNotifications(); $("#task-center-message").textContent = "";
   } catch (error) { $("#task-center-message").textContent = `Taken konden niet worden geladen: ${error.message}`; }
@@ -2025,12 +2038,17 @@ async function loadIssueRecommendation(issue) {
     const definitionsPromise = state.recommendationDefinitions
       ? Promise.resolve(state.recommendationDefinitions)
       : api("/api/v1/recommendation-types");
-    const [tasks, definitions] = await Promise.all([
+    const membersPromise = ["superuser", "admin"].includes(state.currentUser?.role)
+      ? api(`/api/v1/clients/${$("#client-select").value}/members`).catch(() => [])
+      : Promise.resolve([]);
+    const [tasks, definitions, members] = await Promise.all([
       api(`/api/v1/websites/${issue.website_id}/recommendation-tasks?status=all`),
       definitionsPromise,
+      membersPromise,
     ]);
     if (state.selectedIssueId !== issue.id) return;
     state.recommendationDefinitions = definitions;
+    state.taskMembers = members;
     const taskSummary = tasks.find((task) => task.primary_issue_id === issue.id) || null;
     if (taskSummary) {
       const taskId = taskSummary.id;
@@ -2077,6 +2095,7 @@ function renderRecommendationTask(issue, supported = true) {
   const statusOptions = [task.status, ...transitions]
     .map((value) => `<option value="${value}">${escapeHtml(taskStatusLabels[value] || value)}</option>`)
     .join("");
+  const assigneeOptions = `<option value="">Niet toegewezen</option>${taskAssigneeOptions().map((member) => `<option value="${member.id}" ${member.id === task.assigned_to_user_id ? "selected" : ""}>${escapeHtml(member.display_name || member.email)}${member.id === state.currentUser?.id ? " (jij)" : ""}</option>`).join("")}`;
   const nextStep = task.feasibility === "needs_decision"
     ? ["Neem eerst een besluit", task.required_input[0] || "Bepaal welke uitkomst voor deze pagina bedoeld is."]
     : ({
@@ -2088,7 +2107,7 @@ function renderRecommendationTask(issue, supported = true) {
     closed: ["Geen actie nodig", "Deze taak is afgesloten. Heropen haar alleen wanneer opnieuw werk nodig is."],
   }[task.status] || ["Bepaal de volgende stap", "Werk de taakstatus bij zodra de situatie verandert."]);
   const controls = canWrite
-    ? `<section class="task-panel task-controls-panel"><div class="task-section-heading"><span>03</span><div><small>Werk bijwerken</small><h4>Kies de nieuwe taakstatus</h4></div></div><div class="task-controls"><label>Nieuwe status<select id="recommendation-task-status">${statusOptions}</select></label><label class="task-comment">Korte toelichting<textarea id="recommendation-task-comment" maxlength="2000" placeholder="Optioneel, behalve bij heropenen"></textarea></label><label id="task-close-reason-label" class="task-close-reason hidden">Waarom wordt de taak afgesloten?<select id="recommendation-task-close-reason">${Object.entries(closeReasonLabels).map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join("")}</select></label><button id="save-recommendation-task" class="primary-button" type="button" disabled>Taak bijwerken</button></div></section>`
+    ? `<section class="task-panel task-controls-panel"><div class="task-section-heading"><span>03</span><div><small>Werk bijwerken</small><h4>Kies eigenaar en taakstatus</h4></div></div><div class="task-controls"><label>Eigenaar<select id="recommendation-task-owner">${assigneeOptions}</select><small>Laat leeg zolang nog niet bekend is wie de taak oppakt.</small></label><label>Nieuwe status<select id="recommendation-task-status">${statusOptions}</select></label><label class="task-comment">Korte toelichting<textarea id="recommendation-task-comment" maxlength="2000" placeholder="Optioneel, behalve bij heropenen"></textarea></label><label id="task-close-reason-label" class="task-close-reason hidden">Waarom wordt de taak afgesloten?<select id="recommendation-task-close-reason">${Object.entries(closeReasonLabels).map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join("")}</select></label><button id="save-recommendation-task" class="primary-button" type="button" disabled>Taak bijwerken</button></div></section>`
     : "";
   const latestFeedback = state.recommendationFeedback[0];
   const feedbackSummary = latestFeedback
@@ -2242,7 +2261,8 @@ async function saveRecommendationTask() {
     message.textContent = "Geef een toelichting om een afgesloten taak te heropenen.";
     return;
   }
-  const payload = {status, comment: comment || null};
+  const owner = $("#recommendation-task-owner").value;
+  const payload = {status, assigned_to_user_id: owner || null, comment: comment || null};
   if (status === "closed") payload.close_reason = $("#recommendation-task-close-reason").value;
   message.textContent = "Taak wordt bijgewerkt…";
   try {
@@ -2459,10 +2479,11 @@ $("#recommendation-task-content").addEventListener("click", (event) => {
   if (removeScope) removeTaskScope(removeScope.dataset.taskUrlId);
 });
 $("#recommendation-task-content").addEventListener("change", (event) => {
-  if (!event.target.closest("#recommendation-task-status")) return;
-  const status = event.target.value;
+  if (!event.target.closest("#recommendation-task-status, #recommendation-task-owner")) return;
+  const status = $("#recommendation-task-status").value;
+  const owner = $("#recommendation-task-owner").value || null;
   $("#task-close-reason-label").classList.toggle("hidden", status !== "closed");
-  $("#save-recommendation-task").disabled = status === state.selectedRecommendationTask?.status;
+  $("#save-recommendation-task").disabled = status === state.selectedRecommendationTask?.status && owner === state.selectedRecommendationTask?.assigned_to_user_id;
 });
 $("#recommendation-task-content").addEventListener("submit", (event) => {
   if (event.target.closest("#recommendation-feedback-form")) saveRecommendationFeedback(event);
