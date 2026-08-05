@@ -1,7 +1,8 @@
 # Release 7 — Matomo en analytics-meetkwaliteit
 
-Status: op 5 augustus 2026 succesvol naar staging uitgerold vanaf commit `c3bd183`.
-Productie-uitrol is nog niet uitgevoerd.
+Status: afgerond en op 5 augustus 2026 succesvol naar staging en productie uitgerold. Staging
+gebruikte releasecommit `c3bd183`; productie gebruikte het definitieve documentatiearchief uit
+commit `705640a` met dezelfde applicatiecode.
 
 ## Scope
 
@@ -51,5 +52,7 @@ Matomo-site-ID zijn operationele secrets of configuratiewaarden en staan niet in
 - Diffcontrole: geslaagd.
 - Staging: migration `0045`, gezonde API en database, aanwezige Matomo-tabellen en nieuwe
   integratiekolommen, `PAGESPEED_ENABLED=false` en `RENDERING_ENABLED=false` bevestigd.
-- Productie: nog uit te voeren volgens de vaste terminal-first releaseprocedure met `sleep 40`
-  vóór de eerste status- of healthcheck.
+- Productie: migration `0045`, gezonde API, database, integration-worker en scheduler, aanwezige
+  Matomo-tabellen en integratiekolommen en beschikbare Matomo- en primaire-bronroutes bevestigd.
+  PageSpeed en JavaScript-rendering blijven uitgeschakeld. De veilige crawl-drain is opgeheven met
+  nul actieve of wachtende taken.
