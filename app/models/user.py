@@ -1,7 +1,17 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, UniqueConstraint, text
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -26,6 +36,10 @@ class User(UUIDTimestampMixin, Base):
     role: Mapped[str] = mapped_column(String(30), default="user", index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    mfa_secret_encrypted: Mapped[str | None] = mapped_column(String(1024))
+    mfa_recovery_code_hashes: Mapped[list[str]] = mapped_column(JSON, default=list)
+    mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    mfa_last_counter: Mapped[int | None] = mapped_column(BigInteger)
 
 
 class UserSession(UUIDTimestampMixin, Base):
