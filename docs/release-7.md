@@ -65,3 +65,15 @@ Matomo-site-ID zijn operationele secrets of configuratiewaarden en staan niet in
   Bing-backlinkupload en optionele taaktoewijzing inhoudelijk bevestigd. Beide omgevingen bleven op
   migration `0045`; de productie-API was gezond en de veilige crawl-drain eindigde zonder actieve
   of wachtende taken.
+- Matomo-synchronisatiecorrecties `29b12bf` en `e564dcd` zijn zonder migration op staging en
+  productie gevalideerd. Paginaresultaten blijven beschikbaar wanneer een optioneel rapport
+  ontbreekt en verkeersbronnen gebruiken de ondersteunde overzichtsmethode met methodespecifieke
+  parameters. De productieproef importeerde pagina-, verkeersbron- en conversiedata zonder
+  waarschuwing; API en database bleven gezond en de crawl-drain werd veilig opgeheven.
+
+## Uitgestelde interface-polish
+
+- De getoonde URL-koppelingsratio is technisch correct, maar zonder context onvoldoende duidelijk
+  voor niet-technische gebruikers. Uitleg, unieke URL-aantallen en een bruikbare doorklik naar
+  ongekoppelde varianten worden gebundeld met een latere substantiële interface-release en niet als
+  afzonderlijke hotfix uitgebracht.
