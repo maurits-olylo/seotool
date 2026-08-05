@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import Cookie, Depends, Header, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -59,6 +59,15 @@ def revoke_session_token(token: str | None) -> None:
         if session:
             session.revoked_at = datetime.now(UTC)
             db.commit()
+
+
+def revoke_user_sessions(db: Session, user_id: UUID) -> int:
+    result = db.execute(
+        update(UserSession)
+        .where(UserSession.user_id == user_id, UserSession.revoked_at.is_(None))
+        .values(revoked_at=datetime.now(UTC))
+    )
+    return int(result.rowcount or 0)
 
 
 def active_session_id(token: str | None) -> UUID | None:

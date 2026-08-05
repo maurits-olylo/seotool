@@ -20,6 +20,7 @@ from app.db.session import get_db
 from app.models.user import LoginAttempt, User
 from app.services.mfa import consume_recovery_code, valid_totp_counter
 from app.services.oauth import decrypt_token
+from app.services.security_audit import record_security_event
 
 router = APIRouter(tags=["interface"])
 UI_ROOT = Path(__file__).resolve().parents[2] / "ui"
@@ -119,6 +120,15 @@ def login(
                 succeeded=False,
             )
         )
+        record_security_event(
+            db,
+            event_type="authentication.login",
+            result="failed",
+            summary="Mislukte inlogpoging",
+            target_type="user",
+            target_id=user.id if user else None,
+            source_hash=source_hash,
+        )
         db.commit()
         raise HTTPException(status_code=401, detail="E-mailadres of wachtwoord is onjuist")
     if user.mfa_enabled:
@@ -136,6 +146,24 @@ def login(
                 payload.mfa_code, user.mfa_recovery_code_hashes or []
             )
             if remaining is None:
+                db.add(
+                    LoginAttempt(
+                        identifier_hash=identifier_hash,
+                        source_hash=source_hash,
+                        succeeded=False,
+                    )
+                )
+                record_security_event(
+                    db,
+                    event_type="authentication.mfa",
+                    result="failed",
+                    summary="Mislukte MFA-verificatie",
+                    actor_user_id=user.id,
+                    target_type="user",
+                    target_id=user.id,
+                    source_hash=source_hash,
+                )
+                db.commit()
                 raise HTTPException(status_code=401, detail="De verificatiecode is onjuist")
             user.mfa_recovery_code_hashes = remaining
     db.execute(
@@ -145,6 +173,17 @@ def login(
         )
     )
     user.last_login_at = datetime.now(UTC)
+    record_security_event(
+        db,
+        event_type="authentication.login",
+        result="succeeded",
+        summary="Gebruiker ingelogd",
+        actor_user_id=user.id,
+        target_type="user",
+        target_id=user.id,
+        source_hash=source_hash,
+        details={"mfa_used": user.mfa_enabled},
+    )
     db.commit()
     response.set_cookie(
         "seo_session",

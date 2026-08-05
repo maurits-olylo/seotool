@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     JSON,
@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     String,
+    Text,
     UniqueConstraint,
     text,
 )
@@ -59,6 +60,28 @@ class LoginAttempt(UUIDTimestampMixin, Base):
     identifier_hash: Mapped[str] = mapped_column(String(64), index=True)
     source_hash: Mapped[str] = mapped_column(String(64), index=True)
     succeeded: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+
+
+class SecurityAuditEvent(Base):
+    __tablename__ = "security_audit_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
+    client_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("clients.id", ondelete="SET NULL"), index=True
+    )
+    event_type: Mapped[str] = mapped_column(String(80), index=True)
+    target_type: Mapped[str | None] = mapped_column(String(50))
+    target_id: Mapped[str | None] = mapped_column(String(255), index=True)
+    result: Mapped[str] = mapped_column(String(20), index=True)
+    source_hash: Mapped[str | None] = mapped_column(String(64))
+    summary: Mapped[str] = mapped_column(Text)
+    details: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True
+    )
 
 
 class OAuthState(UUIDTimestampMixin, Base):

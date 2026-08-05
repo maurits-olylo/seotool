@@ -21,7 +21,7 @@ from app.models.integrations import (
 )
 from app.models.issues import ActivityLog, Issue, IssueOccurrence, IssueSuppression
 from app.models.reporting import MonthlyReportSnapshot
-from app.models.user import ClientMembership, User
+from app.models.user import ClientMembership, SecurityAuditEvent, User
 from app.models.website import WebsiteSettings
 from app.services.mfa import totp_code
 
@@ -289,6 +289,15 @@ def test_interface_login_creates_http_only_session() -> None:
         ).status_code
         == 401
     )
+    with SessionLocal() as db:
+        failed_event = db.scalar(
+            select(SecurityAuditEvent).where(
+                SecurityAuditEvent.event_type == "authentication.login",
+                SecurityAuditEvent.result == "failed",
+            )
+        )
+        assert failed_event is not None
+        assert failed_event.source_hash and len(failed_event.source_hash) == 64
 
     login = browser.post(
         "/ui/login",
@@ -301,6 +310,15 @@ def test_interface_login_creates_http_only_session() -> None:
     assert "HttpOnly" in login.headers["set-cookie"]
     assert browser.get("/app").status_code == 200
     assert browser.get("/api/v1/clients").status_code == 200
+    with SessionLocal() as db:
+        succeeded_event = db.scalar(
+            select(SecurityAuditEvent).where(
+                SecurityAuditEvent.event_type == "authentication.login",
+                SecurityAuditEvent.result == "succeeded",
+            )
+        )
+        assert succeeded_event is not None
+        assert succeeded_event.details == {"mfa_used": False}
     stolen_session = browser.cookies.get("seo_session")
     assert stolen_session
 
@@ -361,6 +379,38 @@ def test_cookie_authenticated_mutation_rejects_foreign_origin() -> None:
     assert denied.json()["detail"] == "Ongeldige request-origin"
 
 
+def test_mfa_failures_are_rate_limited(monkeypatch) -> None:
+    monkeypatch.setenv("TOKEN_ENCRYPTION_KEY", "1e" * 32)
+    get_settings.cache_clear()
+    from app.main import app
+
+    with SessionLocal() as db:
+        user = User(
+            email="mfa-limit@example.com",
+            role="admin",
+            password_hash=hash_password("Mfa-limit-password-1!"),
+            mfa_enabled=True,
+        )
+        db.add(user)
+        db.commit()
+    browser = TestClient(app)
+    for _ in range(5):
+        response = browser.post(
+            "/ui/login",
+            json={
+                "email": "mfa-limit@example.com",
+                "password": "Mfa-limit-password-1!",
+                "mfa_code": "000000",
+            },
+        )
+        assert response.status_code == 401
+    assert browser.post(
+        "/ui/login",
+        json={"email": "mfa-limit@example.com", "password": "Mfa-limit-password-1!"},
+    ).status_code == 429
+    get_settings.cache_clear()
+
+
 def test_admin_enrolls_mfa_and_uses_single_recovery_code(monkeypatch) -> None:
     monkeypatch.setenv("TOKEN_ENCRYPTION_KEY", "0e" * 32)
     monkeypatch.setenv("MFA_ENFORCEMENT_ENABLED", "true")
@@ -411,6 +461,18 @@ def test_admin_enrolls_mfa_and_uses_single_recovery_code(monkeypatch) -> None:
         enrolled = db.get(User, user_id)
         assert enrolled and enrolled.mfa_enabled
         assert len(enrolled.mfa_recovery_code_hashes) == 9
+        mfa_events = list(
+            db.scalars(
+                select(SecurityAuditEvent).where(
+                    SecurityAuditEvent.actor_user_id == user_id,
+                    SecurityAuditEvent.event_type.in_({"mfa.setup_started", "mfa.enabled"}),
+                )
+            )
+        )
+        assert {event.event_type for event in mfa_events} == {
+            "mfa.setup_started",
+            "mfa.enabled",
+        }
     get_settings.cache_clear()
 
 
@@ -638,12 +700,26 @@ def test_admin_can_manage_other_client_members(client: TestClient) -> None:
         ).status_code
         == 204
     )
+    member_browser = TestClient(app)
+    assert member_browser.post(
+        "/ui/login",
+        json={"email": "managed@example.com", "password": "Managed-secure-password-1!"},
+    ).status_code == 204
+    assert member_browser.get("/api/v1/me").status_code == 200
     upgraded = browser.patch(
         f"/api/v1/clients/{customer['id']}/members/{member_id}",
         json={"role": "user"},
     )
     assert upgraded.status_code == 200
     assert upgraded.json()["client_role"] == "user"
+    assert member_browser.get("/api/v1/me").status_code == 401
+    assert (
+        client.patch(
+            f"/api/v1/clients/{customer['id']}/members/{admin_id}",
+            json={"role": "user"},
+        ).status_code
+        == 409
+    )
     assert (
         browser.patch(
             f"/api/v1/clients/{customer['id']}/members/{admin_id}",
@@ -657,6 +733,20 @@ def test_admin_can_manage_other_client_members(client: TestClient) -> None:
     with SessionLocal() as db:
         removed = db.get(User, member_id)
         assert removed and removed.is_active is False
+        audit_events = list(
+            db.scalars(
+                select(SecurityAuditEvent).where(
+                    SecurityAuditEvent.target_id == str(member_id),
+                    SecurityAuditEvent.event_type.in_(
+                        {"membership.role_changed", "membership.removed"}
+                    ),
+                )
+            )
+        )
+        assert {event.event_type for event in audit_events} == {
+            "membership.role_changed",
+            "membership.removed",
+        }
     reinvited = browser.post(
         "/api/v1/invitations",
         json={"email": "managed@example.com", "client_id": customer["id"], "role": "client"},

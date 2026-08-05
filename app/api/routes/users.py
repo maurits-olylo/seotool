@@ -14,6 +14,7 @@ from app.core.security import (
     create_session_token,
     hash_password,
     require_api_key,
+    revoke_user_sessions,
     session_user_id,
     verify_password,
 )
@@ -38,6 +39,7 @@ from app.services.mfa import (
     valid_totp_counter,
 )
 from app.services.oauth import decrypt_token, encrypt_token
+from app.services.security_audit import record_security_event
 
 router = APIRouter(tags=["users"])
 public_router = APIRouter(tags=["users"])
@@ -91,6 +93,15 @@ def setup_mfa(
     user.mfa_recovery_code_hashes = [recovery_code_hash(code) for code in recovery_codes]
     user.mfa_enabled = False
     user.mfa_last_counter = None
+    record_security_event(
+        db,
+        event_type="mfa.setup_started",
+        result="succeeded",
+        summary="MFA-instelling gestart",
+        actor_user_id=user.id,
+        target_type="user",
+        target_id=user.id,
+    )
     db.commit()
     label = quote(user.email)
     issuer = quote("SEO Monitor")
@@ -119,6 +130,15 @@ def confirm_mfa(
         raise HTTPException(status_code=422, detail="De verificatiecode is ongeldig")
     user.mfa_enabled = True
     user.mfa_last_counter = counter
+    record_security_event(
+        db,
+        event_type="mfa.enabled",
+        result="succeeded",
+        summary="MFA geactiveerd",
+        actor_user_id=user.id,
+        target_type="user",
+        target_id=user.id,
+    )
     db.commit()
     return Response(status_code=204)
 
@@ -153,6 +173,18 @@ def create_invitation(
         expires_at=datetime.now(UTC) + timedelta(days=7),
     )
     db.add(invitation)
+    db.flush()
+    record_security_event(
+        db,
+        event_type="invitation.created",
+        result="succeeded",
+        summary="Gebruikersuitnodiging aangemaakt",
+        actor_user_id=principal.user_id,
+        client_id=payload.client_id,
+        target_type="invitation",
+        target_id=invitation.id,
+        details={"role": payload.role},
+    )
     db.commit()
     db.refresh(invitation)
     return {
@@ -203,6 +235,21 @@ def _sync_global_role(db: Session, user: User) -> None:
         user.role = "client"
 
 
+def _require_remaining_admin(db: Session, membership: ClientMembership) -> None:
+    if membership.role != "admin":
+        return
+    admin_count = db.scalar(
+        select(func.count(ClientMembership.id)).where(
+            ClientMembership.client_id == membership.client_id,
+            ClientMembership.role == "admin",
+        )
+    )
+    if int(admin_count or 0) <= 1:
+        raise HTTPException(
+            status_code=409, detail="De laatste klantbeheerder moet behouden blijven"
+        )
+
+
 @router.patch("/clients/{client_id}/members/{user_id}", response_model=ClientMemberRead)
 def update_client_member(
     client_id: UUID,
@@ -225,8 +272,27 @@ def update_client_member(
         raise HTTPException(status_code=404, detail="Gebruiker niet gevonden")
     if user.role == "superuser":
         raise HTTPException(status_code=403, detail="De superuser kan niet worden gewijzigd")
+    if membership.role == "admin" and payload.role != "admin":
+        _require_remaining_admin(db, membership)
+    old_role = membership.role
     membership.role = payload.role
     _sync_global_role(db, user)
+    revoked_sessions = revoke_user_sessions(db, user.id)
+    record_security_event(
+        db,
+        event_type="membership.role_changed",
+        result="succeeded",
+        summary="Klantrol gewijzigd",
+        actor_user_id=principal.user_id,
+        client_id=client_id,
+        target_type="user",
+        target_id=user.id,
+        details={
+            "old_role": old_role,
+            "new_role": payload.role,
+            "revoked_sessions": revoked_sessions,
+        },
+    )
     db.commit()
     db.refresh(user)
     return {
@@ -260,9 +326,23 @@ def delete_client_member(
         raise HTTPException(status_code=404, detail="Gebruiker niet gevonden")
     if user.role == "superuser":
         raise HTTPException(status_code=403, detail="De superuser kan niet worden verwijderd")
+    _require_remaining_admin(db, membership)
+    old_role = membership.role
     db.delete(membership)
     db.flush()
     _sync_global_role(db, user)
+    revoked_sessions = revoke_user_sessions(db, user.id)
+    record_security_event(
+        db,
+        event_type="membership.removed",
+        result="succeeded",
+        summary="Klanttoegang verwijderd",
+        actor_user_id=principal.user_id,
+        client_id=client_id,
+        target_type="user",
+        target_id=user.id,
+        details={"old_role": old_role, "revoked_sessions": revoked_sessions},
+    )
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -330,6 +410,17 @@ def accept_invitation(
     db.flush()
     _sync_global_role(db, user)
     invitation.accepted_at = now
+    record_security_event(
+        db,
+        event_type="invitation.accepted",
+        result="succeeded",
+        summary="Gebruikersuitnodiging geaccepteerd",
+        actor_user_id=user.id,
+        client_id=invitation.client_id,
+        target_type="invitation",
+        target_id=invitation.id,
+        details={"role": invitation.role},
+    )
     db.commit()
     response.set_cookie(
         "seo_session",
