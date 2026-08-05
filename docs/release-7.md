@@ -1,8 +1,9 @@
 # Release 7 — Matomo en analytics-meetkwaliteit
 
-Status: afgerond en op 5 augustus 2026 succesvol naar staging en productie uitgerold. Staging
-gebruikte releasecommit `c3bd183`; productie gebruikte het definitieve documentatiearchief uit
-commit `705640a` met dezelfde applicatiecode.
+Status: afgerond en op 5 augustus 2026 succesvol naar staging en productie uitgerold. De backend
+is eerst vanuit releasecommit `c3bd183` gevalideerd. De complete beheerinterface en optionele
+taaktoewijzing zijn daarna gecorrigeerd in commits `600c24e` en `039fcd9`; het definitieve
+productiearchief kwam uit commit `039fcd9`.
 
 ## Scope
 
@@ -60,3 +61,7 @@ Matomo-site-ID zijn operationele secrets of configuratiewaarden en staan niet in
   Matomo-tabellen en integratiekolommen en beschikbare Matomo- en primaire-bronroutes bevestigd.
   PageSpeed en JavaScript-rendering blijven uitgeschakeld. De veilige crawl-drain is opgeheven met
   nul actieve of wachtende taken.
+- Definitieve UI-correctie: op staging en productie zijn de Matomo-koppeling, vernieuwde
+  Bing-backlinkupload en optionele taaktoewijzing inhoudelijk bevestigd. Beide omgevingen bleven op
+  migration `0045`; de productie-API was gezond en de veilige crawl-drain eindigde zonder actieve
+  of wachtende taken.
