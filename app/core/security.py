@@ -1,46 +1,64 @@
-import base64
-import binascii
 import hashlib
 import hmac
 import os
-import time
+import secrets
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import Cookie, Depends, Header, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.db.session import get_db
-from app.models.user import User
+from app.db.session import SessionLocal, get_db
+from app.models.user import User, UserSession
 
 SESSION_TTL_SECONDS = 60 * 60 * 12
 
 
 def create_session_token(user_id: UUID) -> str:
-    expires_at = str(int(time.time()) + SESSION_TTL_SECONDS)
-    payload = f"{user_id}.{expires_at}"
-    signature = hmac.new(
-        get_settings().api_key.encode(), payload.encode(), hashlib.sha256
-    ).hexdigest()
-    return base64.urlsafe_b64encode(f"{payload}.{signature}".encode()).decode()
+    token = secrets.token_urlsafe(32)
+    with SessionLocal() as db:
+        db.add(
+            UserSession(
+                user_id=user_id,
+                token_hash=hashlib.sha256(token.encode()).hexdigest(),
+                expires_at=datetime.now(UTC) + timedelta(seconds=SESSION_TTL_SECONDS),
+            )
+        )
+        db.commit()
+    return token
 
 
 def session_user_id(token: str | None) -> UUID | None:
     if not token:
-        return False
-    try:
-        decoded = base64.urlsafe_b64decode(token.encode()).decode()
-        user_id, expires_at, signature = decoded.split(".", maxsplit=2)
-        parsed_user_id = UUID(user_id)
-        if int(expires_at) < int(time.time()):
-            return None
-    except (binascii.Error, ValueError, UnicodeDecodeError):
         return None
-    expected = hmac.new(
-        get_settings().api_key.encode(), f"{user_id}.{expires_at}".encode(), hashlib.sha256
-    ).hexdigest()
-    return parsed_user_id if hmac.compare_digest(signature, expected) else None
+    now = datetime.now(UTC)
+    with SessionLocal() as db:
+        session = db.scalar(
+            select(UserSession).where(
+                UserSession.token_hash == hashlib.sha256(token.encode()).hexdigest(),
+                UserSession.revoked_at.is_(None),
+                UserSession.expires_at > now,
+            )
+        )
+        return session.user_id if session else None
+
+
+def revoke_session_token(token: str | None) -> None:
+    if not token:
+        return
+    with SessionLocal() as db:
+        session = db.scalar(
+            select(UserSession).where(
+                UserSession.token_hash == hashlib.sha256(token.encode()).hexdigest(),
+                UserSession.revoked_at.is_(None),
+            )
+        )
+        if session:
+            session.revoked_at = datetime.now(UTC)
+            db.commit()
 
 
 def is_valid_session_token(token: str | None) -> bool:

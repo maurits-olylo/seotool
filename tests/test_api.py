@@ -300,9 +300,14 @@ def test_interface_login_creates_http_only_session() -> None:
     assert "HttpOnly" in login.headers["set-cookie"]
     assert browser.get("/app").status_code == 200
     assert browser.get("/api/v1/clients").status_code == 200
+    stolen_session = browser.cookies.get("seo_session")
+    assert stolen_session
 
     assert browser.post("/ui/logout").status_code == 204
     assert browser.get("/api/v1/clients").status_code == 401
+    replay = TestClient(app)
+    replay.cookies.set("seo_session", stolen_session)
+    assert replay.get("/api/v1/clients").status_code == 401
 
 
 def test_login_clears_session_for_missing_user() -> None:

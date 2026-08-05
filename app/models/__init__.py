@@ -44,7 +44,7 @@ from app.models.recommendations import (
 from app.models.rendering import RenderObservation
 from app.models.reporting import MonthlyReportSnapshot
 from app.models.system import CrawlDeploymentControl, QueueDeadLetter, RetentionOperation
-from app.models.user import ClientMembership, User, UserInvitation
+from app.models.user import ClientMembership, User, UserInvitation, UserSession
 from app.models.website import Website, WebsiteSettings
 
 __all__ = [
@@ -97,6 +97,7 @@ __all__ = [
     "UrlSource",
     "User",
     "UserInvitation",
+    "UserSession",
     "Website",
     "WebsiteIntegration",
     "WebsiteSettings",

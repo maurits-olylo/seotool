@@ -11,6 +11,7 @@ from app.core.config import get_settings
 from app.core.security import (
     create_session_token,
     hash_password,
+    revoke_session_token,
     session_user_id,
     verify_password,
 )
@@ -99,7 +100,8 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(get_d
 
 
 @router.post("/ui/logout", include_in_schema=False, status_code=status.HTTP_204_NO_CONTENT)
-def logout(response: Response) -> Response:
+def logout(response: Response, seo_session: str | None = Cookie(default=None)) -> Response:
+    revoke_session_token(seo_session)
     response.delete_cookie("seo_session", samesite="lax")
     response.status_code = status.HTTP_204_NO_CONTENT
     return response
