@@ -2,7 +2,8 @@
 
 ## Release 7a-A — Identiteit en toegang
 
-Status: lokaal afgerond en integraal getest; nog niet op staging of productie gedeployed.
+Status: lokaal afgerond en op 5 augustus 2026 met commit `97b8aed` op staging gevalideerd;
+nog niet op productie gedeployed.
 
 Deze eerste deelrelease sluit de kritieke account- en tenanttoegangsrisico's uit de audit van
 3 augustus 2026:
@@ -39,6 +40,12 @@ Lokale acceptatie:
 
 Productieacceptatie volgt pas na staging, gecontroleerde deployment en functionele verificatie van
 persoonlijk inloggen, verplichte MFA, sessie-intrekking, tenantrollen, OAuth-state en auditregistratie.
+
+Stagingacceptatie bevestigde migratie `0051`, een gezonde API en database, actieve
+MFA-handhaving, lokale encryptie van het TOTP-secret, een scanbare lokaal gegenereerde QR-code,
+succesvolle activatie en opnieuw inloggen met MFA. De algemene technische API-key blijft in
+productie uitgeschakeld. De loginpresentatie wordt later als interfacepolish opgesplitst in een
+afzonderlijke wachtwoordstap en verificatiestap; dit verandert de reeds werkende authenticatie niet.
 
 ## Release 7a-B — Platform en privacy
 
