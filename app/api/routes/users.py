@@ -15,6 +15,7 @@ from app.core.security import (
     hash_password,
     require_api_key,
     revoke_user_sessions,
+    session_ttl_seconds,
     session_user_id,
     verify_password,
 )
@@ -437,7 +438,7 @@ def accept_invitation(
     response.set_cookie(
         "seo_session",
         create_session_token(user.id),
-        max_age=60 * 60 * 12,
+        max_age=session_ttl_seconds(user.role),
         httponly=True,
         secure=get_settings().app_env == "production",
         samesite="lax",

@@ -13,6 +13,7 @@ from app.core.security import (
     create_session_token,
     hash_password,
     revoke_session_token,
+    session_ttl_seconds,
     session_user_id,
     verify_password,
 )
@@ -188,7 +189,7 @@ def login(
     response.set_cookie(
         "seo_session",
         create_session_token(user.id),
-        max_age=60 * 60 * 12,
+        max_age=session_ttl_seconds(user.role),
         httponly=True,
         secure=settings.app_env == "production",
         samesite="lax",

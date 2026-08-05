@@ -12,6 +12,7 @@ Deze eerste deelrelease sluit de kritieke account- en tenanttoegangsrisico's uit
 - schrijfrechten worden afgedwongen op de rol binnen de betreffende tenant;
 - sessies zijn server-side, intrekbaar en worden ingetrokken bij uitloggen, rolwijziging en
   toegangsverwijdering;
+- beheerder- en superusersessies verlopen na twee uur; gewone gebruikerssessies na twaalf uur;
 - OAuth-state is eenmalig en gebonden aan gebruiker, sessie, tenant en provider;
 - login-rate-limiting, request-origincontrole en MFA voor beheerders zijn aanwezig;
 - MFA ondersteunt TOTP en eenmalige herstelcodes; mislukte MFA-pogingen vallen onder de rate-limit;

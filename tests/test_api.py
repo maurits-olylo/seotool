@@ -8,7 +8,14 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api.routes.reports import _period_dates
 from app.core.config import get_settings
-from app.core.security import create_session_token, hash_password, verify_password
+from app.core.security import (
+    ADMIN_SESSION_TTL_SECONDS,
+    USER_SESSION_TTL_SECONDS,
+    create_session_token,
+    hash_password,
+    session_ttl_seconds,
+    verify_password,
+)
 from app.db.session import SessionLocal
 from app.models.crawl import CrawlRun, ElementLocation, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url, UrlSource
@@ -311,6 +318,7 @@ def test_interface_login_creates_http_only_session() -> None:
     )
     assert login.status_code == 204
     assert "HttpOnly" in login.headers["set-cookie"]
+    assert f"Max-Age={ADMIN_SESSION_TTL_SECONDS}" in login.headers["set-cookie"]
     assert browser.get("/app").status_code == 200
     assert browser.get("/api/v1/clients").status_code == 200
     with SessionLocal() as db:
@@ -330,6 +338,13 @@ def test_interface_login_creates_http_only_session() -> None:
     replay = TestClient(app)
     replay.cookies.set("seo_session", stolen_session)
     assert replay.get("/api/v1/clients").status_code == 401
+
+
+def test_session_duration_is_shorter_for_administrators() -> None:
+    assert session_ttl_seconds("superuser") == 60 * 60 * 2
+    assert session_ttl_seconds("admin") == ADMIN_SESSION_TTL_SECONDS
+    assert session_ttl_seconds("user") == USER_SESSION_TTL_SECONDS
+    assert session_ttl_seconds("client") == 60 * 60 * 12
 
 
 def test_login_clears_session_for_missing_user() -> None:

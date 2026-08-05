@@ -14,17 +14,24 @@ from app.core.config import get_settings
 from app.db.session import SessionLocal, get_db
 from app.models.user import User, UserSession
 
-SESSION_TTL_SECONDS = 60 * 60 * 12
+ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 2
+USER_SESSION_TTL_SECONDS = 60 * 60 * 12
+
+
+def session_ttl_seconds(role: str) -> int:
+    return ADMIN_SESSION_TTL_SECONDS if role in {"superuser", "admin"} else USER_SESSION_TTL_SECONDS
 
 
 def create_session_token(user_id: UUID) -> str:
     token = secrets.token_urlsafe(32)
     with SessionLocal() as db:
+        user = db.get(User, user_id)
+        ttl_seconds = session_ttl_seconds(user.role if user else "user")
         db.add(
             UserSession(
                 user_id=user_id,
                 token_hash=hashlib.sha256(token.encode()).hexdigest(),
-                expires_at=datetime.now(UTC) + timedelta(seconds=SESSION_TTL_SECONDS),
+                expires_at=datetime.now(UTC) + timedelta(seconds=ttl_seconds),
             )
         )
         db.commit()
