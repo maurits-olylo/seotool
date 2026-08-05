@@ -154,7 +154,7 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
 def test_operations_status_ignores_stale_website_responses(client: TestClient) -> None:
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
-    assert 'src="/ui/assets/app.js?v=20260804-3"' in page.text
+    assert 'src="/ui/assets/app.js?v=20260805-1"' in page.text
     assert 'href="/ui/assets/actionable.css?v=20260731-4"' in page.text
     assert 'id="recommendation-task-section"' in page.text
     assert 'id="recommendation-task-content"' in page.text
@@ -200,6 +200,15 @@ def test_settings_and_integrations_have_responsive_states(client: TestClient) ->
     assert 'class="table-wrap client-directory-table-wrap"' in page.text
     assert 'class="table-wrap member-table-wrap"' in page.text
     assert 'id="integration-message" class="integration-message hidden" role="status"' in page.text
+    for element_id in [
+        "matomo-connect",
+        "matomo-server-url",
+        "matomo-token",
+        "matomo-property",
+        "sync-matomo",
+        "analytics-primary-source",
+    ]:
+        assert f'id="{element_id}"' in page.text
 
     script = client.get("/ui/assets/app.js")
     assert script.status_code == 200
@@ -207,6 +216,10 @@ def test_settings_and_integrations_have_responsive_states(client: TestClient) ->
     assert 'for (const selector of ["#member-rows", "#member-cards"])' in script.text
     assert 'target.classList.toggle("connected"' in script.text
     assert 'connected: "Gekoppeld", error: "Fout"' in script.text
+    assert "async function connectMatomo" in script.text
+    assert "async function loadMatomoSites" in script.text
+    assert "async function syncMatomo" in script.text
+    assert "async function savePrimaryAnalyticsSource" in script.text
 
 
 def test_dashboard_and_reports_have_clear_drilldowns(client: TestClient) -> None:

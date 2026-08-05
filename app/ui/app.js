@@ -24,7 +24,7 @@ const labels = {
   pause_requested: "Pauze wordt voorbereid", paused: "Gepauzeerd",
   cancel_requested: "Stop wordt voorbereid", connected: "Gekoppeld", error: "Fout",
 };
-const state = { currentUser: null, currentView: "dashboard", clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], changesRequestId: 0, jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], showCrawlArchive: false, activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, operationsRequestId: 0, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], urlCoverage: null, filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, selectedRecommendationTask: null, recommendationFeedback: [], recommendationDefinitions: null, recommendationTasks: [], taskNotifications: [], taskMembers: [], googleConnectionId: null, bingConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
+const state = { currentUser: null, currentView: "dashboard", clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], changesRequestId: 0, jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], showCrawlArchive: false, activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, operationsRequestId: 0, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], urlCoverage: null, filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, selectedRecommendationTask: null, recommendationFeedback: [], recommendationDefinitions: null, recommendationTasks: [], taskNotifications: [], taskMembers: [], googleConnectionId: null, bingConnectionId: null, matomoConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
 const VIEW_HASHES = {dashboard: "overzicht", tasks: "taken", actions: "analyse/acties", urls: "analyse/urls", changes: "analyse/wijzigingen", insights: "analyse/inzichten", vacancies: "analyse/vacatures", reports: "rapportages", operations: "crawls-exports", clients: "instellingen/klanten-websites", team: "instellingen/team-toegang", integrations: "instellingen/integraties"};
 const LEGACY_HASHES = {rapportage: "reports", urls: "urls", wijzigingen: "changes", inzichten: "insights", vacatures: "vacancies", beheer: "operations", organisatie: "clients", integraties: "integrations", acties: "actions"};
 const ANALYSIS_VIEWS = new Set(["actions", "urls", "changes", "insights", "vacancies"]);
@@ -187,8 +187,8 @@ function renderReportIssues(issues = [], emptyText) {
 
 function renderIntegrationWarning() {
   const panel = $("#integration-warning");
-  const providerLabels = {google: "Google (GSC en GA4)", bing: "Bing Webmaster Tools"};
-  const serviceLabels = {search_console: "Google Search Console", ga4: "Google Analytics 4", bing_webmaster: "Bing Webmaster Tools"};
+  const providerLabels = {google: "Google (GSC en GA4)", bing: "Bing Webmaster Tools", matomo: "Matomo"};
+  const serviceLabels = {search_console: "Google Search Console", ga4: "Google Analytics 4", bing_webmaster: "Bing Webmaster Tools", matomo: "Matomo"};
   const connectionErrors = (state.integrationHealth.connections || []).filter((item) => item.status === "error");
   const mappingErrors = (state.integrationHealth.mappings || []).filter((item) => item.status === "error");
   const warnings = [
@@ -432,7 +432,7 @@ async function loadIntegrations() {
     api("/api/v1/integrations/google/config"),
     api("/api/v1/integrations/bing/config"),
   ]);
-  for (const provider of ["google", "bing"]) {
+  for (const provider of ["google", "bing", "matomo"]) {
     const connection = connections.find((item) => item.provider === provider);
     const target = $(`#${provider}-status`);
     target.textContent = connection ? `${labels[connection.status] || connection.status}${connection.account_email ? ` · ${connection.account_email}` : ""}` : "Niet gekoppeld";
@@ -479,6 +479,71 @@ async function loadIntegrations() {
     state.bingConnectionId = null;
     $("#bing-property-mapping").classList.add("hidden");
   }
+  const matomoConnection = connections.find((item) => item.provider === "matomo" && item.status === "connected");
+  state.matomoConnectionId = matomoConnection?.id || null;
+  $("#matomo-connect").textContent = matomoConnection ? "Verbinding vervangen" : "Matomo koppelen";
+  if (matomoConnection) {
+    $("#matomo-server-url").value = matomoConnection.settings?.server_url || "";
+    await loadMatomoSites().catch(() => {
+      $("#matomo-connect-message").textContent = "Matomo-sites konden niet worden geladen. Controleer het token en de leesrechten.";
+      $("#matomo-connect-panel").classList.remove("hidden");
+    });
+  } else {
+    $("#matomo-property-mapping").classList.add("hidden");
+  }
+  await loadPrimaryAnalyticsSource().catch(() => {});
+}
+
+function showMatomoConnect() {
+  $("#matomo-connect-panel").classList.toggle("hidden");
+  if (!$("#matomo-connect-panel").classList.contains("hidden")) $("#matomo-server-url").focus();
+}
+
+async function connectMatomo() {
+  const clientId = $("#client-select").value;
+  const serverUrl = $("#matomo-server-url").value.trim();
+  const token = $("#matomo-token").value.trim();
+  const button = $("#test-matomo"); const message = $("#matomo-connect-message");
+  if (!clientId || !serverUrl || !token) { message.textContent = "Vul het HTTPS-adres en API-token in."; return; }
+  button.disabled = true; button.textContent = "Testen…"; message.textContent = "";
+  try {
+    const result = await api(`/api/v1/clients/${clientId}/integrations/matomo`, {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify({server_url:serverUrl, token_auth:token})});
+    $("#matomo-token").value = "";
+    message.textContent = `Verbinding geslaagd; ${result.sites.length} site(s) beschikbaar.`;
+    await loadIntegrations();
+  } catch (error) { message.textContent = error.message; }
+  finally { button.disabled = false; button.textContent = "Verbinding testen en sites laden"; }
+}
+
+async function loadMatomoSites() {
+  const clientId = $("#client-select").value; const websiteId = $("#website-select").value;
+  if (!clientId || !websiteId || !state.matomoConnectionId) return;
+  const [properties, mappings] = await Promise.all([api(`/api/v1/clients/${clientId}/integrations/matomo/sites`), api(`/api/v1/websites/${websiteId}/integrations`)]);
+  const mapping = mappings.find((item) => item.service === "matomo");
+  fillPropertySelect("#matomo-property", properties.sites, mapping);
+  showMappingStatus(mapping, "#matomo-property-message", "Matomo");
+  $("#matomo-mapping-website").textContent = $("#website-select").selectedOptions[0]?.textContent || "website";
+  $("#matomo-property-mapping").classList.remove("hidden");
+}
+
+async function loadPrimaryAnalyticsSource() {
+  const websiteId = $("#website-select").value;
+  if (!websiteId) return;
+  const [mappings, primary] = await Promise.all([api(`/api/v1/websites/${websiteId}/integrations`), api(`/api/v1/websites/${websiteId}/integrations/analytics-primary`)]);
+  const options = mappings.filter((item) => ["ga4", "matomo"].includes(item.service) && item.status === "active");
+  const select = $("#analytics-primary-source");
+  select.innerHTML = `<option value="">Selecteer een gekoppelde bron</option>${options.map((item) => `<option value="${item.service}">${item.service === "ga4" ? "Google Analytics 4" : "Matomo"}</option>`).join("")}`;
+  select.value = primary.source || "";
+  $("#analytics-primary-message").textContent = primary.source ? `${primary.source === "ga4" ? "GA4" : "Matomo"} is de primaire bron.` : "Kies een primaire analyticsbron.";
+  $("#analytics-primary-panel").classList.toggle("hidden", options.length === 0);
+}
+
+async function savePrimaryAnalyticsSource() {
+  const websiteId = $("#website-select").value; const source = $("#analytics-primary-source").value;
+  const message = $("#analytics-primary-message");
+  if (!websiteId || !source) { message.textContent = "Selecteer eerst een bron."; return; }
+  await api(`/api/v1/websites/${websiteId}/integrations/analytics-primary`, {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify({source})});
+  message.textContent = `${source === "ga4" ? "GA4" : "Matomo"} is nu de primaire bron.`;
 }
 
 async function loadGoogleProperties() {
@@ -563,9 +628,10 @@ async function saveProperty(service, selector, buttonSelector, messageSelector, 
       method: "PUT", headers: {"Content-Type": "application/json"},
       body: JSON.stringify({ connection_id: connectionId, external_property_id: select.value, external_property_name: select.selectedOptions[0]?.dataset.name || select.value }),
     });
-    const serviceLabel = service === "ga4" ? "GA4" : service === "bing_webmaster" ? "Bing" : "Search Console";
+    const serviceLabel = service === "ga4" ? "GA4" : service === "matomo" ? "Matomo" : service === "bing_webmaster" ? "Bing" : "Search Console";
     button.textContent = "Opgeslagen ✓"; message.textContent = `${serviceLabel}-property opgeslagen.`;
     if (service === "ga4") await loadGa4KeyEvents();
+    if (["ga4", "matomo"].includes(service)) await loadPrimaryAnalyticsSource();
   } catch (error) { button.textContent = "Opnieuw proberen"; message.textContent = "Opslaan is mislukt."; }
   finally { button.disabled = false; }
 }
@@ -598,6 +664,21 @@ async function syncGa4() {
   finally { button.disabled = false; }
 }
 
+async function syncMatomo() {
+  const websiteId = $("#website-select").value;
+  const button = $("#sync-matomo"); const message = $("#matomo-property-message");
+  if (!websiteId) return;
+  button.disabled = true; button.textContent = "Importeren…"; message.textContent = "";
+  try {
+    const result = await api(`/api/v1/websites/${websiteId}/integrations/matomo/sync`, {method:"POST"});
+    const percentage = result.url_match_rate == null ? "onbekend" : `${Math.round(result.url_match_rate * 100)}%`;
+    message.textContent = `${result.page_rows} pagina-regels geïmporteerd; ${result.matched_urls} gekoppeld (${percentage}).`;
+    button.textContent = "Opnieuw synchroniseren";
+    await loadIssues();
+  } catch (error) { message.textContent = error.message; button.textContent = "Opnieuw proberen"; }
+  finally { button.disabled = false; }
+}
+
 async function syncBing() {
   const websiteId = $("#website-select").value;
   const button = $("#sync-bing"); const message = $("#bing-property-message");
@@ -626,6 +707,12 @@ async function importBingBacklinks() {
     message.textContent = `${result.domains} domeinen, ${result.pages} verwijzende pagina’s en ${result.anchors} ankerteksten geïmporteerd; ${result.matched_targets} doelen gekoppeld.`;
   } catch (error) { message.textContent = error.message; }
   finally { button.disabled = false; }
+}
+
+function updateBingFileName(inputSelector, nameSelector) {
+  const file = $(inputSelector).files[0];
+  $(nameSelector).textContent = file ? file.name : "CSV selecteren";
+  $(inputSelector).closest(".file-upload-card").classList.toggle("selected", Boolean(file));
 }
 
 async function syncIntegrationHistory() {
@@ -2468,10 +2555,18 @@ $("#save-search-console").addEventListener("click", () => saveProperty("search_c
 $("#save-ga4").addEventListener("click", () => saveProperty("ga4", "#ga4-property", "#save-ga4", "#ga4-message", state.googleConnectionId));
 $("#save-ga4-key-events").addEventListener("click", saveGa4KeyEvents);
 $("#save-bing").addEventListener("click", () => saveProperty("bing_webmaster", "#bing-property", "#save-bing", "#bing-property-message", state.bingConnectionId));
+$("#matomo-connect").addEventListener("click", showMatomoConnect);
+$("#test-matomo").addEventListener("click", connectMatomo);
+$("#save-matomo").addEventListener("click", () => saveProperty("matomo", "#matomo-property", "#save-matomo", "#matomo-property-message", state.matomoConnectionId));
+$("#save-analytics-primary").addEventListener("click", savePrimaryAnalyticsSource);
 $("#sync-search-console").addEventListener("click", syncSearchConsole);
 $("#sync-ga4").addEventListener("click", syncGa4);
 $("#sync-bing").addEventListener("click", syncBing);
+$("#sync-matomo").addEventListener("click", syncMatomo);
 $("#import-bing-backlinks").addEventListener("click", importBingBacklinks);
+$("#bing-domains-file").addEventListener("change", () => updateBingFileName("#bing-domains-file", "#bing-domains-name"));
+$("#bing-pages-file").addEventListener("change", () => updateBingFileName("#bing-pages-file", "#bing-pages-name"));
+$("#bing-anchors-file").addEventListener("change", () => updateBingFileName("#bing-anchors-file", "#bing-anchors-name"));
 $("#sync-integration-history").addEventListener("click", syncIntegrationHistory);
 
 api("/api/v1/me").then((user) => {

@@ -435,6 +435,19 @@ def update_primary_analytics_source(
     return {"source": payload.source}
 
 
+@router.get("/websites/{website_id}/integrations/analytics-primary")
+def get_primary_analytics_source(
+    website_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, str | None]:
+    require_website_access(db, principal, website_id, admin=True)
+    settings = db.get(WebsiteSettings, website_id)
+    if not settings:
+        raise HTTPException(status_code=404, detail="Website settings not found")
+    return {"source": settings.primary_analytics_source}
+
+
 @router.post(
     "/websites/{website_id}/integrations",
     response_model=WebsiteIntegrationRead,

@@ -15,6 +15,8 @@ commit `705640a` met dezelfde applicatiecode.
 - Provider-onafhankelijke analyticslaag voor issue-impact en klantrapportages.
 - Eén expliciet gekozen primaire analyticsbron per website. GA4 en Matomo worden nooit
   stilzwijgend gecombineerd of als elkaars terugval gebruikt.
+- Beheerinterface voor Matomo-verbinding, siteselectie, synchronisatie en primaire-bronkeuze,
+  met herkenbare providericonen en vernieuwde Bing-backlinkupload.
 
 De eerste beoogde website voor de koppeling is `human.nl`. Het serveradres, API-token en de
 Matomo-site-ID zijn operationele secrets of configuratiewaarden en staan niet in Git.

@@ -98,6 +98,9 @@ def test_connect_and_select_human_matomo_site(client: TestClient, monkeypatch) -
     )
     assert primary.status_code == 200
     assert primary.json() == {"source": "matomo"}
+    current_primary = client.get(f"/api/v1/websites/{website['id']}/integrations/analytics-primary")
+    assert current_primary.status_code == 200
+    assert current_primary.json() == {"source": "matomo"}
     with SessionLocal() as db:
         selected = db.scalar(
             select(WebsiteIntegration).where(
