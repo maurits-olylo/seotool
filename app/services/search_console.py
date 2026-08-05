@@ -21,7 +21,11 @@ from app.services.url_normalization import InvalidUrlError, normalize_url
 
 
 async def sync_search_console(
-    db: Session, website_id: UUID, days: int | None = None
+    db: Session,
+    website_id: UUID,
+    days: int | None = None,
+    *,
+    through: date | None = None,
 ) -> dict[str, object]:
     sync_started = time.perf_counter()
     mapping = db.scalar(
@@ -46,7 +50,7 @@ async def sync_search_console(
             else 28
         )
 
-    end_date = date.today() - timedelta(days=1)
+    end_date = through or date.today() - timedelta(days=1)
     start_date = end_date - timedelta(days=days - 1)
     token = await get_google_access_token(db, connection)
     endpoint = (

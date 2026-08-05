@@ -174,7 +174,13 @@ def _number(row: dict[str, object], key: str) -> float:
         return 0
 
 
-async def sync_matomo(db: Session, website_id: UUID, days: int | None = None) -> dict[str, object]:
+async def sync_matomo(
+    db: Session,
+    website_id: UUID,
+    days: int | None = None,
+    *,
+    through: date | None = None,
+) -> dict[str, object]:
     website = db.get(Website, website_id)
     mapping = db.scalar(
         select(WebsiteIntegration).where(
@@ -194,7 +200,7 @@ async def sync_matomo(db: Session, website_id: UUID, days: int | None = None) ->
         raise ValueError("Matomo connection is incomplete")
 
     days = days or (480 if not mapping.settings.get("last_import_start") else 28)
-    end_date = date.today() - timedelta(days=1)
+    end_date = through or date.today() - timedelta(days=1)
     start_date = end_date - timedelta(days=days - 1)
     async with httpx.AsyncClient(timeout=60, follow_redirects=False) as http:
         try:

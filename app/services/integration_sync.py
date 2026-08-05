@@ -1,5 +1,5 @@
 import asyncio
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
 import structlog
@@ -21,10 +21,58 @@ from app.services.search_console import sync_search_console
 from app.services.url_inspection import sync_url_inspection
 
 logger = structlog.get_logger()
+HISTORY_CHUNK_DAYS = 28
 
 
 def _date_as_iso(value: date | None) -> str | None:
     return value.isoformat() if value else None
+
+
+def _history_chunks(days: int, *, through: date | None = None) -> list[tuple[date, date]]:
+    end_date = through or date.today() - timedelta(days=1)
+    start_date = end_date - timedelta(days=days - 1)
+    chunks: list[tuple[date, date]] = []
+    chunk_start = start_date
+    while chunk_start <= end_date:
+        chunk_end = min(chunk_start + timedelta(days=HISTORY_CHUNK_DAYS - 1), end_date)
+        chunks.append((chunk_start, chunk_end))
+        chunk_start = chunk_end + timedelta(days=1)
+    return chunks
+
+
+def _history_result(results: list[dict[str, object]]) -> dict[str, object]:
+    return {
+        "status": "succeeded",
+        "chunks": len(results),
+        "start_date": results[0]["start_date"],
+        "end_date": results[-1]["end_date"],
+    }
+
+
+async def _sync_search_console_history(
+    db: Session, website_id: UUID, days: int | None
+) -> dict[str, object]:
+    if not days or days <= HISTORY_CHUNK_DAYS:
+        return await sync_search_console(db, website_id, days)
+    results: list[dict[str, object]] = []
+    for chunk_start, chunk_end in _history_chunks(days):
+        chunk_days = (chunk_end - chunk_start).days + 1
+        results.append(
+            await sync_search_console(db, website_id, chunk_days, through=chunk_end)
+        )
+    return _history_result(results)
+
+
+async def _sync_matomo_history(
+    db: Session, website_id: UUID, days: int | None
+) -> dict[str, object]:
+    if not days or days <= HISTORY_CHUNK_DAYS:
+        return await sync_matomo(db, website_id, days)
+    results: list[dict[str, object]] = []
+    for chunk_start, chunk_end in _history_chunks(days):
+        chunk_days = (chunk_end - chunk_start).days + 1
+        results.append(await sync_matomo(db, website_id, chunk_days, through=chunk_end))
+    return _history_result(results)
 
 
 def synchronize_website_integrations(website_id: str, days: int | None = None) -> None:
@@ -47,7 +95,7 @@ async def _synchronize_website_integrations(website_id: UUID, days: int | None =
         errors: list[str] = []
         if "search_console" in services:
             try:
-                result = await sync_search_console(db, website_id, days)
+                result = await _sync_search_console_history(db, website_id, days)
                 logger.info("search_console_sync_succeeded", website_id=str(website_id), **result)
                 inspection = await sync_url_inspection(db, website_id)
                 logger.info(
@@ -67,7 +115,7 @@ async def _synchronize_website_integrations(website_id: UUID, days: int | None =
                 errors.append(f"GA4: {exc}")
         if "matomo" in services:
             try:
-                result = await sync_matomo(db, website_id, days)
+                result = await _sync_matomo_history(db, website_id, days)
                 logger.info("matomo_sync_succeeded", website_id=str(website_id), **result)
             except Exception as exc:
                 db.rollback()
