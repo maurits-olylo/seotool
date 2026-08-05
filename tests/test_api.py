@@ -321,6 +321,45 @@ def test_login_clears_session_for_missing_user() -> None:
     assert "Max-Age=0" in response.headers["set-cookie"]
 
 
+def test_login_rate_limit_blocks_repeated_failures() -> None:
+    from app.main import app
+
+    browser = TestClient(app)
+    for _ in range(5):
+        response = browser.post(
+            "/ui/login",
+            json={"email": "unknown@example.com", "password": "wrong-password"},
+        )
+        assert response.status_code == 401
+    blocked = browser.post(
+        "/ui/login",
+        json={"email": "unknown@example.com", "password": "wrong-password"},
+    )
+    assert blocked.status_code == 429
+    assert blocked.json()["detail"] == "Probeer het later opnieuw"
+
+
+def test_cookie_authenticated_mutation_rejects_foreign_origin() -> None:
+    from app.main import app
+
+    with SessionLocal() as db:
+        user = User(
+            email="csrf@example.com",
+            role="admin",
+            password_hash=hash_password("Csrf-secure-password-1!"),
+        )
+        db.add(user)
+        db.commit()
+    browser = TestClient(app)
+    assert browser.post(
+        "/ui/login",
+        json={"email": "csrf@example.com", "password": "Csrf-secure-password-1!"},
+    ).status_code == 204
+    denied = browser.post("/ui/logout", headers={"Origin": "https://attacker.example"})
+    assert denied.status_code == 403
+    assert denied.json()["detail"] == "Ongeldige request-origin"
+
+
 def test_only_one_superuser_can_exist() -> None:
     with SessionLocal() as db:
         db.add_all(

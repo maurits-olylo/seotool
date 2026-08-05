@@ -1,10 +1,11 @@
-from datetime import UTC, datetime
+import hashlib
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel, EmailStr
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -16,7 +17,7 @@ from app.core.security import (
     verify_password,
 )
 from app.db.session import get_db
-from app.models.user import User
+from app.models.user import LoginAttempt, User
 
 router = APIRouter(tags=["interface"])
 UI_ROOT = Path(__file__).resolve().parents[2] / "ui"
@@ -28,6 +29,12 @@ class LoginRequest(BaseModel):
 
 
 DUMMY_PASSWORD_HASH = hash_password("invalid-login-password")
+LOGIN_WINDOW = timedelta(minutes=15)
+LOGIN_ATTEMPT_LIMIT = 5
+
+
+def _login_fingerprint(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
 
 
 @router.get("/", include_in_schema=False)
@@ -78,13 +85,45 @@ def invitation_page() -> FileResponse:
 
 
 @router.post("/ui/login", include_in_schema=False, status_code=status.HTTP_204_NO_CONTENT)
-def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)) -> Response:
+def login(
+    payload: LoginRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> Response:
     settings = get_settings()
     email = payload.email.strip().lower()
+    identifier_hash = _login_fingerprint(email)
+    source_hash = _login_fingerprint(request.client.host if request.client else "unknown")
+    cutoff = datetime.now(UTC) - LOGIN_WINDOW
+    recent_failures = db.scalar(
+        select(func.count(LoginAttempt.id)).where(
+            LoginAttempt.created_at >= cutoff,
+            LoginAttempt.succeeded.is_(False),
+            (LoginAttempt.identifier_hash == identifier_hash)
+            | (LoginAttempt.source_hash == source_hash),
+        )
+    )
+    if int(recent_failures or 0) >= LOGIN_ATTEMPT_LIMIT:
+        raise HTTPException(status_code=429, detail="Probeer het later opnieuw")
     user = db.scalar(select(User).where(func.lower(User.email) == email))
     password_hash = user.password_hash if user else DUMMY_PASSWORD_HASH
     if not verify_password(payload.password, password_hash) or not user or not user.is_active:
+        db.add(
+            LoginAttempt(
+                identifier_hash=identifier_hash,
+                source_hash=source_hash,
+                succeeded=False,
+            )
+        )
+        db.commit()
         raise HTTPException(status_code=401, detail="E-mailadres of wachtwoord is onjuist")
+    db.execute(
+        delete(LoginAttempt).where(
+            (LoginAttempt.identifier_hash == identifier_hash)
+            | (LoginAttempt.source_hash == source_hash)
+        )
+    )
     user.last_login_at = datetime.now(UTC)
     db.commit()
     response.set_cookie(

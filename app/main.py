@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 import structlog
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -50,6 +50,18 @@ app = FastAPI(title=get_settings().app_name, version="0.1.0", lifespan=lifespan)
 async def redirect_proxied_http_to_https(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
+    if (
+        request.method in {"POST", "PUT", "PATCH", "DELETE"}
+        and request.cookies.get("seo_session")
+        and not request.headers.get("x-api-key")
+    ):
+        origin = request.headers.get("origin")
+        scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+        expected_origin = f"{scheme}://{request.headers.get('host', request.url.netloc)}"
+        if origin and origin != expected_origin:
+            return JSONResponse(status_code=403, content={"detail": "Ongeldige request-origin"})
+        if get_settings().app_env == "production" and not origin:
+            return JSONResponse(status_code=403, content={"detail": "Request-origin ontbreekt"})
     if (
         get_settings().app_env == "production"
         and request.headers.get("x-forwarded-proto") == "http"

@@ -39,6 +39,14 @@ class UserSession(UUIDTimestampMixin, Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
 
+class LoginAttempt(UUIDTimestampMixin, Base):
+    __tablename__ = "login_attempts"
+
+    identifier_hash: Mapped[str] = mapped_column(String(64), index=True)
+    source_hash: Mapped[str] = mapped_column(String(64), index=True)
+    succeeded: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+
+
 class ClientMembership(UUIDTimestampMixin, Base):
     __tablename__ = "client_memberships"
     __table_args__ = (UniqueConstraint("user_id", "client_id"),)
