@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -17,7 +17,7 @@ from app.core.queue import (
     enqueue_performance_sync,
     queue_has_capacity,
 )
-from app.core.security import Principal, require_api_key
+from app.core.security import Principal, active_session_id, require_api_key
 from app.db.session import get_db
 from app.models.client import Client
 from app.models.integrations import (
@@ -68,10 +68,11 @@ from app.services.oauth import (
     GOOGLE_SCOPES,
     bing_authorization_url,
     bing_is_configured,
+    consume_oauth_state,
+    create_oauth_state,
     encrypt_token,
     google_authorization_url,
     google_is_configured,
-    parse_oauth_state,
 )
 from app.services.search_console import sync_search_console
 from app.services.url_inspection import sync_url_inspection
@@ -95,13 +96,18 @@ def authorize_google(
     client_id: UUID = Query(),
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
+    seo_session: str | None = Cookie(default=None),
 ) -> RedirectResponse:
     if not google_is_configured():
         raise HTTPException(status_code=503, detail="Google OAuth is not configured")
     if not db.get(Client, client_id):
         raise HTTPException(status_code=404, detail="Client not found")
     require_client_access(db, principal, client_id, admin=True)
-    return RedirectResponse(google_authorization_url(client_id), status_code=302)
+    session_id = active_session_id(seo_session)
+    if not principal.user_id or not session_id:
+        raise HTTPException(status_code=403, detail="Een persoonlijke sessie is vereist")
+    state = create_oauth_state(db, client_id, principal.user_id, session_id, "google")
+    return RedirectResponse(google_authorization_url(state), status_code=302)
 
 
 @router.get("/integrations/bing/authorize")
@@ -109,13 +115,18 @@ def authorize_bing(
     client_id: UUID = Query(),
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
+    seo_session: str | None = Cookie(default=None),
 ) -> RedirectResponse:
     if not bing_is_configured():
         raise HTTPException(status_code=503, detail="Bing OAuth is not configured")
     if not db.get(Client, client_id):
         raise HTTPException(status_code=404, detail="Client not found")
     require_client_access(db, principal, client_id, admin=True)
-    return RedirectResponse(bing_authorization_url(client_id), status_code=302)
+    session_id = active_session_id(seo_session)
+    if not principal.user_id or not session_id:
+        raise HTTPException(status_code=403, detail="Een persoonlijke sessie is vereist")
+    state = create_oauth_state(db, client_id, principal.user_id, session_id, "bing")
+    return RedirectResponse(bing_authorization_url(state), status_code=302)
 
 
 @oauth_router.get("/integrations/google/callback", include_in_schema=False)
@@ -124,11 +135,15 @@ async def google_callback(
     state: str | None = None,
     error: str | None = None,
     db: Session = Depends(get_db),
+    seo_session: str | None = Cookie(default=None),
 ) -> RedirectResponse:
     if error or not code or not state or not google_is_configured():
         return RedirectResponse("/app?integration=google-error", status_code=302)
     try:
-        client_id = parse_oauth_state(state)
+        session_id = active_session_id(seo_session)
+        if not session_id:
+            raise ValueError
+        client_id = consume_oauth_state(db, state, "google", session_id)
     except ValueError:
         return RedirectResponse("/app?integration=google-error", status_code=302)
     if not db.get(Client, client_id):
@@ -187,11 +202,15 @@ async def bing_callback(
     state: str | None = None,
     error: str | None = None,
     db: Session = Depends(get_db),
+    seo_session: str | None = Cookie(default=None),
 ) -> RedirectResponse:
     if error or not code or not state or not bing_is_configured():
         return RedirectResponse("/app?integration=bing-error", status_code=302)
     try:
-        client_id = parse_oauth_state(state)
+        session_id = active_session_id(seo_session)
+        if not session_id:
+            raise ValueError
+        client_id = consume_oauth_state(db, state, "bing", session_id)
     except ValueError:
         return RedirectResponse("/app?integration=bing-error", status_code=302)
     if not db.get(Client, client_id):

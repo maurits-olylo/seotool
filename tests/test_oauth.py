@@ -6,15 +6,36 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.core.config import get_settings
+from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.models.integrations import IntegrationConnection
+from app.models.user import ClientMembership, User
 from app.services.oauth import (
-    create_oauth_state,
     decrypt_token,
     encrypt_token,
     oauth_error_message,
-    parse_oauth_state,
 )
+
+
+def _oauth_browser(client_id: str, email: str) -> TestClient:
+    with SessionLocal() as db:
+        user = User(
+            email=email,
+            role="admin",
+            password_hash=hash_password("OAuth-secure-password-1!"),
+        )
+        db.add(user)
+        db.flush()
+        db.add(ClientMembership(user_id=user.id, client_id=UUID(client_id), role="admin"))
+        db.commit()
+    from app.main import app
+
+    browser = TestClient(app)
+    assert browser.post(
+        "/ui/login",
+        json={"email": email, "password": "OAuth-secure-password-1!"},
+    ).status_code == 204
+    return browser
 
 
 def test_oauth_refresh_error_is_actionable_without_exposing_response_body() -> None:
@@ -48,7 +69,8 @@ def test_google_authorize_uses_signed_state_and_read_only_scopes(
     get_settings.cache_clear()
     try:
         customer = client.post("/api/v1/clients", json={"name": "OAuth client"}).json()
-        response = client.get(
+        browser = _oauth_browser(customer["id"], "google-authorize@example.com")
+        response = browser.get(
             f"/api/v1/integrations/google/authorize?client_id={customer['id']}",
             follow_redirects=False,
         )
@@ -56,7 +78,7 @@ def test_google_authorize_uses_signed_state_and_read_only_scopes(
         query = parse_qs(urlparse(response.headers["location"]).query)
         assert "https://www.googleapis.com/auth/webmasters.readonly" in query["scope"][0]
         assert "https://www.googleapis.com/auth/analytics.readonly" in query["scope"][0]
-        assert str(parse_oauth_state(query["state"][0])) == customer["id"]
+        assert query["state"][0]
 
         encrypted = encrypt_token("refresh-secret")
         assert encrypted and "refresh-secret" not in encrypted
@@ -109,13 +131,31 @@ def test_google_callback_stores_encrypted_tokens(client: TestClient, monkeypatch
     )
     try:
         customer = client.post("/api/v1/clients", json={"name": "Callback client"}).json()
-        state = create_oauth_state(UUID(customer["id"]))
-        response = client.get(
+        browser = _oauth_browser(customer["id"], "google-callback@example.com")
+        authorize = browser.get(
+            f"/api/v1/integrations/google/authorize?client_id={customer['id']}",
+            follow_redirects=False,
+        )
+        state = parse_qs(urlparse(authorize.headers["location"]).query)["state"][0]
+        from app.main import app
+
+        wrong_browser = TestClient(app)
+        rejected = wrong_browser.get(
+            f"/api/v1/integrations/google/callback?code=auth-code&state={state}",
+            follow_redirects=False,
+        )
+        assert rejected.headers["location"] == "/app?integration=google-error"
+        response = browser.get(
             f"/api/v1/integrations/google/callback?code=auth-code&state={state}",
             follow_redirects=False,
         )
         assert response.status_code == 302
         assert response.headers["location"] == "/app?integration=google-connected"
+        replay = browser.get(
+            f"/api/v1/integrations/google/callback?code=auth-code&state={state}",
+            follow_redirects=False,
+        )
+        assert replay.headers["location"] == "/app?integration=google-error"
         with SessionLocal() as db:
             connection = db.scalar(select(IntegrationConnection))
             assert connection and connection.status == "connected"
@@ -208,14 +248,15 @@ def test_bing_authorize_uses_signed_state_and_read_scope(client: TestClient, mon
     get_settings.cache_clear()
     try:
         customer = client.post("/api/v1/clients", json={"name": "Bing OAuth client"}).json()
-        response = client.get(
+        browser = _oauth_browser(customer["id"], "bing-authorize@example.com")
+        response = browser.get(
             f"/api/v1/integrations/bing/authorize?client_id={customer['id']}",
             follow_redirects=False,
         )
         assert response.status_code == 302
         query = parse_qs(urlparse(response.headers["location"]).query)
         assert query["scope"] == ["webmaster.read"]
-        assert str(parse_oauth_state(query["state"][0])) == customer["id"]
+        assert query["state"][0]
     finally:
         get_settings.cache_clear()
 
@@ -258,8 +299,13 @@ def test_bing_callback_stores_encrypted_tokens(client: TestClient, monkeypatch) 
     )
     try:
         customer = client.post("/api/v1/clients", json={"name": "Bing callback client"}).json()
-        state = create_oauth_state(UUID(customer["id"]))
-        response = client.get(
+        browser = _oauth_browser(customer["id"], "bing-callback@example.com")
+        authorize = browser.get(
+            f"/api/v1/integrations/bing/authorize?client_id={customer['id']}",
+            follow_redirects=False,
+        )
+        state = parse_qs(urlparse(authorize.headers["location"]).query)["state"][0]
+        response = browser.get(
             f"/api/v1/integrations/bing/callback?code=auth-code&state={state}",
             follow_redirects=False,
         )

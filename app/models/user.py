@@ -47,6 +47,24 @@ class LoginAttempt(UUIDTimestampMixin, Base):
     succeeded: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
 
 
+class OAuthState(UUIDTimestampMixin, Base):
+    __tablename__ = "oauth_states"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("user_sessions.id", ondelete="CASCADE"), index=True
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"), index=True
+    )
+    provider: Mapped[str] = mapped_column(String(30), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+
+
 class ClientMembership(UUIDTimestampMixin, Base):
     __tablename__ = "client_memberships"
     __table_args__ = (UniqueConstraint("user_id", "client_id"),)

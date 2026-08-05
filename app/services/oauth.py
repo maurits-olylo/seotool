@@ -1,16 +1,17 @@
 import base64
-import binascii
 import hashlib
-import hmac
-import json
-import time
+import secrets
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import urlencode
 from uuid import UUID
 
 from cryptography.fernet import Fernet, InvalidToken
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.models.user import OAuthState
 
 GOOGLE_SCOPES = [
     "openid",
@@ -47,7 +48,7 @@ def google_is_configured() -> bool:
     )
 
 
-def google_authorization_url(client_id: UUID) -> str:
+def google_authorization_url(state: str) -> str:
     settings = get_settings()
     parameters = {
         "client_id": settings.google_client_id,
@@ -57,7 +58,7 @@ def google_authorization_url(client_id: UUID) -> str:
         "access_type": "offline",
         "prompt": "consent",
         "include_granted_scopes": "true",
-        "state": create_oauth_state(client_id),
+        "state": state,
     }
     return f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(parameters)}"
 
@@ -74,39 +75,51 @@ def bing_is_configured() -> bool:
     )
 
 
-def bing_authorization_url(client_id: UUID) -> str:
+def bing_authorization_url(state: str) -> str:
     settings = get_settings()
     parameters = {
         "client_id": settings.bing_client_id,
         "redirect_uri": settings.bing_redirect_uri,
         "response_type": "code",
         "scope": " ".join(BING_SCOPES),
-        "state": create_oauth_state(client_id),
+        "state": state,
     }
     return f"https://www.bing.com/webmasters/oauth/authorize?{urlencode(parameters)}"
 
 
-def create_oauth_state(client_id: UUID, *, lifetime_seconds: int = 600) -> str:
-    payload = json.dumps(
-        {"client_id": str(client_id), "expires_at": int(time.time()) + lifetime_seconds},
-        separators=(",", ":"),
-    ).encode()
-    signature = hmac.new(_signing_key(), payload, hashlib.sha256).digest()
-    return f"{_b64encode(payload)}.{_b64encode(signature)}"
+def create_oauth_state(
+    db: Session, client_id: UUID, user_id: UUID, session_id: UUID, provider: str
+) -> str:
+    token = secrets.token_urlsafe(32)
+    db.add(
+        OAuthState(
+            client_id=client_id,
+            user_id=user_id,
+            session_id=session_id,
+            provider=provider,
+            token_hash=hashlib.sha256(token.encode()).hexdigest(),
+            expires_at=datetime.now(UTC) + timedelta(minutes=10),
+        )
+    )
+    db.commit()
+    return token
 
 
-def parse_oauth_state(state: str) -> UUID:
-    try:
-        payload_encoded, signature_encoded = state.split(".", maxsplit=1)
-        payload = _b64decode(payload_encoded)
-        signature = _b64decode(signature_encoded)
-        expected = hmac.new(_signing_key(), payload, hashlib.sha256).digest()
-        data = json.loads(payload)
-        if not hmac.compare_digest(signature, expected) or data["expires_at"] < time.time():
-            raise ValueError("OAuth state is invalid or expired")
-        return UUID(data["client_id"])
-    except (binascii.Error, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
-        raise ValueError("OAuth state is invalid or expired") from exc
+def consume_oauth_state(db: Session, state: str, provider: str, session_id: UUID) -> UUID:
+    record = db.scalar(
+        select(OAuthState).where(
+            OAuthState.token_hash == hashlib.sha256(state.encode()).hexdigest(),
+            OAuthState.provider == provider,
+            OAuthState.session_id == session_id,
+            OAuthState.consumed_at.is_(None),
+            OAuthState.expires_at > datetime.now(UTC),
+        )
+    )
+    if not record:
+        raise ValueError("OAuth state is invalid or expired")
+    record.consumed_at = datetime.now(UTC)
+    db.commit()
+    return record.client_id
 
 
 def encrypt_token(token: str | None) -> str | None:
@@ -130,15 +143,3 @@ def _fernet() -> Fernet:
     if len(raw_key) != 32:
         raise ValueError("TOKEN_ENCRYPTION_KEY must contain 64 hexadecimal characters")
     return Fernet(base64.urlsafe_b64encode(raw_key))
-
-
-def _signing_key() -> bytes:
-    return (get_settings().token_encryption_key or get_settings().api_key).encode()
-
-
-def _b64encode(value: bytes) -> str:
-    return base64.urlsafe_b64encode(value).rstrip(b"=").decode()
-
-
-def _b64decode(value: str) -> bytes:
-    return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))

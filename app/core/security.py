@@ -61,6 +61,21 @@ def revoke_session_token(token: str | None) -> None:
             db.commit()
 
 
+def active_session_id(token: str | None) -> UUID | None:
+    if not token:
+        return None
+    now = datetime.now(UTC)
+    with SessionLocal() as db:
+        session = db.scalar(
+            select(UserSession).where(
+                UserSession.token_hash == hashlib.sha256(token.encode()).hexdigest(),
+                UserSession.revoked_at.is_(None),
+                UserSession.expires_at > now,
+            )
+        )
+        return session.id if session else None
+
+
 def is_valid_session_token(token: str | None) -> bool:
     return session_user_id(token) is not None
 
