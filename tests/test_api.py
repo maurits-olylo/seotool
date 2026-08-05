@@ -155,7 +155,7 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
 def test_operations_status_ignores_stale_website_responses(client: TestClient) -> None:
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
-    assert 'src="/ui/assets/app.js?v=20260805-2"' in page.text
+    assert 'src="/ui/assets/app.js?v=20260805-3"' in page.text
     assert 'href="/ui/assets/actionable.css?v=20260731-4"' in page.text
     assert 'id="recommendation-task-section"' in page.text
     assert 'id="recommendation-task-content"' in page.text
@@ -240,6 +240,9 @@ def test_dashboard_and_reports_have_clear_drilldowns(client: TestClient) -> None
     assert script.status_code == 200
     assert "data-dashboard-priority=" in script.text
     assert '"#dashboard-priorities"' in script.text
+    assert "if (user.mfa_required)" in script.text
+    assert "await openMfaSetup();" in script.text
+    assert "if (!workspaceReady) return;" in script.text
     assert "Geen gekoppelde data" in script.text
     assert 'setAttribute("aria-pressed"' in script.text
 

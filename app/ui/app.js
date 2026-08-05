@@ -2429,6 +2429,8 @@ $("#confirm-mfa").addEventListener("click", async () => {
     await api("/api/v1/me/mfa/confirm", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({code:$("#mfa-confirm-code").value})});
     state.currentUser.mfa_enabled = true; state.currentUser.mfa_required = false;
     $("#mfa-message").textContent = "Tweestapsverificatie is actief.";
+    await loadClients();
+    showView(viewFromHash(), false);
     window.setTimeout(() => $("#mfa-dialog").close(), 800);
   } catch (error) { $("#mfa-message").textContent = error.message; }
 });
@@ -2607,12 +2609,18 @@ $("#bing-pages-file").addEventListener("change", () => updateBingFileName("#bing
 $("#bing-anchors-file").addEventListener("change", () => updateBingFileName("#bing-anchors-file", "#bing-anchors-name"));
 $("#sync-integration-history").addEventListener("click", syncIntegrationHistory);
 
-api("/api/v1/me").then((user) => {
+api("/api/v1/me").then(async (user) => {
   state.currentUser = user;
-  if (user.mfa_required) openMfaSetup().catch(() => {});
   applyRolePermissions();
-  return loadClients();
-}).then(() => {
+  if (user.mfa_required) {
+    showApp();
+    await openMfaSetup();
+    return false;
+  }
+  await loadClients();
+  return true;
+}).then((workspaceReady) => {
+  if (!workspaceReady) return;
   showApp();
   const integrationResult = new URLSearchParams(window.location.search).get("integration");
   if (integrationResult) {
