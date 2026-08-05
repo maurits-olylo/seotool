@@ -1,0 +1,32 @@
+#mfa-dialog {
+  width: min(560px, calc(100vw - 32px));
+}
+
+.mfa-qr-wrap {
+  display: grid;
+  place-items: center;
+  margin: 1rem 0;
+}
+
+.mfa-qr-wrap img {
+  width: min(260px, 72vw);
+  height: auto;
+  background: #fff;
+  border: 10px solid #fff;
+  border-radius: 12px;
+}
+
+.mfa-manual {
+  margin: .75rem 0 1.25rem;
+}
+
+.mfa-manual summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+#mfa-recovery-codes {
+  max-height: 12rem;
+  overflow: auto;
+  white-space: pre-wrap;
+}

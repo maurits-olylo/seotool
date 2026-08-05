@@ -23,6 +23,7 @@ class CurrentUserRead(BaseModel):
 class MfaSetupRead(BaseModel):
     secret: str
     provisioning_uri: str
+    qr_code_data_uri: str
     recovery_codes: list[str]
 
 

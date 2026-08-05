@@ -18,6 +18,7 @@
   <link rel="stylesheet" href="/ui/assets/organization.css?v=20260725-1">
   <link rel="stylesheet" href="/ui/assets/report.css">
   <link rel="stylesheet" href="/ui/assets/member-management.css">
+  <link rel="stylesheet" href="/ui/assets/mfa.css?v=20260805-1">
   <link rel="stylesheet" href="/ui/assets/report-performance.css?v=20260725-1">
   <link rel="stylesheet" href="/ui/assets/key-events.css">
   <link rel="stylesheet" href="/ui/assets/jobs.css">
@@ -227,7 +228,7 @@
     <dl><div><dt>Vergeleken meetmomenten</dt><dd id="change-detail-date"></dd></div><div><dt>Mogelijke relevantie</dt><dd id="change-detail-relevance"></dd></div><div><dt>Aanbevolen controle</dt><dd id="change-detail-action"></dd></div></dl>
     <div id="change-group-details"></div>
   </dialog>
-  <dialog id="mfa-dialog" aria-labelledby="mfa-title"><h2 id="mfa-title">Tweestapsverificatie instellen</h2><p>Voeg het onderstaande geheim toe aan je authenticator en bewaar de herstelcodes veilig.</p><label>Geheim<input id="mfa-secret" readonly></label><pre id="mfa-recovery-codes"></pre><label>Code uit authenticator<input id="mfa-confirm-code" inputmode="numeric" autocomplete="one-time-code"></label><button id="confirm-mfa" class="primary-button" type="button">Activeren</button><p id="mfa-message" class="operation-message" role="status"></p></dialog>
-  <script src="/ui/assets/app.js?v=20260805-3" defer></script>
+  <dialog id="mfa-dialog" aria-labelledby="mfa-title"><h2 id="mfa-title">Tweestapsverificatie instellen</h2><p>Scan deze QR-code met je authenticator-app.</p><div class="mfa-qr-wrap"><img id="mfa-qr-code" alt="QR-code voor tweestapsverificatie"></div><details class="mfa-manual"><summary>Handmatig instellen</summary><label>Geheime sleutel<input id="mfa-secret" readonly></label></details><h3>Herstelcodes</h3><p>Bewaar deze codes veilig. Iedere code werkt één keer.</p><pre id="mfa-recovery-codes"></pre><label>Code uit authenticator<input id="mfa-confirm-code" inputmode="numeric" autocomplete="one-time-code"></label><button id="confirm-mfa" class="primary-button" type="button">Activeren</button><p id="mfa-message" class="operation-message" role="status"></p></dialog>
+  <script src="/ui/assets/app.js?v=20260805-4" defer></script>
 </body>
 </html>

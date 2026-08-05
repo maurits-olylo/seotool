@@ -35,6 +35,7 @@ from app.services.authorization import require_client_access
 from app.services.mfa import (
     generate_recovery_codes,
     generate_totp_secret,
+    qr_code_data_uri,
     recovery_code_hash,
     valid_totp_counter,
 )
@@ -105,9 +106,13 @@ def setup_mfa(
     db.commit()
     label = quote(user.email)
     issuer = quote("SEO Monitor")
+    provisioning_uri = (
+        f"otpauth://totp/SEO%20Monitor:{label}?secret={secret}&issuer={issuer}"
+    )
     return {
         "secret": secret,
-        "provisioning_uri": f"otpauth://totp/SEO%20Monitor:{label}?secret={secret}&issuer={issuer}",
+        "provisioning_uri": provisioning_uri,
+        "qr_code_data_uri": qr_code_data_uri(provisioning_uri),
         "recovery_codes": recovery_codes,
     }
 

@@ -2418,6 +2418,7 @@ async function markIssueWontFix() {
 $("#logout").addEventListener("click", async () => { await fetch("/ui/logout", { method: "POST" }); window.location.assign("/"); });
 async function openMfaSetup() {
   const setup = await api("/api/v1/me/mfa/setup", {method:"POST"});
+  $("#mfa-qr-code").src = setup.qr_code_data_uri;
   $("#mfa-secret").value = setup.secret;
   $("#mfa-recovery-codes").textContent = setup.recovery_codes.join("\n");
   $("#mfa-message").textContent = "Bewaar de herstelcodes voordat je activeert.";

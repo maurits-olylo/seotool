@@ -4,9 +4,21 @@ import hmac
 import secrets
 import struct
 import time
+from io import BytesIO
+
+import qrcode
+from qrcode.image.svg import SvgPathImage
 
 TOTP_PERIOD_SECONDS = 30
 TOTP_DIGITS = 6
+
+
+def qr_code_data_uri(value: str) -> str:
+    image = qrcode.make(value, image_factory=SvgPathImage, box_size=8, border=3)
+    output = BytesIO()
+    image.save(output)
+    encoded = base64.b64encode(output.getvalue()).decode()
+    return f"data:image/svg+xml;base64,{encoded}"
 
 
 def generate_totp_secret() -> str:
