@@ -174,6 +174,25 @@ def _number(row: dict[str, object], key: str) -> float:
         return 0
 
 
+def _merge_metric_row(
+    rows: dict[tuple[object, ...], dict[str, object]],
+    key: tuple[object, ...],
+    row: dict[str, object],
+    numeric_fields: tuple[str, ...],
+) -> None:
+    existing = rows.get(key)
+    if existing is None:
+        rows[key] = row
+        return
+    for field in numeric_fields:
+        current = existing[field]
+        incoming = row[field]
+        if isinstance(current, int) and isinstance(incoming, int):
+            existing[field] = current + incoming
+        else:
+            existing[field] = float(current) + float(incoming)
+
+
 async def sync_matomo(
     db: Session,
     website_id: UUID,
@@ -264,8 +283,7 @@ async def sync_matomo(
         item.normalized_url: item.id
         for item in db.scalars(select(Url).where(Url.website_id == website_id))
     }
-    page_rows: list[dict[str, object]] = []
-    matched = 0
+    page_rows_by_key: dict[tuple[object, ...], dict[str, object]] = {}
     unmatched_variants: set[str] = set()
     for metric_date, row in _dated_rows(pages):
         raw_url = str(row.get("url") or row.get("label") or "").strip()
@@ -277,40 +295,50 @@ async def sync_matomo(
         except InvalidUrlError:
             normalized = page_url
         url_id = url_map.get(normalized)
-        matched += int(url_id is not None)
         if url_id is None and len(unmatched_variants) < 100:
             unmatched_variants.add(page_url)
-        page_rows.append(
-            {
-                "website_id": website_id,
-                "url_id": url_id,
-                "date": metric_date,
-                "page_url": page_url,
-                "visits": int(_number(row, "nb_visits")),
-                "pageviews": int(_number(row, "nb_hits")),
-                "unique_pageviews": int(_number(row, "nb_uniq_pageviews")),
-                "conversions": _number(row, "nb_conversions"),
-            }
+        metric_row: dict[str, object] = {
+            "website_id": website_id,
+            "url_id": url_id,
+            "date": metric_date,
+            "page_url": page_url,
+            "visits": int(_number(row, "nb_visits")),
+            "pageviews": int(_number(row, "nb_hits")),
+            "unique_pageviews": int(_number(row, "nb_uniq_pageviews")),
+            "conversions": _number(row, "nb_conversions"),
+        }
+        _merge_metric_row(
+            page_rows_by_key,
+            (website_id, metric_date, page_url),
+            metric_row,
+            ("visits", "pageviews", "unique_pageviews", "conversions"),
         )
+    page_rows = list(page_rows_by_key.values())
+    matched = sum(row["url_id"] is not None for row in page_rows)
     insert_metric_rows(db, MatomoPageMetric, page_rows)
 
-    aggregate_rows: list[dict[str, object]] = []
+    aggregate_rows_by_key: dict[tuple[object, ...], dict[str, object]] = {}
     for metric_type, payload in (("traffic_source", sources), ("goal", goals)):
         for metric_date, row in _dated_rows(payload):
             key = str(row.get("idgoal") or row.get("segment") or row.get("label") or "unknown")
-            aggregate_rows.append(
-                {
-                    "website_id": website_id,
-                    "date": metric_date,
-                    "metric_type": metric_type,
-                    "dimension_key": key,
-                    "dimension_name": str(row.get("name") or row.get("label") or key),
-                    "visits": int(_number(row, "nb_visits")),
-                    "actions": int(_number(row, "nb_actions")),
-                    "conversions": _number(row, "nb_conversions"),
-                    "revenue": _number(row, "revenue"),
-                }
+            metric_row = {
+                "website_id": website_id,
+                "date": metric_date,
+                "metric_type": metric_type,
+                "dimension_key": key,
+                "dimension_name": str(row.get("name") or row.get("label") or key),
+                "visits": int(_number(row, "nb_visits")),
+                "actions": int(_number(row, "nb_actions")),
+                "conversions": _number(row, "nb_conversions"),
+                "revenue": _number(row, "revenue"),
+            }
+            _merge_metric_row(
+                aggregate_rows_by_key,
+                (website_id, metric_date, metric_type, key),
+                metric_row,
+                ("visits", "actions", "conversions", "revenue"),
             )
+    aggregate_rows = list(aggregate_rows_by_key.values())
     insert_metric_rows(db, MatomoAggregateMetric, aggregate_rows)
 
     now = datetime.now(UTC)

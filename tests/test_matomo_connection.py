@@ -180,6 +180,72 @@ def test_matomo_sync_stores_aggregates_and_url_coverage(monkeypatch) -> None:  #
     get_settings.cache_clear()
 
 
+def test_matomo_sync_merges_duplicate_report_rows(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setenv("TOKEN_ENCRYPTION_KEY", "0d" * 32)
+    get_settings.cache_clear()
+    monkeypatch.setattr(matomo, "validate_public_http_url", lambda _url: None)
+
+    async def fake_report(_http, _endpoint, _token, method, *_args):  # type: ignore[no-untyped-def]
+        if method == "Actions.getPageUrls":
+            return {
+                "2026-08-01": [
+                    {"label": "/dubbel", "nb_visits": 2, "nb_hits": 3},
+                    {"label": "/dubbel", "nb_visits": 4, "nb_hits": 5},
+                ]
+            }
+        return {
+            "2026-08-01": [
+                {"label": "duplicate", "nb_visits": 2},
+                {"label": "duplicate", "nb_visits": 4},
+            ]
+        }
+
+    monkeypatch.setattr(matomo, "_report", fake_report)
+    with SessionLocal() as db:
+        customer = Client(name="Duplicate Matomo rows")
+        website = Website(client=customer, name="Duplicate", base_url="https://example.com/")
+        db.add(website)
+        db.flush()
+        db.add(Url(website_id=website.id, normalized_url="https://example.com/dubbel"))
+        connection = IntegrationConnection(
+            client_id=customer.id,
+            provider="matomo",
+            status="connected",
+            encrypted_access_token=integrations.encrypt_token("secret"),
+            settings={"server_url": "https://analytics.example.com/index.php"},
+        )
+        db.add(connection)
+        db.flush()
+        db.add(
+            WebsiteIntegration(
+                website_id=website.id,
+                connection_id=connection.id,
+                service="matomo",
+                external_property_id="7",
+                status="active",
+            )
+        )
+        db.commit()
+
+        import asyncio
+
+        result = asyncio.run(matomo.sync_matomo(db, website.id, days=1))
+        pages = list(db.scalars(select(MatomoPageMetric)))
+        aggregates = list(db.scalars(select(MatomoAggregateMetric)))
+
+        assert result["page_rows"] == 1
+        assert result["matched_urls"] == 1
+        assert len(pages) == 1
+        assert pages[0].visits == 6
+        assert pages[0].pageviews == 8
+        assert len(aggregates) == 2
+        assert {row.metric_type: row.visits for row in aggregates} == {
+            "goal": 6,
+            "traffic_source": 6,
+        }
+    get_settings.cache_clear()
+
+
 def test_matomo_sync_keeps_pages_when_optional_report_is_unavailable(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.setenv("TOKEN_ENCRYPTION_KEY", "0c" * 32)
     get_settings.cache_clear()
