@@ -81,3 +81,30 @@ Lokale acceptatie:
   DNS-blokkering en veilige redirects;
 - JavaScript-rendering blijft uitgeschakeld en valt buiten deze fase;
 - er zijn geen databasewijzigingen of migraties.
+
+### Fase 2 — Containerhardening
+
+Status: lokaal afgerond en nog niet gedeployed.
+
+Alle applicatiecontainers gebruiken een vaste niet-rootgebruiker met UID/GID `10001`. Hun
+rootfilesystem is alleen-lezen, alle Linux-capabilities zijn verwijderd en privilegeverhoging is
+uitgeschakeld. Alleen `/tmp` en de minimaal noodzakelijke exportvolume zijn schrijfbaar. Daarnaast
+gelden per container grenzen voor processen, geheugen en relatieve CPU-prioriteit, afgestemd op de
+beperkte productiecapaciteit van de NAS. PostgreSQL en Redis behouden bewust het officiële
+imagebeleid; hun opstartrechten worden niet zonder afzonderlijke migratie- en herstelproef
+gewijzigd.
+
+Bij de eerste staging- en productiedeployment moet de bestaande exportvolume vóór het starten van
+de niet-root applicaties eenmalig en gecontroleerd aan UID/GID `10001` worden overgedragen. Dit
+wijzigt geen exportinhoud en vereist geen databasemigratie of databaseback-up. De renderer blijft
+uitgeschakeld.
+
+Lokale acceptatie:
+
+- productie- en staging-Composeconfiguratie: geldig;
+- Ruff: geslaagd;
+- volledige testsuite: 436 tests geslaagd;
+- regressietests bewaken het niet-rootimage, alleen-lezen filesystems, capability-drop,
+  privilegeblokkering en proces- en resourcegrenzen;
+- een zware lokale imagebuild is volgens het infrastructuurprofiel overgeslagen en wordt op staging
+  uitgevoerd.
