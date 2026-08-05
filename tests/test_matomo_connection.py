@@ -1,3 +1,4 @@
+from datetime import date
 from uuid import UUID
 
 import httpx
@@ -15,8 +16,9 @@ from app.models.integrations import (
     MatomoPageMetric,
     WebsiteIntegration,
 )
-from app.models.website import Website
+from app.models.website import Website, WebsiteSettings
 from app.services import matomo
+from app.services.analytics_provider import analytics_page_totals
 from app.services.oauth import decrypt_token
 
 
@@ -90,6 +92,12 @@ def test_connect_and_select_human_matomo_site(client: TestClient, monkeypatch) -
     )
     assert mapping.status_code == 200
     assert mapping.json()["external_property_id"] == "7"
+    primary = client.put(
+        f"/api/v1/websites/{website['id']}/integrations/analytics-primary",
+        json={"source": "matomo"},
+    )
+    assert primary.status_code == 200
+    assert primary.json() == {"source": "matomo"}
     with SessionLocal() as db:
         selected = db.scalar(
             select(WebsiteIntegration).where(
@@ -143,6 +151,7 @@ def test_matomo_sync_stores_aggregates_and_url_coverage(monkeypatch) -> None:  #
             status="active",
         )
         db.add(mapping)
+        db.add(WebsiteSettings(website_id=website.id, primary_analytics_source="matomo"))
         db.commit()
 
         import asyncio
@@ -156,6 +165,9 @@ def test_matomo_sync_stores_aggregates_and_url_coverage(monkeypatch) -> None:  #
         assert result["url_match_rate"] == 0.5
         assert len(pages) == 2
         assert len(aggregates) == 2
+        source, totals = analytics_page_totals(db, website.id, date(2026, 7, 1))
+        assert source == "matomo"
+        assert [(item.visits, item.users) for item in totals] == [(10, 0)]
         assert mapping.settings["coverage"]["transitions"] == "unknown"
         assert mapping.settings["coverage"]["internal_search"] == "not_imported"
         assert mapping.settings["unmatched_url_variants"] == [

@@ -22,6 +22,7 @@ from app.models.integrations import (
 from app.models.issues import ActivityLog, Issue, IssueOccurrence, IssueSuppression
 from app.models.reporting import MonthlyReportSnapshot
 from app.models.user import ClientMembership, User
+from app.models.website import WebsiteSettings
 
 
 def test_health(client: TestClient) -> None:
@@ -575,6 +576,7 @@ def test_client_report_contains_performance_and_work(client: TestClient) -> None
     yesterday = date.today() - timedelta(days=1)
     with SessionLocal() as db:
         connection = IntegrationConnection(client_id=UUID(customer["id"]), provider="google")
+        db.get(WebsiteSettings, website_id).primary_analytics_source = "ga4"
         db.add(connection)
         db.flush()
         db.add(

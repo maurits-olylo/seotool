@@ -13,11 +13,13 @@ from app.db.session import get_db
 from app.models.integrations import (
     GoogleAnalyticsEventMetric,
     GoogleAnalyticsMetric,
+    MatomoPageMetric,
     SearchConsoleMetric,
     WebsiteIntegration,
 )
 from app.models.issues import ActivityLog, Change, Issue
 from app.models.reporting import MonthlyReportSnapshot
+from app.models.website import WebsiteSettings
 from app.services.authorization import require_website_access
 from app.services.search_insights import build_search_insights
 
@@ -144,20 +146,42 @@ def build_client_report(
             impressions=float(impressions or 0),
             position_weight=float(position_weight or 0),
         )
-    for metric_date, sessions, users in db.execute(
-        select(
-            GoogleAnalyticsMetric.date,
-            func.sum(GoogleAnalyticsMetric.sessions),
-            func.sum(GoogleAnalyticsMetric.active_users),
+    website_settings = db.get(WebsiteSettings, website_id)
+    analytics_source = website_settings.primary_analytics_source if website_settings else None
+    analytics_model = GoogleAnalyticsMetric if analytics_source == "ga4" else MatomoPageMetric
+    visits_column = (
+        GoogleAnalyticsMetric.sessions if analytics_source == "ga4" else MatomoPageMetric.visits
+    )
+    users_column = (
+        GoogleAnalyticsMetric.active_users
+        if analytics_source == "ga4"
+        else MatomoPageMetric.unique_pageviews
+    )
+    analytics_rows = (
+        db.execute(
+            select(
+                analytics_model.date,
+                func.sum(visits_column),
+                func.sum(users_column),
+                func.sum(MatomoPageMetric.conversions)
+                if analytics_source == "matomo"
+                else func.sum(GoogleAnalyticsMetric.key_events),
+            )
+            .where(analytics_model.website_id == website_id)
+            .group_by(analytics_model.date)
         )
-        .where(GoogleAnalyticsMetric.website_id == website_id)
-        .group_by(GoogleAnalyticsMetric.date)
-    ):
+        if analytics_source
+        else []
+    )
+    for metric_date, sessions, users, conversions in analytics_rows:
         ga_dates.append(metric_date)
         daily[metric_date].update(
             sessions=float(sessions or 0),
             active_users=float(users or 0),
         )
+        if analytics_source == "matomo":
+            daily[metric_date]["key_events"] = float(conversions or 0)
+            key_event_dates.append(metric_date)
 
     ga4_mapping = db.scalar(
         select(WebsiteIntegration).where(
@@ -166,7 +190,9 @@ def build_client_report(
         )
     )
     qualified_events = (
-        set(ga4_mapping.settings.get("qualified_key_events", [])) if ga4_mapping else set()
+        (set(ga4_mapping.settings.get("qualified_key_events", [])) if ga4_mapping else set())
+        if analytics_source == "ga4"
+        else set()
     )
     event_breakdown: dict[str, float] = defaultdict(float)
     if qualified_events:
@@ -310,6 +336,7 @@ def build_client_report(
         "previous": previous,
         "comparisons": comparisons,
         "primary_metric": primary_metric,
+        "analytics_source": analytics_source,
         "available_periods": available_periods,
         "monthly": [
             {"month": month, **{key: round(value, 1) for key, value in values.items()}}
@@ -320,6 +347,7 @@ def build_client_report(
             "through": max(daily) if daily else None,
             "gsc_from": min(gsc_dates) if gsc_dates else None,
             "ga4_from": min(ga_dates) if ga_dates else None,
+            "analytics_source": analytics_source,
             "key_events_from": min(key_event_dates) if key_event_dates else None,
         },
         "qualified_key_events": {

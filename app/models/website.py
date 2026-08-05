@@ -62,3 +62,4 @@ class WebsiteSettings(Base):
     full_crawl_interval: Mapped[str] = mapped_column(Text, default="weekly")
     queue_priority: Mapped[int] = mapped_column(Integer, default=50)
     crawl_queue_limit: Mapped[int] = mapped_column(Integer, default=1)
+    primary_analytics_source: Mapped[str | None] = mapped_column(String(20))

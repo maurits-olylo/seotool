@@ -11,7 +11,7 @@ from app.db.session import get_db
 from app.models.common import utc_now
 from app.models.crawl import CrawlRun, ElementLocation, UrlLink, UrlSnapshot
 from app.models.discovery import Url
-from app.models.integrations import GoogleAnalyticsMetric, SearchConsoleMetric
+from app.models.integrations import SearchConsoleMetric
 from app.models.issues import (
     ActivityLog,
     Change,
@@ -33,6 +33,7 @@ from app.schemas.issues import (
     IssueSuppressionRead,
     IssueUpdate,
 )
+from app.services.analytics_provider import analytics_page_totals
 from app.services.authorization import require_website_access, require_write_access
 from app.services.element_jumps import build_live_jump_url
 from app.services.internal_redirect_analysis import INTERNAL_REDIRECT_PATTERN_TYPE
@@ -777,16 +778,18 @@ def get_issue(
                 .limit(100)
             )
         )
-    elif issue.issue_type in {
-        "downloadable_document_inventory",
-        "generic_internal_anchor_text",
-        "image_delivery_quality",
-        "media_delivery_quality",
-    } and occurrence:
+    elif (
+        issue.issue_type
+        in {
+            "downloadable_document_inventory",
+            "generic_internal_anchor_text",
+            "image_delivery_quality",
+            "media_delivery_quality",
+        }
+        and occurrence
+    ):
         source_urls = [
-            value
-            for value in occurrence.evidence.get("source_urls", [])
-            if isinstance(value, str)
+            value for value in occurrence.evidence.get("source_urls", []) if isinstance(value, str)
         ][:200]
     return {
         **IssueRead.model_validate(issue).model_dump(),
@@ -945,14 +948,8 @@ def _organic_impacts(
         SearchConsoleMetric.date >= since,
         SearchConsoleMetric.url_id.is_not(None),
     ]
-    analytics_conditions = [
-        GoogleAnalyticsMetric.website_id == website_id,
-        GoogleAnalyticsMetric.date >= since,
-        GoogleAnalyticsMetric.url_id.is_not(None),
-    ]
     if url_id is not None:
         search_conditions.append(SearchConsoleMetric.url_id == url_id)
-        analytics_conditions.append(GoogleAnalyticsMetric.url_id == url_id)
     rows = db.execute(
         select(
             SearchConsoleMetric.url_id,
@@ -980,34 +977,27 @@ def _organic_impacts(
             "level": level,
             "basis": "GSC-klikken en vertoningen",
         }
-    analytics_rows = db.execute(
-        select(
-            GoogleAnalyticsMetric.url_id,
-            func.sum(GoogleAnalyticsMetric.sessions),
-            func.sum(GoogleAnalyticsMetric.active_users),
-            func.sum(GoogleAnalyticsMetric.key_events),
-        )
-        .where(*analytics_conditions)
-        .group_by(GoogleAnalyticsMetric.url_id)
-    )
-    for url_id, sessions, active_users, key_events in analytics_rows:
-        impact = result.setdefault(url_id, {"period_days": 28, "level": "unknown"})
-        session_count = int(sessions or 0)
-        event_count = round(float(key_events or 0), 1)
-        ga_level = (
+    analytics_source, analytics_rows = analytics_page_totals(db, website_id, since)
+    for row in analytics_rows:
+        if url_id is not None and row.url_id != url_id:
+            continue
+        impact = result.setdefault(row.url_id, {"period_days": 28, "level": "unknown"})
+        event_count = round(row.conversions, 1)
+        analytics_level = (
             "high"
-            if event_count >= 5 or session_count >= 500
-            else ("medium" if event_count >= 1 or session_count >= 100 else "low")
+            if event_count >= 5 or row.visits >= 500
+            else ("medium" if event_count >= 1 or row.visits >= 100 else "low")
         )
         levels = {"unknown": 0, "low": 1, "medium": 2, "high": 3}
-        if levels[ga_level] > levels[str(impact["level"])]:
-            impact["level"] = ga_level
+        if levels[analytics_level] > levels[str(impact["level"])]:
+            impact["level"] = analytics_level
         impact.update(
             {
-                "sessions": session_count,
-                "active_users": int(active_users or 0),
+                "sessions": row.visits,
+                "active_users": row.users,
                 "key_events": event_count,
-                "basis": "GSC-zoekbereik en GA4-landingspaginaverkeer",
+                "analytics_source": analytics_source,
+                "basis": f"GSC-zoekbereik en {analytics_source}-landingspaginaverkeer",
             }
         )
     return result

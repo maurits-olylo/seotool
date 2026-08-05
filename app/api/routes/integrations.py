@@ -31,7 +31,7 @@ from app.models.integrations import (
     WebsiteIntegration,
 )
 from app.models.performance import PerformanceObservation
-from app.models.website import Website
+from app.models.website import Website, WebsiteSettings
 from app.schemas.integrations import (
     BingBacklinkCsvImport,
     BingPropertiesRead,
@@ -43,6 +43,7 @@ from app.schemas.integrations import (
     MatomoConnectionCreate,
     MatomoSitesRead,
     PerformanceObservationRead,
+    PrimaryAnalyticsSourceUpdate,
     UrlInspectionResultRead,
     WebsiteIntegrationCreate,
     WebsiteIntegrationRead,
@@ -407,6 +408,31 @@ def list_website_integrations(
             .order_by(WebsiteIntegration.service)
         )
     )
+
+
+@router.put("/websites/{website_id}/integrations/analytics-primary")
+def update_primary_analytics_source(
+    website_id: UUID,
+    payload: PrimaryAnalyticsSourceUpdate,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, str]:
+    require_website_access(db, principal, website_id, admin=True)
+    mapping = db.scalar(
+        select(WebsiteIntegration).where(
+            WebsiteIntegration.website_id == website_id,
+            WebsiteIntegration.service == payload.source,
+            WebsiteIntegration.status == "active",
+        )
+    )
+    if not mapping:
+        raise HTTPException(status_code=409, detail="Selected analytics source is not active")
+    settings = db.get(WebsiteSettings, website_id)
+    if not settings:
+        raise HTTPException(status_code=404, detail="Website settings not found")
+    settings.primary_analytics_source = payload.source
+    db.commit()
+    return {"source": payload.source}
 
 
 @router.post(
