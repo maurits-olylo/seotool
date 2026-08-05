@@ -40,6 +40,8 @@ from app.schemas.integrations import (
     GooglePropertiesRead,
     IntegrationConnectionCreate,
     IntegrationConnectionRead,
+    MatomoConnectionCreate,
+    MatomoSitesRead,
     PerformanceObservationRead,
     UrlInspectionResultRead,
     WebsiteIntegrationCreate,
@@ -54,6 +56,11 @@ from app.services.bing_backlink_import import (
 from app.services.bing_integrations import BING_TOKEN_URL, list_bing_sites, sync_bing_webmaster
 from app.services.google_analytics import sync_google_analytics
 from app.services.google_integrations import list_google_properties
+from app.services.matomo import (
+    list_connection_sites,
+    list_matomo_sites,
+    normalize_matomo_server_url,
+)
 from app.services.oauth import (
     BING_SCOPES,
     GOOGLE_SCOPES,
@@ -268,6 +275,73 @@ def create_client_integration(
     return connection
 
 
+@router.put(
+    "/clients/{client_id}/integrations/matomo",
+    response_model=MatomoSitesRead,
+)
+async def connect_matomo(
+    client_id: UUID,
+    payload: MatomoConnectionCreate,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, object]:
+    if not db.get(Client, client_id):
+        raise HTTPException(status_code=404, detail="Client not found")
+    require_client_access(db, principal, client_id, admin=True)
+    try:
+        server_url = normalize_matomo_server_url(payload.server_url)
+        sites = await list_matomo_sites(server_url, payload.token_auth)
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    connection = db.scalar(
+        select(IntegrationConnection).where(
+            IntegrationConnection.client_id == client_id,
+            IntegrationConnection.provider == "matomo",
+        )
+    )
+    if connection is None:
+        connection = IntegrationConnection(client_id=client_id, provider="matomo")
+        db.add(connection)
+    connection.status = "connected"
+    connection.encrypted_access_token = encrypt_token(payload.token_auth)
+    connection.encrypted_refresh_token = None
+    connection.token_expires_at = None
+    connection.scopes = ["analytics:read"]
+    connection.settings = {"server_url": server_url}
+    connection.last_error = None
+    db.commit()
+    return {"sites": sites}
+
+
+@router.get(
+    "/clients/{client_id}/integrations/matomo/sites",
+    response_model=MatomoSitesRead,
+)
+async def matomo_sites(
+    client_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, object]:
+    require_client_access(db, principal, client_id, admin=True)
+    connection = db.scalar(
+        select(IntegrationConnection).where(
+            IntegrationConnection.client_id == client_id,
+            IntegrationConnection.provider == "matomo",
+            IntegrationConnection.status == "connected",
+        )
+    )
+    if not connection:
+        raise HTTPException(status_code=409, detail="Matomo is not connected")
+    try:
+        return {"sites": await list_connection_sites(connection)}
+    except ValueError as exc:
+        connection.status = "error"
+        connection.last_error = str(exc)
+        db.commit()
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
 @router.get(
     "/clients/{client_id}/integrations/google/properties",
     response_model=GooglePropertiesRead,
@@ -352,7 +426,13 @@ def create_website_integration(
     require_client_access(db, principal, website.client_id, admin=True)
     if not connection or connection.client_id != website.client_id:
         raise HTTPException(status_code=422, detail="Connection does not belong to this client")
-    expected_provider = "bing" if payload.service == "bing_webmaster" else "google"
+    expected_provider = (
+        "bing"
+        if payload.service == "bing_webmaster"
+        else "matomo"
+        if payload.service == "matomo"
+        else "google"
+    )
     if connection.provider != expected_provider:
         raise HTTPException(status_code=422, detail="Service and provider do not match")
     mapping = WebsiteIntegration(website_id=website_id, **payload.model_dump())
@@ -377,7 +457,7 @@ def upsert_website_integration(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> WebsiteIntegration:
-    if service not in {"search_console", "ga4", "bing_webmaster"}:
+    if service not in {"search_console", "ga4", "bing_webmaster", "matomo"}:
         raise HTTPException(status_code=422, detail="Unsupported integration service")
     website = db.get(Website, website_id)
     connection = db.get(IntegrationConnection, payload.connection_id)
@@ -386,7 +466,9 @@ def upsert_website_integration(
     require_client_access(db, principal, website.client_id, admin=True)
     if not connection or connection.client_id != website.client_id:
         raise HTTPException(status_code=422, detail="Connection does not belong to this client")
-    expected_provider = "bing" if service == "bing_webmaster" else "google"
+    expected_provider = (
+        "bing" if service == "bing_webmaster" else service if service == "matomo" else "google"
+    )
     if connection.provider != expected_provider:
         raise HTTPException(status_code=422, detail="Service and provider do not match")
     mapping = db.scalar(
@@ -613,9 +695,7 @@ def list_url_inspection_results(
     query = select(UrlInspectionResult).where(UrlInspectionResult.website_id == website_id)
     if url_id is not None:
         query = query.where(UrlInspectionResult.url_id == url_id)
-    return list(
-        db.scalars(query.order_by(UrlInspectionResult.inspected_at.desc()).limit(limit))
-    )
+    return list(db.scalars(query.order_by(UrlInspectionResult.inspected_at.desc()).limit(limit)))
 
 
 @router.post("/websites/{website_id}/integrations/url_inspection/sync")
@@ -645,16 +725,12 @@ def list_pagespeed_results(
     principal: Principal = Depends(require_api_key),
 ) -> list[PerformanceObservation]:
     require_website_access(db, principal, website_id)
-    query = select(PerformanceObservation).where(
-        PerformanceObservation.website_id == website_id
-    )
+    query = select(PerformanceObservation).where(PerformanceObservation.website_id == website_id)
     if url_id is not None:
         query = query.where(PerformanceObservation.url_id == url_id)
     if strategy is not None:
         query = query.where(PerformanceObservation.strategy == strategy)
-    return list(
-        db.scalars(query.order_by(PerformanceObservation.analyzed_at.desc()).limit(limit))
-    )
+    return list(db.scalars(query.order_by(PerformanceObservation.analyzed_at.desc()).limit(limit)))
 
 
 @router.post(

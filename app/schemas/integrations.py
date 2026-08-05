@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from app.schemas.common import Timestamped
 
 Provider = Literal["google", "bing"]
-Service = Literal["search_console", "ga4", "bing_webmaster"]
+Service = Literal["search_console", "ga4", "bing_webmaster", "matomo"]
 
 
 class IntegrationConnectionCreate(BaseModel):
@@ -21,6 +21,7 @@ class IntegrationConnectionRead(Timestamped):
     account_email: str | None
     status: str
     scopes: list[str]
+    settings: dict[str, object]
     last_synced_at: datetime | None
     last_error: str | None
 
@@ -109,6 +110,21 @@ class BingProperty(BaseModel):
 
 class BingPropertiesRead(BaseModel):
     sites: list[BingProperty]
+
+
+class MatomoConnectionCreate(BaseModel):
+    server_url: str = Field(min_length=8, max_length=2048)
+    token_auth: str = Field(min_length=1, max_length=512)
+
+
+class MatomoSite(BaseModel):
+    id: str
+    name: str
+    main_url: str | None = None
+
+
+class MatomoSitesRead(BaseModel):
+    sites: list[MatomoSite]
 
 
 class BingBacklinkCsvImport(BaseModel):

@@ -51,6 +51,7 @@ class IntegrationConnection(UUIDTimestampMixin, Base):
     encrypted_refresh_token: Mapped[str | None] = mapped_column(Text)
     token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     scopes: Mapped[list[str]] = mapped_column(JSON, default=list)
+    settings: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_error: Mapped[str | None] = mapped_column(Text)
 
@@ -81,9 +82,7 @@ class UrlInspectionResult(UUIDTimestampMixin, Base):
     website_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("websites.id", ondelete="CASCADE"), index=True
     )
-    url_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("urls.id", ondelete="CASCADE"), index=True
-    )
+    url_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("urls.id", ondelete="CASCADE"), index=True)
     inspected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     inspection_result_link: Mapped[str | None] = mapped_column(String(2048))
     verdict: Mapped[str | None] = mapped_column(String(40), index=True)
