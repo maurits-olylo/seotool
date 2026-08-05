@@ -22,7 +22,7 @@ from app.services.url_normalization import InvalidUrlError, normalize_url
 
 REPORT_LABELS = {
     "Actions.getPageUrls": "Paginaresultaten",
-    "Referrers.getAll": "Verkeersbronnen",
+    "Referrers.getReferrerType": "Verkeersbronnen",
     "Goals.get": "Doelen en conversies",
 }
 
@@ -124,22 +124,20 @@ async def _report(
     start_date: date,
     end_date: date,
 ) -> object:
+    request_data = {
+        "module": "API",
+        "method": method,
+        "idSite": site_id,
+        "period": "day",
+        "date": f"{start_date.isoformat()},{end_date.isoformat()}",
+        "format": "JSON",
+        "filter_limit": "-1",
+        "token_auth": token,
+    }
+    if method == "Actions.getPageUrls":
+        request_data.update({"flat": "1", "expanded": "1"})
     try:
-        response = await http.post(
-            endpoint,
-            data={
-                "module": "API",
-                "method": method,
-                "idSite": site_id,
-                "period": "day",
-                "date": f"{start_date.isoformat()},{end_date.isoformat()}",
-                "format": "JSON",
-                "filter_limit": "-1",
-                "flat": "1",
-                "expanded": "1",
-                "token_auth": token,
-            },
-        )
+        response = await http.post(endpoint, data=request_data)
     except httpx.RequestError as exc:
         raise MatomoReportError(method, "Matomo kon niet worden bereikt") from exc
     if response.is_redirect or response.status_code != 200:
@@ -219,7 +217,7 @@ async def sync_matomo(db: Session, website_id: UUID, days: int | None = None) ->
                 http,
                 endpoint,
                 token,
-                "Referrers.getAll",
+                "Referrers.getReferrerType",
                 mapping.external_property_id,
                 start_date,
                 end_date,

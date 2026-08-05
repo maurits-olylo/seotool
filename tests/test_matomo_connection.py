@@ -1,4 +1,5 @@
 from datetime import date
+from urllib.parse import parse_qs
 from uuid import UUID
 
 import httpx
@@ -126,7 +127,7 @@ def test_matomo_sync_stores_aggregates_and_url_coverage(monkeypatch) -> None:  #
                     {"label": "/onbekend?genre=kunst", "nb_visits": 2, "nb_hits": 3},
                 ]
             }
-        if method == "Referrers.getAll":
+        if method == "Referrers.getReferrerType":
             return {"2026-08-01": [{"label": "Search Engines", "nb_visits": 8}]}
         return {"2026-08-01": [{"idgoal": "1", "name": "Nieuwsbrief", "nb_conversions": 2}]}
 
@@ -269,3 +270,44 @@ def test_matomo_report_classifies_api_error_without_exposing_raw_message(monkeyp
         assert "secret" not in str(exc)
     else:
         raise AssertionError("MatomoReportError was not raised")
+
+
+def test_matomo_report_uses_method_specific_parameters(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    captured: dict[str, dict[str, list[str]]] = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        parameters = parse_qs(request.content.decode())
+        captured[parameters["method"][0]] = parameters
+        return httpx.Response(200, json={})
+
+    transport = httpx.MockTransport(handler)
+    original_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        matomo.httpx,
+        "AsyncClient",
+        lambda **kwargs: original_client(transport=transport, **kwargs),
+    )
+
+    import asyncio
+
+    async def request_reports() -> None:
+        async with matomo.httpx.AsyncClient() as http:
+            for method in ("Actions.getPageUrls", "Referrers.getReferrerType", "Goals.get"):
+                await matomo._report(
+                    http,
+                    "https://analytics.example.com/index.php",
+                    "secret-token",
+                    method,
+                    "7",
+                    date(2026, 8, 1),
+                    date(2026, 8, 2),
+                )
+
+    asyncio.run(request_reports())
+
+    assert captured["Actions.getPageUrls"]["flat"] == ["1"]
+    assert captured["Actions.getPageUrls"]["expanded"] == ["1"]
+    assert "flat" not in captured["Referrers.getReferrerType"]
+    assert "expanded" not in captured["Referrers.getReferrerType"]
+    assert "flat" not in captured["Goals.get"]
+    assert "expanded" not in captured["Goals.get"]
