@@ -44,9 +44,11 @@ persoonlijk inloggen, verplichte MFA, sessie-intrekking, tenantrollen, OAuth-sta
 
 Stagingacceptatie bevestigde migratie `0051`, een gezonde API en database, actieve
 MFA-handhaving, lokale encryptie van het TOTP-secret, een scanbare lokaal gegenereerde QR-code,
-succesvolle activatie en opnieuw inloggen met MFA. De algemene technische API-key blijft in
-productie uitgeschakeld. De loginpresentatie wordt later als interfacepolish opgesplitst in een
-afzonderlijke wachtwoordstap en verificatiestap; dit verandert de reeds werkende authenticatie niet.
+succesvolle activatie, opnieuw inloggen met MFA en de tweeuursgrens voor een nieuwe
+superusersessie. Staging is daarmee functioneel volledig akkoord. De algemene technische API-key
+blijft in productie uitgeschakeld. De loginpresentatie wordt later als interfacepolish opgesplitst
+in een afzonderlijke wachtwoordstap en verificatiestap; dit verandert de reeds werkende
+authenticatie niet.
 
 ## Release 7a-B — Platform en privacy
 
