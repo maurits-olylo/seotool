@@ -8,12 +8,24 @@ from app.core.config import Settings
 
 
 def test_accepts_production_without_technical_api_key() -> None:
-    settings = Settings(app_env="production", api_key="")
+    settings = Settings(
+        app_env="production",
+        api_key="",
+        database_url="postgresql+psycopg://seo:strong@postgres:5432/seo",
+        token_encryption_key="01" * 32,
+        mfa_enforcement_enabled=True,
+    )
     assert settings.app_env == "production"
 
 
 def test_configured_production_key_does_not_enable_legacy_access() -> None:
-    settings = Settings(app_env="production", api_key="a-long-production-secret")
+    settings = Settings(
+        app_env="production",
+        api_key="a-long-production-secret",
+        database_url="postgresql+psycopg://seo:strong@postgres:5432/seo",
+        token_encryption_key="01" * 32,
+        mfa_enforcement_enabled=True,
+    )
     assert settings.app_env == "production"
 
 
@@ -75,3 +87,49 @@ def test_application_image_runs_as_non_root_user() -> None:
     dockerfile = (project_root / "Dockerfile").read_text().splitlines()
 
     assert "USER app" in dockerfile
+
+
+def test_production_rejects_insecure_defaults() -> None:
+    with pytest.raises(ValidationError, match="Default database credentials"):
+        Settings(
+            app_env="production",
+            service_role="crawl-worker",
+            database_url="postgresql+psycopg://seo:seo@postgres:5432/seo",
+        )
+    with pytest.raises(ValidationError, match="MFA_ENFORCEMENT_ENABLED"):
+        Settings(
+            app_env="production",
+            database_url="postgresql+psycopg://seo:strong@postgres:5432/seo",
+            token_encryption_key="01" * 32,
+        )
+    with pytest.raises(ValidationError, match="TOKEN_ENCRYPTION_KEY"):
+        Settings(
+            app_env="production",
+            database_url="postgresql+psycopg://seo:strong@postgres:5432/seo",
+            mfa_enforcement_enabled=True,
+        )
+
+
+def test_compose_limits_sensitive_environment_by_service() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    compose = yaml.safe_load((project_root / "compose.yaml").read_text())
+    services = compose["services"]
+    sensitive = {
+        "API_KEY",
+        "GOOGLE_CLIENT_SECRET",
+        "BING_CLIENT_SECRET",
+        "TOKEN_ENCRYPTION_KEY",
+        "INITIAL_SUPERUSER_PASSWORD",
+        "PAGESPEED_API_KEY",
+    }
+
+    assert "env_file" not in "\n".join(
+        (project_root / filename).read_text()
+        for filename in ("compose.yaml", "compose.staging.yaml")
+    )
+    assert sensitive.isdisjoint(services["worker"]["environment"])
+    assert sensitive.isdisjoint(services["crawl-worker-2"]["environment"])
+    assert sensitive.isdisjoint(services["export-worker"]["environment"])
+    assert sensitive.isdisjoint(services["scheduler"]["environment"])
+    assert "TOKEN_ENCRYPTION_KEY" in services["integration-worker"]["environment"]
+    assert "INITIAL_SUPERUSER_PASSWORD" not in services["integration-worker"]["environment"]

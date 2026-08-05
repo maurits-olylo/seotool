@@ -8,11 +8,32 @@ x-app-hardening: &app-hardening
     - ALL
   pids_limit: 256
 
+x-runtime-env: &runtime-env
+  APP_ENV: ${APP_ENV:-development}
+  DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
 services:
   api:
     <<: *app-hardening
     build: .
-    env_file: .env
+    environment:
+      <<: *runtime-env
+      SERVICE_ROLE: api
+      API_KEY: ${API_KEY:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
+      BING_CLIENT_ID: ${BING_CLIENT_ID:-}
+      BING_CLIENT_SECRET: ${BING_CLIENT_SECRET:-}
+      BING_REDIRECT_URI: ${BING_REDIRECT_URI:-}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-}
+      INITIAL_SUPERUSER_EMAIL: ${INITIAL_SUPERUSER_EMAIL:-}
+      INITIAL_SUPERUSER_PASSWORD: ${INITIAL_SUPERUSER_PASSWORD:-}
+      MFA_ENFORCEMENT_ENABLED: ${MFA_ENFORCEMENT_ENABLED:-false}
+      RENDERING_ENABLED: ${RENDERING_ENABLED:-false}
+      PAGESPEED_ENABLED: ${PAGESPEED_ENABLED:-false}
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     ports: ["127.0.0.1:${API_PORT:-8000}:8000"]
     volumes: ["exports_data:/app/exports"]
@@ -29,8 +50,9 @@ services:
   worker:
     <<: *app-hardening
     build: .
-    env_file: .env
     environment:
+      <<: *runtime-env
+      SERVICE_ROLE: crawl-worker
       # Keep legacy default jobs drainable during the first queue-split deployment.
       # Drain pre-split crawl jobs from `crawls` during the queue transition.
       WORKER_QUEUES: sitemaps,crawls_light,crawls,default,verifications
@@ -51,8 +73,9 @@ services:
   crawl-worker-2:
     <<: *app-hardening
     build: .
-    env_file: .env
     environment:
+      <<: *runtime-env
+      SERVICE_ROLE: crawl-worker
       WORKER_QUEUES: crawls_full
       WORKER_NAME: full-1
     command: python -m app.worker
@@ -72,8 +95,9 @@ services:
     <<: *app-hardening
     profiles: ["crawl-overflow"]
     build: .
-    env_file: .env
     environment:
+      <<: *runtime-env
+      SERVICE_ROLE: crawl-worker
       WORKER_QUEUES: crawls_light,crawls_full
       WORKER_NAME: crawl-overflow-1
     command: python -m app.worker
@@ -92,8 +116,16 @@ services:
   integration-worker:
     <<: *app-hardening
     build: .
-    env_file: .env
     environment:
+      <<: *runtime-env
+      SERVICE_ROLE: integration-worker
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      BING_CLIENT_ID: ${BING_CLIENT_ID:-}
+      BING_CLIENT_SECRET: ${BING_CLIENT_SECRET:-}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-}
+      PAGESPEED_ENABLED: ${PAGESPEED_ENABLED:-false}
+      PAGESPEED_API_KEY: ${PAGESPEED_API_KEY:-}
       WORKER_QUEUES: integrations,maintenance,performance
       WORKER_NAME: integrations-1
     command: python -m app.worker
@@ -111,8 +143,9 @@ services:
   export-worker:
     <<: *app-hardening
     build: .
-    env_file: .env
     environment:
+      <<: *runtime-env
+      SERVICE_ROLE: export-worker
       WORKER_QUEUES: exports
       WORKER_NAME: exports-1
     command: python -m app.worker
@@ -134,8 +167,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.render
-    env_file: .env
     environment:
+      <<: *runtime-env
+      SERVICE_ROLE: render-worker
+      USER_AGENT: ${USER_AGENT:-SEO-Monitor-Bot/0.1}
+      RENDERING_ENABLED: ${RENDERING_ENABLED:-false}
       WORKER_QUEUES: renders
       WORKER_NAME: render-1
     command: python -m app.worker
@@ -155,7 +191,9 @@ services:
   scheduler:
     <<: *app-hardening
     build: .
-    env_file: .env
+    environment:
+      <<: *runtime-env
+      SERVICE_ROLE: scheduler
     command: python -m app.scheduler
     depends_on:
       redis: {condition: service_healthy}

@@ -6,6 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_env: str = "development"
+    service_role: str = "api"
     app_name: str = "SEO Monitor API"
     api_key: str = "change-me"
     database_url: str = "postgresql+psycopg://seo:seo@postgres:5432/seo"
@@ -32,6 +33,20 @@ class Settings(BaseSettings):
     def validate_production_secrets(self) -> "Settings":
         if self.pagespeed_enabled and not self.pagespeed_api_key:
             raise ValueError("PAGESPEED_API_KEY is required when PageSpeed is enabled")
+        if self.app_env == "production":
+            if "seo:seo@" in self.database_url:
+                raise ValueError("Default database credentials are not allowed in production")
+            if self.service_role == "api" and not self.mfa_enforcement_enabled:
+                raise ValueError("MFA_ENFORCEMENT_ENABLED must be true for the production API")
+            if self.service_role in {"api", "integration-worker"}:
+                try:
+                    key = bytes.fromhex(self.token_encryption_key)
+                except ValueError as exc:
+                    raise ValueError(
+                        "TOKEN_ENCRYPTION_KEY must contain 64 hexadecimal characters"
+                    ) from exc
+                if len(key) != 32:
+                    raise ValueError("TOKEN_ENCRYPTION_KEY must contain 64 hexadecimal characters")
         return self
 
 

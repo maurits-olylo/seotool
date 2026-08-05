@@ -108,3 +108,28 @@ Lokale acceptatie:
   privilegeblokkering en proces- en resourcegrenzen;
 - een zware lokale imagebuild is volgens het infrastructuurprofiel overgeslagen en wordt op staging
   uitgevoerd.
+
+### Fase 3 — Secretscheiding en veilige productiestart
+
+Status: lokaal afgerond en nog niet gedeployed.
+
+Compose injecteert niet langer het volledige environmentbestand in iedere applicatiecontainer.
+De API ontvangt uitsluitend zijn authenticatie-, OAuth- en bootstrapconfiguratie; de
+integration-worker ontvangt alleen de OAuth-, tokenencryptie- en optionele PageSpeedconfiguratie
+die voor integraties nodig is. Crawl-, export-, render- en schedulerprocessen krijgen deze
+gevoelige waarden niet. Alle services behouden vooralsnog de bestaande database- en Redisverbinding;
+afzonderlijke databaseaccounts en grants vereisen een aparte, gecontroleerde rechtenmigratie.
+
+De productieconfiguratie stopt nu direct bij bekende standaarddatabasecredentials, uitgeschakelde
+API-MFA of een ontbrekende/ongeldige tokenencryptiesleutel voor de API en integration-worker. De
+voorbeeldconfiguratie bevat geen actieve technische API-key of standaard databasewachtwoord meer.
+Productie- en staging-environmentbestanden blijven buiten Git, krijgen modus `0600` en worden niet
+in logs getoond.
+
+Lokale acceptatie:
+
+- productie- en staging-Composeconfiguratie: geldig;
+- Ruff: geslaagd;
+- volledige testsuite: 438 tests geslaagd;
+- regressietests bewaken servicegebonden secretinjectie en fail-fast productieconfiguratie;
+- er zijn geen databasewijzigingen of migraties.

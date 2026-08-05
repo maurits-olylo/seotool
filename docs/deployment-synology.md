@@ -38,7 +38,11 @@ DATABASE_URL=postgresql+psycopg://seo:URL_ENCODED_WACHTWOORD@postgres:5432/seo
 API_PORT=8000
 ```
 
-Gebruik geen spaties of on-geëscapete speciale tekens in `DATABASE_URL`. Commit `.env` nooit.
+Gebruik geen spaties of on-geëscapete speciale tekens in `DATABASE_URL`. Commit `.env` nooit en
+behoud bestandsmodus `0600`. Compose gebruikt het bestand alleen voor variabelesubstitutie; iedere
+applicatieservice ontvangt vervolgens uitsluitend de instellingen die voor zijn rol zijn
+toegestaan. Controleer na iedere handmatige vervanging opnieuw de modus en eigenaar zonder de
+inhoud te tonen.
 
 ## Installeren en starten
 
@@ -73,6 +77,9 @@ sudo cp .env.staging.example .env.staging
 sudo chmod 600 .env.staging
 sudo vi .env.staging
 ```
+
+Behoud ook voor `.env.staging` bestandsmodus `0600`. Deel dit bestand niet met productie en toon de
+inhoud niet in deploymentlogs of Compose-uitvoer.
 
 Controleer vóór de eerste start dat staging zelfstandig is en uitsluitend op loopback publiceert:
 

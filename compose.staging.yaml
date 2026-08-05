@@ -10,11 +10,32 @@ x-app-hardening: &app-hardening
     - ALL
   pids_limit: 256
 
+x-runtime-env: &runtime-env
+  APP_ENV: ${APP_ENV:-staging}
+  DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
 services:
   api:
     <<: *app-hardening
     build: .
-    env_file: ${STAGING_ENV_FILE:-.env.staging}
+    environment:
+      <<: *runtime-env
+      SERVICE_ROLE: api
+      API_KEY: ${API_KEY:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
+      BING_CLIENT_ID: ${BING_CLIENT_ID:-}
+      BING_CLIENT_SECRET: ${BING_CLIENT_SECRET:-}
+      BING_REDIRECT_URI: ${BING_REDIRECT_URI:-}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-}
+      INITIAL_SUPERUSER_EMAIL: ${INITIAL_SUPERUSER_EMAIL:-}
+      INITIAL_SUPERUSER_PASSWORD: ${INITIAL_SUPERUSER_PASSWORD:-}
+      MFA_ENFORCEMENT_ENABLED: ${MFA_ENFORCEMENT_ENABLED:-false}
+      RENDERING_ENABLED: ${RENDERING_ENABLED:-false}
+      PAGESPEED_ENABLED: ${PAGESPEED_ENABLED:-false}
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     ports:
       - "127.0.0.1:${STAGING_API_PORT:-18000}:8000"
@@ -69,8 +90,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.render
-    env_file: ${STAGING_ENV_FILE:-.env.staging}
     environment:
+      <<: *runtime-env
+      SERVICE_ROLE: render-worker
+      USER_AGENT: ${USER_AGENT:-SEO-Monitor-Bot/0.1}
+      RENDERING_ENABLED: ${RENDERING_ENABLED:-false}
       WORKER_QUEUES: renders
       WORKER_NAME: render-staging-1
     command: python -m app.worker

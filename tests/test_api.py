@@ -388,10 +388,13 @@ def test_cookie_authenticated_mutation_rejects_foreign_origin() -> None:
         db.add(user)
         db.commit()
     browser = TestClient(app)
-    assert browser.post(
-        "/ui/login",
-        json={"email": "csrf@example.com", "password": "Csrf-secure-password-1!"},
-    ).status_code == 204
+    assert (
+        browser.post(
+            "/ui/login",
+            json={"email": "csrf@example.com", "password": "Csrf-secure-password-1!"},
+        ).status_code
+        == 204
+    )
     denied = browser.post("/ui/logout", headers={"Origin": "https://attacker.example"})
     assert denied.status_code == 403
     assert denied.json()["detail"] == "Ongeldige request-origin"
@@ -422,10 +425,13 @@ def test_mfa_failures_are_rate_limited(monkeypatch) -> None:
             },
         )
         assert response.status_code == 401
-    assert browser.post(
-        "/ui/login",
-        json={"email": "mfa-limit@example.com", "password": "Mfa-limit-password-1!"},
-    ).status_code == 429
+    assert (
+        browser.post(
+            "/ui/login",
+            json={"email": "mfa-limit@example.com", "password": "Mfa-limit-password-1!"},
+        ).status_code
+        == 429
+    )
     get_settings.cache_clear()
 
 
@@ -445,10 +451,13 @@ def test_admin_enrolls_mfa_and_uses_single_recovery_code(monkeypatch) -> None:
         db.commit()
         user_id = user.id
     browser = TestClient(app)
-    assert browser.post(
-        "/ui/login",
-        json={"email": "mfa-admin@example.com", "password": "Mfa-secure-password-1!"},
-    ).status_code == 204
+    assert (
+        browser.post(
+            "/ui/login",
+            json={"email": "mfa-admin@example.com", "password": "Mfa-secure-password-1!"},
+        ).status_code
+        == 204
+    )
     assert browser.get("/api/v1/me").json()["mfa_required"] is True
     assert browser.get("/api/v1/clients").status_code == 428
     setup = browser.post("/api/v1/me/mfa/setup")
@@ -456,10 +465,13 @@ def test_admin_enrolls_mfa_and_uses_single_recovery_code(monkeypatch) -> None:
     assert setup.status_code == 200
     assert setup_data["qr_code_data_uri"].startswith("data:image/svg+xml;base64,")
     assert len(setup_data["recovery_codes"]) == 10
-    assert browser.post(
-        "/api/v1/me/mfa/confirm",
-        json={"code": totp_code(setup_data["secret"])},
-    ).status_code == 204
+    assert (
+        browser.post(
+            "/api/v1/me/mfa/confirm",
+            json={"code": totp_code(setup_data["secret"])},
+        ).status_code
+        == 204
+    )
     assert browser.get("/api/v1/clients").status_code == 200
     recovery_code = setup_data["recovery_codes"][0]
     assert browser.post("/ui/logout").status_code == 204
@@ -468,14 +480,17 @@ def test_admin_enrolls_mfa_and_uses_single_recovery_code(monkeypatch) -> None:
         json={"email": "mfa-admin@example.com", "password": "Mfa-secure-password-1!"},
     )
     assert challenge.status_code == 202
-    assert browser.post(
-        "/ui/login",
-        json={
-            "email": "mfa-admin@example.com",
-            "password": "Mfa-secure-password-1!",
-            "mfa_code": recovery_code,
-        },
-    ).status_code == 204
+    assert (
+        browser.post(
+            "/ui/login",
+            json={
+                "email": "mfa-admin@example.com",
+                "password": "Mfa-secure-password-1!",
+                "mfa_code": recovery_code,
+            },
+        ).status_code
+        == 204
+    )
     with SessionLocal() as db:
         enrolled = db.get(User, user_id)
         assert enrolled and enrolled.mfa_enabled
@@ -720,15 +735,21 @@ def test_admin_can_manage_other_client_members(client: TestClient) -> None:
         == 204
     )
     member_browser = TestClient(app)
-    assert member_browser.post(
-        "/ui/login",
-        json={"email": "managed@example.com", "password": "Managed-secure-password-1!"},
-    ).status_code == 204
+    assert (
+        member_browser.post(
+            "/ui/login",
+            json={"email": "managed@example.com", "password": "Managed-secure-password-1!"},
+        ).status_code
+        == 204
+    )
     assert member_browser.get("/api/v1/me").status_code == 200
-    assert browser.patch(
-        f"/api/v1/clients/{customer['id']}/members/{member_id}",
-        json={"role": "admin"},
-    ).status_code == 403
+    assert (
+        browser.patch(
+            f"/api/v1/clients/{customer['id']}/members/{member_id}",
+            json={"role": "admin"},
+        ).status_code
+        == 403
+    )
     upgraded = browser.patch(
         f"/api/v1/clients/{customer['id']}/members/{member_id}",
         json={"role": "user"},
@@ -826,10 +847,13 @@ def test_invitation_cannot_replace_existing_account_password(client: TestClient)
     from app.main import app
 
     inviter = TestClient(app)
-    assert inviter.post(
-        "/ui/login",
-        json={"email": "inviter@example.com", "password": "Inviter-secure-password-1!"},
-    ).status_code == 204
+    assert (
+        inviter.post(
+            "/ui/login",
+            json={"email": "inviter@example.com", "password": "Inviter-secure-password-1!"},
+        ).status_code
+        == 204
+    )
     invitation = inviter.post(
         "/api/v1/invitations",
         json={
@@ -902,18 +926,24 @@ def test_tenant_client_role_cannot_write_when_user_is_admin_elsewhere(
     from app.main import app
 
     browser = TestClient(app)
-    assert browser.post(
-        "/ui/login",
-        json={"email": "mixed-role@example.com", "password": "Mixed-role-password-1!"},
-    ).status_code == 204
+    assert (
+        browser.post(
+            "/ui/login",
+            json={"email": "mixed-role@example.com", "password": "Mixed-role-password-1!"},
+        ).status_code
+        == 204
+    )
     assert browser.get(f"/api/v1/websites/{website['id']}/issues").status_code == 200
-    assert browser.patch(
-        f"/api/v1/issues/{issue_id}", json={"status": "planned"}
-    ).status_code == 403
-    assert browser.post(
-        "/api/v1/exports",
-        json={"website_id": website["id"], "export_type": "excel"},
-    ).status_code == 403
+    assert (
+        browser.patch(f"/api/v1/issues/{issue_id}", json={"status": "planned"}).status_code == 403
+    )
+    assert (
+        browser.post(
+            "/api/v1/exports",
+            json={"website_id": website["id"], "export_type": "excel"},
+        ).status_code
+        == 403
+    )
 
 
 def test_client_report_contains_performance_and_work(client: TestClient) -> None:
@@ -1457,6 +1487,8 @@ def test_proxied_http_redirects_to_https_in_production(monkeypatch) -> None:
 
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("API_KEY", "a-long-production-secret")
+    monkeypatch.setenv("MFA_ENFORCEMENT_ENABLED", "true")
+    monkeypatch.setenv("TOKEN_ENCRYPTION_KEY", "11" * 32)
     get_settings.cache_clear()
     try:
         response = TestClient(app).get(
@@ -1476,6 +1508,8 @@ def test_direct_production_healthcheck_is_not_redirected(monkeypatch) -> None:
 
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("API_KEY", "a-long-production-secret")
+    monkeypatch.setenv("MFA_ENFORCEMENT_ENABLED", "true")
+    monkeypatch.setenv("TOKEN_ENCRYPTION_KEY", "12" * 32)
     get_settings.cache_clear()
     try:
         response = TestClient(app).get("/health")
@@ -1490,6 +1524,8 @@ def test_technical_api_key_is_rejected_in_production(monkeypatch) -> None:
 
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("API_KEY", "a-long-production-secret")
+    monkeypatch.setenv("MFA_ENFORCEMENT_ENABLED", "true")
+    monkeypatch.setenv("TOKEN_ENCRYPTION_KEY", "13" * 32)
     get_settings.cache_clear()
     try:
         response = TestClient(app).get(
