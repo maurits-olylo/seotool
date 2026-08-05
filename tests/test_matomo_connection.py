@@ -177,3 +177,95 @@ def test_matomo_sync_stores_aggregates_and_url_coverage(monkeypatch) -> None:  #
             "https://human.nl/onbekend?genre=kunst"
         ]
     get_settings.cache_clear()
+
+
+def test_matomo_sync_keeps_pages_when_optional_report_is_unavailable(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setenv("TOKEN_ENCRYPTION_KEY", "0c" * 32)
+    get_settings.cache_clear()
+    monkeypatch.setattr(matomo, "validate_public_http_url", lambda _url: None)
+
+    async def fake_report(_http, _endpoint, _token, method, *_args):  # type: ignore[no-untyped-def]
+        if method == "Actions.getPageUrls":
+            return {"2026-08-01": [{"label": "/programma", "nb_visits": 10}]}
+        if method == "Goals.get":
+            raise matomo.MatomoReportError(
+                method, "dit rapport is niet beschikbaar in deze Matomo-installatie"
+            )
+        return {"2026-08-01": [{"label": "Search Engines", "nb_visits": 8}]}
+
+    monkeypatch.setattr(matomo, "_report", fake_report)
+    with SessionLocal() as db:
+        customer = Client(name="Human partial")
+        website = Website(client=customer, name="Human partial", base_url="https://human.nl/")
+        db.add(website)
+        db.flush()
+        connection = IntegrationConnection(
+            client_id=customer.id,
+            provider="matomo",
+            status="connected",
+            encrypted_access_token=integrations.encrypt_token("secret"),
+            settings={"server_url": "https://analytics.example.com/index.php"},
+        )
+        db.add(connection)
+        db.flush()
+        mapping = WebsiteIntegration(
+            website_id=website.id,
+            connection_id=connection.id,
+            service="matomo",
+            external_property_id="7",
+            status="active",
+        )
+        db.add(mapping)
+        db.commit()
+
+        import asyncio
+
+        result = asyncio.run(matomo.sync_matomo(db, website.id, days=5))
+
+        assert result["status"] == "partially_succeeded"
+        assert result["page_rows"] == 1
+        assert result["coverage"]["traffic_sources"] == "available"
+        assert result["coverage"]["goals"] == "unavailable"
+        assert result["warnings"] == [
+            "Doelen en conversies: dit rapport is niet beschikbaar in deze Matomo-installatie"
+        ]
+        assert mapping.status == "active"
+        assert mapping.settings["last_error"] == result["warnings"][0]
+    get_settings.cache_clear()
+
+
+def test_matomo_report_classifies_api_error_without_exposing_raw_message(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"result": "error", "message": "Plugin disabled: secret"})
+
+    transport = httpx.MockTransport(handler)
+    original_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        matomo.httpx,
+        "AsyncClient",
+        lambda **kwargs: original_client(transport=transport, **kwargs),
+    )
+
+    import asyncio
+
+    async def request_report() -> None:
+        async with matomo.httpx.AsyncClient() as http:
+            await matomo._report(
+                http,
+                "https://analytics.example.com/index.php",
+                "secret-token",
+                "Goals.get",
+                "7",
+                date(2026, 8, 1),
+                date(2026, 8, 2),
+            )
+
+    try:
+        asyncio.run(request_report())
+    except matomo.MatomoReportError as exc:
+        assert str(exc) == (
+            "Doelen en conversies: dit rapport is niet beschikbaar in deze Matomo-installatie"
+        )
+        assert "secret" not in str(exc)
+    else:
+        raise AssertionError("MatomoReportError was not raised")

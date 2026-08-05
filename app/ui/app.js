@@ -672,7 +672,8 @@ async function syncMatomo() {
   try {
     const result = await api(`/api/v1/websites/${websiteId}/integrations/matomo/sync`, {method:"POST"});
     const percentage = result.url_match_rate == null ? "onbekend" : `${Math.round(result.url_match_rate * 100)}%`;
-    message.textContent = `${result.page_rows} pagina-regels geïmporteerd; ${result.matched_urls} gekoppeld (${percentage}).`;
+    const warning = result.warnings?.length ? ` Waarschuwing: ${result.warnings.join("; ")}.` : "";
+    message.textContent = `${result.page_rows} pagina-regels geïmporteerd; ${result.matched_urls} gekoppeld (${percentage}).${warning}`;
     button.textContent = "Opnieuw synchroniseren";
     await loadIssues();
   } catch (error) { message.textContent = error.message; button.textContent = "Opnieuw proberen"; }

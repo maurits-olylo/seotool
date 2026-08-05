@@ -20,6 +20,31 @@ from app.services.oauth import decrypt_token
 from app.services.security import validate_public_http_url
 from app.services.url_normalization import InvalidUrlError, normalize_url
 
+REPORT_LABELS = {
+    "Actions.getPageUrls": "Paginaresultaten",
+    "Referrers.getAll": "Verkeersbronnen",
+    "Goals.get": "Doelen en conversies",
+}
+
+
+class MatomoReportError(ValueError):
+    def __init__(self, method: str, reason: str) -> None:
+        self.method = method
+        self.report_label = REPORT_LABELS.get(method, method)
+        self.reason = reason
+        super().__init__(f"{self.report_label}: {reason}")
+
+
+def _safe_report_error(payload: dict[str, object]) -> str:
+    message = str(payload.get("message") or "").lower()
+    if "token" in message or "authentication" in message:
+        return "het API-token is geweigerd"
+    if "access" in message or "permission" in message or "privilege" in message:
+        return "het Matomo-account heeft onvoldoende leesrechten"
+    if "method" in message or "plugin" in message or "module" in message:
+        return "dit rapport is niet beschikbaar in deze Matomo-installatie"
+    return "Matomo heeft dit rapport geweigerd"
+
 
 def normalize_matomo_server_url(value: str) -> str:
     raw = value.strip()
@@ -99,29 +124,32 @@ async def _report(
     start_date: date,
     end_date: date,
 ) -> object:
-    response = await http.post(
-        endpoint,
-        data={
-            "module": "API",
-            "method": method,
-            "idSite": site_id,
-            "period": "day",
-            "date": f"{start_date.isoformat()},{end_date.isoformat()}",
-            "format": "JSON",
-            "filter_limit": "-1",
-            "flat": "1",
-            "expanded": "1",
-            "token_auth": token,
-        },
-    )
+    try:
+        response = await http.post(
+            endpoint,
+            data={
+                "module": "API",
+                "method": method,
+                "idSite": site_id,
+                "period": "day",
+                "date": f"{start_date.isoformat()},{end_date.isoformat()}",
+                "format": "JSON",
+                "filter_limit": "-1",
+                "flat": "1",
+                "expanded": "1",
+                "token_auth": token,
+            },
+        )
+    except httpx.RequestError as exc:
+        raise MatomoReportError(method, "Matomo kon niet worden bereikt") from exc
     if response.is_redirect or response.status_code != 200:
-        raise ValueError("Matomo report could not be loaded")
+        raise MatomoReportError(method, "Matomo heeft het verzoek niet geaccepteerd")
     try:
         payload = response.json()
     except ValueError as exc:
-        raise ValueError("Matomo returned an invalid report") from exc
+        raise MatomoReportError(method, "Matomo gaf geen geldig rapport terug") from exc
     if isinstance(payload, dict) and payload.get("result") == "error":
-        raise ValueError("Matomo token is invalid or lacks access to the selected site")
+        raise MatomoReportError(method, _safe_report_error(payload))
     return payload
 
 
@@ -172,40 +200,53 @@ async def sync_matomo(db: Session, website_id: UUID, days: int | None = None) ->
     start_date = end_date - timedelta(days=days - 1)
     async with httpx.AsyncClient(timeout=60, follow_redirects=False) as http:
         try:
-            pages, sources, goals = await asyncio.gather(
-                _report(
-                    http,
-                    endpoint,
-                    token,
-                    "Actions.getPageUrls",
-                    mapping.external_property_id,
-                    start_date,
-                    end_date,
-                ),
-                _report(
-                    http,
-                    endpoint,
-                    token,
-                    "Referrers.getAll",
-                    mapping.external_property_id,
-                    start_date,
-                    end_date,
-                ),
-                _report(
-                    http,
-                    endpoint,
-                    token,
-                    "Goals.get",
-                    mapping.external_property_id,
-                    start_date,
-                    end_date,
-                ),
+            pages = await _report(
+                http,
+                endpoint,
+                token,
+                "Actions.getPageUrls",
+                mapping.external_property_id,
+                start_date,
+                end_date,
             )
-        except ValueError as exc:
+        except MatomoReportError as exc:
             mapping.status = "error"
             mapping.settings = {**mapping.settings, "last_error": str(exc)}
             db.commit()
             raise
+        optional_results = await asyncio.gather(
+            _report(
+                http,
+                endpoint,
+                token,
+                "Referrers.getAll",
+                mapping.external_property_id,
+                start_date,
+                end_date,
+            ),
+            _report(
+                http,
+                endpoint,
+                token,
+                "Goals.get",
+                mapping.external_property_id,
+                start_date,
+                end_date,
+            ),
+            return_exceptions=True,
+        )
+
+    optional_payloads: list[object] = []
+    warnings: list[str] = []
+    for result in optional_results:
+        if isinstance(result, BaseException):
+            warnings.append(str(result))
+            optional_payloads.append({})
+        else:
+            optional_payloads.append(result)
+    sources, goals = optional_payloads
+    sources_unavailable = isinstance(optional_results[0], BaseException)
+    goals_unavailable = isinstance(optional_results[1], BaseException)
 
     for model in (MatomoPageMetric, MatomoAggregateMetric):
         db.execute(
@@ -282,19 +323,31 @@ async def sync_matomo(db: Session, website_id: UUID, days: int | None = None) ->
         "unmatched_url_variants": sorted(unmatched_variants),
         "coverage": {
             "pages": "available",
-            "traffic_sources": "available" if _dated_rows(sources) else "unknown",
-            "goals": "available" if _dated_rows(goals) else "unknown",
+            "traffic_sources": (
+                "unavailable"
+                if sources_unavailable
+                else "available"
+                if _dated_rows(sources)
+                else "unknown"
+            ),
+            "goals": (
+                "unavailable"
+                if goals_unavailable
+                else "available"
+                if _dated_rows(goals)
+                else "unknown"
+            ),
             "transitions": "unknown",
             "downloads": "unknown",
             "outbound_links": "unknown",
             "internal_search": "not_imported",
         },
-        "last_error": None,
+        "last_error": "; ".join(warnings) if warnings else None,
     }
     connection.last_synced_at = now
     db.commit()
     return {
-        "status": "succeeded",
+        "status": "partially_succeeded" if warnings else "succeeded",
         "start_date": start_date,
         "end_date": end_date,
         "page_rows": total,
@@ -303,4 +356,5 @@ async def sync_matomo(db: Session, website_id: UUID, days: int | None = None) ->
         "url_match_rate": mapping.settings["url_match_rate"],
         "aggregate_rows": len(aggregate_rows),
         "coverage": mapping.settings["coverage"],
+        "warnings": warnings,
     }
