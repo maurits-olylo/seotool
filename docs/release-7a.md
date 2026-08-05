@@ -2,8 +2,8 @@
 
 ## Release 7a-A — Identiteit en toegang
 
-Status: lokaal afgerond en op 5 augustus 2026 met commit `97b8aed` op staging gevalideerd;
-nog niet op productie gedeployed.
+Status: afgerond en op 5 augustus 2026 met releasecommit `b537c78` op staging en productie
+gevalideerd.
 
 Deze eerste deelrelease sluit de kritieke account- en tenanttoegangsrisico's uit de audit van
 3 augustus 2026:
@@ -39,8 +39,8 @@ Lokale acceptatie:
 - JavaScript-rendering en PageSpeed blijven uitgeschakeld;
 - de Linux-worker blijft buiten deze release.
 
-Productieacceptatie volgt pas na staging, gecontroleerde deployment en functionele verificatie van
-persoonlijk inloggen, verplichte MFA, sessie-intrekking, tenantrollen, OAuth-state en auditregistratie.
+De acceptatie omvat staging, gecontroleerde deployment en functionele verificatie van persoonlijk
+inloggen, verplichte MFA, sessie-intrekking, tenantrollen, OAuth-state en auditregistratie.
 
 Stagingacceptatie bevestigde migratie `0051`, een gezonde API en database, actieve
 MFA-handhaving, lokale encryptie van het TOTP-secret, een scanbare lokaal gegenereerde QR-code,
@@ -49,6 +49,13 @@ superusersessie. Staging is daarmee functioneel volledig akkoord. De algemene te
 blijft in productie uitgeschakeld. De loginpresentatie wordt later als interfacepolish opgesplitst
 in een afzonderlijke wachtwoordstap en verificatiestap; dit verandert de reeds werkende
 authenticatie niet.
+
+De productiedeployment is uitgevoerd vanaf de exacte releasecommit na een veilige crawl-drain en
+een inhoudelijk geverifieerde databaseback-up. Productie is gezond op migratie `0051`; de API is
+uitsluitend op loopback gepubliceerd, MFA-handhaving en de tweeuursgrens voor beheerders zijn
+actief en de algemene technische API-key wordt geweigerd. Activeren via de QR-code, uitloggen en
+opnieuw inloggen met MFA zijn functioneel bevestigd. De crawl-drain is na alle controles zonder
+wachtende taken opgeheven.
 
 ## Release 7a-B — Platform en privacy
 
