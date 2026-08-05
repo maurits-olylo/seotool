@@ -70,6 +70,12 @@ Matomo-site-ID zijn operationele secrets of configuratiewaarden en staan niet in
   ontbreekt en verkeersbronnen gebruiken de ondersteunde overzichtsmethode met methodespecifieke
   parameters. De productieproef importeerde pagina-, verkeersbron- en conversiedata zonder
   waarschuwing; API en database bleven gezond en de crawl-drain werd veilig opgeheven.
+- De historische importcorrecties `41f41a5` en `c89bdd8` zijn zonder migration op productie
+  gevalideerd. Aanvragen van 480 dagen worden in 18 blokken van maximaal 28 dagen verwerkt en
+  dubbele Matomo-regels binnen één dag worden vóór opslag samengevoegd. De herhaalde functionele
+  import eindigde succesvol met GSC-dekking vanaf 23 maart 2025, GSC-zoekopdrachten vanaf
+  29 maart 2025 en Bing-dekking vanaf 25 april 2025; alle bronnen liepen door tot hun laatst
+  beschikbare datum. API, integration-worker en database bleven gezond op migration `0045`.
 
 ## Uitgestelde interface-polish
 
