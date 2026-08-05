@@ -31,7 +31,7 @@ from app.schemas.recommendations import (
     RecommendationVerificationRead,
     TaskNotificationRead,
 )
-from app.services.authorization import require_website_access, require_write_access
+from app.services.authorization import require_website_access, require_website_write_access
 from app.services.recommendation_library import DEFINITIONS
 from app.services.recommendation_tasks import (
     RecommendationTaskError,
@@ -62,11 +62,10 @@ def create_recommendation_task(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> RecommendationTask:
-    require_write_access(principal)
     issue = db.get(Issue, issue_id)
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
-    require_website_access(db, principal, issue.website_id)
+    require_website_write_access(db, principal, issue.website_id)
     try:
         return create_task_from_issue(db, issue=issue, principal=principal)
     except RecommendationTaskError as exc:
@@ -237,9 +236,8 @@ def create_recommendation_task_url(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> RecommendationTaskUrl:
-    require_write_access(principal)
     task = _task_or_404(db, task_id)
-    require_website_access(db, principal, task.website_id)
+    require_website_write_access(db, principal, task.website_id)
     try:
         return add_task_url(
             db,
@@ -262,9 +260,8 @@ def delete_recommendation_task_url(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> None:
-    require_write_access(principal)
     task = _task_or_404(db, task_id)
-    require_website_access(db, principal, task.website_id)
+    require_website_write_access(db, principal, task.website_id)
     task_url = db.get(RecommendationTaskUrl, task_url_id)
     if not task_url or task_url.task_id != task.id:
         raise HTTPException(status_code=404, detail="Task URL not found")
@@ -281,9 +278,8 @@ def patch_recommendation_task(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> RecommendationTask:
-    require_write_access(principal)
     task = _task_or_404(db, task_id)
-    require_website_access(db, principal, task.website_id)
+    require_website_write_access(db, principal, task.website_id)
     try:
         return update_task(db, task=task, payload=payload, principal=principal)
     except RecommendationTaskError as exc:
@@ -321,9 +317,8 @@ def create_recommendation_feedback(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> RecommendationFeedback:
-    require_write_access(principal)
     task = _task_or_404(db, task_id)
-    require_website_access(db, principal, task.website_id)
+    require_website_write_access(db, principal, task.website_id)
     try:
         return record_feedback(db, task=task, payload=payload, principal=principal)
     except RecommendationTaskError as exc:
@@ -374,9 +369,8 @@ def create_recommendation_verification(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> RecommendationVerification:
-    require_write_access(principal)
     task = _task_or_404(db, task_id)
-    require_website_access(db, principal, task.website_id)
+    require_website_write_access(db, principal, task.website_id)
     try:
         return request_verification(db, task=task, principal=principal)
     except RecommendationTaskError as exc:

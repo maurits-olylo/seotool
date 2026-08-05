@@ -34,7 +34,7 @@ from app.schemas.issues import (
     IssueUpdate,
 )
 from app.services.analytics_provider import analytics_page_totals
-from app.services.authorization import require_website_access, require_write_access
+from app.services.authorization import require_website_access, require_website_write_access
 from app.services.element_jumps import build_live_jump_url
 from app.services.internal_redirect_analysis import INTERNAL_REDIRECT_PATTERN_TYPE
 from app.services.issue_classification import issue_nature, issue_scope
@@ -405,8 +405,7 @@ def bulk_update_issues(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> IssueBulkResult:
-    require_write_access(principal)
-    require_website_access(db, principal, website_id)
+    require_website_write_access(db, principal, website_id)
     issue_ids = list(dict.fromkeys(payload.issue_ids))
     issues = list(
         db.scalars(select(Issue).where(Issue.website_id == website_id, Issue.id.in_(issue_ids)))
@@ -519,8 +518,7 @@ def restore_issue_suppression(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> IssueSuppression:
-    require_write_access(principal)
-    require_website_access(db, principal, website_id)
+    require_website_write_access(db, principal, website_id)
     suppression = db.get(IssueSuppression, suppression_id)
     if suppression is None or suppression.website_id != website_id:
         raise HTTPException(status_code=404, detail="Onderdrukkingsregel niet gevonden.")
@@ -1010,11 +1008,10 @@ def update_issue(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> Issue:
-    require_write_access(principal)
     issue = db.get(Issue, issue_id)
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
-    require_website_access(db, principal, issue.website_id)
+    require_website_write_access(db, principal, issue.website_id)
     previous_status = issue.status
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(issue, key, value)
@@ -1050,11 +1047,10 @@ def add_comment(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> IssueComment:
-    require_write_access(principal)
     issue = db.get(Issue, issue_id)
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
-    require_website_access(db, principal, issue.website_id)
+    require_website_write_access(db, principal, issue.website_id)
     comment = IssueComment(issue_id=issue_id, **payload.model_dump())
     db.add(comment)
     db.commit()

@@ -25,8 +25,8 @@ def create_export(
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> Export:
-    require_write_access(principal)
-    require_website_access(db, principal, payload.website_id)
+    website = require_website_access(db, principal, payload.website_id)
+    require_write_access(db, principal, website.client_id)
     if get_settings().app_env != "test" and not queue_has_capacity("exports"):
         raise HTTPException(status_code=503, detail="De exportwachtrij is tijdelijk vol")
     existing = db.scalar(

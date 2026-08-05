@@ -3,12 +3,19 @@ import secrets
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.security import Principal, create_session_token, hash_password, require_api_key
+from app.core.security import (
+    Principal,
+    create_session_token,
+    hash_password,
+    require_api_key,
+    session_user_id,
+    verify_password,
+)
 from app.db.session import get_db
 from app.models.user import ClientMembership, User, UserInvitation
 from app.schemas.users import (
@@ -203,7 +210,13 @@ def _valid_invitation(token: str, db: Session) -> UserInvitation:
     expires_at = invitation.expires_at if invitation else None
     if expires_at and expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=UTC)
-    if not invitation or invitation.accepted_at or not expires_at or expires_at <= now:
+    if (
+        not invitation
+        or invitation.accepted_at
+        or invitation.revoked_at
+        or not expires_at
+        or expires_at <= now
+    ):
         raise HTTPException(status_code=410, detail="Invitation is invalid or expired")
     return invitation
 
@@ -218,12 +231,20 @@ def accept_invitation(
     token: str,
     payload: InvitationAccept,
     response: Response,
+    seo_session: str | None = Cookie(default=None),
     db: Session = Depends(get_db),
 ) -> Response:
     invitation = _valid_invitation(token, db)
     now = datetime.now(UTC)
     user = db.scalar(select(User).where(func.lower(User.email) == invitation.email.lower()))
     if user:
+        if session_user_id(seo_session) != user.id and not verify_password(
+            payload.password, user.password_hash
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Log eerst in of gebruik het huidige wachtwoord van het bestaande account",
+            )
         if db.scalar(
             select(ClientMembership.id).where(
                 ClientMembership.user_id == user.id,
@@ -231,7 +252,6 @@ def accept_invitation(
             )
         ):
             raise HTTPException(status_code=409, detail="Gebruiker heeft al toegang tot deze klant")
-        user.password_hash = hash_password(payload.password)
         user.is_active = True
     else:
         user = User(

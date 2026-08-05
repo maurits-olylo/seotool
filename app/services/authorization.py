@@ -45,11 +45,22 @@ def require_global_role(principal: Principal, *roles: str) -> None:
     raise HTTPException(status_code=403, detail="Insufficient permissions")
 
 
-def require_write_access(principal: Principal) -> None:
-    """Keep report-only client accounts from mutating customer data."""
-    if principal.is_api_key or principal.role != "client":
+def require_write_access(db: Session, principal: Principal, client_id: UUID) -> None:
+    """Authorize writes against the role for this specific tenant."""
+    if principal.role == "superuser" or principal.is_api_key:
+        return
+    membership = require_client_access(db, principal, client_id)
+    if membership and membership.role in {"admin", "user"}:
         return
     raise HTTPException(status_code=403, detail="Client accounts have read-only access")
+
+
+def require_website_write_access(
+    db: Session, principal: Principal, website_id: UUID
+) -> Website:
+    website = require_website_access(db, principal, website_id)
+    require_write_access(db, principal, website.client_id)
+    return website
 
 
 def require_website_access(

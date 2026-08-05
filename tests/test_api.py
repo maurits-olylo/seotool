@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api.routes.reports import _period_dates
 from app.core.config import get_settings
-from app.core.security import create_session_token, hash_password
+from app.core.security import create_session_token, hash_password, verify_password
 from app.db.session import SessionLocal
 from app.models.crawl import CrawlRun, ElementLocation, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url, UrlSource
@@ -567,7 +567,7 @@ def test_admin_can_manage_other_client_members(client: TestClient) -> None:
     token = reinvited.json()["accept_path"].split("token=", maxsplit=1)[1]
     accepted = TestClient(app).post(
         f"/api/v1/invitations/{token}/accept",
-        json={"password": "Restored-secure-password-1!"},
+        json={"password": "Managed-secure-password-1!"},
     )
     assert accepted.status_code == 204
     with SessionLocal() as db:
@@ -577,6 +577,132 @@ def test_admin_can_manage_other_client_members(client: TestClient) -> None:
         )
         assert restored and restored.is_active is True
         assert membership and membership.role == "client"
+
+
+def test_invitation_cannot_replace_existing_account_password(client: TestClient) -> None:
+    invited_client = client.post("/api/v1/clients", json={"name": "Invitation owner"}).json()
+    existing_client = client.post("/api/v1/clients", json={"name": "Existing account"}).json()
+    with SessionLocal() as db:
+        admin = User(
+            email="inviter@example.com",
+            role="admin",
+            password_hash=hash_password("Inviter-secure-password-1!"),
+        )
+        existing = User(
+            email="existing@example.com",
+            role="client",
+            password_hash=hash_password("Existing-secure-password-1!"),
+        )
+        db.add_all([admin, existing])
+        db.flush()
+        db.add_all(
+            [
+                ClientMembership(
+                    user_id=admin.id,
+                    client_id=UUID(invited_client["id"]),
+                    role="admin",
+                ),
+                ClientMembership(
+                    user_id=existing.id,
+                    client_id=UUID(existing_client["id"]),
+                    role="client",
+                ),
+            ]
+        )
+        db.commit()
+        existing_id = existing.id
+
+    from app.main import app
+
+    inviter = TestClient(app)
+    assert inviter.post(
+        "/ui/login",
+        json={"email": "inviter@example.com", "password": "Inviter-secure-password-1!"},
+    ).status_code == 204
+    invitation = inviter.post(
+        "/api/v1/invitations",
+        json={
+            "email": "existing@example.com",
+            "client_id": invited_client["id"],
+            "role": "client",
+        },
+    )
+    token = invitation.json()["accept_path"].split("token=", maxsplit=1)[1]
+    attack = TestClient(app).post(
+        f"/api/v1/invitations/{token}/accept",
+        json={"password": "Attacker-password-1!"},
+    )
+    assert attack.status_code == 409
+    with SessionLocal() as db:
+        existing = db.get(User, existing_id)
+        assert existing is not None
+        assert verify_password("Existing-secure-password-1!", existing.password_hash)
+        assert not verify_password("Attacker-password-1!", existing.password_hash)
+
+
+def test_tenant_client_role_cannot_write_when_user_is_admin_elsewhere(
+    client: TestClient,
+) -> None:
+    admin_client = client.post("/api/v1/clients", json={"name": "Admin tenant"}).json()
+    readonly_client = client.post("/api/v1/clients", json={"name": "Read-only tenant"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": readonly_client["id"],
+            "name": "Read-only site",
+            "base_url": "https://readonly.example.com",
+        },
+    ).json()
+    with SessionLocal() as db:
+        mixed_role_user = User(
+            email="mixed-role@example.com",
+            role="admin",
+            password_hash=hash_password("Mixed-role-password-1!"),
+        )
+        db.add(mixed_role_user)
+        db.flush()
+        db.add_all(
+            [
+                ClientMembership(
+                    user_id=mixed_role_user.id,
+                    client_id=UUID(admin_client["id"]),
+                    role="admin",
+                ),
+                ClientMembership(
+                    user_id=mixed_role_user.id,
+                    client_id=UUID(readonly_client["id"]),
+                    role="client",
+                ),
+            ]
+        )
+        issue = Issue(
+            website_id=UUID(website["id"]),
+            issue_type="http_404",
+            category="reachability",
+            severity="high",
+            title="Read-only issue",
+            description="Mag niet worden gewijzigd.",
+            recommended_action="Alleen bekijken.",
+        )
+        db.add(issue)
+        db.commit()
+        issue_id = issue.id
+
+    from app.main import app
+
+    browser = TestClient(app)
+    assert browser.post(
+        "/ui/login",
+        json={"email": "mixed-role@example.com", "password": "Mixed-role-password-1!"},
+    ).status_code == 204
+    assert browser.get(f"/api/v1/websites/{website['id']}/issues").status_code == 200
+    assert browser.patch(
+        f"/api/v1/issues/{issue_id}", json={"status": "planned"}
+    ).status_code == 403
+    assert browser.post(
+        "/api/v1/exports",
+        json={"website_id": website["id"], "export_type": "excel"},
+    ).status_code == 403
 
 
 def test_client_report_contains_performance_and_work(client: TestClient) -> None:
