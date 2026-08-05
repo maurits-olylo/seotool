@@ -76,6 +76,15 @@ def active_session_id(token: str | None) -> UUID | None:
         return session.id if session else None
 
 
+def session_requires_mfa(token: str | None) -> bool:
+    user_id = session_user_id(token)
+    if not user_id:
+        return False
+    with SessionLocal() as db:
+        user = db.get(User, user_id)
+        return bool(user and user.role in {"superuser", "admin"} and not user.mfa_enabled)
+
+
 def is_valid_session_token(token: str | None) -> bool:
     return session_user_id(token) is not None
 

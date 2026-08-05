@@ -5,8 +5,16 @@ document.querySelector("#team-login").addEventListener("submit", async (event) =
   error.textContent = ""; button.disabled = true; button.textContent = "Inloggen…";
   const response = await fetch("/ui/login", {
     method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({email: document.querySelector("#email").value, password: document.querySelector("#password").value}),
+    body: JSON.stringify({email: document.querySelector("#email").value, password: document.querySelector("#password").value, mfa_code: document.querySelector("#mfa-code").value || null}),
   });
+  if (response.status === 202) {
+    document.querySelector("#mfa-field").classList.remove("hidden");
+    document.querySelector("#mfa-code").required = true;
+    document.querySelector("#mfa-code").focus();
+    error.textContent = "Vul de code uit je authenticator of een herstelcode in.";
+    button.disabled = false; button.textContent = "Code controleren";
+    return;
+  }
   if (response.ok) { window.location.assign("/app"); return; }
   const payload = await response.json().catch(() => ({}));
   error.textContent = payload.detail || "Inloggen is mislukt.";

@@ -2416,6 +2416,22 @@ async function markIssueWontFix() {
 }
 
 $("#logout").addEventListener("click", async () => { await fetch("/ui/logout", { method: "POST" }); window.location.assign("/"); });
+async function openMfaSetup() {
+  const setup = await api("/api/v1/me/mfa/setup", {method:"POST"});
+  $("#mfa-secret").value = setup.secret;
+  $("#mfa-recovery-codes").textContent = setup.recovery_codes.join("\n");
+  $("#mfa-message").textContent = "Bewaar de herstelcodes voordat je activeert.";
+  $("#mfa-dialog").showModal();
+}
+$("#setup-mfa").addEventListener("click", () => openMfaSetup().catch((error) => { alert(error.message); }));
+$("#confirm-mfa").addEventListener("click", async () => {
+  try {
+    await api("/api/v1/me/mfa/confirm", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({code:$("#mfa-confirm-code").value})});
+    state.currentUser.mfa_enabled = true; state.currentUser.mfa_required = false;
+    $("#mfa-message").textContent = "Tweestapsverificatie is actief.";
+    window.setTimeout(() => $("#mfa-dialog").close(), 800);
+  } catch (error) { $("#mfa-message").textContent = error.message; }
+});
 $("#profile-toggle").addEventListener("click", () => { const open = $("#profile-popover").classList.toggle("hidden") === false; $("#profile-toggle").setAttribute("aria-expanded", String(open)); });
 $("#mobile-nav-toggle").addEventListener("click", () => { const open = $("#app").classList.toggle("mobile-nav-open"); $("#mobile-nav-toggle").setAttribute("aria-expanded", String(open)); });
 $("#client-select").addEventListener("change", async () => { localStorage.setItem(CLIENT_STORAGE_KEY, $("#client-select").value); localStorage.removeItem(WEBSITE_STORAGE_KEY); state.crawlRuns = []; state.changesRequestId += 1; state.changes = []; state.changeGroups = []; await loadWebsites(); if (state.currentView === "integrations") await loadIntegrations(); if (state.currentView === "dashboard") await loadDashboard(); });
@@ -2593,6 +2609,7 @@ $("#sync-integration-history").addEventListener("click", syncIntegrationHistory)
 
 api("/api/v1/me").then((user) => {
   state.currentUser = user;
+  if (user.mfa_required) openMfaSetup().catch(() => {});
   applyRolePermissions();
   return loadClients();
 }).then(() => {

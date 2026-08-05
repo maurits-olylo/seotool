@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
@@ -18,6 +18,8 @@ from app.core.security import (
 )
 from app.db.session import get_db
 from app.models.user import LoginAttempt, User
+from app.services.mfa import consume_recovery_code, valid_totp_counter
+from app.services.oauth import decrypt_token
 
 router = APIRouter(tags=["interface"])
 UI_ROOT = Path(__file__).resolve().parents[2] / "ui"
@@ -26,6 +28,7 @@ UI_ROOT = Path(__file__).resolve().parents[2] / "ui"
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+    mfa_code: str | None = None
 
 
 DUMMY_PASSWORD_HASH = hash_password("invalid-login-password")
@@ -118,6 +121,23 @@ def login(
         )
         db.commit()
         raise HTTPException(status_code=401, detail="E-mailadres of wachtwoord is onjuist")
+    if user.mfa_enabled:
+        if not payload.mfa_code:
+            return JSONResponse(status_code=202, content={"mfa_required": True})
+        counter = valid_totp_counter(
+            decrypt_token(user.mfa_secret_encrypted) or "",
+            payload.mfa_code,
+            last_counter=user.mfa_last_counter,
+        )
+        if counter is not None:
+            user.mfa_last_counter = counter
+        else:
+            remaining = consume_recovery_code(
+                payload.mfa_code, user.mfa_recovery_code_hashes or []
+            )
+            if remaining is None:
+                raise HTTPException(status_code=401, detail="De verificatiecode is onjuist")
+            user.mfa_recovery_code_hashes = remaining
     db.execute(
         delete(LoginAttempt).where(
             (LoginAttempt.identifier_hash == identifier_hash)

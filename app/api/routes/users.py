@@ -1,6 +1,7 @@
 import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
+from urllib.parse import quote
 from uuid import UUID
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
@@ -26,8 +27,17 @@ from app.schemas.users import (
     InvitationCreate,
     InvitationPreview,
     InvitationRead,
+    MfaConfirm,
+    MfaSetupRead,
 )
 from app.services.authorization import require_client_access
+from app.services.mfa import (
+    generate_recovery_codes,
+    generate_totp_secret,
+    recovery_code_hash,
+    valid_totp_counter,
+)
+from app.services.oauth import decrypt_token, encrypt_token
 
 router = APIRouter(tags=["users"])
 public_router = APIRouter(tags=["users"])
@@ -56,7 +66,61 @@ def current_user(
             {"client_id": membership.client_id, "role": membership.role}
             for membership in memberships
         ],
+        "mfa_enabled": bool(user and user.mfa_enabled),
+        "mfa_required": bool(
+            user
+            and not user.mfa_enabled
+            and (
+                user.role in {"superuser", "admin"}
+                or any(membership.role == "admin" for membership in memberships)
+            )
+        ),
     }
+
+
+@router.post("/me/mfa/setup", response_model=MfaSetupRead)
+def setup_mfa(
+    principal: Principal = Depends(require_api_key), db: Session = Depends(get_db)
+) -> dict[str, object]:
+    user = db.get(User, principal.user_id) if principal.user_id else None
+    if not user:
+        raise HTTPException(status_code=403, detail="Een persoonlijke sessie is vereist")
+    secret = generate_totp_secret()
+    recovery_codes = generate_recovery_codes()
+    user.mfa_secret_encrypted = encrypt_token(secret)
+    user.mfa_recovery_code_hashes = [recovery_code_hash(code) for code in recovery_codes]
+    user.mfa_enabled = False
+    user.mfa_last_counter = None
+    db.commit()
+    label = quote(user.email)
+    issuer = quote("SEO Monitor")
+    return {
+        "secret": secret,
+        "provisioning_uri": f"otpauth://totp/SEO%20Monitor:{label}?secret={secret}&issuer={issuer}",
+        "recovery_codes": recovery_codes,
+    }
+
+
+@router.post("/me/mfa/confirm", status_code=204)
+def confirm_mfa(
+    payload: MfaConfirm,
+    principal: Principal = Depends(require_api_key),
+    db: Session = Depends(get_db),
+) -> Response:
+    user = db.get(User, principal.user_id) if principal.user_id else None
+    if not user or not user.mfa_secret_encrypted:
+        raise HTTPException(status_code=409, detail="Start eerst MFA-instelling")
+    counter = valid_totp_counter(
+        decrypt_token(user.mfa_secret_encrypted) or "",
+        payload.code,
+        last_counter=user.mfa_last_counter,
+    )
+    if counter is None:
+        raise HTTPException(status_code=422, detail="De verificatiecode is ongeldig")
+    user.mfa_enabled = True
+    user.mfa_last_counter = counter
+    db.commit()
+    return Response(status_code=204)
 
 
 @router.post("/invitations", response_model=InvitationRead, status_code=status.HTTP_201_CREATED)

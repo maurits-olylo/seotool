@@ -27,7 +27,7 @@ from app.api.routes import (
 )
 from app.core.config import get_settings
 from app.core.logging import configure_logging
-from app.core.security import require_api_key
+from app.core.security import require_api_key, session_requires_mfa
 from app.db.session import engine
 from app.services.users import ensure_initial_superuser
 
@@ -62,6 +62,17 @@ async def redirect_proxied_http_to_https(
             return JSONResponse(status_code=403, content={"detail": "Ongeldige request-origin"})
         if get_settings().app_env == "production" and not origin:
             return JSONResponse(status_code=403, content={"detail": "Request-origin ontbreekt"})
+    if (
+        get_settings().mfa_enforcement_enabled
+        and request.url.path.startswith("/api/v1/")
+        and not request.url.path.startswith("/api/v1/me")
+        and not request.headers.get("x-api-key")
+        and session_requires_mfa(request.cookies.get("seo_session"))
+    ):
+        return JSONResponse(
+            status_code=428,
+            content={"detail": "Activeer eerst tweestapsverificatie voor dit beheerdersaccount"},
+        )
     if (
         get_settings().app_env == "production"
         and request.headers.get("x-forwarded-proto") == "http"

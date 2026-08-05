@@ -38,7 +38,7 @@
         <button id="operations-nav" class="nav-item">Crawls &amp; exports</button>
         <section class="nav-group" data-nav-group="settings"><button id="settings-nav" class="nav-item nav-group-toggle" type="button" aria-expanded="false">Instellingen <span aria-hidden="true">⌄</span></button><div id="settings-subnav" class="subnav hidden"><button id="clients-nav">Klanten &amp; websites</button><button id="team-nav">Team &amp; toegang</button><button id="integrations-nav">Integraties</button></div></section>
       </nav>
-      <div class="profile-menu"><button id="profile-toggle" class="profile-toggle" type="button" aria-expanded="false"><span class="profile-avatar" aria-hidden="true">M</span><span id="current-user"></span><span aria-hidden="true">⌃</span></button><div id="profile-popover" class="profile-popover hidden"><button id="logout" type="button">Uitloggen</button></div></div>
+      <div class="profile-menu"><button id="profile-toggle" class="profile-toggle" type="button" aria-expanded="false"><span class="profile-avatar" aria-hidden="true">M</span><span id="current-user"></span><span aria-hidden="true">⌃</span></button><div id="profile-popover" class="profile-popover hidden"><button id="setup-mfa" type="button">Account beveiligen</button><button id="logout" type="button">Uitloggen</button></div></div>
     </aside>
     <main>
       <section id="context-bar" class="context-bar"><label><span>Klant</span><select id="client-select" aria-label="Klant"></select></label><span class="context-divider" aria-hidden="true">/</span><label><span>Website</span><select id="website-select" aria-label="Website"></select></label><div class="notification-area"><button id="notification-toggle" class="notification-toggle" type="button" aria-label="Meldingen openen" aria-expanded="false"><span aria-hidden="true">●</span><span id="notification-count" class="notification-count hidden">0</span></button><section id="notification-popover" class="notification-popover hidden" aria-label="Meldingen"><header><strong>Meldingen</strong><span id="notification-summary"></span></header><div id="notification-list"></div><button id="notification-all-tasks" type="button">Bekijk alle taken</button></section></div></section>
@@ -227,6 +227,7 @@
     <dl><div><dt>Vergeleken meetmomenten</dt><dd id="change-detail-date"></dd></div><div><dt>Mogelijke relevantie</dt><dd id="change-detail-relevance"></dd></div><div><dt>Aanbevolen controle</dt><dd id="change-detail-action"></dd></div></dl>
     <div id="change-group-details"></div>
   </dialog>
+  <dialog id="mfa-dialog" aria-labelledby="mfa-title"><h2 id="mfa-title">Tweestapsverificatie instellen</h2><p>Voeg het onderstaande geheim toe aan je authenticator en bewaar de herstelcodes veilig.</p><label>Geheim<input id="mfa-secret" readonly></label><pre id="mfa-recovery-codes"></pre><label>Code uit authenticator<input id="mfa-confirm-code" inputmode="numeric" autocomplete="one-time-code"></label><button id="confirm-mfa" class="primary-button" type="button">Activeren</button><p id="mfa-message" class="operation-message" role="status"></p></dialog>
   <script src="/ui/assets/app.js?v=20260805-2" defer></script>
 </body>
 </html>

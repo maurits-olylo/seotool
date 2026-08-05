@@ -23,6 +23,7 @@ from app.models.issues import ActivityLog, Issue, IssueOccurrence, IssueSuppress
 from app.models.reporting import MonthlyReportSnapshot
 from app.models.user import ClientMembership, User
 from app.models.website import WebsiteSettings
+from app.services.mfa import totp_code
 
 
 def test_health(client: TestClient) -> None:
@@ -358,6 +359,59 @@ def test_cookie_authenticated_mutation_rejects_foreign_origin() -> None:
     denied = browser.post("/ui/logout", headers={"Origin": "https://attacker.example"})
     assert denied.status_code == 403
     assert denied.json()["detail"] == "Ongeldige request-origin"
+
+
+def test_admin_enrolls_mfa_and_uses_single_recovery_code(monkeypatch) -> None:
+    monkeypatch.setenv("TOKEN_ENCRYPTION_KEY", "0e" * 32)
+    monkeypatch.setenv("MFA_ENFORCEMENT_ENABLED", "true")
+    get_settings.cache_clear()
+    from app.main import app
+
+    with SessionLocal() as db:
+        user = User(
+            email="mfa-admin@example.com",
+            role="admin",
+            password_hash=hash_password("Mfa-secure-password-1!"),
+        )
+        db.add(user)
+        db.commit()
+        user_id = user.id
+    browser = TestClient(app)
+    assert browser.post(
+        "/ui/login",
+        json={"email": "mfa-admin@example.com", "password": "Mfa-secure-password-1!"},
+    ).status_code == 204
+    assert browser.get("/api/v1/me").json()["mfa_required"] is True
+    assert browser.get("/api/v1/clients").status_code == 428
+    setup = browser.post("/api/v1/me/mfa/setup")
+    setup_data = setup.json()
+    assert setup.status_code == 200
+    assert len(setup_data["recovery_codes"]) == 10
+    assert browser.post(
+        "/api/v1/me/mfa/confirm",
+        json={"code": totp_code(setup_data["secret"])},
+    ).status_code == 204
+    assert browser.get("/api/v1/clients").status_code == 200
+    recovery_code = setup_data["recovery_codes"][0]
+    assert browser.post("/ui/logout").status_code == 204
+    challenge = browser.post(
+        "/ui/login",
+        json={"email": "mfa-admin@example.com", "password": "Mfa-secure-password-1!"},
+    )
+    assert challenge.status_code == 202
+    assert browser.post(
+        "/ui/login",
+        json={
+            "email": "mfa-admin@example.com",
+            "password": "Mfa-secure-password-1!",
+            "mfa_code": recovery_code,
+        },
+    ).status_code == 204
+    with SessionLocal() as db:
+        enrolled = db.get(User, user_id)
+        assert enrolled and enrolled.mfa_enabled
+        assert len(enrolled.mfa_recovery_code_hashes) == 9
+    get_settings.cache_clear()
 
 
 def test_only_one_superuser_can_exist() -> None:

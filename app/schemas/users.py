@@ -16,6 +16,18 @@ class CurrentUserRead(BaseModel):
     display_name: str | None
     role: str
     memberships: list[MembershipRead]
+    mfa_enabled: bool = False
+    mfa_required: bool = False
+
+
+class MfaSetupRead(BaseModel):
+    secret: str
+    provisioning_uri: str
+    recovery_codes: list[str]
+
+
+class MfaConfirm(BaseModel):
+    code: str = Field(min_length=6, max_length=32)
 
 
 class InvitationCreate(BaseModel):

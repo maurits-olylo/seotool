@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     rendering_enabled: bool = False
     pagespeed_enabled: bool = False
     pagespeed_api_key: str = ""
+    mfa_enforcement_enabled: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
