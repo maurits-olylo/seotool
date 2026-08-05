@@ -7,7 +7,15 @@ from sqlalchemy import select
 from app.api.routes import integrations
 from app.core.config import get_settings
 from app.db.session import SessionLocal
-from app.models.integrations import IntegrationConnection, WebsiteIntegration
+from app.models.client import Client
+from app.models.discovery import Url
+from app.models.integrations import (
+    IntegrationConnection,
+    MatomoAggregateMetric,
+    MatomoPageMetric,
+    WebsiteIntegration,
+)
+from app.models.website import Website
 from app.services import matomo
 from app.services.oauth import decrypt_token
 
@@ -91,4 +99,66 @@ def test_connect_and_select_human_matomo_site(client: TestClient, monkeypatch) -
         )
         assert selected is not None
         assert selected.external_property_id == "7"
+    get_settings.cache_clear()
+
+
+def test_matomo_sync_stores_aggregates_and_url_coverage(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setenv("TOKEN_ENCRYPTION_KEY", "0b" * 32)
+    get_settings.cache_clear()
+    monkeypatch.setattr(matomo, "validate_public_http_url", lambda _url: None)
+
+    async def fake_report(_http, _endpoint, _token, method, *_args):  # type: ignore[no-untyped-def]
+        if method == "Actions.getPageUrls":
+            return {
+                "2026-08-01": [
+                    {"label": "/programma", "nb_visits": 10, "nb_hits": 14},
+                    {"label": "/onbekend?genre=kunst", "nb_visits": 2, "nb_hits": 3},
+                ]
+            }
+        if method == "Referrers.getAll":
+            return {"2026-08-01": [{"label": "Search Engines", "nb_visits": 8}]}
+        return {"2026-08-01": [{"idgoal": "1", "name": "Nieuwsbrief", "nb_conversions": 2}]}
+
+    monkeypatch.setattr(matomo, "_report", fake_report)
+    with SessionLocal() as db:
+        customer = Client(name="Human")
+        website = Website(client=customer, name="Human", base_url="https://human.nl/")
+        db.add(website)
+        db.flush()
+        db.add(Url(website_id=website.id, normalized_url="https://human.nl/programma"))
+        connection = IntegrationConnection(
+            client_id=customer.id,
+            provider="matomo",
+            status="connected",
+            encrypted_access_token=integrations.encrypt_token("secret"),
+            settings={"server_url": "https://analytics.example.com/index.php"},
+        )
+        db.add(connection)
+        db.flush()
+        mapping = WebsiteIntegration(
+            website_id=website.id,
+            connection_id=connection.id,
+            service="matomo",
+            external_property_id="7",
+            status="active",
+        )
+        db.add(mapping)
+        db.commit()
+
+        import asyncio
+
+        result = asyncio.run(matomo.sync_matomo(db, website.id, days=5))
+        pages = list(db.scalars(select(MatomoPageMetric).order_by(MatomoPageMetric.page_url)))
+        aggregates = list(db.scalars(select(MatomoAggregateMetric)))
+
+        assert result["page_rows"] == 2
+        assert result["matched_urls"] == 1
+        assert result["url_match_rate"] == 0.5
+        assert len(pages) == 2
+        assert len(aggregates) == 2
+        assert mapping.settings["coverage"]["transitions"] == "unknown"
+        assert mapping.settings["coverage"]["internal_search"] == "not_imported"
+        assert mapping.settings["unmatched_url_variants"] == [
+            "https://human.nl/onbekend?genre=kunst"
+        ]
     get_settings.cache_clear()

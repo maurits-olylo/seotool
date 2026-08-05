@@ -16,6 +16,7 @@ from app.models.integrations import (
 )
 from app.services.bing_integrations import sync_bing_webmaster
 from app.services.google_analytics import sync_google_analytics
+from app.services.matomo import sync_matomo
 from app.services.search_console import sync_search_console
 from app.services.url_inspection import sync_url_inspection
 
@@ -37,7 +38,9 @@ async def _synchronize_website_integrations(website_id: UUID, days: int | None =
             db.scalars(
                 select(WebsiteIntegration.service).where(
                     WebsiteIntegration.website_id == website_id,
-                    WebsiteIntegration.service.in_(["search_console", "ga4", "bing_webmaster"]),
+                    WebsiteIntegration.service.in_(
+                        ["search_console", "ga4", "bing_webmaster", "matomo"]
+                    ),
                 )
             )
         )
@@ -62,6 +65,14 @@ async def _synchronize_website_integrations(website_id: UUID, days: int | None =
                 db.rollback()
                 logger.exception("ga4_sync_failed", website_id=str(website_id))
                 errors.append(f"GA4: {exc}")
+        if "matomo" in services:
+            try:
+                result = await sync_matomo(db, website_id, days)
+                logger.info("matomo_sync_succeeded", website_id=str(website_id), **result)
+            except Exception as exc:
+                db.rollback()
+                logger.exception("matomo_sync_failed", website_id=str(website_id))
+                errors.append(f"Matomo: {exc}")
         if "bing_webmaster" in services:
             try:
                 result = await sync_bing_webmaster(db, website_id, days)
@@ -90,7 +101,9 @@ def _set_history_sync_status(
         db.scalars(
             select(WebsiteIntegration).where(
                 WebsiteIntegration.website_id == website_id,
-                WebsiteIntegration.service.in_(["search_console", "ga4", "bing_webmaster"]),
+                WebsiteIntegration.service.in_(
+                    ["search_console", "ga4", "bing_webmaster", "matomo"]
+                ),
             )
         )
     )
@@ -121,9 +134,7 @@ def _set_history_sync_status(
     if any(mapping.service == "bing_webmaster" for mapping in mappings):
         coverage["bing_from"] = _date_as_iso(
             db.scalar(
-                select(func.min(BingPageMetric.date)).where(
-                    BingPageMetric.website_id == website_id
-                )
+                select(func.min(BingPageMetric.date)).where(BingPageMetric.website_id == website_id)
             )
         )
     for mapping in mappings:

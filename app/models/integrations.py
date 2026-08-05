@@ -292,3 +292,38 @@ class GoogleAnalyticsLandingPageEventMetric(UUIDTimestampMixin, Base):
     landing_page: Mapped[str] = mapped_column(String(2048))
     event_name: Mapped[str] = mapped_column(String(255), index=True)
     key_events: Mapped[float] = mapped_column(Float, default=0)
+
+
+class MatomoPageMetric(UUIDTimestampMixin, Base):
+    __tablename__ = "matomo_page_metrics"
+    __table_args__ = (UniqueConstraint("website_id", "date", "page_url"),)
+
+    website_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("websites.id", ondelete="CASCADE"), index=True
+    )
+    url_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("urls.id", ondelete="SET NULL"), index=True
+    )
+    date: Mapped[date] = mapped_column(Date, index=True)
+    page_url: Mapped[str] = mapped_column(String(2048))
+    visits: Mapped[int] = mapped_column(Integer, default=0)
+    pageviews: Mapped[int] = mapped_column(Integer, default=0)
+    unique_pageviews: Mapped[int] = mapped_column(Integer, default=0)
+    conversions: Mapped[float] = mapped_column(Float, default=0)
+
+
+class MatomoAggregateMetric(UUIDTimestampMixin, Base):
+    __tablename__ = "matomo_aggregate_metrics"
+    __table_args__ = (UniqueConstraint("website_id", "date", "metric_type", "dimension_key"),)
+
+    website_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("websites.id", ondelete="CASCADE"), index=True
+    )
+    date: Mapped[date] = mapped_column(Date, index=True)
+    metric_type: Mapped[str] = mapped_column(String(40), index=True)
+    dimension_key: Mapped[str] = mapped_column(String(512))
+    dimension_name: Mapped[str] = mapped_column(String(512))
+    visits: Mapped[int] = mapped_column(Integer, default=0)
+    actions: Mapped[int] = mapped_column(Integer, default=0)
+    conversions: Mapped[float] = mapped_column(Float, default=0)
+    revenue: Mapped[float] = mapped_column(Float, default=0)

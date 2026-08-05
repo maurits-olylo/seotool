@@ -173,7 +173,9 @@ def schedule_integration_syncs() -> int:
         website_ids = set(
             db.scalars(
                 select(WebsiteIntegration.website_id).where(
-                    WebsiteIntegration.service.in_(["search_console", "ga4", "bing_webmaster"]),
+                    WebsiteIntegration.service.in_(
+                        ["search_console", "ga4", "bing_webmaster", "matomo"]
+                    ),
                     WebsiteIntegration.status.in_(["active", "error"]),
                 )
             )
@@ -183,7 +185,9 @@ def schedule_integration_syncs() -> int:
                 db.scalars(
                     select(WebsiteIntegration).where(
                         WebsiteIntegration.website_id == website_id,
-                        WebsiteIntegration.service.in_(["search_console", "ga4", "bing_webmaster"]),
+                        WebsiteIntegration.service.in_(
+                            ["search_console", "ga4", "bing_webmaster", "matomo"]
+                        ),
                     )
                 )
             )

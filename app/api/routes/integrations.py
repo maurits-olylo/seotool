@@ -60,6 +60,7 @@ from app.services.matomo import (
     list_connection_sites,
     list_matomo_sites,
     normalize_matomo_server_url,
+    sync_matomo,
 )
 from app.services.oauth import (
     BING_SCOPES,
@@ -570,7 +571,9 @@ def synchronize_integration_history(
         db.scalars(
             select(WebsiteIntegration).where(
                 WebsiteIntegration.website_id == website_id,
-                WebsiteIntegration.service.in_(["search_console", "ga4", "bing_webmaster"]),
+                WebsiteIntegration.service.in_(
+                    ["search_console", "ga4", "bing_webmaster", "matomo"]
+                ),
             )
         )
     )
@@ -606,7 +609,9 @@ def integration_history_status(
         db.scalars(
             select(WebsiteIntegration).where(
                 WebsiteIntegration.website_id == website_id,
-                WebsiteIntegration.service.in_(["search_console", "ga4", "bing_webmaster"]),
+                WebsiteIntegration.service.in_(
+                    ["search_console", "ga4", "bing_webmaster", "matomo"]
+                ),
             )
         )
     )
@@ -771,6 +776,20 @@ async def synchronize_google_analytics(
     require_website_access(db, principal, website_id, admin=True)
     try:
         return await sync_google_analytics(db, website_id, days)
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.post("/websites/{website_id}/integrations/matomo/sync")
+async def synchronize_matomo(
+    website_id: UUID,
+    days: int = Query(default=28, ge=1, le=480),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, object]:
+    require_website_access(db, principal, website_id, admin=True)
+    try:
+        return await sync_matomo(db, website_id, days)
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
