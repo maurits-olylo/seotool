@@ -2,12 +2,21 @@ import httpx
 import pytest
 
 from app.services.http_crawler import CrawlError, fetch_metadata, fetch_url
+from app.services.security import ResolvedHttpTarget
 from app.services.url_normalization import InvalidUrlError
 
 
 @pytest.fixture(autouse=True)
 def permit_mock_hosts(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("app.services.http_crawler.validate_public_http_url", lambda _: None)
+    def resolve(url: str) -> ResolvedHttpTarget:
+        request_url = httpx.URL(url)
+        return ResolvedHttpTarget(
+            connect_url=str(request_url.copy_with(host="93.184.216.34")),
+            host_header=request_url.host,
+            sni_hostname=request_url.host,
+        )
+
+    monkeypatch.setattr("app.services.http_crawler.resolve_public_http_target", resolve)
 
 
 def test_follows_redirect_chain() -> None:
@@ -20,6 +29,18 @@ def test_follows_redirect_chain() -> None:
     assert result.status_code == 200
     assert result.final_url == "https://example.com/new"
     assert len(result.redirect_chain) == 1
+
+
+def test_connects_to_pinned_ip_with_original_host_and_sni() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.host == "93.184.216.34"
+        assert request.headers["host"] == "example.com"
+        assert request.extensions["sni_hostname"] == "example.com"
+        return httpx.Response(200, headers={"content-type": "text/html"}, text="ok")
+
+    result = fetch_url("https://example.com/page", transport=httpx.MockTransport(handler))
+
+    assert result.final_url == "https://example.com/page"
 
 
 def test_detects_redirect_loop() -> None:
@@ -105,7 +126,7 @@ def test_unresolvable_hostname_is_a_recoverable_crawl_error(monkeypatch) -> None
     def fail_resolution(*_: object, **__: object) -> object:
         raise InvalidUrlError("Hostname could not be resolved")
 
-    monkeypatch.setattr("app.services.http_crawler.validate_public_http_url", fail_resolution)
+    monkeypatch.setattr("app.services.http_crawler.resolve_public_http_target", fail_resolution)
 
     with pytest.raises(CrawlError) as captured:
         fetch_url("http://human.nl/alvriend")

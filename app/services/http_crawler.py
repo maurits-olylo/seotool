@@ -1,9 +1,10 @@
 import time
 from dataclasses import dataclass
+from urllib.parse import urljoin
 
 import httpx
 
-from app.services.security import validate_public_http_url
+from app.services.security import ResolvedHttpTarget, resolve_public_http_target
 from app.services.url_normalization import InvalidUrlError
 
 
@@ -52,7 +53,6 @@ def fetch_url(
     user_agent: str = "SEO-Monitor-Bot/0.1",
     transport: httpx.BaseTransport | None = None,
 ) -> FetchResult:
-    _validate_target(url)
     started = time.monotonic()
     chain: list[dict[str, object]] = []
     current_url = url
@@ -61,11 +61,18 @@ def fetch_url(
         follow_redirects=False,
         headers={"User-Agent": user_agent, "Accept": "text/html,application/xhtml+xml"},
         transport=transport,
+        trust_env=False,
+        limits=httpx.Limits(max_keepalive_connections=0),
     ) as client:
         for _ in range(max_redirects + 1):
-            _validate_target(current_url)
+            target = _resolve_target(current_url)
             try:
-                with client.stream("GET", current_url) as response:
+                with client.stream(
+                    "GET",
+                    target.connect_url,
+                    headers={"Host": target.host_header},
+                    extensions={"sni_hostname": target.sni_hostname},
+                ) as response:
                     if response.is_redirect:
                         location = response.headers.get("location")
                         if not location:
@@ -73,7 +80,7 @@ def fetch_url(
                                 "Redirect without Location header",
                                 error_type="redirect_invalid",
                             )
-                        next_url = str(response.url.join(location))
+                        next_url = urljoin(current_url, location)
                         chain.append(
                             {
                                 "url": current_url,
@@ -100,7 +107,7 @@ def fetch_url(
                         response_size = len(content)
                     return FetchResult(
                         requested_url=url,
-                        final_url=str(response.url),
+                        final_url=current_url,
                         status_code=response.status_code,
                         redirect_chain=chain,
                         headers=headers,
@@ -123,7 +130,6 @@ def fetch_metadata(
     user_agent: str = "SEO-Monitor-Bot/0.1",
     transport: httpx.BaseTransport | None = None,
 ) -> FetchMetadata:
-    _validate_target(url)
     started = time.monotonic()
     chain: list[dict[str, object]] = []
     current_url = url
@@ -132,11 +138,17 @@ def fetch_metadata(
         follow_redirects=False,
         headers={"User-Agent": user_agent, "Accept": "*/*"},
         transport=transport,
+        trust_env=False,
+        limits=httpx.Limits(max_keepalive_connections=0),
     ) as client:
         for _ in range(max_redirects + 1):
-            _validate_target(current_url)
+            target = _resolve_target(current_url)
             try:
-                response = client.head(current_url)
+                response = client.head(
+                    target.connect_url,
+                    headers={"Host": target.host_header},
+                    extensions={"sni_hostname": target.sni_hostname},
+                )
             except httpx.TimeoutException as exc:
                 raise CrawlError(str(exc), error_type="timeout") from exc
             except httpx.HTTPError as exc:
@@ -148,7 +160,7 @@ def fetch_metadata(
                         "Redirect without Location header",
                         error_type="redirect_invalid",
                     )
-                next_url = str(response.url.join(location))
+                next_url = urljoin(current_url, location)
                 chain.append(
                     {
                         "url": current_url,
@@ -162,7 +174,7 @@ def fetch_metadata(
                 continue
             return FetchMetadata(
                 requested_url=url,
-                final_url=str(response.url),
+                final_url=current_url,
                 status_code=response.status_code,
                 redirect_chain=chain,
                 headers={key.lower(): value for key, value in response.headers.items()},
@@ -183,8 +195,8 @@ def _read_limited(response: httpx.Response, maximum: int) -> bytes:
     return bytes(content)
 
 
-def _validate_target(url: str) -> None:
+def _resolve_target(url: str) -> ResolvedHttpTarget:
     try:
-        validate_public_http_url(url)
+        return resolve_public_http_target(url)
     except InvalidUrlError as exc:
         raise CrawlError(str(exc), error_type="invalid_target") from exc

@@ -59,7 +59,25 @@ wachtende taken opgeheven.
 
 ## Release 7a-B — Platform en privacy
 
-Status: gepland na productieacceptatie van Release 7a-A.
+Status: in uitvoering; fase 1 is lokaal afgerond en nog niet gedeployed.
 
 Deze deelrelease behandelt de resterende platformhardening, SSRF-/netwerkisolatie, secretscheiding,
 containerbeleid, back-upbewijs, supply-chaincontroles en de functionele privacygate.
+
+### Fase 1 — DNS-rebindingbescherming voor de HTTP-crawler
+
+De gewone HTTP-crawler verbindt nu uitsluitend met het IP-adres dat direct voorafgaand aan de
+aanvraag is opgelost en als publiek is gevalideerd. De oorspronkelijke domeinnaam blijft behouden
+voor de HTTP-hostheader en TLS-SNI/certificaatcontrole. Iedere redirect wordt opnieuw logisch
+opgebouwd, opgelost, gevalideerd en op een afzonderlijke verbinding uitgevoerd. Gemengde
+publieke/private DNS-antwoorden, URL-credentials en niet-standaard HTTP-poorten worden geweigerd.
+Proxy-instellingen uit de hostomgeving worden niet overgenomen.
+
+Lokale acceptatie:
+
+- Ruff: geslaagd;
+- volledige testsuite: 433 tests geslaagd;
+- regressietests bevestigen IP-pinning, behoud van host en TLS-SNI, private en gemengde
+  DNS-blokkering en veilige redirects;
+- JavaScript-rendering blijft uitgeschakeld en valt buiten deze fase;
+- er zijn geen databasewijzigingen of migraties.
