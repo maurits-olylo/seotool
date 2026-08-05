@@ -27,7 +27,7 @@ from app.api.routes import (
 )
 from app.core.config import get_settings
 from app.core.logging import configure_logging
-from app.core.security import require_api_key, session_requires_mfa
+from app.core.security import is_valid_technical_api_key, require_api_key, session_requires_mfa
 from app.db.session import engine
 from app.services.users import ensure_initial_superuser
 
@@ -50,10 +50,11 @@ app = FastAPI(title=get_settings().app_name, version="0.1.0", lifespan=lifespan)
 async def redirect_proxied_http_to_https(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
+    valid_technical_key = is_valid_technical_api_key(request.headers.get("x-api-key"))
     if (
         request.method in {"POST", "PUT", "PATCH", "DELETE"}
         and request.cookies.get("seo_session")
-        and not request.headers.get("x-api-key")
+        and not valid_technical_key
     ):
         origin = request.headers.get("origin")
         scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
@@ -66,7 +67,7 @@ async def redirect_proxied_http_to_https(
         get_settings().mfa_enforcement_enabled
         and request.url.path.startswith("/api/v1/")
         and not request.url.path.startswith("/api/v1/me")
-        and not request.headers.get("x-api-key")
+        and not valid_technical_key
         and session_requires_mfa(request.cookies.get("seo_session"))
     ):
         return JSONResponse(

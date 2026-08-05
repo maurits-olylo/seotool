@@ -30,8 +30,6 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
-        if self.app_env == "production" and self.api_key in {"", "change-me"}:
-            raise ValueError("API_KEY must be changed in production")
         if self.pagespeed_enabled and not self.pagespeed_api_key:
             raise ValueError("PAGESPEED_API_KEY is required when PageSpeed is enabled")
         return self

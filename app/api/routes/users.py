@@ -272,6 +272,13 @@ def update_client_member(
         raise HTTPException(status_code=404, detail="Gebruiker niet gevonden")
     if user.role == "superuser":
         raise HTTPException(status_code=403, detail="De superuser kan niet worden gewijzigd")
+    if (
+        payload.role == "admin"
+        and membership.role != "admin"
+        and principal.role != "superuser"
+        and not principal.is_api_key
+    ):
+        raise HTTPException(status_code=403, detail="Alleen de superuser kan beheerders promoveren")
     if membership.role == "admin" and payload.role != "admin":
         _require_remaining_admin(db, membership)
     old_role = membership.role

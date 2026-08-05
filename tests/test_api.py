@@ -706,6 +706,10 @@ def test_admin_can_manage_other_client_members(client: TestClient) -> None:
         json={"email": "managed@example.com", "password": "Managed-secure-password-1!"},
     ).status_code == 204
     assert member_browser.get("/api/v1/me").status_code == 200
+    assert browser.patch(
+        f"/api/v1/clients/{customer['id']}/members/{member_id}",
+        json={"role": "admin"},
+    ).status_code == 403
     upgraded = browser.patch(
         f"/api/v1/clients/{customer['id']}/members/{member_id}",
         json={"role": "user"},
@@ -1460,6 +1464,22 @@ def test_direct_production_healthcheck_is_not_redirected(monkeypatch) -> None:
         get_settings.cache_clear()
 
     assert response.status_code == 200
+
+
+def test_technical_api_key_is_rejected_in_production(monkeypatch) -> None:
+    from app.main import app
+
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("API_KEY", "a-long-production-secret")
+    get_settings.cache_clear()
+    try:
+        response = TestClient(app).get(
+            "/api/v1/clients", headers={"X-API-Key": "a-long-production-secret"}
+        )
+    finally:
+        get_settings.cache_clear()
+
+    assert response.status_code == 401
 
 
 def test_url_registry_deduplicates_and_creates_job(client: TestClient) -> None:

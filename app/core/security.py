@@ -131,13 +131,22 @@ class Principal:
     is_api_key: bool = False
 
 
+def is_valid_technical_api_key(value: str | None) -> bool:
+    settings = get_settings()
+    return bool(
+        settings.app_env != "production"
+        and value
+        and settings.api_key not in {"", "change-me"}
+        and hmac.compare_digest(value, settings.api_key)
+    )
+
+
 def require_api_key(
     x_api_key: str | None = Header(default=None),
     seo_session: str | None = Cookie(default=None),
     db: Session = Depends(get_db),
 ) -> Principal:
-    valid_key = x_api_key is not None and hmac.compare_digest(x_api_key, get_settings().api_key)
-    if valid_key:
+    if is_valid_technical_api_key(x_api_key):
         return Principal(user_id=None, role="superuser", is_api_key=True)
     user_id = session_user_id(seo_session)
     user = db.get(User, user_id) if user_id else None
