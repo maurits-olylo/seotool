@@ -1,6 +1,7 @@
 # Back-up- en herstelbeleid
 
-Status: Release 7a-B fase 6A lokaal en op staging gevalideerd; productieacceptatie volgt.
+Status: Release 7a-B fase 6A lokaal, op staging en technisch op productie gevalideerd; dagelijkse
+planning en waarschuwing volgen.
 
 ## Reikwijdte fase 6A
 
@@ -48,6 +49,12 @@ De stagingrestore van 6 augustus 2026 bevestigde volledige leesbaarheid en priva
 beschikbare terminalregistratie bevat geen betrouwbare gezamenlijke start- en eindtijd; het RTO van
 vier uur blijft daarom voorlopig en wordt bij de eerste geplande volledige herstelmeting met
 expliciete tijdmarkers vervangen door een gemeten waarde.
+
+De eerste productie-uitvoering op 6 augustus 2026 publiceerde en controleerde een volledig
+versleuteld pakket terwijl crawls veilig waren gedraind en overige achtergrondschrijvers tijdelijk
+waren gestopt. Alle services waren daarna gezond en de drain werd zonder hervatte taken opgeheven.
+Productie is niet als hersteltest gebruikt; de volledige restoreproef blijft uitsluitend op de
+synthetische stagingomgeving uitgevoerd.
 
 ## Privacy na herstel
 

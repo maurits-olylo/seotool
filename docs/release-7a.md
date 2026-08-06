@@ -226,7 +226,8 @@ uitsluitend voor deze releasecontrole uitgevoerd en blijft onderdeel van gepland
 
 ### Fase 6A — Versleuteld lokaal herstelbaar fundament
 
-Status: lokaal en op staging geaccepteerd; productieacceptatie volgt.
+Status: lokaal, op staging en technisch op productie geaccepteerd; operationele planning en
+waarschuwing volgen.
 
 De bestaande losse PostgreSQL-dump wordt vervangen door één cliënt-side versleuteld herstelpakket
 met database, duurzaam exportvolume, noodzakelijke herstelconfiguratie, exacte Git-commit, manifest
@@ -256,6 +257,19 @@ niet-root herstelcontainer en mount alleen dat bestand. De hervatte exportrestor
 eindcontroles slaagden. De Synology-kernelwaarschuwing over de niet-ondersteunde PID-limiet bleef
 ongewijzigd; een Compose-waarschuwing over het vooraf aangemaakte stagingprivacyvolume had geen
 functionele impact.
+
+De productieacceptatie op 6 augustus 2026 eindigde gezond op commit `df1b907`. De API gebruikt het
+vaste externe privacyvolume met schrijfbare UID/GID `10001`; het oude automatisch benoemde volume
+is niet verwijderd. De volledige productieback-up kon alleen worden gepubliceerd nadat database,
+exports, herstelconfiguratie, privacyregister, manifest, encryptie en alle checksums leesbaar waren.
+Integration-worker, export-worker en scheduler zijn daarna gezond hervat. API, PostgreSQL, Redis en
+beide crawlerpools bleven gezond, Alembic bleef op `0051` en de crawl-drain eindigde met
+`active=false resumed=0`. Er is geen productierestore, crawl of historische import gestart.
+
+Twee eerdere productiecontroles stopten vóór de back-up: eerst gebruikte de API nog een oud
+root-owned Compose-volume, daarna bleek de vaste volumenaam niet expliciet extern. De uiteindelijke
+configuratie forceerde uitsluitend de API opnieuw met het vooraf bevoegde externe volume. De oude
+volumes zijn bewust niet als verkennende stap verwijderd.
 
 ### Fase 6B — Onafhankelijke immutable EU-back-up
 
