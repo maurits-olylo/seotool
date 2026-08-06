@@ -6,7 +6,8 @@ ATTEMPT=1
 MAX_ATTEMPTS="${CRAWLER_FIREWALL_MAX_ATTEMPTS:-12}"
 
 while [ "$ATTEMPT" -le "$MAX_ATTEMPTS" ]; do
-  if "$SCRIPT_DIR/crawler-egress-firewall.sh" apply; then
+  if "$SCRIPT_DIR/ensure-crawler-egress-network.sh" && \
+    "$SCRIPT_DIR/crawler-egress-firewall.sh" apply; then
     exit 0
   fi
   if [ "$ATTEMPT" -eq "$MAX_ATTEMPTS" ]; then

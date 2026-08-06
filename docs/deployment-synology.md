@@ -247,6 +247,9 @@ Pas na het maken van de Compose-netwerken als root de hostfirewall toe:
 
 ```bash
 sudo CRAWLER_EGRESS_NETWORK_NAME=seo-monitor-crawler-egress \
+  CRAWLER_EGRESS_PROJECT_NAME=seo-monitor \
+  scripts/ensure-crawler-egress-network.sh
+sudo CRAWLER_EGRESS_NETWORK_NAME=seo-monitor-crawler-egress \
   CRAWLER_EGRESS_CHAIN_NAME=SEO-CRAWLER-EGRESS \
   scripts/crawler-egress-firewall.sh apply
 sudo CRAWLER_EGRESS_NETWORK_NAME=seo-monitor-crawler-egress \
@@ -265,6 +268,8 @@ hostconfiguratie; ander crawlerverkeer naar lokale resolvers en privénetwerken 
 Staging gebruikt gelijktijdig de afzonderlijke keten `SEO-CRAWLER-STAGING` voor netwerk
 `seo-monitor-staging-crawler-egress`. De scripts verwijderen of overschrijven de keten van de
 andere omgeving niet; beide koppelingen moeten vóór de standaard `RETURN` blijven staan.
+Gebruik voor staging `CRAWLER_EGRESS_PROJECT_NAME=seo-monitor-staging` wanneer het netwerk nog
+niet door een actieve crawler- of renderworker is aangemaakt.
 
 ## Rollback
 

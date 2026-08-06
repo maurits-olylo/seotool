@@ -218,3 +218,21 @@ def test_crawler_firewall_blocks_non_public_ipv4_ranges() -> None:
     assert 'test "$LINK_POSITION" -lt "$RETURN_POSITION"' in script
     assert "iptables -F DOCKER-USER" not in script
     assert 'IPV6_ENABLED" != "false"' in script
+
+
+def test_crawler_network_bootstrap_is_idempotent_and_validates_isolation() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    network_script = (
+        project_root / "scripts/ensure-crawler-egress-network.sh"
+    ).read_text()
+    firewall_script = (
+        project_root / "scripts/ensure-crawler-egress-firewall.sh"
+    ).read_text()
+
+    assert 'docker network inspect "$NETWORK_NAME"' in network_script
+    assert "docker network create" in network_script
+    assert 'com.docker.compose.network=crawler-egress' in network_script
+    assert 'DRIVER" != "bridge"' in network_script
+    assert 'INTERNAL" != "false"' in network_script
+    assert 'IPV6_ENABLED" != "false"' in network_script
+    assert '"$SCRIPT_DIR/ensure-crawler-egress-network.sh"' in firewall_script
