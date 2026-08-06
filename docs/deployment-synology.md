@@ -232,6 +232,11 @@ Plan `scripts/backup.sh` dagelijks via Synology Taakplanner. Stel `PROJECT_DIR`,
 na iedere uitvoering `scripts/check-backup.sh` het nieuwste pakket controleren. De onafhankelijke
 EU-kopie en Object Lock volgen verplicht in Release 7a-B fase 6B vóór Friends & Family.
 
+Het productieprivacyregister gebruikt het vooraf ingerichte externe volume
+`seo-monitor-privacy-ledger-data`. Maak dit volume vóór de eerste API-start met Compose-labels voor
+project `seo-monitor` en volume `privacy_ledger_data`, en geef uitsluitend de inhoud aan
+UID/GID `10001`. Compose maakt of verwijdert dit herstelkritieke volume daarna niet zelfstandig.
+
 Stop voor restore alle schrijvende services. Het restorescript weigert verder te gaan zolang één
 van deze services nog draait. PostgreSQL en Redis blijven beschikbaar. Restore past vóór afronding
 ook het actuele privacyverwijderingsregister toe; controleer de gerapporteerde aantallen voordat de

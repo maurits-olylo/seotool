@@ -139,6 +139,7 @@ def test_compose_limits_sensitive_environment_by_service() -> None:
     assert compose["volumes"]["privacy_ledger_data"]["name"] == (
         "seo-monitor-privacy-ledger-data"
     )
+    assert compose["volumes"]["privacy_ledger_data"]["external"] is True
 
 
 def test_compose_uses_service_specific_database_urls() -> None:
