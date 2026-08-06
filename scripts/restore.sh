@@ -53,5 +53,5 @@ compose exec -T postgres \
 compose exec -T postgres \
   pg_restore --clean --if-exists --no-owner \
   -U "${POSTGRES_USER:-seo}" -d "${POSTGRES_DB:-seo}" < "$BACKUP_FILE"
-compose run --rm api alembic upgrade head
+compose --profile tools run --rm migrate
 echo "Restore completed: $BACKUP_FILE"

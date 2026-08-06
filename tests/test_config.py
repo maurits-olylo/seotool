@@ -56,6 +56,7 @@ def test_application_containers_are_hardened() -> None:
         "export-worker",
         "render-worker",
         "scheduler",
+        "migrate",
     }
     compose = yaml.safe_load((project_root / "compose.yaml").read_text())
 
@@ -74,7 +75,7 @@ def test_staging_application_containers_are_hardened() -> None:
     project_root = Path(__file__).resolve().parents[1]
     compose = yaml.safe_load((project_root / "compose.staging.yaml").read_text())
 
-    for service_name in ("api", "render-worker"):
+    for service_name in ("api", "render-worker", "migrate"):
         service = compose["services"][service_name]
         assert service["read_only"] is True
         assert service["cap_drop"] == ["ALL"]
@@ -133,3 +134,32 @@ def test_compose_limits_sensitive_environment_by_service() -> None:
     assert sensitive.isdisjoint(services["scheduler"]["environment"])
     assert "TOKEN_ENCRYPTION_KEY" in services["integration-worker"]["environment"]
     assert "INITIAL_SUPERUSER_PASSWORD" not in services["integration-worker"]["environment"]
+
+
+def test_compose_uses_service_specific_database_urls() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    compose = yaml.safe_load((project_root / "compose.yaml").read_text())
+    expected = {
+        "api": "API_DATABASE_URL",
+        "worker": "CRAWLER_DATABASE_URL",
+        "crawl-worker-2": "CRAWLER_DATABASE_URL",
+        "crawl-worker-3": "CRAWLER_DATABASE_URL",
+        "render-worker": "CRAWLER_DATABASE_URL",
+        "integration-worker": "INTEGRATION_DATABASE_URL",
+        "export-worker": "EXPORT_DATABASE_URL",
+        "scheduler": "SCHEDULER_DATABASE_URL",
+    }
+    for service_name, variable_name in expected.items():
+        database_url = compose["services"][service_name]["environment"]["DATABASE_URL"]
+        assert variable_name in database_url
+
+
+def test_database_role_policy_protects_sensitive_tables() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    policy = (project_root / "scripts/database-roles.sql").read_text()
+
+    for role in ("seo_crawler", "seo_integration", "seo_export", "seo_scheduler"):
+        assert f"TO {role}" in policy
+    assert "integration_connections, login_attempts, oauth_states, security_audit_events" in policy
+    assert "REVOKE CREATE ON SCHEMA public FROM PUBLIC" in policy
+    assert "GRANT SELECT, UPDATE ON TABLE exports TO seo_export" in policy

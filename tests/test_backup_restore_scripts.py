@@ -106,7 +106,7 @@ def test_restore_checks_checksum_and_archive_before_restore(tmp_path: Path) -> N
     log = (tmp_path / "docker.log").read_text()
     assert "pg_restore --list" in log
     assert "pg_restore --clean --if-exists --no-owner" in log
-    assert "run --rm api alembic upgrade head" in log
+    assert "--profile tools run --rm migrate" in log
 
 
 def test_staging_target_uses_only_staging_compose(tmp_path: Path) -> None:

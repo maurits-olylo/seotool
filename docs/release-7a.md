@@ -164,3 +164,19 @@ geactiveerd; beide koppelingen werken weer en de daaropvolgende historische impo
 afgerond. JavaScript-rendering en PageSpeed blijven uitgeschakeld. Fasen 1–3 zijn hiermee op
 productie afgerond; de resterende platform-, back-up-, supply-chain- en privacyonderdelen van
 Release 7a-B blijven open.
+
+### Fase 4 — Database-identiteiten en minimale rechten
+
+Status: lokaal geïmplementeerd; stagingacceptatie volgt.
+
+API, crawler, integraties, exports en scheduler gebruiken afzonderlijke PostgreSQL-loginrollen.
+Een herhaalbaar configuratiescript maakt of roteert deze rollen en herstelt hun grants naar het
+vastgelegde beleid. Alleen de migratiebeheerder bezit schemaobjecten en voert Alembic uit.
+Runtime-rollen kunnen geen schemaobjecten maken. Crawl-, export- en schedulerrollen hebben geen
+toegang tot account-, sessie-, OAuth-state- of security-audittabellen. De exportrol kan alleen het
+eigen exportrecord wijzigen. Nieuwe tabellen krijgen niet automatisch workerrechten en moeten bij
+een volgende migration bewust aan het rechtenbeleid worden toegevoegd.
+
+Er is geen Alembic-migratie: PostgreSQL-rollen zijn omgevingsconfiguratie en geen onderdeel van het
+applicatieschema. Staging moet positieve serviceflows en negatieve grants bevestigen voordat
+dezelfde rolconfiguratie in productie wordt toegepast.

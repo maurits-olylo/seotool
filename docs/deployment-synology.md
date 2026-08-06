@@ -44,12 +44,19 @@ applicatieservice ontvangt vervolgens uitsluitend de instellingen die voor zijn 
 toegestaan. Controleer na iedere handmatige vervanging opnieuw de modus en eigenaar zonder de
 inhoud te tonen.
 
+Gebruik voor iedere applicatierol een unieke database-URL en een uniek wachtwoord:
+`API_DATABASE_URL`, `CRAWLER_DATABASE_URL`, `INTEGRATION_DATABASE_URL`,
+`EXPORT_DATABASE_URL` en `SCHEDULER_DATABASE_URL`. `DATABASE_URL` blijft voor Alembic en andere
+beheerhandelingen en gebruikt de database-eigenaar. Configureer of roteer runtime-rollen na het
+invullen van de niet-gecommitte environmentwaarden met `scripts/configure-database-roles.sh`.
+Het script is herhaalbaar en herstelt afwijkende grants.
+
 ## Installeren en starten
 
 ```bash
 docker compose -f compose.yaml -f compose.prod.yaml build
 docker compose -f compose.yaml -f compose.prod.yaml up -d postgres redis
-docker compose -f compose.yaml -f compose.prod.yaml run --rm api alembic upgrade head
+docker compose -f compose.yaml -f compose.prod.yaml --profile tools run --rm migrate
 docker compose -f compose.yaml -f compose.prod.yaml up -d
 docker compose -f compose.yaml -f compose.prod.yaml ps
 curl http://127.0.0.1:8000/health
@@ -95,7 +102,7 @@ gegevensdiensten, voer de migraties uit en start de API:
 ```bash
 sudo docker compose --env-file .env.staging -f compose.staging.yaml build api
 sudo docker compose --env-file .env.staging -f compose.staging.yaml up -d postgres redis
-sudo docker compose --env-file .env.staging -f compose.staging.yaml run --rm api alembic upgrade head
+sudo docker compose --env-file .env.staging -f compose.staging.yaml --profile tools run --rm migrate
 sudo docker compose --env-file .env.staging -f compose.staging.yaml up -d api
 sudo docker compose --env-file .env.staging -f compose.staging.yaml ps
 curl --fail --silent --show-error http://127.0.0.1:18000/health

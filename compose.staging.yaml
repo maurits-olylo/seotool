@@ -12,7 +12,6 @@ x-app-hardening: &app-hardening
 
 x-runtime-env: &runtime-env
   APP_ENV: ${APP_ENV:-staging}
-  DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
   REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
   LOG_LEVEL: ${LOG_LEVEL:-INFO}
 
@@ -22,6 +21,7 @@ services:
     build: .
     environment:
       <<: *runtime-env
+      DATABASE_URL: ${API_DATABASE_URL:?API_DATABASE_URL is required}
       SERVICE_ROLE: api
       API_KEY: ${API_KEY:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
@@ -92,6 +92,7 @@ services:
       dockerfile: Dockerfile.render
     environment:
       <<: *runtime-env
+      DATABASE_URL: ${CRAWLER_DATABASE_URL:?CRAWLER_DATABASE_URL is required}
       SERVICE_ROLE: render-worker
       USER_AGENT: ${USER_AGENT:-SEO-Monitor-Bot/0.1}
       RENDERING_ENABLED: ${RENDERING_ENABLED:-false}
@@ -111,6 +112,21 @@ services:
       timeout: 5s
       retries: 3
     restart: unless-stopped
+
+  migrate:
+    <<: *app-hardening
+    profiles: ["tools"]
+    build: .
+    environment:
+      APP_ENV: ${APP_ENV:-staging}
+      SERVICE_ROLE: migration
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    command: alembic upgrade head
+    depends_on:
+      postgres: {condition: service_healthy}
+    cpu_shares: 64
+    mem_limit: 384m
 
 volumes:
   staging_postgres_data:

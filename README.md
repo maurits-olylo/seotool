@@ -26,7 +26,7 @@ Vereisten: Docker Engine met Compose v2 en Git. Gebruik voor lokale ontwikkeling
 cp .env.example .env
 docker compose build
 docker compose up -d postgres redis
-docker compose run --rm api alembic upgrade head
+docker compose --profile tools run --rm migrate
 docker compose up -d
 docker compose ps
 curl http://localhost:8000/health
@@ -69,8 +69,8 @@ Tests gebruiken SQLite en lokale fixtures en hebben geen internetverbinding nodi
 ## Migrations en updates
 
 ```bash
-docker compose run --rm api alembic current
-docker compose run --rm api alembic upgrade head
+docker compose --profile tools run --rm migrate alembic current
+docker compose --profile tools run --rm migrate
 docker compose build --pull
 docker compose up -d
 ```
