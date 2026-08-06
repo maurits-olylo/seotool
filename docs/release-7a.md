@@ -133,3 +133,18 @@ Lokale acceptatie:
 - volledige testsuite: 438 tests geslaagd;
 - regressietests bewaken servicegebonden secretinjectie en fail-fast productieconfiguratie;
 - er zijn geen databasewijzigingen of migraties.
+
+### Stagingacceptatie fasen 1–3
+
+De gecombineerde stagingdeployment vanaf commit `214a08d` is technisch en functioneel akkoord.
+De API draait gezond op migratie `0051`, als niet-rootgebruiker `app`, met een alleen-lezen
+rootfilesystem, alle capabilities verwijderd en `no-new-privileges` actief. Login en MFA werken;
+de beschikbare testklant en interface laden zonder fout of laadlus. Staging bevat geen verdere
+klanten, websites of URL-details, waardoor die inhoud in deze acceptatie niet functioneel kon
+worden beoordeeld.
+
+De Synology-kernel ondersteunt de ingestelde Docker-PID-limiet niet en Docker negeert uitsluitend
+die limiet met een expliciete waarschuwing. De overige containerbeperkingen zijn aantoonbaar actief.
+Deze platformbeperking blijft open voor aanvullende compensatie of een toekomstige
+uitvoeringsomgeving met volledige cgroupondersteuning. JavaScript-rendering en PageSpeed blijven
+uitgeschakeld.
