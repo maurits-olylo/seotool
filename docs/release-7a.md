@@ -148,3 +148,19 @@ die limiet met een expliciete waarschuwing. De overige containerbeperkingen zijn
 Deze platformbeperking blijft open voor aanvullende compensatie of een toekomstige
 uitvoeringsomgeving met volledige cgroupondersteuning. JavaScript-rendering en PageSpeed blijven
 uitgeschakeld.
+
+### Productieacceptatie fasen 1–3
+
+De gecombineerde productiedeployment vanaf commit `6f93f06` is technisch en functioneel akkoord.
+Alle actieve applicatieservices draaien gezond op migratie `0051`, als niet-rootgebruiker, met een
+alleen-lezen rootfilesystem, capability-drop, `no-new-privileges` en aantoonbare secretscheiding.
+De veilige crawl-drain is zonder achterblijvende of hervatte taken opgeheven. De Synology-waarschuwing
+over de niet-ondersteunde PID-limiet is gelijk aan staging; alle overige containerbeperkingen zijn
+actief.
+
+Persoonlijk inloggen met MFA, klanten, websites, URL-details, dashboard, inzichten en integraties
+zijn functioneel gecontroleerd. De GSC- en GA-koppeling voor één productieklant moest opnieuw worden
+geactiveerd; beide koppelingen werken weer en de daaropvolgende historische import is succesvol
+afgerond. JavaScript-rendering en PageSpeed blijven uitgeschakeld. Fasen 1–3 zijn hiermee op
+productie afgerond; de resterende platform-, back-up-, supply-chain- en privacyonderdelen van
+Release 7a-B blijven open.
