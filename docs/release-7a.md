@@ -198,7 +198,7 @@ historische integratie-import uitsluitend voor releasecontrole gestart.
 
 ### Fase 5 — Crawlernetwerkisolatie
 
-Status: lokaal geïmplementeerd; stagingacceptatie volgt.
+Status: productie geaccepteerd op 6 augustus 2026.
 
 PostgreSQL en Redis staan met alle applicatieservices op een intern backendnetwerk zonder directe
 uitgaande route. Alleen API en integration-worker krijgen daarnaast het algemene applicatie-
@@ -208,7 +208,18 @@ crawler-egressnetwerk. Docker-IPv6 staat voor alle nieuwe netwerken expliciet ui
 Een idempotente hostfirewall koppelt het dynamisch gevonden crawler-egresssubnet vóór de standaard
 terugkeerregel aan `DOCKER-USER`. Uitgaand crawlerverkeer naar localhost, private, link-local,
 metadata-, test-, multicast- en gereserveerde IPv4-ranges wordt geweigerd; publiek IPv4-verkeer
-blijft mogelijk. De bestaande IP-validatie en IP-pinning blijven als onafhankelijke applicatielaag
-actief. Een afzonderlijke boothelper probeert de firewall na Dockerstart begrensd opnieuw toe te
-passen. Staging en productie moeten netwerkbereik, blokkering, firewallpersistentie en alle
-servicehealthchecks nog operationeel bevestigen.
+blijft mogelijk. DNS is alleen toegestaan via TCP/UDP-poort 53 naar de IPv4-resolvers van de host.
+De bestaande IP-validatie en IP-pinning blijven als onafhankelijke applicatielaag actief.
+
+Staging en productie bevestigden gescheiden interne, applicatie-egress- en crawler-egressnetwerken
+met uitgeschakeld Docker-IPv6. DNS en publiek crawlerverkeer waren bereikbaar, terwijl een directe
+verbinding met het metadata- en link-localbereik werd geblokkeerd. Beide firewallketens bleven
+gelijktijdig actief en alle productiecontainers, API- en databasehealthchecks waren gezond. De
+veilige crawl-drain is na de controles opgeheven zonder taken te hervatten; er is geen crawl of
+import voor de releasecontrole gestart. Login met MFA, klanten, websites, analyse, acties en
+uitloggen zijn functioneel geslaagd.
+
+DSM 7 bevat een ingeschakelde, door `root` uitgevoerde `Boot-up`-taak die de begrensd herhalende
+firewallhersteller vanaf de gedeelde projectmap uitvoert. Een handmatige uitvoering bevestigde dat
+zowel de productie- als stagingketen actief wordt hersteld. Een daadwerkelijke NAS-herstart is niet
+uitsluitend voor deze releasecontrole uitgevoerd en blijft onderdeel van gepland onderhoud.
