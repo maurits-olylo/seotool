@@ -167,7 +167,8 @@ Release 7a-B blijven open.
 
 ### Fase 4 — Database-identiteiten en minimale rechten
 
-Status: lokaal en op staging technisch en functioneel geaccepteerd; productiedeployment volgt.
+Status: afgerond en op 6 augustus 2026 lokaal, op staging en op productie technisch en functioneel
+geaccepteerd.
 
 API, crawler, integraties, exports en scheduler gebruiken afzonderlijke PostgreSQL-loginrollen.
 Een herhaalbaar configuratiescript maakt of roteert deze rollen en herstelt hun grants naar het
@@ -185,3 +186,12 @@ Staging bevestigde afzonderlijke logins, een gezonde API-databaseverbinding en d
 positieve en negatieve tabelrechten. Persoonlijk inloggen met MFA, klant- en websiteoverzicht,
 navigatie zonder laadlus en uitloggen zijn functioneel geslaagd. Environmentwachtwoorden worden
 voortaan uitsluitend met de niet-tonende, atomische configuratiehelper toegevoegd of geroteerd.
+
+Productie draait gezond met afzonderlijke rollen voor API, crawler, integraties, exports en
+scheduler. De rechtenmatrix bevestigde dat runtimeprocessen hun noodzakelijke tabellen wel en
+account-, sessie-, OAuth-state- en security-audittabellen niet buiten hun taak kunnen benaderen.
+Alle actieve services zijn gezond, de API-databaseverbinding meldt `ok` en migratie `0051` bleef
+ongewijzigd. De veilige crawl-drain is na de controles opgeheven zonder gepauzeerde taken te
+hervatten. Persoonlijk inloggen met MFA, klanten, websites, URL-details, dashboard, inzichten,
+integraties, uitloggen en opnieuw inloggen zijn functioneel geslaagd. Er is geen crawl of
+historische integratie-import uitsluitend voor releasecontrole gestart.
