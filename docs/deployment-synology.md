@@ -259,7 +259,8 @@ zijn voordat crawlworkers werk aannemen. Gebruik daarvoor de begrensd herhalende
 `scripts/ensure-crawler-egress-firewall.sh` als root bij het opstarten. De definitieve Synology-
 opstarttaak wordt pas na stagingacceptatie vastgelegd; vertrouw niet alleen op een eerdere
 firewallstatus. IPv6 blijft uit totdat een gelijkwaardige, geteste IPv6-firewallketen beschikbaar
-is.
+is. De firewall staat DNS uitsluitend toe via TCP/UDP-poort 53 naar de IPv4-resolvers uit de
+hostconfiguratie; ander crawlerverkeer naar lokale resolvers en privénetwerken blijft geblokkeerd.
 
 Staging gebruikt gelijktijdig de afzonderlijke keten `SEO-CRAWLER-STAGING` voor netwerk
 `seo-monitor-staging-crawler-egress`. De scripts verwijderen of overschrijven de keten van de

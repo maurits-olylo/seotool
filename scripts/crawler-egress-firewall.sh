@@ -35,6 +35,15 @@ if [ -z "$SUBNET" ]; then
   exit 1
 fi
 
+DNS_RESOLVERS="$(
+  awk '$1 == "nameserver" && $2 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ { print $2 }' \
+    /etc/resolv.conf
+)"
+if [ -z "$DNS_RESOLVERS" ]; then
+  echo "Crawler egress refused: no IPv4 DNS resolver is configured" >&2
+  exit 1
+fi
+
 BLOCKED_DESTINATIONS="
 0.0.0.0/8
 10.0.0.0/8
@@ -64,6 +73,12 @@ check_rules() {
   test -n "$LINK_POSITION"
   test -n "$RETURN_POSITION"
   test "$LINK_POSITION" -lt "$RETURN_POSITION"
+  for resolver in $DNS_RESOLVERS; do
+    iptables -C "$CHAIN_NAME" -s "$SUBNET" -d "$resolver" \
+      -p udp --dport 53 -j RETURN > /dev/null 2>&1
+    iptables -C "$CHAIN_NAME" -s "$SUBNET" -d "$resolver" \
+      -p tcp --dport 53 -j RETURN > /dev/null 2>&1
+  done
   for destination in $BLOCKED_DESTINATIONS; do
     iptables -C "$CHAIN_NAME" -s "$SUBNET" -d "$destination" \
       -j DROP > /dev/null 2>&1
@@ -82,6 +97,12 @@ fi
 
 iptables -nL "$CHAIN_NAME" > /dev/null 2>&1 || iptables -N "$CHAIN_NAME"
 iptables -F "$CHAIN_NAME"
+for resolver in $DNS_RESOLVERS; do
+  iptables -A "$CHAIN_NAME" -s "$SUBNET" -d "$resolver" \
+    -p udp --dport 53 -j RETURN
+  iptables -A "$CHAIN_NAME" -s "$SUBNET" -d "$resolver" \
+    -p tcp --dport 53 -j RETURN
+done
 for destination in $BLOCKED_DESTINATIONS; do
   iptables -A "$CHAIN_NAME" -s "$SUBNET" -d "$destination" \
     -j DROP

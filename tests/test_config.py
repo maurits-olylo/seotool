@@ -211,6 +211,9 @@ def test_crawler_firewall_blocks_non_public_ipv4_ranges() -> None:
     assert 'iptables -F "$CHAIN_NAME"' in script
     assert '-j DROP' in script
     assert '--reject-with' not in script
+    assert '/etc/resolv.conf' in script
+    assert '-p udp --dport 53 -j RETURN' in script
+    assert '-p tcp --dport 53 -j RETURN' in script
     assert 'iptables -I DOCKER-USER 1 -j "$CHAIN_NAME"' in script
     assert 'test "$LINK_POSITION" -lt "$RETURN_POSITION"' in script
     assert "iptables -F DOCKER-USER" not in script
