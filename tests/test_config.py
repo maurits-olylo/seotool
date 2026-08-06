@@ -236,3 +236,17 @@ def test_crawler_network_bootstrap_is_idempotent_and_validates_isolation() -> No
     assert 'INTERNAL" != "false"' in network_script
     assert 'IPV6_ENABLED" != "false"' in network_script
     assert '"$SCRIPT_DIR/ensure-crawler-egress-network.sh"' in firewall_script
+
+
+def test_boot_restore_configures_production_and_staging_firewalls() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    script = (
+        project_root / "scripts/restore-crawler-egress-firewalls.sh"
+    ).read_text()
+
+    assert "PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" in script
+    assert "CRAWLER_EGRESS_NETWORK_NAME=seo-monitor-crawler-egress" in script
+    assert "CRAWLER_EGRESS_CHAIN_NAME=SEO-CRAWLER-EGRESS" in script
+    assert "CRAWLER_EGRESS_NETWORK_NAME=seo-monitor-staging-crawler-egress" in script
+    assert "CRAWLER_EGRESS_CHAIN_NAME=SEO-CRAWLER-STAGING" in script
+    assert script.count('"$SCRIPT_DIR/ensure-crawler-egress-firewall.sh"') == 2

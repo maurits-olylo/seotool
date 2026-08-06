@@ -260,9 +260,20 @@ sudo CRAWLER_EGRESS_NETWORK_NAME=seo-monitor-crawler-egress \
 De regels in `DOCKER-USER` moeten na iedere Docker- of NAS-herstart opnieuw aantoonbaar actief
 zijn voordat crawlworkers werk aannemen. Gebruik daarvoor de begrensd herhalende
 `scripts/ensure-crawler-egress-firewall.sh` als root bij het opstarten. De definitieve Synology-
-opstarttaak wordt pas na stagingacceptatie vastgelegd; vertrouw niet alleen op een eerdere
-firewallstatus. IPv6 blijft uit totdat een gelijkwaardige, geteste IPv6-firewallketen beschikbaar
-is. De firewall staat DNS uitsluitend toe via TCP/UDP-poort 53 naar de IPv4-resolvers uit de
+opstarttaak voert als `root` via een absolute padverwijzing dit script uit:
+
+```text
+/bin/sh /volume1/docker/seo-monitor/project/scripts/restore-crawler-egress-firewalls.sh
+```
+
+Maak in DSM 7 via `Configuratiescherm > Taakplanner > Maken > Geactiveerde taak > Door de
+gebruiker gedefinieerd script` een ingeschakelde opstarttaak. Gebruik als taaknaam
+`SEO Monitor crawler firewall`, gebruiker `root` en gebeurtenis `Opstarten`. Plaats de bovenstaande
+regel onder `Taakinstellingen > Opdracht uitvoeren`. Stop wanneer een schermnaam, gebeurtenis of
+veld afwijkt; sla de taak dan niet op voordat het actuele DSM-pad opnieuw is gecontroleerd.
+
+Vertrouw niet alleen op een eerdere firewallstatus. IPv6 blijft uit totdat een gelijkwaardige,
+geteste IPv6-firewallketen beschikbaar is. De firewall staat DNS uitsluitend toe via TCP/UDP-poort 53 naar de IPv4-resolvers uit de
 hostconfiguratie; ander crawlerverkeer naar lokale resolvers en privénetwerken blijft geblokkeerd.
 
 Staging gebruikt gelijktijdig de afzonderlijke keten `SEO-CRAWLER-STAGING` voor netwerk
