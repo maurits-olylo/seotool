@@ -57,6 +57,7 @@ def test_application_containers_are_hardened() -> None:
         "render-worker",
         "scheduler",
         "migrate",
+        "database-roles",
     }
     compose = yaml.safe_load((project_root / "compose.yaml").read_text())
 
@@ -65,7 +66,7 @@ def test_application_containers_are_hardened() -> None:
         assert service["read_only"] is True
         assert service["cap_drop"] == ["ALL"]
         assert service["security_opt"] == ["no-new-privileges:true"]
-        assert service["pids_limit"] == 256
+        assert service["pids_limit"] in {64, 256}
         assert service["mem_limit"]
         assert service["cpu_shares"]
         assert any(value.startswith("/tmp:") for value in service["tmpfs"])
@@ -75,12 +76,12 @@ def test_staging_application_containers_are_hardened() -> None:
     project_root = Path(__file__).resolve().parents[1]
     compose = yaml.safe_load((project_root / "compose.staging.yaml").read_text())
 
-    for service_name in ("api", "render-worker", "migrate"):
+    for service_name in ("api", "render-worker", "migrate", "database-roles"):
         service = compose["services"][service_name]
         assert service["read_only"] is True
         assert service["cap_drop"] == ["ALL"]
         assert service["security_opt"] == ["no-new-privileges:true"]
-        assert service["pids_limit"] == 256
+        assert service["pids_limit"] in {64, 256}
 
 
 def test_application_image_runs_as_non_root_user() -> None:
@@ -163,3 +164,14 @@ def test_database_role_policy_protects_sensitive_tables() -> None:
     assert "integration_connections, login_attempts, oauth_states, security_audit_events" in policy
     assert "REVOKE CREATE ON SCHEMA public FROM PUBLIC" in policy
     assert "GRANT SELECT, UPDATE ON TABLE exports TO seo_export" in policy
+
+
+def test_database_role_configurator_does_not_source_environment_files() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    script = (project_root / "scripts/configure-database-roles.sh").read_text()
+    compose = yaml.safe_load((project_root / "compose.yaml").read_text())
+
+    assert ". ./.env" not in script
+    assert "--profile tools run --rm database-roles" in script
+    assert compose["services"]["database-roles"]["read_only"] is True
+    assert compose["services"]["database-roles"]["cap_drop"] == ["ALL"]

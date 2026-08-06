@@ -227,6 +227,42 @@ services:
       postgres: {condition: service_healthy}
     cpu_shares: 128
     mem_limit: 512m
+  database-roles:
+    image: postgres:16-alpine
+    profiles: ["tools"]
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 64
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB:-seo}
+      PGUSER: ${POSTGRES_USER:-seo}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      DB_API_PASSWORD: ${DB_API_PASSWORD:?DB_API_PASSWORD is required}
+      DB_CRAWLER_PASSWORD: ${DB_CRAWLER_PASSWORD:?DB_CRAWLER_PASSWORD is required}
+      DB_INTEGRATION_PASSWORD: ${DB_INTEGRATION_PASSWORD:?DB_INTEGRATION_PASSWORD is required}
+      DB_EXPORT_PASSWORD: ${DB_EXPORT_PASSWORD:?DB_EXPORT_PASSWORD is required}
+      DB_SCHEDULER_PASSWORD: ${DB_SCHEDULER_PASSWORD:?DB_SCHEDULER_PASSWORD is required}
+    volumes:
+      - ./scripts/database-roles.sql:/database-roles.sql:ro
+    command:
+      - sh
+      - -ec
+      - >-
+        psql -v ON_ERROR_STOP=1 -v database_name="$$PGDATABASE"
+        -v api_password="$$DB_API_PASSWORD" -v crawler_password="$$DB_CRAWLER_PASSWORD"
+        -v integration_password="$$DB_INTEGRATION_PASSWORD"
+        -v export_password="$$DB_EXPORT_PASSWORD"
+        -v scheduler_password="$$DB_SCHEDULER_PASSWORD" -f /database-roles.sql
+    depends_on:
+      postgres: {condition: service_healthy}
+    cpu_shares: 64
+    mem_limit: 128m
   postgres:
     image: postgres:16-alpine
     environment:
