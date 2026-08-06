@@ -66,7 +66,7 @@ check_rules() {
   test "$LINK_POSITION" -lt "$RETURN_POSITION"
   for destination in $BLOCKED_DESTINATIONS; do
     iptables -C "$CHAIN_NAME" -s "$SUBNET" -d "$destination" \
-      -j REJECT --reject-with icmp-admin-prohibited > /dev/null 2>&1
+      -j DROP > /dev/null 2>&1
   done
   iptables -C "$CHAIN_NAME" -s "$SUBNET" -j RETURN > /dev/null 2>&1
 }
@@ -84,7 +84,7 @@ iptables -nL "$CHAIN_NAME" > /dev/null 2>&1 || iptables -N "$CHAIN_NAME"
 iptables -F "$CHAIN_NAME"
 for destination in $BLOCKED_DESTINATIONS; do
   iptables -A "$CHAIN_NAME" -s "$SUBNET" -d "$destination" \
-    -j REJECT --reject-with icmp-admin-prohibited
+    -j DROP
 done
 iptables -A "$CHAIN_NAME" -s "$SUBNET" -j RETURN
 while iptables -C DOCKER-USER -j "$CHAIN_NAME" > /dev/null 2>&1; do
