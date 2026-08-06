@@ -226,16 +226,23 @@ garanderen wanneer tussentijdse statuscontrole veilig mogelijk is.
 
 ## Back-up en restore
 
-Plan `scripts/backup.sh` dagelijks via Synology Taakplanner. Stel `PROJECT_DIR`, `BACKUP_DIR` en
-optioneel `BACKUP_RETENTION_DAYS` in. Kopieer back-ups ook naar een andere fysieke locatie.
+Plan `scripts/backup.sh` dagelijks via Synology Taakplanner. Stel `PROJECT_DIR`, `BACKUP_DIR`,
+`BACKUP_KEY_FILE` en optioneel `BACKUP_RETENTION_DAYS` in. Maak de sleutel vooraf niet-tonend met
+`scripts/configure-backup-key.sh` en bewaar een herstelkopie buiten project en back-upvolume. Laat
+na iedere uitvoering `scripts/check-backup.sh` het nieuwste pakket controleren. De onafhankelijke
+EU-kopie en Object Lock volgen verplicht in Release 7a-B fase 6B vóór Friends & Family.
 
 Stop voor restore alle schrijvende services. Het restorescript weigert verder te gaan zolang één
-van deze services nog draait. PostgreSQL en Redis blijven beschikbaar:
+van deze services nog draait. PostgreSQL en Redis blijven beschikbaar. Restore past vóór afronding
+ook het actuele privacyverwijderingsregister toe; controleer de gerapporteerde aantallen voordat de
+services opnieuw starten:
 
 ```bash
 docker compose -f compose.yaml -f compose.prod.yaml stop \
   api worker crawl-worker-2 crawl-worker-3 integration-worker export-worker scheduler
-PROJECT_DIR=/volume1/docker/seo-monitor/project ./scripts/restore.sh /pad/backup.dump
+PROJECT_DIR=/volume1/docker/seo-monitor/project \
+BACKUP_KEY_FILE=/secure/path/seo-monitor-backup.key \
+./scripts/restore.sh /pad/seo-monitor-production-YYYYMMDDTHHMMSSZ.tar.enc
 docker compose -f compose.yaml -f compose.prod.yaml up -d
 ```
 

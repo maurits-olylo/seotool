@@ -34,9 +34,12 @@ services:
       MFA_ENFORCEMENT_ENABLED: ${MFA_ENFORCEMENT_ENABLED:-false}
       RENDERING_ENABLED: ${RENDERING_ENABLED:-false}
       PAGESPEED_ENABLED: ${PAGESPEED_ENABLED:-false}
+      PRIVACY_DELETION_LEDGER_FILE: /app/privacy-ledger/deletions.jsonl
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     ports: ["127.0.0.1:${API_PORT:-8000}:8000"]
-    volumes: ["exports_data:/app/exports"]
+    volumes:
+      - exports_data:/app/exports
+      - privacy_ledger_data:/app/privacy-ledger
     networks: [backend, app-egress]
     depends_on:
       postgres: {condition: service_healthy}
@@ -301,6 +304,7 @@ volumes:
   postgres_data:
   redis_data:
   exports_data:
+  privacy_ledger_data:
 networks:
   backend:
     name: seo-monitor-backend

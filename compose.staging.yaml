@@ -36,11 +36,13 @@ services:
       MFA_ENFORCEMENT_ENABLED: ${MFA_ENFORCEMENT_ENABLED:-false}
       RENDERING_ENABLED: ${RENDERING_ENABLED:-false}
       PAGESPEED_ENABLED: ${PAGESPEED_ENABLED:-false}
+      PRIVACY_DELETION_LEDGER_FILE: /app/privacy-ledger/deletions.jsonl
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     ports:
       - "127.0.0.1:${STAGING_API_PORT:-18000}:8000"
     volumes:
       - staging_exports_data:/app/exports
+      - staging_privacy_ledger_data:/app/privacy-ledger
     networks: [backend, app-egress]
     depends_on:
       postgres: {condition: service_healthy}
@@ -178,6 +180,8 @@ volumes:
     name: seo-monitor-staging-redis-data
   staging_exports_data:
     name: seo-monitor-staging-exports-data
+  staging_privacy_ledger_data:
+    name: seo-monitor-staging-privacy-ledger-data
 networks:
   backend:
     name: seo-monitor-staging-backend

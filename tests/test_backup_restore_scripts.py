@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import os
 import subprocess
 from pathlib import Path
@@ -21,6 +20,12 @@ case "$*" in
   *"pg_dump"*)
     printf 'fake-postgres-archive'
     ;;
+  *"privacy-ledger/deletions.jsonl"*)
+    printf ''
+    ;;
+  *"exec -T api python -c"*)
+    tar -cf - --files-from /dev/null
+    ;;
   *"pg_restore --list"*)
     cat > /dev/null
     ;;
@@ -28,25 +33,42 @@ esac
 """
     )
     executable.chmod(0o755)
-    log_file = tmp_path / "docker.log"
     return {
         **os.environ,
         "PATH": f"{tmp_path}:{os.environ['PATH']}",
-        "FAKE_DOCKER_LOG": str(log_file),
+        "FAKE_DOCKER_LOG": str(tmp_path / "docker.log"),
         "FAKE_RUNNING_WRITERS": running_writers,
     }
 
 
-def test_backup_creates_verified_archive_and_checksum(tmp_path: Path) -> None:
-    backup_dir = tmp_path / "backups"
+def _secret_file(path: Path, content: str) -> Path:
+    path.write_text(content)
+    path.chmod(0o600)
+    return path
+
+
+def _backup_environment(tmp_path: Path, *, target: str = "production") -> dict[str, str]:
     env = _fake_docker(tmp_path)
     env.update(
         {
             "PROJECT_DIR": str(PROJECT_DIR),
-            "BACKUP_DIR": str(backup_dir),
+            "BACKUP_DIR": str(tmp_path / "backups"),
+            "BACKUP_KEY_FILE": str(
+                _secret_file(tmp_path / "backup.key", "test-only-recovery-passphrase")
+            ),
+            "BACKUP_ENV_FILE": str(
+                _secret_file(tmp_path / ".env.test", "TOKEN_ENCRYPTION_KEY=test-only\n")
+            ),
+            "COMPOSE_TARGET": target,
+            "APP_ENV": "test",
+            "BACKUP_TEST_PBKDF2_ITERATIONS": "1000",
         }
     )
+    return env
 
+
+def test_backup_creates_verified_encrypted_bundle_and_checksum(tmp_path: Path) -> None:
+    env = _backup_environment(tmp_path)
     result = subprocess.run(
         ["sh", str(PROJECT_DIR / "scripts/backup.sh")],
         check=False,
@@ -56,18 +78,42 @@ def test_backup_creates_verified_archive_and_checksum(tmp_path: Path) -> None:
     )
 
     assert result.returncode == 0, result.stderr
-    archives = list(backup_dir.glob("postgres-*.dump"))
+    archives = list((tmp_path / "backups").glob("seo-monitor-production-*.tar.enc"))
     assert len(archives) == 1
-    assert archives[0].read_bytes() == b"fake-postgres-archive"
-    assert archives[0].with_suffix(".dump.sha256").is_file()
-    assert not list(backup_dir.glob("*.incomplete"))
+    assert archives[0].read_bytes().startswith(b"Salted__")
+    assert Path(f"{archives[0]}.sha256").is_file()
+    assert not list((tmp_path / "backups").glob("*.incomplete"))
+
+
+def test_backup_rejects_insecure_key_permissions(tmp_path: Path) -> None:
+    env = _backup_environment(tmp_path)
+    Path(env["BACKUP_KEY_FILE"]).chmod(0o644)
+
+    result = subprocess.run(
+        ["sh", str(PROJECT_DIR / "scripts/backup.sh")],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode != 0
+    assert "mode 0600 or 0400" in result.stderr
 
 
 def test_restore_refuses_while_writer_is_running(tmp_path: Path) -> None:
-    backup = tmp_path / "postgres.dump"
-    backup.write_bytes(b"fake-postgres-archive")
+    backup = tmp_path / "bundle.tar.enc"
+    backup.write_bytes(b"encrypted-placeholder")
+    Path(f"{backup}.sha256").write_text("unused\n")
     env = _fake_docker(tmp_path, running_writers="api\nexport-worker\n")
-    env["PROJECT_DIR"] = str(PROJECT_DIR)
+    env.update(
+        {
+            "PROJECT_DIR": str(PROJECT_DIR),
+            "BACKUP_KEY_FILE": str(
+                _secret_file(tmp_path / "backup.key", "test-only-recovery-passphrase")
+            ),
+        }
+    )
 
     result = subprocess.run(
         ["sh", str(PROJECT_DIR / "scripts/restore.sh"), str(backup)],
@@ -81,18 +127,21 @@ def test_restore_refuses_while_writer_is_running(tmp_path: Path) -> None:
     assert "Restore geweigerd" in result.stderr
     assert "api" in result.stderr
     assert "export-worker" in result.stderr
-    log = (tmp_path / "docker.log").read_text()
-    assert "pg_restore --clean" not in log
+    assert "pg_restore --clean" not in (tmp_path / "docker.log").read_text()
 
 
-def test_restore_checks_checksum_and_archive_before_restore(tmp_path: Path) -> None:
-    backup = tmp_path / "postgres.dump"
-    content = b"fake-postgres-archive"
-    backup.write_bytes(content)
-    checksum = hashlib.sha256(content).hexdigest()
-    backup.with_suffix(".dump.sha256").write_text(f"{checksum}  {backup.name}\n")
+def test_restore_requires_checksum(tmp_path: Path) -> None:
+    backup = tmp_path / "bundle.tar.enc"
+    backup.write_bytes(b"encrypted-placeholder")
     env = _fake_docker(tmp_path)
-    env["PROJECT_DIR"] = str(PROJECT_DIR)
+    env.update(
+        {
+            "PROJECT_DIR": str(PROJECT_DIR),
+            "BACKUP_KEY_FILE": str(
+                _secret_file(tmp_path / "backup.key", "test-only-recovery-passphrase")
+            ),
+        }
+    )
 
     result = subprocess.run(
         ["sh", str(PROJECT_DIR / "scripts/restore.sh"), str(backup)],
@@ -102,25 +151,13 @@ def test_restore_checks_checksum_and_archive_before_restore(tmp_path: Path) -> N
         env=env,
     )
 
-    assert result.returncode == 0, result.stderr
-    log = (tmp_path / "docker.log").read_text()
-    assert "pg_restore --list" in log
-    assert "pg_restore --clean --if-exists --no-owner" in log
-    assert "--profile tools run --rm migrate" in log
+    assert result.returncode != 0
+    assert not (tmp_path / "docker.log").exists()
 
 
 def test_staging_target_uses_only_staging_compose(tmp_path: Path) -> None:
-    backup_dir = tmp_path / "backups"
-    env = _fake_docker(tmp_path)
-    env.update(
-        {
-            "PROJECT_DIR": str(PROJECT_DIR),
-            "BACKUP_DIR": str(backup_dir),
-            "COMPOSE_TARGET": "staging",
-            "POSTGRES_USER": "seo_staging",
-            "POSTGRES_DB": "seo_staging",
-        }
-    )
+    env = _backup_environment(tmp_path, target="staging")
+    env.update({"POSTGRES_USER": "seo_staging", "POSTGRES_DB": "seo_staging"})
 
     result = subprocess.run(
         ["sh", str(PROJECT_DIR / "scripts/backup.sh")],

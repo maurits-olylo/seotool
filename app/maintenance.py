@@ -18,6 +18,7 @@ from app.services.crawl_deployment import (
     start_deployment_drain,
     wait_for_deployment_drain,
 )
+from app.services.privacy_deletions import apply_privacy_deletions
 from app.services.retention_audit import build_retention_audit, cleanup_element_locations
 from app.services.retention_operations import (
     create_retention_operations,
@@ -62,6 +63,10 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser(
         "change-history-audit",
         help="Toon read-only aantallen in de wijzigingshistorie",
+    )
+    commands.add_parser(
+        "reapply-privacy-deletions",
+        help="Pas het onafhankelijke privacyverwijderingsregister opnieuw toe",
     )
     retention_all = commands.add_parser(
         "retention-all",
@@ -116,6 +121,15 @@ def main() -> int:
     if args.command == "change-history-audit":
         with SessionLocal() as db:
             result = change_history_counts(db)
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        return 0
+    if args.command == "reapply-privacy-deletions":
+        try:
+            with SessionLocal() as db:
+                result = apply_privacy_deletions(db)
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
         print(json.dumps(result, indent=2, ensure_ascii=False))
         return 0
     if args.command == "retention-all":

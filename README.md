@@ -122,14 +122,18 @@ De volledige installatie-, beveiligings-, update- en rollbackprocedure staat in
 ## Back-up en restore
 
 ```bash
-./scripts/backup.sh
-./scripts/restore.sh /volumepath/backups/postgres-YYYYMMDDTHHMMSSZ.dump
+./scripts/configure-backup-key.sh /secure/path/seo-monitor-backup.key
+BACKUP_KEY_FILE=/secure/path/seo-monitor-backup.key ./scripts/backup.sh
+BACKUP_KEY_FILE=/secure/path/seo-monitor-backup.key \
+  ./scripts/check-backup.sh /volumepath/backups/seo-monitor-production-YYYYMMDDTHHMMSSZ.tar.enc
+BACKUP_KEY_FILE=/secure/path/seo-monitor-backup.key \
+  ./scripts/restore.sh /volumepath/backups/seo-monitor-production-YYYYMMDDTHHMMSSZ.tar.enc
 ```
 
-Iedere back-up wordt pas gepubliceerd nadat PostgreSQL het archief kan lezen en krijgt een
-SHA-256-bestand. Restore controleert deze gegevens en weigert zolang een schrijvende service draait.
-Test restores periodiek op een aparte, niet-gepubliceerde database. De scripts bewaren standaard
-dertig dagen.
+Iedere back-up bevat database, exports, herstelconfiguratie en manifest in één versleuteld pakket.
+Restore vereist de afzonderlijk bewaarde sleutel en alle checksums en weigert zolang een schrijvende
+service draait. Test restores uitsluitend met synthetische data in geïsoleerde staging. De scripts
+bewaren lokaal standaard dertig dagen. Zie `docs/backup-recovery.md`.
 
 ## Veelvoorkomende fouten
 

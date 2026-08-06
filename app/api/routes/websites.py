@@ -10,6 +10,7 @@ from app.models.client import Client
 from app.models.website import Website, WebsiteSettings
 from app.schemas.website import WebsiteCreate, WebsiteRead, WebsiteSettingsData, WebsiteUpdate
 from app.services.authorization import accessible_client_ids, require_client_access
+from app.services.privacy_deletions import record_privacy_deletion
 
 router = APIRouter(prefix="/websites", tags=["websites"])
 
@@ -94,6 +95,7 @@ def delete_website(
     require_client_access(db, principal, website.client_id, admin=True)
     db.delete(website)
     db.commit()
+    record_privacy_deletion("website", website_id)
     return Response(status_code=204)
 
 

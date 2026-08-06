@@ -223,3 +223,29 @@ DSM 7 bevat een ingeschakelde, door `root` uitgevoerde `Boot-up`-taak die de beg
 firewallhersteller vanaf de gedeelde projectmap uitvoert. Een handmatige uitvoering bevestigde dat
 zowel de productie- als stagingketen actief wordt hersteld. Een daadwerkelijke NAS-herstart is niet
 uitsluitend voor deze releasecontrole uitgevoerd en blijft onderdeel van gepland onderhoud.
+
+### Fase 6A — Versleuteld lokaal herstelbaar fundament
+
+Status: lokaal in uitvoering; staging- en productieacceptatie volgen.
+
+De bestaande losse PostgreSQL-dump wordt vervangen door één cliënt-side versleuteld herstelpakket
+met database, duurzaam exportvolume, noodzakelijke herstelconfiguratie, exacte Git-commit, manifest
+en verplichte checksums. Back-up en restore weigeren ontbrekende sleutels, onveilige sleutel- of
+environmentrechten, ontbrekende checksums, beschadigde archieven en restore naast schrijvende
+services. Een afzonderlijke controle meldt een te oud, onleesbaar of niet-ontsleutelbaar pakket.
+
+De herstelsleutel wordt niet in Git, het project, het back-upvolume of logs bewaard. Een afzonderlijk
+privacyvolume registreert verwijderde klant- en website-UUID's zonder persoonsgegevens. Restore past
+dit actuelere register idempotent toe voordat schrijvers opnieuw mogen starten, zodat een ouder
+databasepunt verwijderde gegevens niet opnieuw activeert. De lokale acceptatie omvat regressietests
+en een volledige synthetische stagingrestore. Voorlopige doelen zijn RPO 24 uur en RTO 4 uur; de
+stagingmeting wordt leidend.
+
+### Fase 6B — Onafhankelijke immutable EU-back-up
+
+Status: bewust geparkeerd als harde gate vóór de Friends & Family-release.
+
+Deze fase kiest en configureert pas dan een betaalde tweede EU-opslaglocatie, Object Lock of
+gelijkwaardige verwijderbescherming, automatische lifecycle en herstel vanaf uitsluitend de
+onafhankelijke kopie. SEC-13 blijft tot die acceptatie gedeeltelijk open en kan vóór Friends &
+Family niet als volledig opgelost worden aangemerkt.

@@ -26,6 +26,7 @@ from app.services.authorization import (
     require_global_role,
 )
 from app.services.crawl_deployment import crawl_deployment_is_active
+from app.services.privacy_deletions import record_privacy_deletion
 
 router = APIRouter(prefix="/clients", tags=["clients"])
 
@@ -199,4 +200,5 @@ def delete_client(
     require_client_access(db, principal, client_id, admin=True)
     db.delete(get_client_or_404(client_id, db))
     db.commit()
+    record_privacy_deletion("client", client_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
