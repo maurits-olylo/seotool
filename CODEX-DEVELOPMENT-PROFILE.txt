@@ -111,6 +111,10 @@ PRIVACY EN SECRETS
   in direct kopieerbare terminalcommando's worden opgenomen, maar niet voor andere doeleinden
   worden verspreid.
 - Plaats secrets uitsluitend in niet-gecommitte environmentbestanden of een geschikte secretstore.
+- Voeg of roteer wachtwoorden en andere secrets in `.env`-bestanden nooit handmatig via `vi`.
+  Gebruik een gecontroleerde automatisering die veilige URL-compatibele waarden genereert, de
+  gekoppelde variabelen atomair bijwerkt, geen secretwaarden toont en daarna overeenkomst en
+  bestandsmodus valideert.
 - Gebruik in documentatie veilige placeholders of een reeds ingestelde hostalias.
 - Log geen secrets of volledige gevoelige responsecontent.
 
