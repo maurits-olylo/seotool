@@ -86,10 +86,29 @@ Implementatie en lokale acceptatie:
 
 ## Fase 3 — Verdelingen, mismatch en contentkansen
 
+Status: lokaal geïmplementeerd en nog niet gedeployed.
+
 - Voeg website-, cluster- en paginaverdelingen toe.
 - Detecteer intentiemismatch, aantoonbare queryoverlap, ontbrekende vervolgstappen en contenthiaten.
 - Behandel uitkomsten als controle of kans met onderliggend bewijs, niet als automatisch defect.
 - Hergebruik de bestaande taak- en issuelifecycle zonder dubbele aanbevelingen te maken.
+
+Implementatie en lokale acceptatie:
+
+- De beveiligde website-API levert website-, eerste-padcluster- en paginaverdelingen met periode,
+  classificatiedekking, GSC-dekking, confidence en effectieve handmatige overrides.
+- Een intentiemismatch vereist een gelockte handmatige keuze, een afwijkende automatische uitkomst
+  en minimaal `0.65` confidence.
+- Queryoverlap vereist minimaal twee pagina's met ieder 50 vertoningen, samen 150 vertoningen, een
+  aandeel van minimaal 20% voor de tweede pagina en dezelfde niet-onzekere intentie.
+- Een contenthiaat vereist minimaal 75 vertoningen en een query-intentie die met voldoende bewijs
+  afwijkt van alle gekoppelde pagina-intenties. De tekst adviseert eerst bestaande pagina's te
+  controleren en stelt nooit automatisch nieuwe content verplicht.
+- Kansen zijn standaard read-only. Alleen een expliciete gebruikersactie maakt een bestaande
+  aanbevelingstaak met URL-scope, activiteitenregistratie en stabiele opportunitysleutel aan;
+  herhaling retourneert dezelfde actieve taak.
+- Twee gerichte regressietests bevestigen verdelingen, drempels, mismatch, contenthiaat,
+  queryoverlap en taakdeduplicatie. Ruff is schoon; deze fase vereist geen migration.
 
 ## Fase 4 — Klantreis en primaire analyticsbron
 

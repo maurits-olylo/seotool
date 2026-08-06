@@ -16,6 +16,10 @@ from app.schemas.content_analysis import (
 )
 from app.services.authorization import require_website_access, require_website_write_access
 from app.services.content_analysis import analyze_website_content
+from app.services.content_opportunities import (
+    build_content_opportunities,
+    create_opportunity_task,
+)
 from app.services.security_audit import record_security_event
 
 router = APIRouter(prefix="/websites/{website_id}/content-analysis", tags=["content-analysis"])
@@ -40,6 +44,48 @@ def classify_website_content(
     if period_start > period_end:
         raise HTTPException(status_code=422, detail="Start date must not be after end date")
     return analyze_website_content(db, website_id, period_start, period_end)
+
+
+@router.get("/opportunities")
+def content_opportunities(
+    website_id: UUID,
+    period_start: date,
+    period_end: date,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, object]:
+    require_website_access(db, principal, website_id)
+    if period_start > period_end:
+        raise HTTPException(status_code=422, detail="Start date must not be after end date")
+    return build_content_opportunities(db, website_id, period_start, period_end)
+
+
+@router.post("/opportunities/{opportunity_key}/task", status_code=201)
+def promote_content_opportunity(
+    website_id: UUID,
+    opportunity_key: str,
+    period_start: date,
+    period_end: date,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, object]:
+    require_website_write_access(db, principal, website_id)
+    if period_start > period_end:
+        raise HTTPException(status_code=422, detail="Start date must not be after end date")
+    analysis = build_content_opportunities(db, website_id, period_start, period_end)
+    opportunity = next(
+        (item for item in analysis["opportunities"] if item["key"] == opportunity_key),
+        None,
+    )
+    if not opportunity:
+        raise HTTPException(status_code=404, detail="Content opportunity not found")
+    task, created = create_opportunity_task(
+        db,
+        website_id=website_id,
+        opportunity=opportunity,
+        principal=principal,
+    )
+    return {"task_id": str(task.id), "created": created}
 
 
 @router.get("/settings", response_model=ContentAnalysisSettingsData)
