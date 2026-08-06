@@ -10,6 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.routes import (
     clients,
+    content_analysis,
     crawls,
     discovery,
     exports,
@@ -91,6 +92,9 @@ async def redirect_proxied_http_to_https(
 
 
 app.include_router(clients.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
+app.include_router(
+    content_analysis.router, prefix="/api/v1", dependencies=[Depends(require_api_key)]
+)
 app.include_router(websites.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(discovery.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(crawls.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])

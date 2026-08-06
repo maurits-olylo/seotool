@@ -1,5 +1,10 @@
 from app.models.assets import Asset
 from app.models.client import Client
+from app.models.content_analysis import (
+    ContentAnalysisSettings,
+    UrlContentClassification,
+    UrlContentOverride,
+)
 from app.models.crawl import CrawlRun, ElementLocation, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url, UrlSource
 from app.models.exports import Export
@@ -57,6 +62,7 @@ from app.models.website import Website, WebsiteSettings
 
 __all__ = [
     "Client",
+    "ContentAnalysisSettings",
     "Asset",
     "ClientMembership",
     "Change",
@@ -100,6 +106,8 @@ __all__ = [
     "SearchConsoleQueryMetric",
     "UrlInspectionResult",
     "Url",
+    "UrlContentClassification",
+    "UrlContentOverride",
     "UrlLink",
     "UrlSnapshot",
     "UrlSource",

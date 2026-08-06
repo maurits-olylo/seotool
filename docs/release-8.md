@@ -1,6 +1,6 @@
 # Release 8 — Zoekintentie en contentanalyse
 
-Status: voorbereid; fase 1 is de eerstvolgende uitvoeringsfase.
+Status: in uitvoering; fase 1 is lokaal geïmplementeerd en nog niet gedeployed.
 
 ## Doel en afbakening
 
@@ -28,8 +28,8 @@ stilzwijgend opgeteld. JavaScript-rendering en PageSpeed blijven uitgeschakeld.
 
 ## Fase 1 — Versieerbaar classificatie- en bewijsfundament
 
-Doel: migration `0052` en een deterministische domeinlaag toevoegen zonder bestaande data
-automatisch te classificeren.
+Status: lokaal geïmplementeerd. Migration `0052` en een deterministische domeinlaag zijn toegevoegd
+zonder bestaande data automatisch te classificeren.
 
 - Leg vaste waarden vast voor zoekintentie, klantreisfase en contentrol, inclusief `uncertain`.
 - Bewaar classificaties historisch per website en URL met analyseperiode, inputhash,
@@ -50,6 +50,14 @@ Acceptatie:
 - een gelockte handmatige override overleeft automatische heranalyse;
 - classificaties kunnen niet buiten de geautoriseerde tenant worden gelezen of gewijzigd;
 - Alembic heeft één lineaire head op `0052`, Ruff en de relevante tests slagen.
+
+Lokale acceptatie:
+
+- Alembic heeft één lineaire head op `0052`, direct vanaf `0051`.
+- De drie gerichte domein-, API-, tenant- en auditlogtests slagen.
+- Ruff slaagt voor de volledige applicatiemap, de migration en de nieuwe tests.
+- De migration is uitsluitend additief en voert geen backfill of dataherschrijving uit; een extra
+  releaseback-up is daarom niet nodig.
 
 ## Fase 2 — Deterministische pagina- en queryclassificatie
 
