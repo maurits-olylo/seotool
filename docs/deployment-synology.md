@@ -239,6 +239,26 @@ PROJECT_DIR=/volume1/docker/seo-monitor/project ./scripts/restore.sh /pad/backup
 docker compose -f compose.yaml -f compose.prod.yaml up -d
 ```
 
+## Crawler-egressfirewall
+
+De crawlworkers gebruiken uitsluitend `seo-monitor-crawler-egress` voor publiek uitgaand verkeer.
+Het backendnetwerk is intern en de integration-worker gebruikt een afzonderlijk egressnetwerk.
+Pas na het maken van de Compose-netwerken als root de hostfirewall toe:
+
+```bash
+sudo CRAWLER_EGRESS_NETWORK_NAME=seo-monitor-crawler-egress \
+  scripts/crawler-egress-firewall.sh apply
+sudo CRAWLER_EGRESS_NETWORK_NAME=seo-monitor-crawler-egress \
+  scripts/crawler-egress-firewall.sh check
+```
+
+De regels in `DOCKER-USER` moeten na iedere Docker- of NAS-herstart opnieuw aantoonbaar actief
+zijn voordat crawlworkers werk aannemen. Gebruik daarvoor de begrensd herhalende
+`scripts/ensure-crawler-egress-firewall.sh` als root bij het opstarten. De definitieve Synology-
+opstarttaak wordt pas na stagingacceptatie vastgelegd; vertrouw niet alleen op een eerdere
+firewallstatus. IPv6 blijft uit totdat een gelijkwaardige, geteste IPv6-firewallketen beschikbaar
+is.
+
 ## Rollback
 
 1. Stop API, worker en scheduler en maak een kopie van de huidige databaseback-up.

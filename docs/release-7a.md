@@ -195,3 +195,20 @@ ongewijzigd. De veilige crawl-drain is na de controles opgeheven zonder gepauzee
 hervatten. Persoonlijk inloggen met MFA, klanten, websites, URL-details, dashboard, inzichten,
 integraties, uitloggen en opnieuw inloggen zijn functioneel geslaagd. Er is geen crawl of
 historische integratie-import uitsluitend voor releasecontrole gestart.
+
+### Fase 5 — Crawlernetwerkisolatie
+
+Status: lokaal geïmplementeerd; stagingacceptatie volgt.
+
+PostgreSQL en Redis staan met alle applicatieservices op een intern backendnetwerk zonder directe
+uitgaande route. Alleen API en integration-worker krijgen daarnaast het algemene applicatie-
+egressnetwerk. Crawlworkers en de uitgeschakelde renderer krijgen uitsluitend een afzonderlijk
+crawler-egressnetwerk. Docker-IPv6 staat voor alle nieuwe netwerken expliciet uit.
+
+Een idempotente hostfirewall koppelt het dynamisch gevonden crawler-egresssubnet vóór de standaard
+terugkeerregel aan `DOCKER-USER`. Uitgaand crawlerverkeer naar localhost, private, link-local,
+metadata-, test-, multicast- en gereserveerde IPv4-ranges wordt geweigerd; publiek IPv4-verkeer
+blijft mogelijk. De bestaande IP-validatie en IP-pinning blijven als onafhankelijke applicatielaag
+actief. Een afzonderlijke boothelper probeert de firewall na Dockerstart begrensd opnieuw toe te
+passen. Staging en productie moeten netwerkbereik, blokkering, firewallpersistentie en alle
+servicehealthchecks nog operationeel bevestigen.

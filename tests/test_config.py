@@ -175,3 +175,41 @@ def test_database_role_configurator_does_not_source_environment_files() -> None:
     assert "--profile tools run --rm database-roles" in script
     assert compose["services"]["database-roles"]["read_only"] is True
     assert compose["services"]["database-roles"]["cap_drop"] == ["ALL"]
+
+
+def test_crawler_network_is_separated_from_other_egress() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    compose = yaml.safe_load((project_root / "compose.yaml").read_text())
+    services = compose["services"]
+
+    assert compose["networks"]["backend"]["internal"] is True
+    assert compose["networks"]["backend"]["enable_ipv6"] is False
+    assert compose["networks"]["crawler-egress"]["enable_ipv6"] is False
+    for service_name in ("worker", "crawl-worker-2", "crawl-worker-3", "render-worker"):
+        assert services[service_name]["networks"] == ["backend", "crawler-egress"]
+    for service_name in ("api", "integration-worker"):
+        assert services[service_name]["networks"] == ["backend", "app-egress"]
+    for service_name in ("export-worker", "scheduler", "postgres", "redis"):
+        assert services[service_name]["networks"] == ["backend"]
+
+
+def test_crawler_firewall_blocks_non_public_ipv4_ranges() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    script = (project_root / "scripts/crawler-egress-firewall.sh").read_text()
+
+    for destination in (
+        "10.0.0.0/8",
+        "100.64.0.0/10",
+        "127.0.0.0/8",
+        "169.254.0.0/16",
+        "172.16.0.0/12",
+        "192.168.0.0/16",
+        "224.0.0.0/4",
+        "240.0.0.0/4",
+    ):
+        assert destination in script
+    assert 'iptables -F "$CHAIN_NAME"' in script
+    assert 'iptables -I DOCKER-USER 1 -j "$CHAIN_NAME"' in script
+    assert 'test "$FIRST_TARGET" = "$CHAIN_NAME"' in script
+    assert "iptables -F DOCKER-USER" not in script
+    assert 'IPV6_ENABLED" != "false"' in script

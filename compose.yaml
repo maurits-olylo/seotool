@@ -37,6 +37,7 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     ports: ["127.0.0.1:${API_PORT:-8000}:8000"]
     volumes: ["exports_data:/app/exports"]
+    networks: [backend, app-egress]
     depends_on:
       postgres: {condition: service_healthy}
     healthcheck:
@@ -60,6 +61,7 @@ services:
       WORKER_NAME: light-1
     command: python -m app.worker
     volumes: ["exports_data:/app/exports"]
+    networks: [backend, crawler-egress]
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
@@ -82,6 +84,7 @@ services:
       WORKER_NAME: full-1
     command: python -m app.worker
     volumes: ["exports_data:/app/exports"]
+    networks: [backend, crawler-egress]
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
@@ -105,6 +108,7 @@ services:
       WORKER_NAME: crawl-overflow-1
     command: python -m app.worker
     volumes: ["exports_data:/app/exports"]
+    networks: [backend, crawler-egress]
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
@@ -133,6 +137,7 @@ services:
       WORKER_QUEUES: integrations,maintenance,performance
       WORKER_NAME: integrations-1
     command: python -m app.worker
+    networks: [backend, app-egress]
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
@@ -155,6 +160,7 @@ services:
       WORKER_NAME: exports-1
     command: python -m app.worker
     volumes: ["exports_data:/app/exports"]
+    networks: [backend]
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
@@ -181,6 +187,7 @@ services:
       WORKER_QUEUES: renders
       WORKER_NAME: render-1
     command: python -m app.worker
+    networks: [backend, crawler-egress]
     init: true
     shm_size: 256mb
     mem_limit: 1g
@@ -202,6 +209,7 @@ services:
       DATABASE_URL: ${SCHEDULER_DATABASE_URL:?SCHEDULER_DATABASE_URL is required}
       SERVICE_ROLE: scheduler
     command: python -m app.scheduler
+    networks: [backend]
     depends_on:
       redis: {condition: service_healthy}
       postgres: {condition: service_healthy}
@@ -223,6 +231,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     command: alembic upgrade head
+    networks: [backend]
     depends_on:
       postgres: {condition: service_healthy}
     cpu_shares: 128
@@ -250,6 +259,7 @@ services:
       DB_SCHEDULER_PASSWORD: ${DB_SCHEDULER_PASSWORD:?DB_SCHEDULER_PASSWORD is required}
     volumes:
       - ./scripts/database-roles.sql:/database-roles.sql:ro
+    networks: [backend]
     command:
       - sh
       - -ec
@@ -270,6 +280,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-seo}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-seo}
     volumes: ["postgres_data:/var/lib/postgresql/data"]
+    networks: [backend]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U seo -d seo"]
       interval: 10s
@@ -279,6 +290,7 @@ services:
   redis:
     image: redis:7-alpine
     volumes: ["redis_data:/data"]
+    networks: [backend]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -289,3 +301,14 @@ volumes:
   postgres_data:
   redis_data:
   exports_data:
+networks:
+  backend:
+    name: seo-monitor-backend
+    internal: true
+    enable_ipv6: false
+  app-egress:
+    name: seo-monitor-app-egress
+    enable_ipv6: false
+  crawler-egress:
+    name: seo-monitor-crawler-egress
+    enable_ipv6: false

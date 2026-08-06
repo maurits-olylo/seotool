@@ -41,6 +41,7 @@ services:
       - "127.0.0.1:${STAGING_API_PORT:-18000}:8000"
     volumes:
       - staging_exports_data:/app/exports
+    networks: [backend, app-egress]
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
@@ -61,6 +62,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - staging_postgres_data:/var/lib/postgresql/data
+    networks: [backend]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
@@ -75,6 +77,7 @@ services:
     command: redis-server --appendonly yes --maxmemory 192mb --maxmemory-policy allkeys-lru
     volumes:
       - staging_redis_data:/data
+    networks: [backend]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -99,6 +102,7 @@ services:
       WORKER_QUEUES: renders
       WORKER_NAME: render-staging-1
     command: python -m app.worker
+    networks: [backend, crawler-egress]
     init: true
     shm_size: 256mb
     cpu_shares: 128
@@ -123,6 +127,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     command: alembic upgrade head
+    networks: [backend]
     depends_on:
       postgres: {condition: service_healthy}
     cpu_shares: 64
@@ -151,6 +156,7 @@ services:
       DB_SCHEDULER_PASSWORD: ${DB_SCHEDULER_PASSWORD:?DB_SCHEDULER_PASSWORD is required}
     volumes:
       - ./scripts/database-roles.sql:/database-roles.sql:ro
+    networks: [backend]
     command:
       - sh
       - -ec
@@ -172,3 +178,14 @@ volumes:
     name: seo-monitor-staging-redis-data
   staging_exports_data:
     name: seo-monitor-staging-exports-data
+networks:
+  backend:
+    name: seo-monitor-staging-backend
+    internal: true
+    enable_ipv6: false
+  app-egress:
+    name: seo-monitor-staging-app-egress
+    enable_ipv6: false
+  crawler-egress:
+    name: seo-monitor-staging-crawler-egress
+    enable_ipv6: false
