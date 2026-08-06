@@ -42,6 +42,9 @@ neemt de belangrijkste bescherming bij diefstal of verlies weg.
   decryptable is, een verkeerde checksum heeft of geen leesbaar archief bevat.
 - Iedere geslaagde uitvoering vernieuwt een omgevingsgebonden `latest`-verwijzing pas nadat pakket
   en checksum volledig zijn gepubliceerd; herstelcommando's hoeven daardoor geen glob te gebruiken.
+- `scripts/scheduled-backup.sh` voorkomt overlap, activeert de crawl-drain, stopt tijdelijk de drie
+  overige achtergrondschrijvers, maakt en controleert de back-up en herstelt services en drain ook
+  wanneer een tussenstap faalt. De oorspronkelijke foutstatus blijft behouden voor DSM-melding.
 - De definitieve RPO en RTO worden vervangen door de werkelijk gemeten waarden uit de geïsoleerde
   stagingrestore.
 

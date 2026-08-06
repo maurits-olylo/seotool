@@ -237,6 +237,13 @@ Het productieprivacyregister gebruikt het vooraf ingerichte externe volume
 project `seo-monitor` en volume `privacy_ledger_data`, en geef uitsluitend de inhoud aan
 UID/GID `10001`. Compose maakt of verwijdert dit herstelkritieke volume daarna niet zelfstandig.
 
+Plan dagelijks als `root` uitsluitend het absolute script
+`/bin/sh /volume1/docker/seo-monitor/project/scripts/scheduled-backup.sh`. Schakel in Taakplanner
+`Uitvoeringsdetails per e-mail verzenden` en `Verstuur uitvoeringsdetails alleen wanneer het script
+abnormaal wordt beëindigd` in. De wrapper eindigt bij iedere mislukte back-up, checksum,
+decryptiecontrole, herstart of healthcheck met een foutstatus, maar probeert eerst services en
+crawl-drain veilig te herstellen.
+
 Stop voor restore alle schrijvende services. Het restorescript weigert verder te gaan zolang één
 van deze services nog draait. PostgreSQL en Redis blijven beschikbaar. Restore past vóór afronding
 ook het actuele privacyverwijderingsregister toe; controleer de gerapporteerde aantallen voordat de
