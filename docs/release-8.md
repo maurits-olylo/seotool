@@ -61,11 +61,28 @@ Lokale acceptatie:
 
 ## Fase 2 — Deterministische pagina- en queryclassificatie
 
+Status: lokaal geïmplementeerd en nog niet gedeployed.
+
 - Classificeer crawlerinhoud en GSC-query's uitlegbaar op basis van versieerbare regels.
 - Cache queryclassificatie per genormaliseerde query, taal en markt.
 - Bereken pagina-uitkomsten gewogen op vertoningen en klikken met expliciete dekking.
 - Sla alleen een nieuwe historische uitkomst op bij gewijzigde inputhash of classificatieversie.
 - Maak geen harde actie bij ontbrekende of tegenstrijdige brondekking.
+
+Implementatie en lokale acceptatie:
+
+- Migration `0053` voegt een gedeelde, contextgebonden querycache toe met unieke combinatie van
+  genormaliseerde query, taal, land en classificatieversie.
+- Regelversie `intent-rules-2026-08-07-v1` classificeert Nederlandse en Engelse query- en
+  paginasignalen zonder externe provider. Branded termen blijven websitegebonden en beïnvloeden
+  alleen de uitkomst voor de betreffende website.
+- Alleen actieve, succesvolle, indexeerbare HTML-pagina's met eigen geldige canonical en een
+  bruikbare contenthash worden geclassificeerd.
+- GSC-vertoningen en klikken wegen mee in de paginaverdeling; crawler- en GSC-dekking blijven
+  afzonderlijk zichtbaar in het bewijs.
+- Dezelfde inputhash, analyseperiode en regelversie maken geen tweede paginaclassificatie.
+- Drie gerichte regel-, bewijs-, cache- en idempotentietests slagen; Ruff is schoon en Alembic heeft
+  één lineaire head op `0053`.
 
 ## Fase 3 — Verdelingen, mismatch en contentkansen
 

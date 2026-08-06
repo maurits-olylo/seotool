@@ -62,3 +62,28 @@ class UrlContentOverride(UUIDTimestampMixin, Base):
     updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
     )
+
+
+class QueryContentClassification(UUIDTimestampMixin, Base):
+    __tablename__ = "query_content_classifications"
+    __table_args__ = (
+        UniqueConstraint(
+            "normalized_query",
+            "language",
+            "country",
+            "classification_version",
+            name="uq_query_content_classification_context_version",
+        ),
+    )
+
+    normalized_query: Mapped[str] = mapped_column(String(2048))
+    language: Mapped[str] = mapped_column(String(10))
+    country: Mapped[str] = mapped_column(String(2))
+    classification_version: Mapped[str] = mapped_column(String(40))
+    input_hash: Mapped[str] = mapped_column(String(64))
+    search_intent: Mapped[str] = mapped_column(String(40), index=True)
+    journey_stage: Mapped[str] = mapped_column(String(40))
+    content_role: Mapped[str] = mapped_column(String(40))
+    confidence: Mapped[float] = mapped_column(Float)
+    probabilities: Mapped[dict[str, float]] = mapped_column(JSON)
+    evidence: Mapped[list[dict[str, object]]] = mapped_column(JSON, default=list)

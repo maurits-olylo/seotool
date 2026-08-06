@@ -2,6 +2,7 @@ from app.models.assets import Asset
 from app.models.client import Client
 from app.models.content_analysis import (
     ContentAnalysisSettings,
+    QueryContentClassification,
     UrlContentClassification,
     UrlContentOverride,
 )
@@ -63,6 +64,7 @@ from app.models.website import Website, WebsiteSettings
 __all__ = [
     "Client",
     "ContentAnalysisSettings",
+    "QueryContentClassification",
     "Asset",
     "ClientMembership",
     "Change",

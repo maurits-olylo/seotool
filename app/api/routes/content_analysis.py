@@ -1,3 +1,4 @@
+from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -14,6 +15,7 @@ from app.schemas.content_analysis import (
     ContentOverrideWrite,
 )
 from app.services.authorization import require_website_access, require_website_write_access
+from app.services.content_analysis import analyze_website_content
 from app.services.security_audit import record_security_event
 
 router = APIRouter(prefix="/websites/{website_id}/content-analysis", tags=["content-analysis"])
@@ -24,6 +26,20 @@ def _url_for_website(db: Session, website_id: UUID, url_id: UUID) -> Url:
     if not url or url.website_id != website_id:
         raise HTTPException(status_code=404, detail="URL not found")
     return url
+
+
+@router.post("/classify")
+def classify_website_content(
+    website_id: UUID,
+    period_start: date,
+    period_end: date,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, int]:
+    require_website_write_access(db, principal, website_id)
+    if period_start > period_end:
+        raise HTTPException(status_code=422, detail="Start date must not be after end date")
+    return analyze_website_content(db, website_id, period_start, period_end)
 
 
 @router.get("/settings", response_model=ContentAnalysisSettingsData)
