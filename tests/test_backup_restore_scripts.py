@@ -162,6 +162,14 @@ def test_restore_requires_checksum(tmp_path: Path) -> None:
     assert not (tmp_path / "docker.log").exists()
 
 
+def test_restore_mounts_only_readable_export_archive() -> None:
+    script = (PROJECT_DIR / "scripts/restore.sh").read_text()
+
+    assert 'chmod 711 "$WORK_DIR"' in script
+    assert 'chmod 644 "$WORK_DIR/exports.tar"' in script
+    assert '-v "$WORK_DIR/exports.tar:/restore/exports.tar:ro"' in script
+
+
 def test_staging_target_uses_only_staging_compose(tmp_path: Path) -> None:
     env = _backup_environment(tmp_path, target="staging")
     env.update({"POSTGRES_USER": "seo_staging", "POSTGRES_DB": "seo_staging"})

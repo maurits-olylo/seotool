@@ -82,7 +82,9 @@ if [ "${RESTORE_PRIVACY_LEDGER_IF_EMPTY:-false}" = "true" ]; then
     'from pathlib import Path; source=Path("/restore/privacy-deletions.jsonl"); target=Path("/app/privacy-ledger/deletions.jsonl"); target.parent.mkdir(parents=True, exist_ok=True); (not target.exists() or target.stat().st_size == 0) and target.write_bytes(source.read_bytes())'
 fi
 compose run --rm --no-deps -T api python -m app.maintenance reapply-privacy-deletions
-compose run --rm --no-deps -T -v "$WORK_DIR:/restore:ro" api python -c \
+chmod 711 "$WORK_DIR"
+chmod 644 "$WORK_DIR/exports.tar"
+compose run --rm --no-deps -T -v "$WORK_DIR/exports.tar:/restore/exports.tar:ro" api python -c \
   'import pathlib, shutil, tarfile; root=pathlib.Path("/app/exports"); [shutil.rmtree(p) if p.is_dir() else p.unlink() for p in list(root.iterdir())]; tarfile.open("/restore/exports.tar").extractall("/app")'
 
 if [ "${RESTORE_ENVIRONMENT:-false}" = "true" ]; then
