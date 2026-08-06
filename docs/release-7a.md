@@ -167,7 +167,7 @@ Release 7a-B blijven open.
 
 ### Fase 4 — Database-identiteiten en minimale rechten
 
-Status: lokaal geïmplementeerd; stagingacceptatie volgt.
+Status: lokaal en op staging technisch en functioneel geaccepteerd; productiedeployment volgt.
 
 API, crawler, integraties, exports en scheduler gebruiken afzonderlijke PostgreSQL-loginrollen.
 Een herhaalbaar configuratiescript maakt of roteert deze rollen en herstelt hun grants naar het
@@ -180,3 +180,8 @@ een volgende migration bewust aan het rechtenbeleid worden toegevoegd.
 Er is geen Alembic-migratie: PostgreSQL-rollen zijn omgevingsconfiguratie en geen onderdeel van het
 applicatieschema. Staging moet positieve serviceflows en negatieve grants bevestigen voordat
 dezelfde rolconfiguratie in productie wordt toegepast.
+
+Staging bevestigde afzonderlijke logins, een gezonde API-databaseverbinding en de verwachte
+positieve en negatieve tabelrechten. Persoonlijk inloggen met MFA, klant- en websiteoverzicht,
+navigatie zonder laadlus en uitloggen zijn functioneel geslaagd. Environmentwachtwoorden worden
+voortaan uitsluitend met de niet-tonende, atomische configuratiehelper toegevoegd of geroteerd.

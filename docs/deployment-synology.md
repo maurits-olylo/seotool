@@ -51,6 +51,12 @@ beheerhandelingen en gebruikt de database-eigenaar. Configureer of roteer runtim
 invullen van de niet-gecommitte environmentwaarden met `scripts/configure-database-roles.sh`.
 Het script is herhaalbaar en herstelt afwijkende grants.
 
+Maak of roteer deze tien gekoppelde environmentwaarden nooit handmatig via een editor. Gebruik
+`scripts/configure-database-role-environment.sh <env-bestand> <database>` als root. Dit script
+genereert vijf unieke hexwachtwoorden, schrijft ieder wachtwoord en zijn URL atomair, verwijdert
+dubbele regels, toont geen secretwaarden en herstelt bestandsmodus `0600`. Voer daarna
+`scripts/configure-database-roles.sh` uit om de PostgreSQL-loginrollen gelijk te trekken.
+
 ## Installeren en starten
 
 ```bash
