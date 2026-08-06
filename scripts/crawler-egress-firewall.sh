@@ -2,13 +2,19 @@
 set -eu
 
 NETWORK_NAME="${CRAWLER_EGRESS_NETWORK_NAME:-seo-monitor-crawler-egress}"
-CHAIN_NAME="SEO-CRAWLER-EGRESS"
+CHAIN_NAME="${CRAWLER_EGRESS_CHAIN_NAME:-SEO-CRAWLER-EGRESS}"
 MODE="${1:-apply}"
 
 if [ "$MODE" != "apply" ] && [ "$MODE" != "check" ]; then
   echo "Usage: $0 [apply|check]" >&2
   exit 1
 fi
+case "$CHAIN_NAME" in
+  *[!A-Z0-9-]*|"")
+    echo "Crawler egress refused: invalid firewall chain name" >&2
+    exit 1
+    ;;
+esac
 if [ "$(id -u)" -ne 0 ]; then
   echo "Run this script as root" >&2
   exit 1
@@ -47,10 +53,17 @@ BLOCKED_DESTINATIONS="
 "
 
 check_rules() {
-  FIRST_TARGET="$(
-    iptables -S DOCKER-USER | awk '$1 == "-A" { print $NF; exit }'
+  LINK_POSITION="$(
+    iptables -S DOCKER-USER | awk -v chain="$CHAIN_NAME" \
+      '$1 == "-A" { position += 1; if ($NF == chain) { print position; exit } }'
   )"
-  test "$FIRST_TARGET" = "$CHAIN_NAME"
+  RETURN_POSITION="$(
+    iptables -S DOCKER-USER | awk \
+      '$1 == "-A" { position += 1; if ($NF == "RETURN") { print position; exit } }'
+  )"
+  test -n "$LINK_POSITION"
+  test -n "$RETURN_POSITION"
+  test "$LINK_POSITION" -lt "$RETURN_POSITION"
   for destination in $BLOCKED_DESTINATIONS; do
     iptables -C "$CHAIN_NAME" -s "$SUBNET" -d "$destination" \
       -j REJECT --reject-with icmp-admin-prohibited > /dev/null 2>&1

@@ -247,8 +247,10 @@ Pas na het maken van de Compose-netwerken als root de hostfirewall toe:
 
 ```bash
 sudo CRAWLER_EGRESS_NETWORK_NAME=seo-monitor-crawler-egress \
+  CRAWLER_EGRESS_CHAIN_NAME=SEO-CRAWLER-EGRESS \
   scripts/crawler-egress-firewall.sh apply
 sudo CRAWLER_EGRESS_NETWORK_NAME=seo-monitor-crawler-egress \
+  CRAWLER_EGRESS_CHAIN_NAME=SEO-CRAWLER-EGRESS \
   scripts/crawler-egress-firewall.sh check
 ```
 
@@ -258,6 +260,10 @@ zijn voordat crawlworkers werk aannemen. Gebruik daarvoor de begrensd herhalende
 opstarttaak wordt pas na stagingacceptatie vastgelegd; vertrouw niet alleen op een eerdere
 firewallstatus. IPv6 blijft uit totdat een gelijkwaardige, geteste IPv6-firewallketen beschikbaar
 is.
+
+Staging gebruikt gelijktijdig de afzonderlijke keten `SEO-CRAWLER-STAGING` voor netwerk
+`seo-monitor-staging-crawler-egress`. De scripts verwijderen of overschrijven de keten van de
+andere omgeving niet; beide koppelingen moeten vóór de standaard `RETURN` blijven staan.
 
 ## Rollback
 
