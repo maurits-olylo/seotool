@@ -226,8 +226,8 @@ uitsluitend voor deze releasecontrole uitgevoerd en blijft onderdeel van gepland
 
 ### Fase 6A — Versleuteld lokaal herstelbaar fundament
 
-Status: lokaal, op staging en technisch op productie geaccepteerd; operationele planning en
-waarschuwing volgen.
+Status: volledig geaccepteerd op lokaal, staging en productie, inclusief operationele planning en
+waarschuwing bij mislukking.
 
 De bestaande losse PostgreSQL-dump wordt vervangen door één cliënt-side versleuteld herstelpakket
 met database, duurzaam exportvolume, noodzakelijke herstelconfiguratie, exacte Git-commit, manifest
@@ -270,6 +270,13 @@ Twee eerdere productiecontroles stopten vóór de back-up: eerst gebruikte de AP
 root-owned Compose-volume, daarna bleek de vaste volumenaam niet expliciet extern. De uiteindelijke
 configuratie forceerde uitsluitend de API opnieuw met het vooraf bevoegde externe volume. De oude
 volumes zijn bewust niet als verkennende stap verwijderd.
+
+De definitieve operationele acceptatie volgde op commit `883ea5e`. De ingeschakelde DSM-roottaak
+`SEO Monitor encrypted backup` voert de gecontroleerde wrapper dagelijks om 03:00 uit en meldt
+abnormale beëindiging per e-mail. De handmatige taakrun van 6 augustus 2026 duurde van 23:07:22 tot
+23:15:03 en eindigde met `Normal (0)`. De oude database-only taak is uitgeschakeld en mag worden
+verwijderd, zodat geen overlappende back-ups op hetzelfde tijdstip kunnen ontstaan. Daarmee is fase
+6A volledig afgerond; de beperking van SEC-13 resteert uitsluitend in fase 6B.
 
 ### Fase 6B — Onafhankelijke immutable EU-back-up
 

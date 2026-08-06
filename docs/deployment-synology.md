@@ -226,11 +226,13 @@ garanderen wanneer tussentijdse statuscontrole veilig mogelijk is.
 
 ## Back-up en restore
 
-Plan `scripts/backup.sh` dagelijks via Synology Taakplanner. Stel `PROJECT_DIR`, `BACKUP_DIR`,
-`BACKUP_KEY_FILE` en optioneel `BACKUP_RETENTION_DAYS` in. Maak de sleutel vooraf niet-tonend met
-`scripts/configure-backup-key.sh` en bewaar een herstelkopie buiten project en back-upvolume. Laat
-na iedere uitvoering `scripts/check-backup.sh` het nieuwste pakket controleren. De onafhankelijke
-EU-kopie en Object Lock volgen verplicht in Release 7a-B fase 6B vóór Friends & Family.
+Gebruik `scripts/backup.sh` en `scripts/check-backup.sh` niet als losse geplande taken. De dagelijkse
+Taakplanner-taak roept uitsluitend `scripts/scheduled-backup.sh` aan; deze verzorgt beide stappen,
+voorkomt overlap en herstelt services en crawl-drain ook na een fout. Stel `PROJECT_DIR`,
+`BACKUP_DIR`, `BACKUP_KEY_FILE` en optioneel `BACKUP_RETENTION_DAYS` in. Maak de sleutel vooraf
+niet-tonend met `scripts/configure-backup-key.sh` en bewaar een herstelkopie buiten project en
+back-upvolume. De onafhankelijke EU-kopie en Object Lock volgen verplicht in Release 7a-B fase 6B
+vóór Friends & Family.
 
 Het productieprivacyregister gebruikt het vooraf ingerichte externe volume
 `seo-monitor-privacy-ledger-data`. Maak dit volume vóór de eerste API-start met Compose-labels voor
@@ -242,7 +244,8 @@ Plan dagelijks als `root` uitsluitend het absolute script
 `Uitvoeringsdetails per e-mail verzenden` en `Verstuur uitvoeringsdetails alleen wanneer het script
 abnormaal wordt beëindigd` in. De wrapper eindigt bij iedere mislukte back-up, checksum,
 decryptiecontrole, herstart of healthcheck met een foutstatus, maar probeert eerst services en
-crawl-drain veilig te herstellen.
+crawl-drain veilig te herstellen. Verwijder of laat iedere oudere database-only back-uptaak
+uitgeschakeld; plan nooit beide taken op hetzelfde tijdstip.
 
 Stop voor restore alle schrijvende services. Het restorescript weigert verder te gaan zolang één
 van deze services nog draait. PostgreSQL en Redis blijven beschikbaar. Restore past vóór afronding

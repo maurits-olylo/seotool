@@ -1,7 +1,7 @@
 # Back-up- en herstelbeleid
 
-Status: Release 7a-B fase 6A lokaal, op staging en technisch op productie gevalideerd; dagelijkse
-planning en waarschuwing volgen.
+Status: Release 7a-B fase 6A lokaal, op staging en op productie geaccepteerd, inclusief dagelijkse
+planning en waarschuwing bij mislukking.
 
 ## Reikwijdte fase 6A
 
@@ -58,6 +58,12 @@ versleuteld pakket terwijl crawls veilig waren gedraind en overige achtergrondsc
 waren gestopt. Alle services waren daarna gezond en de drain werd zonder hervatte taken opgeheven.
 Productie is niet als hersteltest gebruikt; de volledige restoreproef blijft uitsluitend op de
 synthetische stagingomgeving uitgevoerd.
+
+De dagelijkse DSM-roottaak `SEO Monitor encrypted backup` is om 03:00 ingeschakeld met e-mail bij
+abnormale beëindiging. De handmatige acceptatierun van 6 augustus 2026 liep van 23:07:22 tot
+23:15:03 en eindigde met DSM-status `Normal (0)`. Daarmee zijn ook de foutdoorgifte voor monitoring
+en de volledige geplande wrapperroute operationeel geaccepteerd. De oude database-only taak blijft
+uitgeschakeld en mag worden verwijderd; twee gelijktijdige back-uptaken zijn niet toegestaan.
 
 ## Privacy na herstel
 
