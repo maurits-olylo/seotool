@@ -118,6 +118,9 @@ mv "$BACKUP_FILE.incomplete" "$BACKUP_FILE"
 (
   cd "$BACKUP_DIR"
   sha256_file "$(basename "$BACKUP_FILE")" > "$(basename "$BACKUP_FILE").sha256"
+  ln -sfn "$(basename "$BACKUP_FILE")" "seo-monitor-$TARGET-latest.tar.enc"
+  ln -sfn "$(basename "$BACKUP_FILE").sha256" \
+    "seo-monitor-$TARGET-latest.tar.enc.sha256"
 )
 rm -f "$PLAIN_ARCHIVE"
 

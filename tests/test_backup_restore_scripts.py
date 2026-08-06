@@ -78,10 +78,17 @@ def test_backup_creates_verified_encrypted_bundle_and_checksum(tmp_path: Path) -
     )
 
     assert result.returncode == 0, result.stderr
-    archives = list((tmp_path / "backups").glob("seo-monitor-production-*.tar.enc"))
+    archives = [
+        path
+        for path in (tmp_path / "backups").glob("seo-monitor-production-*.tar.enc")
+        if not path.is_symlink()
+    ]
     assert len(archives) == 1
     assert archives[0].read_bytes().startswith(b"Salted__")
     assert Path(f"{archives[0]}.sha256").is_file()
+    latest = tmp_path / "backups" / "seo-monitor-production-latest.tar.enc"
+    assert latest.resolve() == archives[0].resolve()
+    assert Path(f"{latest}.sha256").resolve() == Path(f"{archives[0]}.sha256").resolve()
     assert not list((tmp_path / "backups").glob("*.incomplete"))
 
 

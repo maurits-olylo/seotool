@@ -39,6 +39,8 @@ neemt de belangrijkste bescherming bij diefstal of verlies weg.
   zijn gevalideerd.
 - `scripts/check-backup.sh` faalt standaard wanneer het nieuwste pakket ouder is dan 30 uur, niet
   decryptable is, een verkeerde checksum heeft of geen leesbaar archief bevat.
+- Iedere geslaagde uitvoering vernieuwt een omgevingsgebonden `latest`-verwijzing pas nadat pakket
+  en checksum volledig zijn gepubliceerd; herstelcommando's hoeven daardoor geen glob te gebruiken.
 - De definitieve RPO en RTO worden vervangen door de werkelijk gemeten waarden uit de geïsoleerde
   stagingrestore.
 
