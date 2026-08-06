@@ -1,6 +1,6 @@
 # Back-up- en herstelbeleid
 
-Status: Release 7a-B fase 6A lokaal geïmplementeerd; staging- en productieacceptatie volgen.
+Status: Release 7a-B fase 6A lokaal en op staging gevalideerd; productieacceptatie volgt.
 
 ## Reikwijdte fase 6A
 
@@ -43,6 +43,11 @@ neemt de belangrijkste bescherming bij diefstal of verlies weg.
   en checksum volledig zijn gepubliceerd; herstelcommando's hoeven daardoor geen glob te gebruiken.
 - De definitieve RPO en RTO worden vervangen door de werkelijk gemeten waarden uit de geïsoleerde
   stagingrestore.
+
+De stagingrestore van 6 augustus 2026 bevestigde volledige leesbaarheid en privacyherhaling. De
+beschikbare terminalregistratie bevat geen betrouwbare gezamenlijke start- en eindtijd; het RTO van
+vier uur blijft daarom voorlopig en wordt bij de eerste geplande volledige herstelmeting met
+expliciete tijdmarkers vervangen door een gemeten waarde.
 
 ## Privacy na herstel
 

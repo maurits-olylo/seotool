@@ -226,7 +226,7 @@ uitsluitend voor deze releasecontrole uitgevoerd en blijft onderdeel van gepland
 
 ### Fase 6A — Versleuteld lokaal herstelbaar fundament
 
-Status: lokaal in uitvoering; staging- en productieacceptatie volgen.
+Status: lokaal en op staging geaccepteerd; productieacceptatie volgt.
 
 De bestaande losse PostgreSQL-dump wordt vervangen door één cliënt-side versleuteld herstelpakket
 met database, duurzaam exportvolume, noodzakelijke herstelconfiguratie, exacte Git-commit, manifest
@@ -240,6 +240,22 @@ dit actuelere register idempotent toe voordat schrijvers opnieuw mogen starten, 
 databasepunt verwijderde gegevens niet opnieuw activeert. De lokale acceptatie omvat regressietests
 en een volledige synthetische stagingrestore. Voorlopige doelen zijn RPO 24 uur en RTO 4 uur; de
 stagingmeting wordt leidend.
+
+Stagingacceptatie op 6 augustus 2026 bevestigde vanaf commit `f790032` een volledig versleuteld
+pakket met leesbare PostgreSQL-dump, exports, herstelconfiguratie, privacyregister, manifest en alle
+verplichte checksums. De geïsoleerde restore zette de synthetische database en het exportbewijs
+terug, terwijl een klant die ná het back-upmoment was verwijderd door het actuelere onafhankelijke
+privacyregister opnieuw werd verwijderd. Het gereedsignaal meldde
+`full_restore_proof=passed privacy_reactivation=blocked exports_readable=true`. API, PostgreSQL en
+Redis waren daarna gezond en Alembic bleef op `0051`. De proef startte geen crawl of import en
+gebruikte geen productiedata.
+
+De eerste restorepoging stopte na database- en privacyherstel veilig op onvoldoende leesrechten voor
+het tijdelijke exportarchief. Commit `f790032` maakt uitsluitend `exports.tar` leesbaar voor de
+niet-root herstelcontainer en mount alleen dat bestand. De hervatte exportrestore en alle
+eindcontroles slaagden. De Synology-kernelwaarschuwing over de niet-ondersteunde PID-limiet bleef
+ongewijzigd; een Compose-waarschuwing over het vooraf aangemaakte stagingprivacyvolume had geen
+functionele impact.
 
 ### Fase 6B — Onafhankelijke immutable EU-back-up
 
