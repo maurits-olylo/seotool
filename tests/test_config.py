@@ -136,6 +136,9 @@ def test_compose_limits_sensitive_environment_by_service() -> None:
     assert "TOKEN_ENCRYPTION_KEY" in services["integration-worker"]["environment"]
     assert "INITIAL_SUPERUSER_PASSWORD" not in services["integration-worker"]["environment"]
     assert "privacy_ledger_data:/app/privacy-ledger" in services["api"]["volumes"]
+    assert compose["volumes"]["privacy_ledger_data"]["name"] == (
+        "seo-monitor-privacy-ledger-data"
+    )
 
 
 def test_compose_uses_service_specific_database_urls() -> None:

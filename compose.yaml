@@ -305,6 +305,7 @@ volumes:
   redis_data:
   exports_data:
   privacy_ledger_data:
+    name: seo-monitor-privacy-ledger-data
 networks:
   backend:
     name: seo-monitor-backend
