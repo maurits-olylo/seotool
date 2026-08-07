@@ -340,6 +340,10 @@ locaties per historische snapshot, vermeldt meetmoment, crawlrun, renderstatus e
 locator en onderscheidt exact gelokaliseerde van ontbrekende elementen. Een ontbrekend element
 krijgt uitsluitend een semantisch `missing`-target en nooit een verzonnen selector. Screenshot- of
 live renderbewijs wordt pas toegevoegd wanneer dat werkelijk als afzonderlijk artefact bestaat.
+Een ingeschakelde renderworker bewaart maximaal één PNG van de vaste viewport per observatie in een
+afzonderlijk volume. De database bevat alleen sleutel, hash, grootte, afmetingen en vervaldatum; de
+API krijgt read-only volumetoegang en publiceert de interne sleutel niet. De standaardretentie is
+90 dagen en opruiming is per opslagactie begrensd.
 Afbeeldingen en documenten krijgen een lichte HEAD-controle. Grote afbeeldingen (meer dan 2 MB) en
 documenten (meer dan 5 MB) leveren afzonderlijke issues op zonder de volledige bestanden te downloaden.
 

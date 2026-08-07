@@ -40,6 +40,7 @@ services:
     volumes:
       - exports_data:/app/exports
       - privacy_ledger_data:/app/privacy-ledger
+      - render_artifacts_data:/app/render-artifacts:ro
     networks: [backend, app-egress]
     depends_on:
       postgres: {condition: service_healthy}
@@ -190,6 +191,7 @@ services:
       WORKER_QUEUES: renders
       WORKER_NAME: render-1
     command: python -m app.worker
+    volumes: ["render_artifacts_data:/app/render-artifacts"]
     networks: [backend, crawler-egress]
     init: true
     shm_size: 256mb
@@ -304,6 +306,7 @@ volumes:
   postgres_data:
   redis_data:
   exports_data:
+  render_artifacts_data:
   privacy_ledger_data:
     external: true
     name: seo-monitor-privacy-ledger-data

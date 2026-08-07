@@ -149,6 +149,10 @@ def _inspection_page(
         ),
         "render_status": render.status if render else "not_rendered",
         "rendered_at": render.rendered_at if render else None,
+        "screenshot_available": bool(render and render.screenshot_key),
+        "screenshot_width": render.screenshot_width if render else None,
+        "screenshot_height": render.screenshot_height if render else None,
+        "screenshot_expires_at": render.screenshot_expires_at if render else None,
         "targets": targets,
     }
 

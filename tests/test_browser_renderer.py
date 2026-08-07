@@ -84,6 +84,9 @@ class _Page:
     def content(self) -> str:
         return "<html><body><main>Rendered</main></body></html>"
 
+    def screenshot(self, **_kwargs) -> bytes:  # type: ignore[no-untyped-def]
+        return b"png"
+
 
 class _Context:
     def __init__(self, owner, requests) -> None:  # type: ignore[no-untyped-def]

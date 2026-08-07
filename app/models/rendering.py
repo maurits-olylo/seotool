@@ -1,7 +1,16 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -30,5 +39,11 @@ class RenderObservation(UUIDTimestampMixin, Base):
     rendered_metadata_hash: Mapped[str | None] = mapped_column(String(64))
     rendered_links_hash: Mapped[str | None] = mapped_column(String(64))
     rendered_schema_hash: Mapped[str | None] = mapped_column(String(64))
+    screenshot_key: Mapped[str | None] = mapped_column(String(255), unique=True)
+    screenshot_sha256: Mapped[str | None] = mapped_column(String(64))
+    screenshot_bytes: Mapped[int | None] = mapped_column(BigInteger)
+    screenshot_width: Mapped[int | None] = mapped_column(Integer)
+    screenshot_height: Mapped[int | None] = mapped_column(Integer)
+    screenshot_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     comparison: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
     error_message: Mapped[str | None] = mapped_column(Text)

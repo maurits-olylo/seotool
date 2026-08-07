@@ -6,6 +6,7 @@ from app.services.url_normalization import InvalidUrlError
 
 MAX_BROWSER_REQUESTS = 100
 MAX_RENDERED_HTML_BYTES = 5_000_000
+MAX_SCREENSHOT_BYTES = 2_000_000
 BLOCKED_RESOURCE_TYPES = {"font", "image", "media"}
 
 
@@ -18,6 +19,9 @@ class BrowserRenderResult:
     html: str
     browser_name: str
     request_count: int
+    screenshot_png: bytes | None = None
+    screenshot_width: int = 1365
+    screenshot_height: int = 768
 
 
 def render_page_html(
@@ -79,6 +83,10 @@ def render_page_html(
                 raise RenderError("Browser navigation returned no response")
             page.wait_for_timeout(min(max(settle_time_ms, 0), 2_000))
             html = page.content()
+            try:
+                screenshot_png = page.screenshot(type="png", full_page=False)
+            except Exception:
+                screenshot_png = None
             final_url = page.url
             context.close()
             browser.close()
@@ -90,4 +98,11 @@ def render_page_html(
     validate_public_http_url(final_url)
     if len(html.encode("utf-8")) > MAX_RENDERED_HTML_BYTES:
         raise RenderError("Rendered HTML exceeds maximum size")
-    return BrowserRenderResult(html=html, browser_name="chromium", request_count=request_count)
+    if screenshot_png is not None and len(screenshot_png) > MAX_SCREENSHOT_BYTES:
+        screenshot_png = None
+    return BrowserRenderResult(
+        html=html,
+        browser_name="chromium",
+        request_count=request_count,
+        screenshot_png=screenshot_png,
+    )

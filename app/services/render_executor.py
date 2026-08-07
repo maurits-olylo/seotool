@@ -12,6 +12,7 @@ from app.services.browser_renderer import render_page_html
 from app.services.html_extraction import extract_page
 from app.services.issue_engine import reconcile_issues
 from app.services.render_analysis import compare_rendered_page, render_issue_signals
+from app.services.render_artifacts import store_render_screenshot
 
 logger = structlog.get_logger()
 RENDER_ISSUE_TYPES = {
@@ -69,6 +70,16 @@ def execute_render_observation(observation_id: str) -> None:
             observation.rendered_metadata_hash = rendered.metadata_hash
             observation.rendered_links_hash = rendered.links_hash
             observation.rendered_schema_hash = rendered.schema_hash
+            if result.screenshot_png:
+                artifact = store_render_screenshot(
+                    observation.website_id, observation.id, result.screenshot_png
+                )
+                observation.screenshot_key = artifact.key
+                observation.screenshot_sha256 = artifact.sha256
+                observation.screenshot_bytes = artifact.size
+                observation.screenshot_width = result.screenshot_width
+                observation.screenshot_height = result.screenshot_height
+                observation.screenshot_expires_at = artifact.expires_at
             observation.comparison = {
                 **comparison,
                 "browser_request_count": result.request_count,

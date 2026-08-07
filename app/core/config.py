@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     initial_superuser_email: str = ""
     initial_superuser_password: str = ""
     rendering_enabled: bool = False
+    render_artifact_dir: str = "/app/render-artifacts"
+    render_artifact_retention_days: int = 90
     pagespeed_enabled: bool = False
     pagespeed_api_key: str = ""
     mfa_enforcement_enabled: bool = False

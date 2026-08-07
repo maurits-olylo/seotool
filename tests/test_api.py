@@ -27,6 +27,7 @@ from app.models.integrations import (
     WebsiteIntegration,
 )
 from app.models.issues import ActivityLog, Issue, IssueOccurrence, IssueSuppression
+from app.models.rendering import RenderObservation
 from app.models.reporting import MonthlyReportSnapshot
 from app.models.user import ClientMembership, SecurityAuditEvent, User
 from app.models.website import WebsiteSettings
@@ -1434,6 +1435,20 @@ def test_issue_detail_returns_live_element_location(client: TestClient) -> None:
                 ),
             ]
         )
+        db.add(
+            RenderObservation(
+                website_id=website_id,
+                url_id=source.id,
+                source_snapshot_id=snapshot.id,
+                status="succeeded",
+                screenshot_key=f"{website_id}/inspection.png",
+                screenshot_sha256="a" * 64,
+                screenshot_bytes=1024,
+                screenshot_width=1365,
+                screenshot_height=768,
+                screenshot_expires_at=datetime.now(UTC) + timedelta(days=90),
+            )
+        )
         db.commit()
         issue_id = issue.id
 
@@ -1450,7 +1465,10 @@ def test_issue_detail_returns_live_element_location(client: TestClient) -> None:
     page = inspection.json()["pages"][0]
     assert page["source_url"] == "https://example.com/article"
     assert page["is_current_occurrence"] is True
-    assert page["render_status"] == "not_rendered"
+    assert page["render_status"] == "succeeded"
+    assert page["screenshot_available"] is True
+    assert page["screenshot_width"] == 1365
+    assert page["screenshot_height"] == 768
     assert page["targets"][0]["kind"] == "located"
     assert page["targets"][0]["locator"] == {
         "strategy": "id",

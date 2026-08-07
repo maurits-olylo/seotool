@@ -43,6 +43,7 @@ services:
     volumes:
       - staging_exports_data:/app/exports
       - staging_privacy_ledger_data:/app/privacy-ledger
+      - staging_render_artifacts_data:/app/render-artifacts:ro
     networks: [backend, app-egress]
     depends_on:
       postgres: {condition: service_healthy}
@@ -104,6 +105,7 @@ services:
       WORKER_QUEUES: renders
       WORKER_NAME: render-staging-1
     command: python -m app.worker
+    volumes: ["staging_render_artifacts_data:/app/render-artifacts"]
     networks: [backend, crawler-egress]
     init: true
     shm_size: 256mb
@@ -182,6 +184,8 @@ volumes:
     name: seo-monitor-staging-exports-data
   staging_privacy_ledger_data:
     name: seo-monitor-staging-privacy-ledger-data
+  staging_render_artifacts_data:
+    name: seo-monitor-staging-render-artifacts-data
 networks:
   backend:
     name: seo-monitor-staging-backend

@@ -139,6 +139,10 @@ class InspectionPageRead(BaseModel):
     is_current_occurrence: bool
     render_status: str
     rendered_at: datetime | None
+    screenshot_available: bool
+    screenshot_width: int | None
+    screenshot_height: int | None
+    screenshot_expires_at: datetime | None
     targets: list[InspectionTargetRead]
 
 
