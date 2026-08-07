@@ -18,6 +18,7 @@ from app.api.routes import (
     integrations,
     issues,
     jobs,
+    opportunities,
     public_estimates,
     recommendations,
     reports,
@@ -100,6 +101,7 @@ app.include_router(discovery.router, prefix="/api/v1", dependencies=[Depends(req
 app.include_router(crawls.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(issues.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(jobs.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
+app.include_router(opportunities.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(
     recommendations.router,
     prefix="/api/v1",

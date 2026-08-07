@@ -36,6 +36,7 @@ from app.models.issues import (
     IssueSuppression,
 )
 from app.models.jobs import JobListing
+from app.models.opportunities import OpportunityEvaluation
 from app.models.performance import PerformanceObservation
 from app.models.recommendations import (
     RecommendationFeedback,
@@ -82,6 +83,7 @@ __all__ = [
     "IssueSuppression",
     "JobListing",
     "MonthlyReportSnapshot",
+    "OpportunityEvaluation",
     "PerformanceObservation",
     "RecommendationFeedback",
     "RecommendationTask",
