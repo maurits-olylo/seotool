@@ -48,6 +48,8 @@ groei. Bestaande taak-, URL-, classificatie- en metriekhistorie blijft de bron.
 - Basis- en staging-Composeconfiguratie zijn geldig met `.env.example`.
 - API-tests bevestigen expliciete, idempotente interventieregistratie, afwijzing zonder URL-scope,
   historische evaluatielisting en periodevalidatie.
+- Een taaktype zonder automatische verificatieregel blijft leesbaar en toont een niet-ondersteunde
+  verificatiestatus in plaats van een serverfout.
 - UI-tests bevestigen de taakactie, Effect-tab, expliciete berekenroute en cacheversie.
 - Beide migrations zijn additief en herschrijven geen data. Een extra releaseback-up is daarom niet
   vereist; een gezonde bestaande herstelroute blijft wel een deploymentvoorwaarde.

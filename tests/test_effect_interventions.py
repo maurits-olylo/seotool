@@ -126,12 +126,16 @@ def test_effect_intervention_registration_api_is_explicit_and_idempotent(
 
     first = client.post(f"/api/v1/recommendation-tasks/{task_id}/effect-intervention")
     second = client.post(f"/api/v1/recommendation-tasks/{task_id}/effect-intervention")
+    unsupported_plan = client.get(f"/api/v1/recommendation-tasks/{task_id}/verification-plan")
 
     assert first.status_code == 200
     assert first.json()["created"] is True
     assert second.status_code == 200
     assert second.json()["created"] is False
     assert second.json()["id"] == first.json()["id"]
+    assert unsupported_plan.status_code == 200
+    assert unsupported_plan.json()["supported"] is False
+    assert unsupported_plan.json()["scope_version"] == "1"
 
     with SessionLocal() as db:
         _website, _url, unscoped_task, _implemented_at = _task(db)
