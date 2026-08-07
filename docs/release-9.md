@@ -150,3 +150,40 @@ Lokale acceptatie:
 - Ruff slaagt voor de volledige repository; Alembic blijft op de lineaire head `0055` en deze fase
   vereist geen migration.
 - De volledige testsuite slaagt met 473 tests en alleen de bestaande Starlette/httpx-waarschuwing.
+
+## Fase 5 — Contextassistent in de bestaande interface
+
+Status: lokaal geïmplementeerd en nog niet gedeployed.
+
+- Het bestaande issuedetail bevat een compacte vraagsectie die automatisch aan het zichtbare issue
+  en de geselecteerde website is gebonden.
+- Iedere gescoorde kans bevat een afzonderlijk inklapbaar vraagformulier dat uitsluitend de
+  betreffende opportunity-evaluatie als context meestuurt.
+- Vragen worden alleen na expliciet verzenden beantwoord. Openen of laden van een scherm start geen
+  aanvraag en veroorzaakt geen taak, crawl, export of statuswijziging.
+- Antwoorden tonen gemeten feiten, productinterpretaties, ontbrekend bewijs en gebruikte interne
+  bronnen in afzonderlijke kaarten, inclusief confidence en beschikbare meetmomenten.
+- Scopebegrenzingen en fouten verschijnen lokaal bij de vraag. Er is geen nieuwe hoofdnavigatie,
+  chatgeschiedenis of koppeling met de publieke homepageassistent.
+- De vormgeving blijft bruikbaar op 390 px: antwoordkaarten gaan terug naar één kolom en
+  tekstvelden blijven binnen de beschikbare breedte.
+
+Acceptatie:
+
+- het issuedetail verstuurt altijd het geselecteerde issue-ID en de geselecteerde website;
+- een kansvraag verstuurt altijd het bijbehorende historische evaluation-ID;
+- antwoordonderdelen worden gescheiden en alle servertekst wordt veilig als tekst gerenderd;
+- laden, sluiten en opnieuw openen van context wist een eerder lokaal antwoord;
+- de interface bevat geen impliciete mutatie of externe toolroute;
+- UI-, JavaScript-, API-, lint- en regressietests slagen zonder nieuwe migration.
+
+Lokale acceptatie:
+
+- De UI-regressie bevestigt beide contextformulieren, de afzonderlijke stylesheet en de expliciete
+  submitroute; de bestaande contextassistent-API- en tenanttests blijven groen.
+- Een visuele controle op 390 px bevestigt een viewportbrede pagina zonder horizontale overflow,
+  éénkoloms antwoordkaarten en een tekstveld binnen de beschikbare kaartbreedte.
+- Dynamische vraagvelden hebben een uniek label, servertekst wordt ge-escaped en ieder antwoord
+  vermeldt dat de route alleen-lezen is.
+- Ruff, JavaScript-syntaxcontrole en de volledige testsuite met 473 tests slagen; Alembic blijft op
+  head `0055` en deze fase vereist geen migration of extra releaseback-up.

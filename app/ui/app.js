@@ -823,6 +823,37 @@ function scoredOpportunityMarkup(item) {
   return `<article class="opportunity-row scored-opportunity"><div class="opportunity-head"><div><span class="eyebrow">${escapeHtml(opportunityPatternLabels[pattern] || pattern)}</span><h3>${item.primary_url ? `<a href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener">${escapeHtml(item.primary_url)}</a>` : escapeHtml(item.scope_key)}</h3></div><strong class="opportunity-total">${total}/100</strong></div><p>${escapeHtml(opportunityPriorityLabels[item.priority_class] || item.priority_class)} · ${escapeHtml(comparison)} · ${escapeHtml(item.period_start)} t/m ${escapeHtml(item.period_end)}</p><div class="opportunity-score-grid">${opportunityScoreMarkup(item)}</div><div class="coverage-pills">${coverage}</div><details><summary>Waarom deze score?</summary><div class="opportunity-evidence">${contributors}</div><p class="formula-version">Formule ${escapeHtml(item.formula_version)}</p></details><button type="button" class="detail-button opportunity-action" data-opportunity-evaluation="${escapeHtml(item.id)}"${disabled}>Maak taak</button></article>`;
 }
 
+function contextAssistantFormMarkup(contextType, contextId, label) {
+  const inputId = `context-question-${contextId}`;
+  return `<details class="context-assistant" data-context-type="${escapeHtml(contextType)}" data-context-id="${escapeHtml(contextId)}"><summary>${escapeHtml(label)}</summary><p>Het antwoord gebruikt alleen dit zichtbare record en opgeslagen bewijs.</p><form class="context-question-form"><label for="${escapeHtml(inputId)}">Jouw vraag</label><textarea id="${escapeHtml(inputId)}" maxlength="500" required placeholder="Bijvoorbeeld: waarom heeft dit deze prioriteit?"></textarea><button class="detail-button" type="submit">Beantwoord vraag</button></form><div class="context-answer" aria-live="polite"></div></details>`;
+}
+
+function contextAnswerList(title, items) {
+  if (!items?.length) return "";
+  return `<section class="context-answer-card"><h4>${escapeHtml(title)}</h4><ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>`;
+}
+
+function contextAnswerMarkup(result) {
+  if (result.status === "scope_limited") return `<p class="scope-limited">${escapeHtml(result.answer)}</p>`;
+  const sources = (result.sources || []).map((source) => `${source.description}${source.measured_at ? ` · ${new Date(source.measured_at).toLocaleString("nl-NL")}` : ""}`);
+  return `<p>${escapeHtml(result.answer)}</p><div class="context-answer-grid">${contextAnswerList("Gemeten feiten", result.facts)}${contextAnswerList("Interpretatie", result.interpretations)}${contextAnswerList("Ontbrekend bewijs", result.missing_evidence)}${contextAnswerList("Gebruikte bronnen", sources)}</div><p class="context-answer-meta">Confidence: ${escapeHtml(result.confidence)} · alleen-lezen; er zijn geen acties uitgevoerd.</p>`;
+}
+
+async function submitContextQuestion(form, contextType, contextId) {
+  const websiteId = $("#website-select").value;
+  const answer = form.parentElement.querySelector(".context-answer");
+  const button = form.querySelector("button");
+  const question = form.querySelector("textarea").value.trim();
+  if (!question) return;
+  button.disabled = true;
+  answer.innerHTML = `<p>Antwoord wordt opgebouwd uit de zichtbare data…</p>`;
+  try {
+    const result = await api(`/api/v1/websites/${websiteId}/context-assistant/answer`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({question, context_type: contextType, context_id: contextId})});
+    answer.innerHTML = contextAnswerMarkup(result);
+  } catch (error) { answer.innerHTML = `<p>Antwoord kon niet worden geladen: ${escapeHtml(error.message)}</p>`; }
+  finally { button.disabled = false; }
+}
+
 function renderContentAnalysis() {
   const data = state.contentAnalysis;
   if (!data) return;
@@ -858,7 +889,7 @@ function renderContentAnalysis() {
   const coverage = journey.coverage || {};
   $("#content-route-coverage").textContent = `Dekking — landingsgedrag: ${coverage.landing_continuation || "unknown"}; paginatransities: ${coverage.transitions || "unknown"}; microconversies: ${coverage.micro_conversions || "unknown"}. ${journey.interpretation}`;
 
-  const scoredMarkup = scoredOpportunities.map(scoredOpportunityMarkup).join("");
+  const scoredMarkup = scoredOpportunities.map((item) => scoredOpportunityMarkup(item) + contextAssistantFormMarkup("opportunity_evaluation", item.id, "Vraag over deze kans")).join("");
   const contentMarkup = (opportunities.opportunities || []).map((item) => `<article class="opportunity-row"><div class="opportunity-head"><div><span class="eyebrow">INHOUDELIJK CONTROLEPUNT</span><h3>${escapeHtml(item.title)}</h3></div><strong>${Math.round((item.confidence || 0) * 100)}%</strong></div><p>${escapeHtml(item.description)}</p><div class="opportunity-evidence">${evidenceMarkup(item.evidence)}</div><button type="button" class="detail-button opportunity-action" data-content-opportunity="${escapeHtml(item.key)}">Maak taak</button></article>`).join("");
   $("#content-opportunity-list").innerHTML = scoredMarkup + contentMarkup || `<p class="content-loading">Nog geen kansen berekend voor deze periode.</p>`;
   $("#content-branded-terms").value = (data.settings.branded_terms || []).join(", ");
@@ -2123,6 +2154,8 @@ async function showIssue(issueId) {
   state.selectedIssueId = issueId;
   state.selectedRecommendationTask = null;
   state.recommendationFeedback = [];
+  $("#issue-context-question").value = "";
+  $("#issue-context-answer").innerHTML = "";
   const summary = state.issues.find((item) => item.id === issueId);
   $("#detail-title").textContent = summary?.title || "Issuedetail";
   const summaryUrl = summary ? issueUrl(summary) : "";
@@ -2715,7 +2748,9 @@ $("#content-analysis-tabs").addEventListener("click", (event) => { const button 
 $("#content-page-previous").addEventListener("click", () => { state.contentAnalysisPage -= 1; renderContentAnalysis(); });
 $("#content-page-next").addEventListener("click", () => { state.contentAnalysisPage += 1; renderContentAnalysis(); });
 $("#content-opportunity-list").addEventListener("click", (event) => { const scoredButton = event.target.closest("[data-opportunity-evaluation]"); if (scoredButton) { createScoredOpportunityTask(scoredButton.dataset.opportunityEvaluation); return; } const button = event.target.closest("[data-content-opportunity]"); if (button) createContentOpportunityTask(button.dataset.contentOpportunity); });
+$("#content-opportunity-list").addEventListener("submit", (event) => { const form = event.target.closest(".context-question-form"); if (!form) return; event.preventDefault(); const context = form.closest("[data-context-type]"); submitContextQuestion(form, context.dataset.contextType, context.dataset.contextId); });
 $("#evaluate-opportunities").addEventListener("click", evaluateScoredOpportunities);
+$("#issue-context-question-form").addEventListener("submit", (event) => { event.preventDefault(); if (state.selectedIssueId) submitContextQuestion(event.currentTarget, "issue", state.selectedIssueId); });
 $("#content-settings-form").addEventListener("submit", saveContentSettings);
 $("#onboarding-form").addEventListener("submit", onboardClient);
 $("#website-form").addEventListener("submit", createWebsite);

@@ -51,6 +51,7 @@ def test_issue_bulk_controls_and_client_logic_are_served(client: TestClient) -> 
     assert 'id="suppress-selected-issues"' in page.text
     assert 'id="suppression-panel"' in page.text
     assert 'id="issue-detail-loading"' in page.text
+    assert 'id="issue-context-question-form"' in page.text
 
     script = client.get("/ui/assets/app.js")
     assert script.status_code == 200
@@ -123,6 +124,7 @@ def test_issue_details_present_evidence_progressively(client: TestClient) -> Non
     script = client.get("/ui/assets/app.js")
     assert script.status_code == 200
     assert "function renderIssueEvidence" in script.text
+    assert "function submitContextQuestion" in script.text
     assert 'source_page_count: "Unieke bronpagina’s"' in script.text
     assert "`Bronpagina’s met dit signaal (${sourceUrls.length})`" in script.text
     assert "evidencePresentationKeys" in script.text
@@ -211,7 +213,10 @@ def test_content_analysis_interface_exposes_evidence_and_coverage(client: TestCl
     assert 'id="content-analysis-view"' in page.text
     assert 'href="/ui/assets/content-analysis.css?v=20260807-1"' in page.text
     assert 'href="/ui/assets/opportunity-scores.css?v=20260807-1"' in page.text
+    assert 'href="/ui/assets/context-assistant.css?v=20260807-1"' in page.text
     assert 'id="evaluate-opportunities"' in page.text
+    script = client.get("/ui/assets/app.js")
+    assert 'contextAssistantFormMarkup("opportunity_evaluation"' in script.text
     for tab in ("overview", "pages", "clusters", "journey", "opportunities", "settings"):
         assert f'data-content-tab="{tab}"' in page.text
         assert f'id="content-tab-{tab}"' in page.text
