@@ -1,8 +1,18 @@
 # Externe SEO-intelligence — analyse en ontwerp
 
-Status: ontwerpbesluit, geen implementatie  
+Status: ontwerpbesluit; kosteloze contractvoorbereiding gestart
 Datum: 2026-08-08  
 Scope: externe SERP-, autoriteits-, concurrentie- en keywordcontext
+
+Implementatiestatus:
+
+- vraagdekking is provider-onafhankelijk beschikbaar als `answered`, `partial`, `implicit` of
+  `missing`;
+- genormaliseerde SERP- en AI-citationcontracten, capability-protocols en Nederlandse fixtures
+  zijn lokaal beschikbaar;
+- één observation wordt conservatief geïnterpreteerd en creëert geen autonome kwaliteitsclaim;
+- databaseopslag, echte provideradapter, credentials, scheduler en betaalde calls zijn nog bewust
+  niet gebouwd.
 
 ## 1. Executive summary
 
