@@ -1,8 +1,12 @@
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from uuid import UUID
 
 from app.db.session import SessionLocal
-from app.models.external_intelligence import ExternalIntelligenceRequest
+from app.models.external_intelligence import (
+    ExternalIntelligenceRequest,
+    ExternalObservation,
+)
 from app.models.website import WebsiteSettings
 
 
@@ -143,3 +147,83 @@ def test_queue_rejection_cancels_reserved_request(client, monkeypatch) -> None: 
         request = db.query(ExternalIntelligenceRequest).one()
         assert request.status == "cancelled"
         assert request.finished_at is not None
+
+
+def test_completed_evidence_exposes_only_user_relevant_result(
+    client, monkeypatch
+) -> None:  # type: ignore[no-untyped-def]
+    from app.api.routes import content_analysis
+
+    website_id = create_website(client)
+    enable_website(website_id)
+    enable_global(monkeypatch)
+    monkeypatch.setattr(
+        content_analysis, "enqueue_external_intelligence", lambda *_args, **_kwargs: True
+    )
+    endpoint = f"/api/v1/websites/{website_id}/content-analysis/external-evidence"
+    created = client.post(endpoint, json=payload())
+    request_id = created.json()["request_id"]
+    observed_at = datetime(2026, 8, 8, 9, 30, tzinfo=UTC)
+
+    with SessionLocal() as db:
+        request = db.get(ExternalIntelligenceRequest, UUID(request_id))
+        assert request is not None
+        request.status = "succeeded"
+        request.actual_cost_micros = 1234
+        request.finished_at = observed_at
+        observation = ExternalObservation(
+            website_id=UUID(website_id),
+            request_id=request.id,
+            capability="ai_citations",
+            cache_key=request.cache_key,
+            provider="dataforseo",
+            observed_at=observed_at,
+            expires_at=observed_at + timedelta(days=7),
+            input_hash="a" * 64,
+            evidence_hash="b" * 64,
+            normalized_payload={
+                "observations": [
+                    {
+                        "observed_at": observed_at.isoformat(),
+                        "observed_question": "Wat kosten kunststof kozijnen?",
+                        "sources": [
+                            {
+                                "url": "https://example.com/kozijnen",
+                                "title": "Kosten van kunststof kozijnen",
+                                "position": 1,
+                            }
+                        ],
+                        "answer_excerpt": "Dit antwoord mag niet zichtbaar zijn.",
+                        "warnings": ["interne technische melding"],
+                    }
+                ]
+            },
+            source_coverage={"citation_count": 1, "provider": "dataforseo"},
+        )
+        db.add(observation)
+        db.commit()
+        observation_id = str(observation.id)
+
+    status = client.get(f"{endpoint}/{request_id}")
+    result = client.get(f"{endpoint}/observations/{observation_id}")
+
+    assert status.status_code == 200
+    assert status.json()["observation_id"] == observation_id
+    assert result.status_code == 200
+    assert result.json()["question"] == payload()["question"]
+    assert result.json()["observations"][0]["observed_question"] == (
+        "Wat kosten kunststof kozijnen?"
+    )
+    assert result.json()["observations"][0]["sources"][0]["url"] == (
+        "https://example.com/kozijnen"
+    )
+    hidden = result.text.lower()
+    for internal_value in (
+        "dataforseo",
+        "provider",
+        "cost",
+        "answer_excerpt",
+        "dit antwoord mag niet zichtbaar zijn",
+        "interne technische melding",
+    ):
+        assert internal_value not in hidden

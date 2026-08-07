@@ -15,8 +15,8 @@ Implementatiestatus:
 - een read-only first-party selector kiest begrensd belangrijke vraag-paginacombinaties op basis
   van GSC-vraag, indexeerbaarheid, paginabelang, contentrol en URL-familie; webshops hoeven daardoor
   geen volledige URL × vraag-matrix op te bouwen;
-- HUMAN blijft voorlopig de beslisser over de relevante categorieën, pagina's en vragen, ook bij
-  webshops; automatische selectie is alleen een shortlist en loopt niet zelfstandig door de
+- Een mens blijft voorlopig de beslisser over de relevante categorieën, pagina's en vragen, ook bij
+  webshops; automatische selectie toont alleen voorgestelde vragen en loopt niet zelfstandig door de
   volledige catalogus;
 - DataForSEO SERP- en LLM-mentionsresponses worden lokaal naar het provider-onafhankelijke contract
   vertaald met synthetische fixtures; alleen echte `sources` gelden als AI-citations en usage wordt
@@ -27,9 +27,10 @@ Implementatiestatus:
 - provideridentiteit, providerkosten en providertaken zijn uitsluitend interne auditinformatie en
   ontbreken contractueel in de gebruikerspresentatie; de gebruiker ziet alleen de waarneming,
   het meetmoment, de dekking en de betrouwbaarheid;
-- een toegelaten HUMAN-scope kan provider-neutraal worden geclaimd en uitgevoerd; de betaalde call
-  houdt geen langdurige databaselock vast en observation, usage en eindstatus worden daarna in één
-  transactie vastgelegd; mislukking bewaart alleen een generieke foutcode en geen deelresultaat;
+- een toegelaten, menselijk gekozen scope kan provider-neutraal worden geclaimd en uitgevoerd; de
+  betaalde call houdt geen langdurige databaselock vast en observation, usage en eindstatus worden
+  daarna in één transactie vastgelegd; mislukking bewaart alleen een generieke foutcode en geen
+  deelresultaat;
 - een provider-neutrale API zet een handmatig gekozen vraag/pagina pas op de integratiewachtrij na
   globale activering, websiteactivering, positieve kostenraming, cache-, budget-, scope- en
   duplicaatcontrole; wachtrijweigering annuleert de reservering direct;

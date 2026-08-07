@@ -12,14 +12,18 @@ from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.content_analysis import ContentAnalysisSettings, UrlContentOverride
 from app.models.discovery import Url
-from app.models.external_intelligence import ExternalIntelligenceRequest
+from app.models.external_intelligence import ExternalIntelligenceRequest, ExternalObservation
 from app.models.website import WebsiteSettings
 from app.schemas.content_analysis import (
     ContentAnalysisSettingsData,
     ContentOverrideRead,
     ContentOverrideWrite,
 )
-from app.schemas.external_intelligence import ExternalEvidenceCreate, ExternalEvidenceState
+from app.schemas.external_intelligence import (
+    ExternalEvidenceCreate,
+    ExternalEvidenceResult,
+    ExternalEvidenceState,
+)
 from app.services.analytics_journey import build_analytics_journey
 from app.services.authorization import require_website_access, require_website_write_access
 from app.services.content_analysis import analyze_website_content
@@ -29,6 +33,7 @@ from app.services.content_opportunities import (
 )
 from app.services.external_intelligence.contracts import QuestionEvidenceRequest
 from app.services.external_intelligence.policy import admit_external_request
+from app.services.external_intelligence.presentation import public_stored_ai_evidence
 from app.services.question_scope_selection import select_question_scopes
 from app.services.security_audit import record_security_event
 
@@ -167,7 +172,12 @@ def request_external_evidence(
             capability=payload.capability,
         )
     if admission.status == "duplicate" and admission.request:
-        return _external_state(admission.request)
+        observation_id = db.scalar(
+            select(ExternalObservation.id).where(
+                ExternalObservation.request_id == admission.request.id
+            )
+        )
+        return _external_state(admission.request, observation_id=observation_id)
     if not admission.request:
         raise HTTPException(status_code=500, detail="External evidence request failed")
     db.commit()
@@ -198,13 +208,44 @@ def external_evidence_status(
     request = db.get(ExternalIntelligenceRequest, request_id)
     if not request or request.website_id != website_id:
         raise HTTPException(status_code=404, detail="External evidence request not found")
-    return _external_state(request)
+    observation_id = db.scalar(
+        select(ExternalObservation.id).where(ExternalObservation.request_id == request.id)
+    )
+    return _external_state(request, observation_id=observation_id)
 
 
-def _external_state(request: ExternalIntelligenceRequest) -> ExternalEvidenceState:
+@router.get(
+    "/external-evidence/observations/{observation_id}",
+    response_model=ExternalEvidenceResult,
+)
+def external_evidence_result(
+    website_id: UUID,
+    observation_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, object]:
+    require_website_access(db, principal, website_id)
+    observation = db.get(ExternalObservation, observation_id)
+    if (
+        not observation
+        or observation.website_id != website_id
+        or observation.capability != "ai_citations"
+    ):
+        raise HTTPException(status_code=404, detail="Bewijs niet gevonden")
+    request = db.get(ExternalIntelligenceRequest, observation.request_id)
+    if not request or request.status != "succeeded":
+        raise HTTPException(status_code=409, detail="Bewijs is nog niet beschikbaar")
+    question = str(request.request_context.get("question") or "")
+    return public_stored_ai_evidence(observation, question=question)
+
+
+def _external_state(
+    request: ExternalIntelligenceRequest, *, observation_id: UUID | None = None
+) -> ExternalEvidenceState:
     public_status = "available" if request.status == "succeeded" else request.status
     return ExternalEvidenceState(
         request_id=request.id,
+        observation_id=observation_id,
         status=public_status,  # type: ignore[arg-type]
         capability=request.capability,  # type: ignore[arg-type]
     )

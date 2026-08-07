@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
@@ -28,3 +29,23 @@ class ExternalEvidenceState(BaseModel):
         "scope_limit_reached",
     ]
     capability: Literal["serp", "ai_citations"]
+
+
+class ExternalEvidenceSource(BaseModel):
+    url: str
+    title: str | None = None
+    position: int | None = None
+
+
+class ExternalAiObservation(BaseModel):
+    observed_at: datetime
+    observed_question: str | None = None
+    sources: list[ExternalEvidenceSource]
+
+
+class ExternalEvidenceResult(BaseModel):
+    observation_id: UUID
+    capability: Literal["ai_citations"]
+    question: str
+    observed_at: datetime
+    observations: list[ExternalAiObservation]

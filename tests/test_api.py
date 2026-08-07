@@ -165,7 +165,7 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
 def test_operations_status_ignores_stale_website_responses(client: TestClient) -> None:
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
-    assert 'src="/ui/assets/app.js?v=20260808-1"' in page.text
+    assert 'src="/ui/assets/app.js?v=20260808-2"' in page.text
     assert 'href="/ui/assets/actionable.css?v=20260731-4"' in page.text
     assert 'id="recommendation-task-section"' in page.text
     assert 'id="recommendation-task-content"' in page.text
@@ -215,7 +215,7 @@ def test_content_analysis_interface_exposes_evidence_and_coverage(client: TestCl
     assert 'id="content-analysis-nav"' in page.text
     assert 'id="content-analysis-view"' in page.text
     assert 'href="/ui/assets/content-analysis.css?v=20260808-1"' in page.text
-    assert 'href="/ui/assets/external-evidence.css?v=20260808-1"' in page.text
+    assert 'href="/ui/assets/external-evidence.css?v=20260808-2"' in page.text
     assert 'href="/ui/assets/opportunity-scores.css?v=20260807-1"' in page.text
     assert 'href="/ui/assets/context-assistant.css?v=20260807-1"' in page.text
     assert 'id="evaluate-opportunities"' in page.text
@@ -238,6 +238,10 @@ def test_content_analysis_interface_exposes_evidence_and_coverage(client: TestCl
     assert "Promise.all([" in script.text
     assert "function renderContentAnalysis" in script.text
     assert "function loadContentAnalysis" in script.text
+    assert "function questionEvidenceDetailMarkup" in script.text
+    assert "function viewQuestionEvidence" in script.text
+    assert "Bekijk bewijs" in script.text
+    assert "dataforseo" not in script.text.lower()
     assert "opportunityResult.milliseconds" in script.text
     assert "journeyResult.milliseconds" in script.text
     assert "coverage.transitions" in script.text

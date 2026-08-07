@@ -966,6 +966,15 @@ function renderContentAnalysis() {
 
 function questionScopeKey(item) { return `${item.url_id}|${item.question}`; }
 
+function questionEvidenceDetailMarkup(detail) {
+  if (!detail) return "";
+  const observed = detail.observations || [];
+  const sources = observed.flatMap((item) => item.sources || []);
+  const questions = [...new Set(observed.map((item) => item.observed_question).filter(Boolean))];
+  const sourceMarkup = sources.length ? `<ul>${sources.map((source) => `<li><a href="${escapeHtml(source.url)}" target="_blank" rel="noopener">${escapeHtml(source.title || source.url)}</a></li>`).join("")}</ul>` : `<p>Bij deze meting zijn geen citeerbare bronnen aangetroffen.</p>`;
+  return `<div class="question-evidence-detail"><div><span class="eyebrow">AANGETROFFEN BEWIJS</span><strong>Gemeten ${new Date(detail.observed_at).toLocaleString("nl-NL")}</strong></div>${questions.length ? `<p>Aangetroffen formulering: ${escapeHtml(questions.join(" · "))}</p>` : ""}<h4>Geciteerde bronnen</h4>${sourceMarkup}</div>`;
+}
+
 function renderQuestionScopes() {
   const selection = state.questionScopes;
   if (!selection) { $("#content-question-list").innerHTML = `<p class="content-loading">Vragen worden geladen…</p>`; return; }
@@ -977,9 +986,21 @@ function renderQuestionScopes() {
     const requestStatus = current?.status;
     const busy = ["queued", "pending", "running"].includes(requestStatus);
     const disabled = !available || busy || requestStatus === "available";
-    return `<article class="question-scope-row"><div class="question-scope-copy"><h3>${escapeHtml(item.question)}</h3><a href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(item.url)}</a><div class="question-scope-meta"><span class="evidence-chip">${item.impressions} vertoningen</span><span class="evidence-chip">Positie ${item.position}</span><span class="evidence-chip">Prioriteit ${Math.round(item.selection_priority)}</span></div></div><div class="question-scope-action"><button type="button" class="detail-button" data-question-evidence="${escapeHtml(questionScopeKey(item))}" ${disabled ? "disabled" : ""}>${busy ? "Controleren…" : requestStatus === "available" ? "Gecontroleerd" : "Controleer AI-dekking"}</button>${requestStatus ? `<span class="question-scope-status ${requestStatus === "available" ? "available" : ""}">${escapeHtml(statusLabels[requestStatus] || requestStatus)}</span>` : ""}</div></article>`;
+    const action = requestStatus === "available" ? `<button type="button" class="detail-button" data-view-question-evidence="${escapeHtml(questionScopeKey(item))}">${current?.detail ? "Verberg bewijs" : "Bekijk bewijs"}</button>` : `<button type="button" class="detail-button" data-question-evidence="${escapeHtml(questionScopeKey(item))}" ${disabled ? "disabled" : ""}>${busy ? "Controleren…" : "Controleer AI-dekking"}</button>`;
+    return `<article class="question-scope-row"><div class="question-scope-copy"><h3>${escapeHtml(item.question)}</h3><a href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(item.url)}</a><div class="question-scope-meta"><span class="evidence-chip">${item.impressions} vertoningen</span><span class="evidence-chip">Positie ${item.position}</span><span class="evidence-chip">Prioriteit ${Math.round(item.selection_priority)}</span></div></div><div class="question-scope-action">${action}${requestStatus ? `<span class="question-scope-status ${requestStatus === "available" ? "available" : ""}">${escapeHtml(statusLabels[requestStatus] || requestStatus)}</span>` : ""}</div>${questionEvidenceDetailMarkup(current?.detail)}</article>`;
   }).join("") || `<p class="content-loading">Geen relevante vragen gevonden binnen deze periode.</p>`;
   $("#content-question-message").textContent = available ? "Kies alleen vragen waarvoor extra bewijs een beslissing kan verbeteren." : "Extra bewijs is voor deze website nog niet beschikbaar.";
+}
+
+async function viewQuestionEvidence(key) {
+  const current = state.externalEvidenceRequests.get(key);
+  if (!current?.observation_id) return;
+  if (current.detail) { state.externalEvidenceRequests.set(key, {...current, detail:null}); renderQuestionScopes(); return; }
+  try {
+    const websiteId = $("#website-select").value;
+    const detail = await api(`/api/v1/websites/${websiteId}/content-analysis/external-evidence/observations/${current.observation_id}`);
+    state.externalEvidenceRequests.set(key, {...current, detail}); renderQuestionScopes();
+  } catch (error) { $("#content-question-message").textContent = `Bewijs kon niet worden geladen: ${error.message}`; }
 }
 
 async function requestQuestionEvidence(key) {
@@ -2864,7 +2885,7 @@ $("#insight-period").addEventListener("change", async (event) => { state.insight
 $("#performance-context-question-form").addEventListener("submit", submitPerformanceContextQuestion);
 $("#content-analysis-period").addEventListener("change", async (event) => { state.contentAnalysisDays = Number(event.target.value); state.contentAnalysisPage = 1; await loadContentAnalysis(); });
 $("#content-analysis-tabs").addEventListener("click", (event) => { const button = event.target.closest("[data-content-tab]"); if (button) showContentAnalysisTab(button.dataset.contentTab); });
-$("#content-question-list").addEventListener("click", (event) => { const button = event.target.closest("[data-question-evidence]"); if (button) requestQuestionEvidence(button.dataset.questionEvidence); });
+$("#content-question-list").addEventListener("click", (event) => { const viewButton = event.target.closest("[data-view-question-evidence]"); if (viewButton) { viewQuestionEvidence(viewButton.dataset.viewQuestionEvidence); return; } const button = event.target.closest("[data-question-evidence]"); if (button) requestQuestionEvidence(button.dataset.questionEvidence); });
 $("#content-page-previous").addEventListener("click", () => { state.contentAnalysisPage -= 1; renderContentAnalysis(); });
 $("#content-page-next").addEventListener("click", () => { state.contentAnalysisPage += 1; renderContentAnalysis(); });
 $("#content-opportunity-list").addEventListener("click", (event) => { const scoredButton = event.target.closest("[data-opportunity-evaluation]"); if (scoredButton) { createScoredOpportunityTask(scoredButton.dataset.opportunityEvaluation); return; } const button = event.target.closest("[data-content-opportunity]"); if (button) createContentOpportunityTask(button.dataset.contentOpportunity); });

@@ -57,6 +57,37 @@
   color: var(--green);
 }
 
+.question-evidence-detail {
+  grid-column: 1 / -1;
+  padding: 16px 18px;
+  border-radius: 10px;
+  background: #f4f7f5;
+}
+
+.question-evidence-detail > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.question-evidence-detail p,
+.question-evidence-detail h4 {
+  margin: 10px 0 0;
+}
+
+.question-evidence-detail ul {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.question-evidence-detail a {
+  color: var(--green);
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 800px) {
   .question-scope-row {
     grid-template-columns: 1fr;
