@@ -27,6 +27,9 @@ Implementatiestatus:
 - provideridentiteit, providerkosten en providertaken zijn uitsluitend interne auditinformatie en
   ontbreken contractueel in de gebruikerspresentatie; de gebruiker ziet alleen de waarneming,
   het meetmoment, de dekking en de betrouwbaarheid;
+- een toegelaten HUMAN-scope kan provider-neutraal worden geclaimd en uitgevoerd; de betaalde call
+  houdt geen langdurige databaselock vast en observation, usage en eindstatus worden daarna in één
+  transactie vastgelegd; mislukking bewaart alleen een generieke foutcode en geen deelresultaat;
 - één observation wordt conservatief geïnterpreteerd en creëert geen autonome kwaliteitsclaim;
 - de feature en lege credentialconfiguratie staan standaard uit; scheduler, echte credentials en
   betaalde calls zijn nog bewust niet geactiveerd.
