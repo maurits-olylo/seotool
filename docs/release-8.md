@@ -1,6 +1,7 @@
 # Release 8 — Zoekintentie en contentanalyse
 
-Status: in uitvoering; fase 1 is lokaal geïmplementeerd en nog niet gedeployed.
+Status: lokaal geaccepteerd op 7 augustus 2026; staging- en productiedeployment volgen vanaf de
+exacte acceptatiecommit van fase 6.
 
 ## Doel en afbakening
 
@@ -173,11 +174,39 @@ Implementatie en lokale acceptatie:
 
 ## Fase 6 — Integrale acceptatie en deployment
 
+Status: lokale acceptatie afgerond; staging- en productieacceptatie zijn nog niet uitgevoerd.
+
 - Voer volledige lokale lint-, test-, migration- en Compose-controles uit.
 - Valideer met uitsluitend synthetische data op staging, inclusief tenantisolatie en overrides.
 - Deploy daarna via een exact getest Git-archive en de vaste interactieve NAS-route.
 - Start geen crawl of historische import uitsluitend voor releasecontrole.
 - Leg productiehealth, migratiehead, bronafbakening en uitgeschakelde rendering/PageSpeed vast.
+
+Lokale acceptatie:
+
+- Ruff-linting slaagt voor de volledige repository. De Release 8-bestanden voldoen ook aan de
+  formattercontrole; een repositorybrede formattercontrole meldt 62 al bestaande bestanden door
+  de nieuwere Ruff-versie in de verse lokale testomgeving en is daarom niet automatisch toegepast.
+- De volledige testsuite slaagt met 466 tests en alleen de bestaande Starlette/httpx-waarschuwing.
+- De JavaScript-syntaxcontrole van de interface slaagt.
+- Alembic heeft één lineaire head op `0054`, na de additieve migrations `0052`, `0053` en `0054`.
+- De basis-, productie- en staging-Composeconfiguraties zijn geldig met hun voorbeeldconfiguratie.
+- De lokale Docker-daemon was niet actief. De imagebuild en container-healthchecks worden daarom
+  op staging uitgevoerd vanaf de exacte acceptatiecommit en niet als lokaal bewijs gepresenteerd.
+- De migrations zijn additief en herschrijven geen bestaande data. Een extra releaseback-up is
+  niet nodig; de bestaande geverifieerde herstelroute blijft een deploymentvoorwaarde.
+- Er is voor deze acceptatie geen crawl of historische import gestart. De bronafbakening blijft één
+  expliciet gekozen primaire analyticsbron; GA4 en Matomo worden niet gecombineerd en
+  `PAGESPEED_ENABLED=false` en `RENDERING_ENABLED=false` blijven deploymentvoorwaarden.
+
+Openstaande deploymentacceptatie:
+
+- Valideer op staging met uitsluitend synthetische data tenantisolatie, gelockte overrides,
+  classificatie-idempotentie, kanspromotie en de compacte desktop- en mobiele interface.
+- Bevestig na deployment op staging en productie migration-head `0054`, gezonde geraakte services,
+  de expliciete primaire analyticsbron en uitgeschakelde PageSpeed en JavaScript-rendering.
+- Leg de gebruikte exacte commit en de staging- en productie-uitkomsten hier vast; kwalificeer
+  Release 8 pas daarna als gedeployed.
 
 ## Uitgesteld
 
