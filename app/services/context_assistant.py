@@ -1,11 +1,16 @@
+from dataclasses import dataclass
+from datetime import date, timedelta
 from uuid import UUID
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.models.discovery import Url
+from app.models.integrations import GoogleAnalyticsMetric, MatomoPageMetric
 from app.models.issues import Issue, IssueOccurrence
 from app.models.opportunities import OpportunityEvaluation
+from app.models.website import Website
+from app.services.analytics_provider import AnalyticsPageTotal, analytics_page_totals_between
 from app.services.issue_guidance import build_issue_guidance
 
 OUT_OF_SCOPE_MARKERS = {
@@ -23,6 +28,16 @@ class ContextAssistantError(ValueError):
     pass
 
 
+@dataclass(frozen=True)
+class ComparisonPeriod:
+    label: str
+    start: date
+    end: date
+    source: str | None
+    rows: list[AnalyticsPageTotal]
+    covered: bool
+
+
 def answer_context_question(
     db: Session,
     *,
@@ -30,6 +45,8 @@ def answer_context_question(
     context_type: str,
     context_id: UUID,
     question: str,
+    period_end: date | None = None,
+    days: int = 28,
 ) -> dict[str, object]:
     if any(marker in question.casefold() for marker in OUT_OF_SCOPE_MARKERS):
         return _scope_limited_answer()
@@ -37,6 +54,14 @@ def answer_context_question(
         return _answer_issue(db, website_id=website_id, issue_id=context_id)
     if context_type == "opportunity_evaluation":
         return _answer_opportunity(db, website_id=website_id, evaluation_id=context_id)
+    if context_type == "website_performance":
+        if context_id != website_id:
+            raise ContextAssistantError("Contextrecord niet gevonden.")
+        if period_end is None:
+            raise ContextAssistantError("Voor een periodevergelijking is period_end verplicht.")
+        return _answer_website_performance(
+            db, website_id=website_id, period_end=period_end, days=days
+        )
     raise ContextAssistantError("Dit contexttype wordt niet ondersteund.")
 
 
@@ -167,6 +192,215 @@ def _opportunity_confidence(evidence_score: float | None) -> str:
     if evidence_score < 70:
         return "medium"
     return "high"
+
+
+def _answer_website_performance(
+    db: Session, *, website_id: UUID, period_end: date, days: int
+) -> dict[str, object]:
+    website = db.get(Website, website_id)
+    if website is None:
+        raise ContextAssistantError("Contextrecord niet gevonden.")
+    current_start = period_end - timedelta(days=days - 1)
+    previous_end = current_start - timedelta(days=1)
+    previous_year_end = _shift_year(period_end, -1)
+    two_years_ago_end = _shift_year(period_end, -2)
+    periods = [
+        _comparison_period(db, website_id, "huidige periode", current_start, period_end),
+        _comparison_period(
+            db,
+            website_id,
+            "vorige gelijkwaardige periode",
+            previous_end - timedelta(days=days - 1),
+            previous_end,
+        ),
+        _comparison_period(
+            db,
+            website_id,
+            "dezelfde periode één jaar eerder",
+            previous_year_end - timedelta(days=days - 1),
+            previous_year_end,
+        ),
+        _comparison_period(
+            db,
+            website_id,
+            "dezelfde periode twee jaar eerder",
+            two_years_ago_end - timedelta(days=days - 1),
+            two_years_ago_end,
+        ),
+    ]
+    current, previous = periods[:2]
+    missing = [
+        f"{period.label.capitalize()} is onbekend door ontbrekende volledige datadekking."
+        for period in periods
+        if not period.covered
+    ]
+    source = current.source or previous.source
+    if source is None:
+        missing.insert(0, "Er is geen primaire analyticsbron voor deze website ingesteld.")
+    facts = [_period_fact(period) for period in periods]
+    interpretations: list[str] = []
+    if current.covered and previous.covered:
+        interpretations.extend(_comparison_interpretations(db, current, previous))
+        answer = _performance_answer(current, previous, source)
+    else:
+        answer = (
+            "De leadontwikkeling kan niet betrouwbaar worden vergeleken, omdat de huidige of "
+            "direct voorafgaande gelijkwaardige periode geen volledige dekking heeft."
+        )
+    covered_count = sum(period.covered for period in periods)
+    confidence = "high" if covered_count >= 3 else "medium" if covered_count >= 2 else "low"
+    return {
+        "status": ("answered" if current.covered and previous.covered else "insufficient_evidence"),
+        "answer": answer,
+        "facts": facts,
+        "interpretations": interpretations,
+        "missing_evidence": missing,
+        "confidence": confidence,
+        "sources": [
+            {
+                "source_type": f"analytics_{source or 'unknown'}",
+                "record_id": website.id,
+                "measured_at": None,
+                "description": (
+                    f"Primaire analyticsbron; vergelijking van {current_start.isoformat()} "
+                    f"tot {period_end.isoformat()} met gelijkwaardige perioden"
+                ),
+            }
+        ],
+        "mutations_performed": False,
+    }
+
+
+def _comparison_period(
+    db: Session, website_id: UUID, label: str, period_start: date, period_end: date
+) -> ComparisonPeriod:
+    source, rows = analytics_page_totals_between(db, website_id, period_start, period_end)
+    minimum, maximum = _analytics_date_bounds(db, website_id, source)
+    return ComparisonPeriod(
+        label=label,
+        start=period_start,
+        end=period_end,
+        source=source,
+        rows=rows,
+        covered=bool(
+            rows and minimum and maximum and minimum <= period_start and maximum >= period_end
+        ),
+    )
+
+
+def _analytics_date_bounds(
+    db: Session, website_id: UUID, source: str | None
+) -> tuple[date | None, date | None]:
+    model = (
+        GoogleAnalyticsMetric
+        if source == "ga4"
+        else MatomoPageMetric
+        if source == "matomo"
+        else None
+    )
+    if model is None:
+        return None, None
+    return db.execute(
+        select(func.min(model.date), func.max(model.date)).where(model.website_id == website_id)
+    ).one()
+
+
+def _period_fact(period: ComparisonPeriod) -> str:
+    if not period.covered:
+        return f"{period.label.capitalize()} ({period.start} t/m {period.end}): onbekend."
+    visits = sum(row.visits for row in period.rows)
+    conversions = sum(row.conversions for row in period.rows)
+    rate = conversions / visits * 100 if visits else 0
+    return (
+        f"{period.label.capitalize()} ({period.start} t/m {period.end}): {visits} organische "
+        f"sessies/bezoeken, {conversions:.1f} leads, conversieratio {rate:.2f}%."
+    )
+
+
+def _comparison_interpretations(
+    db: Session, current: ComparisonPeriod, previous: ComparisonPeriod
+) -> list[str]:
+    current_totals = _totals(current.rows)
+    previous_totals = _totals(previous.rows)
+    conversion_delta = current_totals[1] - previous_totals[1]
+    direction = (
+        "toegenomen"
+        if conversion_delta > 0
+        else "afgenomen"
+        if conversion_delta < 0
+        else "gelijk gebleven"
+    )
+    result = [
+        f"Leads zijn {direction} met {abs(conversion_delta):.1f} ten opzichte van de vorige "
+        "gelijkwaardige periode."
+    ]
+    urls = {
+        url.id: url.normalized_url
+        for url in db.scalars(
+            select(Url).where(Url.id.in_({row.url_id for row in current.rows + previous.rows}))
+        )
+    }
+    current_by_url = {row.url_id: row for row in current.rows}
+    previous_by_url = {row.url_id: row for row in previous.rows}
+    drivers = []
+    for url_id in set(current_by_url) | set(previous_by_url):
+        current_row = current_by_url.get(url_id, AnalyticsPageTotal(url_id, 0, 0, 0))
+        previous_row = previous_by_url.get(url_id, AnalyticsPageTotal(url_id, 0, 0, 0))
+        delta = current_row.conversions - previous_row.conversions
+        if delta:
+            drivers.append((abs(delta), delta, url_id, current_row, previous_row))
+    ranked_drivers = sorted(drivers, key=lambda item: (item[0], item[1]), reverse=True)
+    for _magnitude, delta, url_id, current_row, previous_row in ranked_drivers[:5]:
+        result.append(
+            _driver_interpretation(urls.get(url_id, str(url_id)), delta, current_row, previous_row)
+        )
+    result.append(
+        "Dit is geobserveerde samenhang. Zonder aanvullend bewijs wordt geen wijziging als "
+        "oorzaak aangewezen."
+    )
+    return result
+
+
+def _driver_interpretation(
+    url: str,
+    conversion_delta: float,
+    current: AnalyticsPageTotal,
+    previous: AnalyticsPageTotal,
+) -> str:
+    previous_rate = previous.conversions / previous.visits if previous.visits else 0
+    current_rate = current.conversions / current.visits if current.visits else 0
+    traffic_effect = (current.visits - previous.visits) * previous_rate
+    rate_effect = current.visits * (current_rate - previous_rate)
+    driver = "verkeer" if abs(traffic_effect) >= abs(rate_effect) else "conversieratio"
+    return (
+        f"{url}: {conversion_delta:+.1f} leads; grootste rekenkundige bijdrage komt van {driver} "
+        f"({previous.visits}→{current.visits} bezoeken; {previous_rate * 100:.2f}%→"
+        f"{current_rate * 100:.2f}%)."
+    )
+
+
+def _totals(rows: list[AnalyticsPageTotal]) -> tuple[int, float]:
+    return sum(row.visits for row in rows), sum(row.conversions for row in rows)
+
+
+def _performance_answer(
+    current: ComparisonPeriod, previous: ComparisonPeriod, source: str | None
+) -> str:
+    current_visits, current_conversions = _totals(current.rows)
+    previous_visits, previous_conversions = _totals(previous.rows)
+    return (
+        f"Volgens de primaire bron {(source or 'onbekend').upper()} veranderden organische leads "
+        f"van {previous_conversions:.1f} naar {current_conversions:.1f} en bezoeken van "
+        f"{previous_visits} naar {current_visits}. De pagina-aandrijvers hieronder splitsen de "
+        "rekenkundige bijdrage van verkeer en conversieratio; dit bewijst geen causaliteit."
+    )
+
+
+def _shift_year(value: date, years: int) -> date:
+    try:
+        return value.replace(year=value.year + years)
+    except ValueError:
+        return value.replace(year=value.year + years, day=28)
 
 
 def _scope_limited_answer() -> dict[str, object]:

@@ -27,6 +27,8 @@ def answer(
             context_type=payload.context_type,
             context_id=payload.context_id,
             question=payload.question,
+            period_end=payload.period_end,
+            days=payload.days,
         )
     except ContextAssistantError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

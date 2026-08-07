@@ -22,8 +22,8 @@ def primary_analytics_source(db: Session, website_id: UUID) -> str | None:
     return settings.primary_analytics_source if settings else None
 
 
-def analytics_page_totals(
-    db: Session, website_id: UUID, since: date
+def analytics_page_totals_between(
+    db: Session, website_id: UUID, period_start: date, period_end: date | None = None
 ) -> tuple[str | None, list[AnalyticsPageTotal]]:
     source = primary_analytics_source(db, website_id)
     if source == "ga4":
@@ -36,7 +36,8 @@ def analytics_page_totals(
             )
             .where(
                 GoogleAnalyticsMetric.website_id == website_id,
-                GoogleAnalyticsMetric.date >= since,
+                GoogleAnalyticsMetric.date >= period_start,
+                *([GoogleAnalyticsMetric.date <= period_end] if period_end is not None else []),
                 GoogleAnalyticsMetric.url_id.is_not(None),
             )
             .group_by(GoogleAnalyticsMetric.url_id)
@@ -51,7 +52,8 @@ def analytics_page_totals(
             )
             .where(
                 MatomoPageMetric.website_id == website_id,
-                MatomoPageMetric.date >= since,
+                MatomoPageMetric.date >= period_start,
+                *([MatomoPageMetric.date <= period_end] if period_end is not None else []),
                 MatomoPageMetric.url_id.is_not(None),
             )
             .group_by(MatomoPageMetric.url_id)
@@ -67,3 +69,9 @@ def analytics_page_totals(
         )
         for url_id, visits, users, conversions in rows
     ]
+
+
+def analytics_page_totals(
+    db: Session, website_id: UUID, since: date
+) -> tuple[str | None, list[AnalyticsPageTotal]]:
+    return analytics_page_totals_between(db, website_id, since)

@@ -187,3 +187,42 @@ Lokale acceptatie:
   vermeldt dat de route alleen-lezen is.
 - Ruff, JavaScript-syntaxcontrole en de volledige testsuite met 473 tests slagen; Alembic blijft op
   head `0055` en deze fase vereist geen migration of extra releaseback-up.
+
+## Fase 6 — Gelijkwaardige leadperioden en pagina-aandrijvers
+
+Status: lokaal geïmplementeerd en nog niet gedeployed.
+
+- De contextassistent ondersteunt een expliciete websiteperformancecontext met een einddatum en
+  een periode van 28 tot en met 90 kalenderdagen.
+- De gekozen periode wordt vergeleken met de direct voorafgaande periode met hetzelfde aantal
+  dagen, dezelfde kalenderperiode één jaar eerder en dezelfde periode twee jaar eerder.
+- Alleen de ingestelde primaire analyticsbron wordt gebruikt. GA4 en Matomo worden niet
+  gecombineerd en analyticsbezoeken worden niet bij GSC-klikken opgeteld.
+- Iedere bekende periode toont organische sessies/bezoeken, gekwalificeerde leads en de afgeleide
+  conversieratio. Een periode zonder aantoonbare bronregels of volledige grensdekking blijft
+  `onbekend` en wordt niet als nul gepresenteerd.
+- De vijf pagina's met de grootste absolute leadverandering worden gerangschikt. Per pagina splitst
+  een rekenkundige decompositie de bijdrage van veranderd verkeer en veranderde conversieratio.
+- De uitkomst benoemt expliciet dat dit geobserveerde samenhang is. Zonder aanvullend bewijs wordt
+  geen crawlwijziging, taak of andere gebeurtenis als oorzaak aangewezen.
+- De berekening is read-only, deterministisch, tenantgebonden en vereist geen AI-provider.
+
+Acceptatie:
+
+- iedere vergelijking gebruikt exact evenveel kalenderdagen;
+- één- en tweejaarshistorie wordt alleen getoond wanneer de bron het bereik aantoonbaar dekt;
+- pagina-aandrijvers tonen verkeer en conversieratio afzonderlijk;
+- ontbrekende historie verlaagt confidence en blijft onbekend;
+- een andere website-ID kan niet als performancecontext worden gebruikt;
+- de endpointvalidatie vereist een einddatum en accepteert uitsluitend perioden van 28–90 dagen;
+- GA4-, Matomo-, contextassistent-, lint- en regressietests slagen zonder nieuwe migration.
+
+Lokale acceptatie:
+
+- De nieuwe regressie bevestigt de huidige en direct voorgaande 28-daagse periode, beschikbare
+  jaarhistorie, onbekende tweejaarshistorie en twee tegengestelde pagina-aandrijvers.
+- De test maakt zichtbaar dat een stijgende pagina vooral door conversieratio verandert en een
+  dalende pagina vooral door verkeer, zonder daar een causale verklaring aan te koppelen.
+- Ontbrekende einddatum levert validatiefout `422`; een afwijkend websitecontext-ID wordt geweigerd.
+- De bestaande Matomo-providerregressies, Ruff en de volledige testsuite met 474 tests slagen;
+  Alembic blijft op head `0055` en deze fase vereist geen migration of extra releaseback-up.

@@ -1,4 +1,5 @@
 from datetime import date
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
@@ -8,10 +9,11 @@ from app.db.session import SessionLocal
 from app.models.client import Client
 from app.models.crawl import CrawlRun
 from app.models.discovery import CrawlJob, Url
+from app.models.integrations import GoogleAnalyticsMetric
 from app.models.issues import ActivityLog, Issue, IssueOccurrence
 from app.models.recommendations import RecommendationTask
 from app.models.user import ClientMembership, User
-from app.models.website import Website
+from app.models.website import Website, WebsiteSettings
 from app.services.opportunity_scoring import (
     calculate_opportunity_scores,
     store_opportunity_evaluation,
@@ -224,3 +226,90 @@ def test_context_assistant_is_read_only_deterministic_and_tenant_bound(
         assert db.scalar(select(func.count()).select_from(RecommendationTask)) == 0
         assert db.scalar(select(func.count()).select_from(ActivityLog)) == 0
         assert db.scalar(select(func.count()).select_from(CrawlJob)) == 1
+
+
+def test_context_assistant_compares_leads_and_page_drivers(client: TestClient) -> None:
+    with SessionLocal() as db:
+        customer = Client(name="Performance context tenant")
+        website = Website(
+            client=customer,
+            name="Performance context site",
+            base_url="https://performance-context.example.com",
+        )
+        website.settings = WebsiteSettings(primary_analytics_source="ga4")
+        db.add_all([customer, website])
+        db.flush()
+        first_page = Url(
+            website_id=website.id,
+            normalized_url="https://performance-context.example.com/growing",
+        )
+        second_page = Url(
+            website_id=website.id,
+            normalized_url="https://performance-context.example.com/declining",
+        )
+        db.add_all([first_page, second_page])
+        db.flush()
+        rows = [
+            (date(2025, 7, 1), first_page, 80, 4),
+            (date(2025, 7, 28), second_page, 20, 1),
+            (date(2026, 6, 3), first_page, 100, 5),
+            (date(2026, 6, 30), second_page, 100, 4),
+            (date(2026, 7, 1), first_page, 100, 10),
+            (date(2026, 7, 28), second_page, 50, 1),
+        ]
+        db.add_all(
+            GoogleAnalyticsMetric(
+                website_id=website.id,
+                url_id=page.id,
+                date=metric_date,
+                landing_page=page.normalized_url,
+                sessions=sessions,
+                active_users=sessions,
+                key_events=leads,
+            )
+            for metric_date, page, sessions, leads in rows
+        )
+        db.commit()
+        website_id = website.id
+
+    response = client.post(
+        f"/api/v1/websites/{website_id}/context-assistant/answer",
+        json={
+            "question": "Waardoor zijn organische leads veranderd?",
+            "context_type": "website_performance",
+            "context_id": str(website_id),
+            "period_end": "2026-07-28",
+            "days": 28,
+        },
+    )
+    assert response.status_code == 200
+    answer = response.json()
+    assert answer["status"] == "answered"
+    assert "van 9.0 naar 11.0" in answer["answer"]
+    assert any("conversieratio" in item for item in answer["interpretations"])
+    assert any("growing" in item for item in answer["interpretations"])
+    assert any("declining" in item and "verkeer" in item for item in answer["interpretations"])
+    assert any("twee jaar eerder" in item for item in answer["missing_evidence"])
+    assert any("één jaar eerder" in item and "5.0 leads" in item for item in answer["facts"])
+    assert "geen causaliteit" in answer["answer"]
+    assert answer["mutations_performed"] is False
+
+    missing_period = client.post(
+        f"/api/v1/websites/{website_id}/context-assistant/answer",
+        json={
+            "question": "Vergelijk de leads",
+            "context_type": "website_performance",
+            "context_id": str(website_id),
+        },
+    )
+    assert missing_period.status_code == 422
+    mismatched_context = client.post(
+        f"/api/v1/websites/{website_id}/context-assistant/answer",
+        json={
+            "question": "Vergelijk de leads",
+            "context_type": "website_performance",
+            "context_id": str(uuid4()),
+            "period_end": "2026-07-28",
+        },
+    )
+    assert mismatched_context.status_code == 404

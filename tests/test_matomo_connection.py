@@ -19,7 +19,7 @@ from app.models.integrations import (
 )
 from app.models.website import Website, WebsiteSettings
 from app.services import matomo
-from app.services.analytics_provider import analytics_page_totals
+from app.services.analytics_provider import analytics_page_totals, analytics_page_totals_between
 from app.services.oauth import decrypt_token
 
 
@@ -181,6 +181,14 @@ def test_matomo_sync_stores_aggregates_and_url_coverage(monkeypatch) -> None:  #
         source, totals = analytics_page_totals(db, website.id, date(2026, 7, 1))
         assert source == "matomo"
         assert [(item.visits, item.users) for item in totals] == [(10, 0)]
+        bounded_source, bounded = analytics_page_totals_between(
+            db, website.id, date(2026, 8, 1), date(2026, 8, 1)
+        )
+        assert bounded_source == "matomo"
+        assert [(item.visits, item.conversions) for item in bounded] == [(10, 0)]
+        assert analytics_page_totals_between(
+            db, website.id, date(2026, 7, 1), date(2026, 7, 31)
+        ) == ("matomo", [])
         assert mapping.settings["coverage"]["transitions"] == "not_imported"
         assert mapping.settings["coverage"]["landing_continuation"] == "available"
         assert mapping.settings["coverage"]["internal_search"] == "not_imported"
