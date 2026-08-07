@@ -5,6 +5,7 @@ IssueNature = Literal["problem", "review", "optimization"]
 
 ISSUE_SCOPE_BY_TYPE: dict[str, IssueScope] = {
     "ga4_event_session_anomaly": "quality",
+    "matomo_conversion_visit_anomaly": "quality",
     "broken_image": "quality",
     "deep_page": "quality",
     "downloadable_document_inventory": "quality",
@@ -33,6 +34,7 @@ ISSUE_SCOPE_BY_TYPE: dict[str, IssueScope] = {
 
 ISSUE_NATURE_BY_TYPE: dict[str, IssueNature] = {
     "ga4_event_session_anomaly": "problem",
+    "matomo_conversion_visit_anomaly": "problem",
     "duplicate_meta_description": "optimization",
     "downloadable_document_inventory": "optimization",
     "deep_page": "review",

@@ -15,6 +15,7 @@ from app.models.integrations import (
     WebsiteIntegration,
 )
 from app.models.website import Website
+from app.services.analytics_quality import reconcile_matomo_quality_issues
 from app.services.metric_storage import insert_metric_rows
 from app.services.oauth import decrypt_token
 from app.services.security import validate_public_http_url
@@ -388,6 +389,7 @@ async def sync_matomo(
         },
         "last_error": "; ".join(warnings) if warnings else None,
     }
+    quality = reconcile_matomo_quality_issues(db, website_id, start_date, end_date)
     connection.last_synced_at = now
     db.commit()
     return {
@@ -401,4 +403,5 @@ async def sync_matomo(
         "aggregate_rows": len(aggregate_rows),
         "coverage": mapping.settings["coverage"],
         "warnings": warnings,
+        "quality": quality,
     }

@@ -536,6 +536,7 @@ async function loadPrimaryAnalyticsSource() {
   select.value = primary.source || "";
   $("#analytics-primary-message").textContent = primary.source ? `${primary.source === "ga4" ? "GA4" : "Matomo"} is de primaire bron.` : "Kies een primaire analyticsbron.";
   $("#analytics-primary-panel").classList.toggle("hidden", options.length === 0);
+  if (options.length) await loadAnalyticsQualityStatus();
 }
 
 async function savePrimaryAnalyticsSource() {
@@ -544,6 +545,7 @@ async function savePrimaryAnalyticsSource() {
   if (!websiteId || !source) { message.textContent = "Selecteer eerst een bron."; return; }
   await api(`/api/v1/websites/${websiteId}/integrations/analytics-primary`, {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify({source})});
   message.textContent = `${source === "ga4" ? "GA4" : "Matomo"} is nu de primaire bron.`;
+  await loadAnalyticsQualityStatus();
 }
 
 async function loadGoogleProperties() {
@@ -575,6 +577,27 @@ async function loadGa4KeyEvents() {
   $("#ga4-key-events-panel").classList.remove("hidden");
 }
 
+async function loadAnalyticsQualityStatus() {
+  const websiteId = $("#website-select").value;
+  if (!websiteId) return;
+  const quality = await api(`/api/v1/websites/${websiteId}/integrations/analytics-quality`);
+  const labels = {
+    not_configured: ["Nog niet ingesteld", "Kies een primaire bron en stel de conversiemeting in."],
+    insufficient_data: ["Nog niet gevalideerd", `Synchroniseer ${quality.source_label || "analytics"} om de meetkwaliteit te controleren.`],
+    attention_needed: ["Aandacht nodig", "De event-/sessieverhouding bevat een sterke afwijking. Leadconclusies blijven begrensd."],
+    provisional: ["Voorlopig hersteld", "Eén schone controle is voltooid; nog één schone controle is nodig voor verificatie."],
+    reliable: ["Metingen betrouwbaar", "De laatste twee controles bevatten geen sterke event-/sessieafwijking."],
+  };
+  const [title, description] = labels[quality.status] || labels.insufficient_data;
+  const anomaly = quality.evidence?.anomalies?.[0];
+  const evidence = anomaly
+    ? `${anomaly.events} events bij ${anomaly.sessions} sessies op ${new Date(anomaly.date).toLocaleDateString("nl-NL")}.`
+    : quality.last_checked_at ? `Laatst gecontroleerd op ${new Date(quality.last_checked_at).toLocaleString("nl-NL")}.` : "";
+  const target = $("#analytics-quality-status");
+  target.className = `ga4-quality-status ${quality.status}`;
+  target.innerHTML = `<strong>${escapeHtml(quality.source_label ? `${quality.source_label}: ${title}` : title)}</strong><span>${escapeHtml(description)}</span>${evidence ? `<small>${escapeHtml(evidence)}</small>` : ""}`;
+}
+
 async function saveGa4KeyEvents() {
   const websiteId = $("#website-select").value;
   const button = $("#save-ga4-key-events"); const message = $("#ga4-key-events-message");
@@ -583,6 +606,7 @@ async function saveGa4KeyEvents() {
   try {
     await api(`/api/v1/websites/${websiteId}/integrations/ga4/key-events`, {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify({event_names:eventNames})});
     message.textContent = `${eventNames.length} conversie-events opgeslagen.`;
+    await Promise.all([loadGa4KeyEvents(), loadAnalyticsQualityStatus()]);
   } catch (error) { message.textContent = error.message; }
   finally { button.disabled = false; }
 }
@@ -659,7 +683,7 @@ async function syncGa4() {
     const result = await api(`/api/v1/websites/${websiteId}/integrations/ga4/sync`, {method: "POST"});
     message.textContent = `${result.rows} dag/landingspagina-regels geïmporteerd; ${result.matched_urls} gekoppeld aan URLs.`;
     button.textContent = "Opnieuw synchroniseren";
-    await loadIssues();
+    await Promise.all([loadIssues(), loadAnalyticsQualityStatus()]);
   } catch (error) { message.textContent = "GA4-import is mislukt."; button.textContent = "Opnieuw proberen"; }
   finally { button.disabled = false; }
 }
@@ -675,7 +699,7 @@ async function syncMatomo() {
     const warning = result.warnings?.length ? ` Waarschuwing: ${result.warnings.join("; ")}.` : "";
     message.textContent = `${result.page_rows} pagina-regels geïmporteerd; ${result.matched_urls} gekoppeld (${percentage}).${warning}`;
     button.textContent = "Opnieuw synchroniseren";
-    await loadIssues();
+    await Promise.all([loadIssues(), loadAnalyticsQualityStatus()]);
   } catch (error) { message.textContent = error.message; button.textContent = "Opnieuw proberen"; }
   finally { button.disabled = false; }
 }

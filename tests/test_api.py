@@ -258,6 +258,7 @@ def test_settings_and_integrations_have_responsive_states(client: TestClient) ->
         "matomo-property",
         "sync-matomo",
         "analytics-primary-source",
+        "analytics-quality-status",
     ]:
         assert f'id="{element_id}"' in page.text
 
@@ -271,6 +272,8 @@ def test_settings_and_integrations_have_responsive_states(client: TestClient) ->
     assert "async function loadMatomoSites" in script.text
     assert "async function syncMatomo" in script.text
     assert "async function savePrimaryAnalyticsSource" in script.text
+    assert "async function loadAnalyticsQualityStatus" in script.text
+    assert "/integrations/analytics-quality" in script.text
 
 
 def test_dashboard_and_reports_have_clear_drilldowns(client: TestClient) -> None:
@@ -1069,6 +1072,43 @@ def test_client_report_contains_performance_and_work(client: TestClient) -> None
     assert report.json()["primary_metric"] == "key_events"
     assert report.json()["comparison_context"] == "dezelfde dagen in de vorige maand"
     assert report.json()["search_insights"] == []
+
+
+def test_analytics_quality_endpoint_uses_primary_provider(client: TestClient) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Quality status"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": customer["id"],
+            "name": "Quality status site",
+            "base_url": "https://quality-status.example.com",
+        },
+    ).json()
+    website_id = UUID(website["id"])
+    with SessionLocal() as db:
+        connection = IntegrationConnection(
+            client_id=UUID(customer["id"]), provider="google", status="connected"
+        )
+        db.get(WebsiteSettings, website_id).primary_analytics_source = "ga4"
+        db.add(connection)
+        db.flush()
+        db.add(
+            WebsiteIntegration(
+                website_id=website_id,
+                connection_id=connection.id,
+                service="ga4",
+                external_property_id="properties/quality-status",
+                status="active",
+                settings={"qualified_key_events": ["lead"]},
+            )
+        )
+        db.commit()
+
+    response = client.get(f"/api/v1/websites/{website_id}/integrations/analytics-quality")
+    assert response.status_code == 200
+    assert response.json()["status"] == "insufficient_data"
+    assert response.json()["source"] == "ga4"
+    assert response.json()["source_label"] == "GA4"
 
 
 def test_report_ytd_and_half_year_use_year_over_year_windows() -> None:

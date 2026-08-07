@@ -339,3 +339,42 @@ Lokale acceptatie:
 - De bestaande GA4-synchronisatie-, contextassistent- en issue-lifecycleregressies blijven groen.
 - Ruff en de volledige testsuite met 476 tests slagen; Alembic blijft op head `0055` en deze fase
   vereist geen migration of extra releaseback-up.
+
+## Fase 10 — Meetkwaliteitsstatus voor GA4 én Matomo
+
+Status: lokaal geïmplementeerd en nog niet gedeployed.
+
+- De Integratiespagina toont bij de gekozen primaire analyticsbron één duidelijke status:
+  `Nog niet ingesteld`, `Nog niet gevalideerd`, `Aandacht nodig`, `Voorlopig hersteld` of
+  `Metingen betrouwbaar`.
+- De kaart benoemt expliciet GA4 of Matomo. Een bronwissel laadt alleen de status van de nieuwe
+  primaire bron; meetwaarden en issues van beide providers worden nooit gecombineerd.
+- GA4 blijft uitsluitend geselecteerde gekwalificeerde events tegenover organische sessies
+  controleren. Matomo controleert afzonderlijk de eigen pagina-conversies tegenover bezoeken.
+- Dezelfde conservatieve eerste afwijkingsregel geldt voor beide bronnen: minimaal tien
+  conversies met nul bezoeken of minimaal drie conversies per bezoek.
+- Matomo-afwijkingen krijgen een eigen gededupliceerd `matomo_conversion_visit_anomaly`-issue met
+  dezelfde bewijs-, herstel-, verificatie- en heropeningshistorie als GA4.
+- Na een handmatige synchronisatie of wijziging van bron of GA4-eventselectie wordt de zichtbare
+  status direct opnieuw geladen. Servertekst wordt veilig als tekst gerenderd.
+
+Acceptatie:
+
+- GA4 en Matomo tonen ieder hun eigen bronnaam, bewijs en status;
+- een Matomo-afwijking maakt geen GA4-issue en omgekeerd;
+- twee schone Matomo-controles doorlopen `resolved` en `verified`;
+- de interface toont bewijsvolume, bezoekvolume en controledatum zonder ruwe data te wijzigen;
+- bronwissel en synchronisatie verversen de status zonder nieuwe navigatie;
+- GA4-, Matomo-, API-, UI-, JavaScript-, lint- en regressietests slagen zonder nieuwe migration.
+
+Lokale acceptatie:
+
+- De GA4-regressie toont `Aandacht nodig` voor 20 geselecteerde events bij 2 sessies en negeert de
+  afwijkende generieke teller; bronlabel en laatste bewijs blijven zichtbaar.
+- De Matomo-regressie toont ook zonder voorafgaand issue na één schone controle `Voorlopig
+  hersteld` en na twee controles `Metingen betrouwbaar`; 20 conversies bij 2 bezoeken maken daarna
+  één eigen issue dat opnieuw via `resolved` en `verified` wordt gecontroleerd.
+- De UI-regressie bevestigt de providerneutrale statuskaart en beveiligde kwaliteitsroute; de
+  JavaScript-syntaxcontrole slaagt.
+- Ruff en de volledige testsuite met 478 tests slagen; Alembic blijft op head `0055` en deze fase
+  vereist geen migration of extra releaseback-up.

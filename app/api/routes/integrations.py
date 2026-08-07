@@ -49,6 +49,7 @@ from app.schemas.integrations import (
     WebsiteIntegrationRead,
     WebsiteIntegrationUpsert,
 )
+from app.services.analytics_quality import analytics_quality_status
 from app.services.authorization import require_client_access, require_website_access
 from app.services.bing_backlink_import import (
     InvalidBingBacklinkExport,
@@ -610,6 +611,16 @@ def update_google_analytics_key_events(
     mapping.settings = {**mapping.settings, "qualified_key_events": selected}
     db.commit()
     return list_google_analytics_key_events(website_id, db, principal)
+
+
+@router.get("/websites/{website_id}/integrations/analytics-quality")
+def get_analytics_quality(
+    website_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, object]:
+    require_website_access(db, principal, website_id, admin=True)
+    return analytics_quality_status(db, website_id)
 
 
 @router.post(

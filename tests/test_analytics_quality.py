@@ -9,11 +9,16 @@ from app.models.integrations import (
     GoogleAnalyticsLandingPageEventMetric,
     GoogleAnalyticsMetric,
     IntegrationConnection,
+    MatomoPageMetric,
     WebsiteIntegration,
 )
 from app.models.issues import ActivityLog, Issue
 from app.models.website import Website, WebsiteSettings
-from app.services.analytics_quality import reconcile_ga4_quality_issues
+from app.services.analytics_quality import (
+    analytics_quality_status,
+    reconcile_ga4_quality_issues,
+    reconcile_matomo_quality_issues,
+)
 
 
 def test_ga4_quality_issue_is_deduplicated_resolved_verified_and_reopened() -> None:
@@ -120,3 +125,86 @@ def test_ga4_quality_issue_is_deduplicated_resolved_verified_and_reopened() -> N
         ]
         assert checks[0].details["anomalies"][0]["events"] == 20
         assert checks[0].details["anomalies"][0]["sessions"] == 2
+        status = analytics_quality_status(db, website.id)
+        assert status["status"] == "attention_needed"
+        assert status["source_label"] == "GA4"
+
+
+def test_matomo_quality_uses_its_own_conversions_and_visits() -> None:
+    checked_date = date(2026, 8, 2)
+    with SessionLocal() as db:
+        customer = Client(name="Matomo quality client")
+        website = Website(
+            client=customer,
+            name="Matomo quality site",
+            base_url="https://matomo-quality.example.com",
+        )
+        website.settings = WebsiteSettings(primary_analytics_source="matomo")
+        db.add(website)
+        db.flush()
+        connection = IntegrationConnection(
+            client_id=customer.id,
+            provider="matomo",
+            status="connected",
+        )
+        db.add(connection)
+        db.flush()
+        page = Url(
+            website_id=website.id,
+            normalized_url="https://matomo-quality.example.com/bedankt",
+        )
+        db.add_all(
+            [
+                page,
+                WebsiteIntegration(
+                    website_id=website.id,
+                    connection_id=connection.id,
+                    service="matomo",
+                    external_property_id="1",
+                    status="active",
+                ),
+            ]
+        )
+        db.flush()
+        metric = MatomoPageMetric(
+            website_id=website.id,
+            url_id=page.id,
+            date=checked_date,
+            page_url=page.normalized_url,
+            visits=2,
+            pageviews=2,
+            unique_pageviews=2,
+            entry_visits=2,
+            bounces=0,
+            exits=0,
+            conversions=1,
+        )
+        db.add(metric)
+        db.flush()
+
+        first_clean = reconcile_matomo_quality_issues(db, website.id, checked_date, checked_date)
+        assert first_clean["created"] == 0
+        assert analytics_quality_status(db, website.id)["status"] == "provisional"
+        reconcile_matomo_quality_issues(db, website.id, checked_date, checked_date)
+        assert analytics_quality_status(db, website.id)["status"] == "reliable"
+
+        metric.conversions = 20
+        db.flush()
+        anomaly = reconcile_matomo_quality_issues(db, website.id, checked_date, checked_date)
+        assert anomaly["created"] == 1
+        assert analytics_quality_status(db, website.id)["status"] == "attention_needed"
+
+        metric.conversions = 1
+        db.flush()
+        assert (
+            reconcile_matomo_quality_issues(db, website.id, checked_date, checked_date)["resolved"]
+            == 1
+        )
+        assert analytics_quality_status(db, website.id)["status"] == "provisional"
+        assert (
+            reconcile_matomo_quality_issues(db, website.id, checked_date, checked_date)["verified"]
+            == 1
+        )
+        status = analytics_quality_status(db, website.id)
+        assert status["status"] == "reliable"
+        assert status["source_label"] == "Matomo"
