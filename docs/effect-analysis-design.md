@@ -1,6 +1,6 @@
 # Effectanalyse — kritisch ontwerpvoorstel
 
-Status: ontwerpbesluit na Release 9; nog niet geïmplementeerd.
+Status: ontwerpbesluit na Release 9; Fase A-fundering lokaal geïmplementeerd.
 
 ## Productdoel
 
@@ -145,6 +145,17 @@ altijd dat samenhang geen bewezen causaliteit is.
 - Definieer task-to-intervention-regels en geldige implementatiemomenten.
 - Leg contextsnapshot en verwijzingen vast zonder `changes` of metrics te kopiëren.
 - Ondersteun eerst alleen geïmplementeerde taken met een concrete URL-scope.
+
+Lokale uitwerking:
+
+- `effect_interventions` bewaart per taak één immutable scope met implementatiemoment,
+  taakdefinitie, URL-rollen en de historische effectieve contentclassificatie.
+- Materialisatie is idempotent op taak en inputversie en weigert open of URL-loze taken.
+- Materialisatie blijft voorlopig een expliciete serviceactie. Taakscope kan in de huidige workflow
+  na `implemented` nog worden aangevuld; automatisch bevriezen tijdens die statusovergang zou
+  daardoor onvolledige interventies kunnen vastleggen.
+- Migration `0056` is additief en kopieert of herschrijft geen bestaande taak-, wijzigings- of
+  metriekhistorie.
 
 ### Fase B — cohortberekening
 

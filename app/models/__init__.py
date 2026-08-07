@@ -8,6 +8,7 @@ from app.models.content_analysis import (
 )
 from app.models.crawl import CrawlRun, ElementLocation, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url, UrlSource
+from app.models.effects import EffectIntervention
 from app.models.exports import Export
 from app.models.integrations import (
     BingInboundLink,
@@ -73,6 +74,7 @@ __all__ = [
     "CrawlJob",
     "CrawlRun",
     "ElementLocation",
+    "EffectIntervention",
     "CrawlDeploymentControl",
     "RetentionOperation",
     "QueueDeadLetter",

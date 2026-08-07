@@ -448,3 +448,16 @@ Sterke afwijkingen blijven als ruwe brondata bestaan, begrenzen afhankelijke con
 als providergebonden issue plus activiteitenhistorie opgeslagen. Eén schone hercontrole zet een
 issue op opgelost; de volgende schone controle verifieert het. Gezonde bronnen zonder eerder issue
 doorlopen dezelfde voorlopige en betrouwbare status via hun controlehistorie.
+
+## Effectinterventies
+
+`effect_interventions` maakt een geïmplementeerde aanbevelingstaak meetbaar zonder een parallel
+SEO-eventsysteem te introduceren. Eén interventie verwijst naar één taak en bevriest het
+implementatiemoment, de taakdefinitie, URL-scope en de op dat moment geldige effectieve
+contentclassificatie. Crawlwijzigingen, issues, verificaties en dagmetrics blijven in hun bestaande
+historische tabellen en worden later als bronbewijs gekoppeld; ze worden niet gekopieerd.
+
+Alleen uitgevoerde taken met een concrete URL-scope komen in aanmerking. De materialisatie is
+expliciet en idempotent. Dit voorkomt dat een nog aangevulde taakscope tijdens een statuswijziging
+te vroeg wordt bevroren. Effectberekening en presentatie volgen in afzonderlijke fasen en blijven
+correlatie van causale attributie onderscheiden.
