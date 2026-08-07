@@ -1,7 +1,7 @@
 # Release 9 — Opportunity-engine en contextuele data-assistent
 
-Status: op 7 augustus 2026 lokaal en op staging geaccepteerd vanaf releasecommit `06f3863`;
-productiedeployment is nog niet uitgevoerd.
+Status: op 7 augustus 2026 lokaal, op staging en op productie geaccepteerd vanaf releasecommit
+`06f3863`.
 
 ## Doel en afbakening
 
@@ -382,7 +382,7 @@ Lokale acceptatie:
 
 ## Fase 11 — Integrale lokale acceptatie
 
-Status: lokaal en op staging afgerond; productieacceptatie is nog niet uitgevoerd.
+Status: lokaal, op staging en op productie afgerond.
 
 - Release 9 omvat het versieerbare opportunityfundament, drie eerste deterministische patronen,
   transparante taakpromotie, de tenantgebonden contextassistent, periodevergelijkingen voor
@@ -423,9 +423,19 @@ Stagingacceptatie:
 - Op desktop en 390 px waren document- en viewportbreedte exact gelijk. Er was geen interne
   overflow en de browser rapporteerde geen fouten of waarschuwingen.
 
-Openstaande productieacceptatie:
+Productieacceptatie:
 
-- Bevestig op productie migration-head `0055`, gezonde geraakte services,
-  `PAGESPEED_ENABLED=false`, `RENDERING_ENABLED=false` en één expliciete primaire analyticsbron.
-- Controleer Content, Inzichten en Integraties op desktop en 390 px zonder documentoverflow of
-  browserfouten en leg de uitkomsten hier vast voordat Release 9 als gedeployed wordt gekwalificeerd.
+- Releasecommit `06f3863` is via het vaste Git-archive en de interactieve NAS-route gedeployed.
+- API, integration-worker, PostgreSQL en Redis zijn gezond op migration-head `0055`; PageSpeed en
+  JavaScript-rendering blijven voor API en integration-worker uitgeschakeld en alle
+  Release-9-routes zijn aanwezig.
+- De veilige hervattingscontrole rapporteert geen actieve of wachtende deploymenttaken en heeft
+  geen impliciete actie uitgevoerd.
+- Content, Kansen, Inzichten en Integraties laden met productiedata zonder bij navigatie een crawl,
+  import, berekening of assistentaanvraag te starten.
+- GA4 is expliciet opgeslagen als primaire analyticsbron voor de gecontroleerde website; de
+  gekoppelde GA4-property, historische import en het gekwalificeerde event `form_submit` blijven
+  behouden. De kwaliteitskaart toont terecht `GA4: Nog niet gevalideerd` totdat een volgende
+  GA4-synchronisatie de meetkwaliteit controleert.
+- Op 390 px waren viewport-, document- en bodybreedte exact 390 px. Er was geen documentoverflow
+  en de browser rapporteerde geen fouten of waarschuwingen.
