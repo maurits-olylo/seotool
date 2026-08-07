@@ -1,7 +1,7 @@
 # Release 8 — Zoekintentie en contentanalyse
 
-Status: lokaal geaccepteerd op 7 augustus 2026; staging- en productiedeployment volgen vanaf de
-exacte acceptatiecommit van fase 6.
+Status: afgerond en op 7 augustus 2026 lokaal, op staging en op productie geaccepteerd vanaf
+releasecommit `1b6b1ef`.
 
 ## Doel en afbakening
 
@@ -174,7 +174,7 @@ Implementatie en lokale acceptatie:
 
 ## Fase 6 — Integrale acceptatie en deployment
 
-Status: lokale acceptatie afgerond; staging- en productieacceptatie zijn nog niet uitgevoerd.
+Status: afgerond op lokaal, staging en productie.
 
 - Voer volledige lokale lint-, test-, migration- en Compose-controles uit.
 - Valideer met uitsluitend synthetische data op staging, inclusief tenantisolatie en overrides.
@@ -199,14 +199,33 @@ Lokale acceptatie:
   expliciet gekozen primaire analyticsbron; GA4 en Matomo worden niet gecombineerd en
   `PAGESPEED_ENABLED=false` en `RENDERING_ENABLED=false` blijven deploymentvoorwaarden.
 
-Openstaande deploymentacceptatie:
+Stagingacceptatie:
 
-- Valideer op staging met uitsluitend synthetische data tenantisolatie, gelockte overrides,
-  classificatie-idempotentie, kanspromotie en de compacte desktop- en mobiele interface.
-- Bevestig na deployment op staging en productie migration-head `0054`, gezonde geraakte services,
-  de expliciete primaire analyticsbron en uitgeschakelde PageSpeed en JavaScript-rendering.
-- Leg de gebruikte exacte commit en de staging- en productie-uitkomsten hier vast; kwalificeer
-  Release 8 pas daarna als gedeployed.
+- Releasecommit `1b6b1ef` is via het vaste Git-archive en de interactieve NAS-route gedeployed.
+- API, PostgreSQL en Redis zijn gezond op migration-head `0054`; de nieuwe routes zijn aanwezig en
+  PageSpeed en JavaScript-rendering blijven uitgeschakeld.
+- De synthetische stagingwebsite bevat bewust geen classificeerbare crawldata. De interface toont
+  daardoor correcte lege toestanden zonder een crawl of historische import te starten;
+  tenantisolatie, gelockte overrides, classificatie-idempotentie en kanspromotie blijven gedekt
+  door de geslaagde regressietests.
+- Classificaties, kansen, doorstroom en instellingen laden parallel. De gemeten endpointtijden lagen
+  tussen 64 en 129 ms en ontbrekende brondekking werd expliciet weergegeven.
+- Op 390 px waren document- en viewportbreedte exact gelijk. Er trad geen documentoverflow op en
+  de browser rapporteerde geen fouten of waarschuwingen.
+
+Productieacceptatie:
+
+- Dezelfde releasecommit `1b6b1ef` is na een veilige crawl-drain gedeployed. De additieve migrations
+  zijn zonder extra releaseback-up toegepast en Alembic rapporteert head `0054`.
+- API, integration-worker, PostgreSQL en Redis zijn gezond. De contentanalyseroutes zijn aanwezig;
+  PageSpeed en JavaScript-rendering blijven uitgeschakeld voor API en integration-worker.
+- De Contentinterface opent voor bestaande productieklanten zonder analyse, crawl of import te
+  starten. De drie gemeten endpoints reageerden binnen 51 tot 141 ms en nog ontbrekende
+  classificaties werden als lege toestand gepresenteerd.
+- Op 390 px waren document- en viewportbreedte exact gelijk en trad geen documentoverflow op. De
+  browser rapporteerde geen fouten of waarschuwingen.
+- De crawl-drain meldde vóór vrijgave `active=true safe=true` met nul gevolgde of wachtende taken en
+  eindigde na alle controles op `active=false` zonder taken te hervatten.
 
 ## Uitgesteld
 
