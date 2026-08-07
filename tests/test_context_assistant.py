@@ -9,7 +9,12 @@ from app.db.session import SessionLocal
 from app.models.client import Client
 from app.models.crawl import CrawlRun
 from app.models.discovery import CrawlJob, Url
-from app.models.integrations import GoogleAnalyticsMetric
+from app.models.integrations import (
+    GoogleAnalyticsLandingPageEventMetric,
+    GoogleAnalyticsMetric,
+    IntegrationConnection,
+    WebsiteIntegration,
+)
 from app.models.issues import ActivityLog, Issue, IssueOccurrence
 from app.models.recommendations import RecommendationTask
 from app.models.user import ClientMembership, User
@@ -247,8 +252,27 @@ def test_context_assistant_compares_leads_and_page_drivers(client: TestClient) -
             website_id=website.id,
             normalized_url="https://performance-context.example.com/declining",
         )
-        db.add_all([first_page, second_page])
+        anomaly_page = Url(
+            website_id=website.id,
+            normalized_url="https://performance-context.example.com/newsletter",
+        )
+        connection = IntegrationConnection(
+            client_id=customer.id,
+            provider="google",
+            status="connected",
+        )
+        db.add_all([first_page, second_page, anomaly_page, connection])
         db.flush()
+        db.add(
+            WebsiteIntegration(
+                website_id=website.id,
+                connection_id=connection.id,
+                service="ga4",
+                external_property_id="properties/context",
+                status="active",
+                settings={"qualified_key_events": ["lead", "newsletter"]},
+            )
+        )
         rows = [
             (date(2025, 7, 1), first_page, 80, 4),
             (date(2025, 7, 28), second_page, 20, 1),
@@ -256,6 +280,7 @@ def test_context_assistant_compares_leads_and_page_drivers(client: TestClient) -
             (date(2026, 6, 30), second_page, 100, 4),
             (date(2026, 7, 1), first_page, 100, 10),
             (date(2026, 7, 28), second_page, 50, 1),
+            (date(2026, 7, 28), anomaly_page, 2, 0),
         ]
         db.add_all(
             GoogleAnalyticsMetric(
@@ -265,9 +290,21 @@ def test_context_assistant_compares_leads_and_page_drivers(client: TestClient) -
                 landing_page=page.normalized_url,
                 sessions=sessions,
                 active_users=sessions,
-                key_events=leads,
+                key_events=leads + 100,
             )
             for metric_date, page, sessions, leads in rows
+        )
+        db.add_all(
+            GoogleAnalyticsLandingPageEventMetric(
+                website_id=website.id,
+                url_id=page.id,
+                date=metric_date,
+                landing_page=page.normalized_url,
+                event_name="lead",
+                key_events=leads,
+            )
+            for metric_date, page, _sessions, leads in rows
+            if leads
         )
         db.commit()
         website_id = website.id
@@ -313,3 +350,42 @@ def test_context_assistant_compares_leads_and_page_drivers(client: TestClient) -
         },
     )
     assert mismatched_context.status_code == 404
+
+    with SessionLocal() as db:
+        db.add(
+            GoogleAnalyticsLandingPageEventMetric(
+                website_id=website_id,
+                url_id=db.scalar(select(Url.id).where(Url.normalized_url.endswith("/newsletter"))),
+                date=date(2026, 7, 28),
+                landing_page="https://performance-context.example.com/newsletter",
+                event_name="newsletter",
+                key_events=20,
+            )
+        )
+        db.commit()
+    quality_warning = client.post(
+        f"/api/v1/websites/{website_id}/context-assistant/answer",
+        json={
+            "question": "Waardoor zijn organische leads veranderd?",
+            "context_type": "website_performance",
+            "context_id": str(website_id),
+            "period_end": "2026-07-28",
+            "days": 28,
+        },
+    )
+    assert quality_warning.status_code == 200
+    warning = quality_warning.json()
+    assert warning["confidence"] == "low"
+    assert "ruwe leads van 9.0 naar 31.0" in warning["answer"]
+    assert "zonder verdachte bijdragen is dit 9.0 naar 11.0" in warning["answer"]
+    assert "geen leadconclusie" in warning["answer"]
+    assert any("20.0 events bij 2 sessies" in item for item in warning["interpretations"])
+    assert any("niet verwijderd" in item for item in warning["interpretations"])
+
+    with SessionLocal() as db:
+        stored_newsletter_events = db.scalar(
+            select(GoogleAnalyticsLandingPageEventMetric.key_events).where(
+                GoogleAnalyticsLandingPageEventMetric.event_name == "newsletter"
+            )
+        )
+    assert stored_newsletter_events == 20

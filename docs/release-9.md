@@ -261,3 +261,44 @@ Lokale acceptatie:
   middernacht in de ingestelde tijdzone.
 - Ruff, JavaScript-syntaxcontrole en de volledige testsuite met 475 tests slagen; Alembic blijft op
   head `0055` en deze fase vereist geen migration of extra releaseback-up.
+
+## Fase 8 — Analytics-meetkwaliteit vóór leadconclusies
+
+Status: lokaal geïmplementeerd en nog niet gedeployed.
+
+- GA4-leadvergelijkingen gebruiken voortaan uitsluitend de events die bij de actieve GA4-koppeling
+  expliciet als gekwalificeerde lead zijn geselecteerd. De generieke `key_events`-teller wordt niet
+  meer stilzwijgend als gekwalificeerde lead geïnterpreteerd.
+- Een read-only kwaliteitslaag vergelijkt geselecteerde events per dag en gekoppelde landingspagina
+  met de organische sessies van diezelfde dag en URL.
+- Minimaal tien events met nul sessies of ten minste drie events per sessie vormen een sterke
+  meetafwijking. Dit is een conservatieve eerste regel en geen universele conversiegrens.
+- Verdachte events worden nooit verwijderd of in de database gecorrigeerd. Het antwoord toont het
+  ruwe totaal én een gevoeligheidsberekening zonder de verdachte bijdrage.
+- Zodra de huidige of vorige periode een sterke afwijking bevat, daalt confidence naar `low`,
+  vervallen pagina-aandrijvers en volgt geen conclusie over groei of daling. De gebruiker krijgt
+  eerst een concrete trackingcontrole met datum, genormaliseerde URL, eventvolume en sessievolume.
+- Matomo blijft via de eigen geaggregeerde conversiedata lopen en wordt niet met GA4-events
+  gecombineerd. De bestaande expliciete primaire-bronkeuze blijft leidend.
+- De kwaliteitscontrole is tenantgebonden, deterministisch en read-only; issue-lifecycle en
+  verificatiehistorie volgen pas in een afzonderlijke fase.
+
+Acceptatie:
+
+- niet-geselecteerde GA4-events tellen niet als leads;
+- een sterke event-/sessieafwijking is zichtbaar vóór iedere conversieconclusie;
+- ruwe en gevoeligheidsberekende totalen blijven naast elkaar beschikbaar;
+- verdachte bronregels blijven ongewijzigd opgeslagen;
+- bij een meetafwijking worden geen pagina- of oorzakelijke aanbevelingen gegeven;
+- GA4-, Matomo-, contextassistent-, lint- en regressietests slagen zonder nieuwe migration.
+
+Lokale acceptatie:
+
+- De regressie gebruikt bewust afwijkende generieke GA4-`key_events` en bevestigt dat alleen de
+  expliciet geselecteerde events meetellen als gekwalificeerde leads.
+- Een meetafwijking van 20 events bij 2 sessies toont 31 ruwe tegenover 11
+  gevoeligheidsberekende leads, verlaagt confidence en onderdrukt lead- en pagina-conclusies.
+- Na de kwaliteitswaarschuwing bevat het oorspronkelijke bronrecord nog steeds exact 20 events;
+  de controle is daarmee aantoonbaar read-only.
+- De bestaande Matomo-regressies, Ruff en de volledige testsuite met 475 tests slagen; Alembic
+  blijft op head `0055` en deze fase vereist geen migration of extra releaseback-up.

@@ -10,7 +10,8 @@ from app.models.integrations import GoogleAnalyticsMetric, MatomoPageMetric
 from app.models.issues import Issue, IssueOccurrence
 from app.models.opportunities import OpportunityEvaluation
 from app.models.website import Website
-from app.services.analytics_provider import AnalyticsPageTotal, analytics_page_totals_between
+from app.services.analytics_provider import AnalyticsPageTotal
+from app.services.analytics_quality import AnalyticsAnomaly, quality_aware_analytics_totals
 from app.services.issue_guidance import build_issue_guidance
 
 OUT_OF_SCOPE_MARKERS = {
@@ -36,6 +37,12 @@ class ComparisonPeriod:
     source: str | None
     rows: list[AnalyticsPageTotal]
     covered: bool
+    configured: bool
+    anomalies: list[AnalyticsAnomaly]
+
+    @property
+    def suspicious_conversions(self) -> float:
+        return sum(item.events for item in self.anomalies)
 
 
 def answer_context_question(
@@ -237,18 +244,39 @@ def _answer_website_performance(
     source = current.source or previous.source
     if source is None:
         missing.insert(0, "Er is geen primaire analyticsbron voor deze website ingesteld.")
+    elif not current.configured:
+        missing.insert(0, "Gekwalificeerde lead-events zijn niet ingesteld voor deze bron.")
+    quality_anomalies = current.anomalies + previous.anomalies
+    if quality_anomalies:
+        missing.insert(
+            0,
+            "De leadmeting bevat een sterke event-/sessieafwijking; herstel of verifieer eerst "
+            "de tracking.",
+        )
     facts = [_period_fact(period) for period in periods]
     interpretations: list[str] = []
     if current.covered and previous.covered:
-        interpretations.extend(_comparison_interpretations(db, current, previous))
-        answer = _performance_answer(current, previous, source)
+        if quality_anomalies:
+            interpretations.extend(_quality_interpretations(db, quality_anomalies))
+            answer = _quality_limited_answer(current, previous, source)
+        else:
+            interpretations.extend(_comparison_interpretations(db, current, previous))
+            answer = _performance_answer(current, previous, source)
     else:
         answer = (
             "De leadontwikkeling kan niet betrouwbaar worden vergeleken, omdat de huidige of "
             "direct voorafgaande gelijkwaardige periode geen volledige dekking heeft."
         )
     covered_count = sum(period.covered for period in periods)
-    confidence = "high" if covered_count >= 3 else "medium" if covered_count >= 2 else "low"
+    confidence = (
+        "low"
+        if quality_anomalies
+        else "high"
+        if covered_count >= 3
+        else "medium"
+        if covered_count >= 2
+        else "low"
+    )
     return {
         "status": ("answered" if current.covered and previous.covered else "insufficient_evidence"),
         "answer": answer,
@@ -274,7 +302,8 @@ def _answer_website_performance(
 def _comparison_period(
     db: Session, website_id: UUID, label: str, period_start: date, period_end: date
 ) -> ComparisonPeriod:
-    source, rows = analytics_page_totals_between(db, website_id, period_start, period_end)
+    totals = quality_aware_analytics_totals(db, website_id, period_start, period_end)
+    source, rows = totals.source, totals.rows
     minimum, maximum = _analytics_date_bounds(db, website_id, source)
     return ComparisonPeriod(
         label=label,
@@ -283,8 +312,15 @@ def _comparison_period(
         source=source,
         rows=rows,
         covered=bool(
-            rows and minimum and maximum and minimum <= period_start and maximum >= period_end
+            totals.configured
+            and rows
+            and minimum
+            and maximum
+            and minimum <= period_start
+            and maximum >= period_end
         ),
+        configured=totals.configured,
+        anomalies=totals.anomalies,
     )
 
 
@@ -311,10 +347,18 @@ def _period_fact(period: ComparisonPeriod) -> str:
     visits = sum(row.visits for row in period.rows)
     conversions = sum(row.conversions for row in period.rows)
     rate = conversions / visits * 100 if visits else 0
-    return (
+    fact = (
         f"{period.label.capitalize()} ({period.start} t/m {period.end}): {visits} organische "
         f"sessies/bezoeken, {conversions:.1f} leads, conversieratio {rate:.2f}%."
     )
+    if period.suspicious_conversions:
+        adjusted = max(0.0, conversions - period.suspicious_conversions)
+        adjusted_rate = adjusted / visits * 100 if visits else 0
+        fact += (
+            f" Zonder de verdachte bijdrage: {adjusted:.1f} leads en "
+            f"{adjusted_rate:.2f}% conversieratio."
+        )
+    return fact
 
 
 def _comparison_interpretations(
@@ -394,6 +438,40 @@ def _performance_answer(
         f"{previous_visits} naar {current_visits}. De pagina-aandrijvers hieronder splitsen de "
         "rekenkundige bijdrage van verkeer en conversieratio; dit bewijst geen causaliteit."
     )
+
+
+def _quality_limited_answer(
+    current: ComparisonPeriod, previous: ComparisonPeriod, source: str | None
+) -> str:
+    _current_visits, current_raw = _totals(current.rows)
+    _previous_visits, previous_raw = _totals(previous.rows)
+    current_adjusted = max(0.0, current_raw - current.suspicious_conversions)
+    previous_adjusted = max(0.0, previous_raw - previous.suspicious_conversions)
+    return (
+        f"De primaire bron {(source or 'onbekend').upper()} toont ruwe leads van "
+        f"{previous_raw:.1f} naar {current_raw:.1f}; zonder verdachte bijdragen is dit "
+        f"{previous_adjusted:.1f} naar {current_adjusted:.1f}. Door de meetafwijking wordt nog "
+        "geen leadconclusie of pagina-advies gegeven. Controleer eerst de tracking."
+    )
+
+
+def _quality_interpretations(db: Session, anomalies: list[AnalyticsAnomaly]) -> list[str]:
+    urls = {
+        url.id: url.normalized_url
+        for url in db.scalars(select(Url).where(Url.id.in_({item.url_id for item in anomalies})))
+    }
+    result = []
+    for item in anomalies[:5]:
+        result.append(
+            f"Mogelijke meetafwijking op {urls.get(item.url_id, str(item.url_id))}: "
+            f"{item.events:.1f} events bij {item.sessions} sessies op {item.date.isoformat()} "
+            f"voor event {item.event_name}."
+        )
+    result.append(
+        "De verdachte events zijn niet verwijderd; alleen de gevoeligheidsberekening sluit hun "
+        "bijdrage tijdelijk uit."
+    )
+    return result
 
 
 def _shift_year(value: date, years: int) -> date:
