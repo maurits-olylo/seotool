@@ -17,6 +17,7 @@ from app.models.integrations import (
     WebsiteIntegration,
 )
 from app.models.website import Website
+from app.services.analytics_quality import reconcile_ga4_quality_issues
 from app.services.google_integrations import get_google_access_token
 from app.services.metric_storage import insert_metric_rows
 from app.services.url_normalization import InvalidUrlError, normalize_url
@@ -272,6 +273,7 @@ async def sync_google_analytics(
         "last_database_duration_ms": database_duration_ms,
         "last_error": None,
     }
+    quality = reconcile_ga4_quality_issues(db, website_id, start_date, end_date)
     connection.last_synced_at = now
     db.commit()
     return {
@@ -287,4 +289,5 @@ async def sync_google_analytics(
         "duration_ms": duration_ms,
         "api_duration_ms": api_duration_ms,
         "database_duration_ms": database_duration_ms,
+        "quality": quality,
     }

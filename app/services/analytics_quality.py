@@ -5,11 +5,13 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.models.common import utc_now
 from app.models.integrations import (
     GoogleAnalyticsLandingPageEventMetric,
     GoogleAnalyticsMetric,
     WebsiteIntegration,
 )
+from app.models.issues import ActivityLog, Issue
 from app.services.analytics_provider import (
     AnalyticsPageTotal,
     analytics_page_totals_between,
@@ -18,6 +20,7 @@ from app.services.analytics_provider import (
 
 MINIMUM_ANOMALOUS_EVENTS = 10
 MINIMUM_EVENTS_PER_SESSION = 3
+ANALYTICS_QUALITY_ISSUE_TYPE = "ga4_event_session_anomaly"
 
 
 @dataclass(frozen=True)
@@ -175,3 +178,115 @@ def _find_ga4_anomalies(
                 )
             )
     return sorted(anomalies, key=lambda item: (-item.events, item.date, str(item.url_id)))
+
+
+def reconcile_ga4_quality_issues(
+    db: Session, website_id: UUID, period_start: date, period_end: date
+) -> dict[str, int]:
+    """Persist GA4 anomalies through the normal two-clean-check issue lifecycle."""
+    totals = quality_aware_analytics_totals(db, website_id, period_start, period_end)
+    if totals.source != "ga4" or not totals.configured:
+        return {"anomalies": 0, "created": 0, "resolved": 0, "verified": 0}
+
+    anomalies_by_url: dict[UUID, list[AnalyticsAnomaly]] = {}
+    for anomaly in totals.anomalies:
+        anomalies_by_url.setdefault(anomaly.url_id, []).append(anomaly)
+    checked_url_ids = {row.url_id for row in totals.rows} | set(anomalies_by_url)
+    existing = {
+        issue.url_id: issue
+        for issue in db.scalars(
+            select(Issue).where(
+                Issue.website_id == website_id,
+                Issue.issue_type == ANALYTICS_QUALITY_ISSUE_TYPE,
+            )
+        )
+        if issue.url_id in checked_url_ids
+    }
+    now = utc_now()
+    created = resolved = verified = 0
+    for url_id in sorted(checked_url_ids, key=str):
+        anomalies = anomalies_by_url.get(url_id, [])
+        issue = existing.get(url_id)
+        if anomalies:
+            if issue is None:
+                issue = Issue(
+                    website_id=website_id,
+                    url_id=url_id,
+                    issue_type=ANALYTICS_QUALITY_ISSUE_TYPE,
+                    category="analytics_quality",
+                    severity="high",
+                    confidence="high",
+                    status="new",
+                    title="GA4-leadevents wijken sterk af van sessies",
+                    description=(
+                        "Gekwalificeerde events zijn niet aannemelijk in verhouding tot "
+                        "organische sessies."
+                    ),
+                    recommended_action=(
+                        "Controleer eventtrigger, consent, dubbele tags en de gekoppelde "
+                        "landingspagina; valideer daarna opnieuw."
+                    ),
+                )
+                db.add(issue)
+                db.flush()
+                created += 1
+            else:
+                issue.last_detected_at = now
+                if issue.status in {"resolved", "verified", "ignored"}:
+                    issue.status = "new"
+                    issue.resolved_at = None
+                    issue.verified_at = None
+            _record_quality_check(
+                db, issue, period_start, period_end, anomalies, "attention_needed"
+            )
+        elif issue is not None and issue.status not in {"ignored", "accepted_risk", "verified"}:
+            if issue.status == "resolved":
+                issue.status = "verified"
+                issue.verified_at = now
+                verified += 1
+                outcome = "verified"
+            else:
+                issue.status = "resolved"
+                issue.resolved_at = now
+                resolved += 1
+                outcome = "resolved"
+            _record_quality_check(db, issue, period_start, period_end, [], outcome)
+    return {
+        "anomalies": len(totals.anomalies),
+        "created": created,
+        "resolved": resolved,
+        "verified": verified,
+    }
+
+
+def _record_quality_check(
+    db: Session,
+    issue: Issue,
+    period_start: date,
+    period_end: date,
+    anomalies: list[AnalyticsAnomaly],
+    outcome: str,
+) -> None:
+    db.add(
+        ActivityLog(
+            website_id=issue.website_id,
+            activity_type="analytics_quality_checked",
+            summary=f"GA4-meetkwaliteit: {outcome}",
+            details={
+                "issue_id": str(issue.id),
+                "outcome": outcome,
+                "period_start": period_start.isoformat(),
+                "period_end": period_end.isoformat(),
+                "anomalies": [
+                    {
+                        "date": item.date.isoformat(),
+                        "url_id": str(item.url_id),
+                        "event_name": item.event_name,
+                        "events": item.events,
+                        "sessions": item.sessions,
+                    }
+                    for item in anomalies
+                ],
+            },
+        )
+    )

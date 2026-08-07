@@ -302,3 +302,40 @@ Lokale acceptatie:
   de controle is daarmee aantoonbaar read-only.
 - De bestaande Matomo-regressies, Ruff en de volledige testsuite met 475 tests slagen; Alembic
   blijft op head `0055` en deze fase vereist geen migration of extra releaseback-up.
+
+## Fase 9 — Persistente GA4-meetkwaliteitsissues
+
+Status: lokaal geïmplementeerd en nog niet gedeployed.
+
+- Iedere geslaagde GA4-synchronisatie voert na opslag van de ruwe bronregels dezelfde
+  event-/sessiekwaliteitscontrole uit als de contextassistent.
+- Een sterke afwijking wordt per website en URL als `ga4_event_session_anomaly` opgeslagen. De
+  bestaande unieke issue-identiteit voorkomt duplicaten bij herhaalde synchronisaties.
+- Iedere controle bewaart periode, uitkomst en concrete event-, sessie-, datum- en URL-bewijzen in
+  de bestaande activiteitenhistorie; de ruwe GA4-regels blijven ongewijzigd.
+- De eerste schone controle zet een actief meetkwaliteitsissue op `resolved`; een tweede schone
+  controle zet het op `verified`. Een nieuwe afwijking opent een opgelost of geverifieerd issue
+  opnieuw.
+- Genegeerde en geaccepteerde-risico-uitkomsten worden bij een schone controle niet automatisch
+  overschreven. De kwaliteitscontrole blokkeert geen crawl of technische onboarding.
+- De synchronisatierespons rapporteert aantallen afwijkingen, nieuwe, opgeloste en geverifieerde
+  issues voor operationele controle.
+
+Acceptatie:
+
+- herhaalde afwijkingen maken geen dubbel issue;
+- bewijs en controle-uitkomst blijven per synchronisatie herleidbaar;
+- twee opeenvolgende schone controles doorlopen `resolved` en `verified`;
+- een terugkerende afwijking heropent hetzelfde issue;
+- generieke GA4-`key_events` blijven buiten de gekwalificeerde leadcontrole;
+- issue-, GA4-, contextassistent-, lint- en regressietests slagen zonder nieuwe migration.
+
+Lokale acceptatie:
+
+- Eén regressieketen bevestigt achtereenvolgens aanmaken, dedupliceren, oplossen, verifiëren en
+  heropenen van exact hetzelfde meetkwaliteitsissue.
+- De vijf controles bewaren ieder hun eigen uitkomst; het eerste bewijs bevat aantoonbaar 20
+  geselecteerde events bij 2 sessies terwijl de generieke teller van 999 wordt genegeerd.
+- De bestaande GA4-synchronisatie-, contextassistent- en issue-lifecycleregressies blijven groen.
+- Ruff en de volledige testsuite met 476 tests slagen; Alembic blijft op head `0055` en deze fase
+  vereist geen migration of extra releaseback-up.
