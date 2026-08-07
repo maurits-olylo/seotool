@@ -1,6 +1,6 @@
 # Release 10 — Meetbare SEO-effectontwikkeling
 
-Status: lokaal geaccepteerd; staging en productie nog niet uitgevoerd.
+Status: geaccepteerd en op 7 augustus 2026 naar staging en productie uitgerold.
 
 ## Doel en afbakening
 
@@ -48,7 +48,7 @@ groei. Bestaande taak-, URL-, classificatie- en metriekhistorie blijft de bron.
 ## Lokale acceptatie
 
 - Ruff slaagt voor de volledige repository en de JavaScript-syntaxcontrole is groen.
-- De volledige testsuite slaagt met 483 tests en alleen de bestaande Starlette/httpx-waarschuwing.
+- De volledige testsuite slaagt met 484 tests en alleen de bestaande Starlette/httpx-waarschuwing.
 - Alembic heeft één lineaire head op `0057`; de overgang `0056` naar `0057` is geïsoleerd getest.
 - Basis- en staging-Composeconfiguratie zijn geldig met `.env.example`.
 - API-tests bevestigen expliciete, idempotente interventieregistratie, afwijzing zonder URL-scope,
@@ -61,7 +61,7 @@ groei. Bestaande taak-, URL-, classificatie- en metriekhistorie blijft de bron.
 
 ## Stagingacceptatie
 
-Staging moet vóór productie aantonen:
+Staging heeft aangetoond:
 
 - API, PostgreSQL en Redis zijn gezond op migration-head `0057`;
 - PageSpeed en JavaScript-rendering blijven uitgeschakeld;
@@ -72,4 +72,17 @@ Staging moet vóór productie aantonen:
 - laden van Content of Effect start geen crawl, import, taak of berekening;
 - desktop en 390 px hebben geen documentoverflow of browserfouten.
 
-Productiedeployment blijft geblokkeerd totdat deze stagingacceptatie expliciet is afgerond.
+De stagingstack bevat conform het isolatieontwerp geen actieve crawlworkers of scheduler. De
+uitkomstovergangen en periodieke effecthercontrole zijn daarom lokaal door regressietests gedekt;
+de read-only interface en operationele randvoorwaarden zijn op staging geaccepteerd.
+
+## Productieacceptatie
+
+- API, PostgreSQL, Redis, scheduler en alle geraakte crawlworkers zijn gezond op migration-head
+  `0057`.
+- De schedulerrol heeft uitsluitend het benodigde aanvullende INSERT-recht op
+  `effect_evaluations` gekregen.
+- De verplichte crawl-drain was vóór de update `safe=true`; na acceptatie zijn vier gepauzeerde
+  crawls hervat en is de drain beëindigd.
+- De Effect-tab toont de automatische werkwijze zonder handmatige registratie- of berekenknop.
+- Desktop en 390 px hebben geen documentoverflow of browserfouten.
