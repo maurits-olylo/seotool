@@ -1,0 +1,23 @@
+{
+  "cost": 0.002,
+  "tasks": [
+    {
+      "id": "provider-task-id-must-not-leak",
+      "status_code": 20000,
+      "status_message": "Ok.",
+      "cost": 0.002,
+      "result": [
+        {
+          "keyword": "wat kosten kunststof kozijnen",
+          "datetime": "2026-08-08 08:30:00 +00:00",
+          "items": [
+            {"type": "ai_overview"},
+            {"type": "organic", "rank_group": 1, "url": "https://voorbeeld.nl/kosten", "title": "Kosten"},
+            {"type": "people_also_ask"},
+            {"type": "organic", "rank_group": 2, "url": "https://ander.nl/prijzen", "title": "Prijzen"}
+          ]
+        }
+      ]
+    }
+  ]
+}

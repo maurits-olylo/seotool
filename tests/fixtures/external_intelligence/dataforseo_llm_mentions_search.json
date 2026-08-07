@@ -1,0 +1,26 @@
+{
+  "cost": 0.0101,
+  "tasks": [
+    {
+      "id": "provider-task-id-must-not-leak",
+      "status_code": 20000,
+      "status_message": "Ok.",
+      "cost": 0.0101,
+      "result": [
+        {
+          "platform": "google",
+          "model_name": "google_ai_overview",
+          "question": "Wat kosten kunststof kozijnen gemiddeld?",
+          "answer": "Een lang antwoord over prijzen.",
+          "last_response_at": "2026-08-08 08:35:00 +00:00",
+          "sources": [
+            {"rank": 1, "url": "https://bron.nl/kozijnen", "title": "Kozijnprijzen"}
+          ],
+          "search_results": [
+            {"rank": 1, "url": "https://eigen-site.nl/kunststof-kozijnen", "title": "Eigen pagina"}
+          ]
+        }
+      ]
+    }
+  ]
+}

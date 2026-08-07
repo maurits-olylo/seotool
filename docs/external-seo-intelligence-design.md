@@ -15,9 +15,15 @@ Implementatiestatus:
 - een read-only first-party selector kiest begrensd belangrijke vraag-paginacombinaties op basis
   van GSC-vraag, indexeerbaarheid, paginabelang, contentrol en URL-familie; webshops hoeven daardoor
   geen volledige URL × vraag-matrix op te bouwen;
+- HUMAN blijft voorlopig de beslisser over de relevante categorieën, pagina's en vragen, ook bij
+  webshops; automatische selectie is alleen een shortlist en loopt niet zelfstandig door de
+  volledige catalogus;
+- DataForSEO SERP- en LLM-mentionsresponses worden lokaal naar het provider-onafhankelijke contract
+  vertaald met synthetische fixtures; alleen echte `sources` gelden als AI-citations en usage wordt
+  in gehele USD-micro-eenheden vastgelegd;
 - één observation wordt conservatief geïnterpreteerd en creëert geen autonome kwaliteitsclaim;
-- de feature staat standaard uit; een echte provideradapter, credentials, scheduler en betaalde
-  calls zijn nog bewust niet gebouwd.
+- de feature staat standaard uit; transport, credentials, scheduler en betaalde calls zijn nog
+  bewust niet gebouwd.
 
 ## 1. Executive summary
 

@@ -74,6 +74,7 @@ class AiCitationObservation:
     observed_at: datetime
     request: QuestionEvidenceRequest
     platform: AiPlatform
+    observed_question: str | None = None
     sources: tuple[SourceReference, ...] = ()
     answer_excerpt: str | None = None
     warnings: tuple[str, ...] = ()
@@ -85,6 +86,18 @@ class AiCitationObservation:
             raise ValueError("AI observations are limited to twenty cited sources")
         if self.answer_excerpt and len(self.answer_excerpt) > 1000:
             raise ValueError("AI answer excerpts are limited to 1000 characters")
+
+
+@dataclass(frozen=True)
+class ProviderUsage:
+    provider: str
+    cost_micros: int
+    units: int = 1
+    currency: str = "USD"
+
+    def __post_init__(self) -> None:
+        if self.cost_micros < 0 or self.units < 0:
+            raise ValueError("Provider usage cannot be negative")
 
 
 @dataclass(frozen=True)
