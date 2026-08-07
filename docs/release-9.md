@@ -42,3 +42,41 @@ Lokale acceptatie:
 - De volledige testsuite slaagt met 468 tests en alleen de bestaande Starlette/httpx-waarschuwing.
 - Migration `0055` is additief, voert geen backfill of dataherschrijving uit en vereist daarom geen
   extra releaseback-up.
+
+## Fase 2 — Eerste deterministische opportunitypatronen
+
+Status: lokaal geïmplementeerd en nog niet gedeployed.
+
+- Een expliciete evaluatieactie combineert bestaande GSC-paginametrics met actieve, passende
+  crawlerissues en schrijft uitsluitend nieuwe historische evaluaties weg.
+- Een CTR-kans vereist minimaal 250 vertoningen, gemiddelde positie 4–15, CTR onder 2,5% en een
+  actieve title- of meta-descriptionfrictie.
+- Een pagina-twee-kans vereist minimaal 150 vertoningen, positie 11–20, een actuele zekere
+  niet-gemengde intentieclassificatie en actieve thin- of near-duplicate-contentfrictie.
+- Een interne-linkkans vereist minimaal 150 vertoningen, crawldiepte vier of hoger en een actief
+  diepte- of interne-ondersteuningsissue.
+- Iedere evaluatie bewaart positieve, negatieve en contextuele bijdragers plus GSC- en issuebewijs.
+  De patroonversie is expliciet en dezelfde periode/input blijft idempotent.
+- Alleen actieve, indexeerbare URL's met status 200 komen in aanmerking. Functionele zoekpagina's,
+  discovery-only varianten en issues met opgelost, geverifieerd, genegeerd of geaccepteerd risico
+  leveren geen kans op.
+- De meetperiode omvat minimaal 28 dagen. Ontbrekende analyticsdekking blijft zichtbaar en wordt
+  niet als nul geïnterpreteerd.
+
+Acceptatie:
+
+- ieder patroon vereist zowel meetbaar potentieel als een aannemelijk beïnvloedbare frictie;
+- drempels, formule- en patroonversie en alle bijdragers zijn uitlegbaar;
+- dezelfde input maakt geen dubbele evaluatie;
+- functionele pagina's en geaccepteerde risico's leveren geen schijnkans;
+- gerichte patroon- en regressietests, Ruff en de volledige testsuite slagen.
+
+Lokale acceptatie:
+
+- Twee gerichte tests bevestigen alle drie patronen, bewijsopbouw, idempotentie, functionele-
+  paginafilters, geaccepteerd risico en de minimale periode.
+- De API-regressie bevestigt dat evaluaties niet buiten de geautoriseerde tenant kunnen worden
+  gestart.
+- Ruff en de formattercontrole voor de fasebestanden slagen; Alembic blijft op de lineaire head
+  `0055` en deze fase vereist geen nieuwe migration.
+- De volledige testsuite slaagt met 470 tests en alleen de bestaande Starlette/httpx-waarschuwing.

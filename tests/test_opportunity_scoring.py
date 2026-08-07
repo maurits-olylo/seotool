@@ -119,3 +119,16 @@ def test_evaluation_is_historical_idempotent_and_tenant_bound(client: TestClient
     assert (
         browser.get(f"/api/v1/websites/{hidden_site_id}/opportunity-evaluations").status_code == 403
     )
+    assert (
+        browser.post(
+            f"/api/v1/websites/{hidden_site_id}/opportunity-evaluations/evaluate",
+            params={"period_start": "2026-07-01", "period_end": "2026-07-28"},
+        ).status_code
+        == 403
+    )
+    short_period = browser.post(
+        f"/api/v1/websites/{allowed_site_id}/opportunity-evaluations/evaluate",
+        params={"period_start": "2026-07-01", "period_end": "2026-07-07"},
+    )
+    assert short_period.status_code == 422
+    assert "at least 28 days" in short_period.json()["detail"]
