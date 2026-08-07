@@ -93,10 +93,30 @@ def test_evaluation_is_historical_idempotent_and_tenant_bound(client: TestClient
             contributors=[{"dimension": "potential", "signal": "gsc_impressions", "value": 80}],
             evidence=[{"source": "gsc", "period_days": 28}],
         )
+        newer_scores = calculate_opportunity_scores(
+            potential=90, friction=70, evidence=80, feasibility=60
+        )
+        newer, newer_created = store_opportunity_evaluation(
+            db,
+            website_id=allowed_site.id,
+            primary_url_id=url.id,
+            scope_type="page",
+            scope_key=str(url.id),
+            period_start=date(2026, 7, 29),
+            period_end=date(2026, 8, 25),
+            scores=newer_scores,
+            source_coverage={"gsc": True, "analytics": False, "pattern": "ctr"},
+            contributors=[{"dimension": "potential", "signal": "gsc_impressions", "value": 90}],
+            evidence=[{"source": "gsc", "period_days": 28}],
+        )
         db.commit()
+        first_total_score = first.total_score
+        newer_total_score = newer.total_score
         allowed_site_id = allowed_site.id
         hidden_site_id = hidden_site.id
         assert created is True and duplicate_created is False and first.id == duplicate.id
+        assert newer_created is True
+        newer_id = newer.id
         assert first.formula_version == FORMULA_VERSION
 
     from app.main import app
@@ -114,8 +134,29 @@ def test_evaluation_is_historical_idempotent_and_tenant_bound(client: TestClient
     )
     response = browser.get(f"/api/v1/websites/{allowed_site_id}/opportunity-evaluations")
     assert response.status_code == 200
-    assert len(response.json()) == 1
+    assert len(response.json()) == 2
     assert response.json()[0]["formula_version"] == FORMULA_VERSION
+    assert response.json()[0]["primary_url"] == "https://allowed-opportunity.example.com/page"
+    assert response.json()[0]["previous_total_score"] == first_total_score
+    assert response.json()[0]["total_score_change"] == round(
+        newer_total_score - first_total_score, 1
+    )
+    latest = browser.get(
+        f"/api/v1/websites/{allowed_site_id}/opportunity-evaluations",
+        params={"latest_only": "true"},
+    )
+    assert latest.status_code == 200
+    assert [item["id"] for item in latest.json()] == [str(newer_id)]
+    created_task = browser.post(
+        f"/api/v1/websites/{allowed_site_id}/opportunity-evaluations/{newer_id}/task"
+    )
+    duplicate_task = browser.post(
+        f"/api/v1/websites/{allowed_site_id}/opportunity-evaluations/{newer_id}/task"
+    )
+    assert created_task.status_code == 201
+    assert duplicate_task.status_code == 201
+    assert duplicate_task.json()["id"] == created_task.json()["id"]
+    assert created_task.json()["verification_spec"]["opportunity_evaluation_id"] == str(newer_id)
     assert (
         browser.get(f"/api/v1/websites/{hidden_site_id}/opportunity-evaluations").status_code == 403
     )

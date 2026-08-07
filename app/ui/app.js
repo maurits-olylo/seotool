@@ -805,6 +805,24 @@ function evidenceMarkup(evidence = {}) {
   return Object.entries(evidence).slice(0, 5).map(([key, value]) => `<span class="evidence-chip">${escapeHtml(key.replaceAll("_", " "))}: ${escapeHtml(Array.isArray(value) ? value.join(", ") : String(value))}</span>`).join("");
 }
 
+const opportunityPatternLabels = {ctr: "CTR-kans", page_two: "Pagina-twee-kans", internal_link: "Interne-linkkans"};
+const opportunityPriorityLabels = {high_opportunity: "Hoge kans", opportunity: "Kans", monitor: "Volgen", insufficient_evidence: "Onvoldoende bewijs"};
+
+function opportunityScoreMarkup(item) {
+  const dimensions = [["Potentieel", item.potential_score], ["Frictie", item.friction_score], ["Bewijs", item.evidence_score], ["Uitvoerbaarheid", item.feasibility_score]];
+  return dimensions.map(([label, score]) => `<div class="opportunity-score-row"><span>${label}</span><span class="opportunity-score-track"><i style="width:${score ?? 0}%"></i></span><strong>${score == null ? "?" : Math.round(score)}</strong></div>`).join("");
+}
+
+function scoredOpportunityMarkup(item) {
+  const pattern = item.source_coverage?.pattern || "unknown";
+  const coverage = Object.entries(item.source_coverage || {}).filter(([key]) => key !== "pattern").map(([key, available]) => `<span class="coverage-pill ${available ? "" : "coverage-missing"}">${escapeHtml(key)}: ${available ? "aanwezig" : "onbekend"}</span>`).join("");
+  const contributors = (item.contributors || []).map((entry) => `<span class="evidence-chip">${escapeHtml(String(entry.signal || entry.dimension))}: ${escapeHtml(Array.isArray(entry.value) ? entry.value.join(", ") : String(entry.value ?? "onbekend"))}</span>`).join("");
+  const comparison = item.previous_total_score == null ? "Eerste meting" : `${item.total_score_change >= 0 ? "+" : ""}${item.total_score_change} sinds vorige meting`;
+  const total = item.total_score == null ? "—" : Math.round(item.total_score);
+  const disabled = item.priority_class === "insufficient_evidence" ? " disabled" : "";
+  return `<article class="opportunity-row scored-opportunity"><div class="opportunity-head"><div><span class="eyebrow">${escapeHtml(opportunityPatternLabels[pattern] || pattern)}</span><h3>${item.primary_url ? `<a href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener">${escapeHtml(item.primary_url)}</a>` : escapeHtml(item.scope_key)}</h3></div><strong class="opportunity-total">${total}/100</strong></div><p>${escapeHtml(opportunityPriorityLabels[item.priority_class] || item.priority_class)} · ${escapeHtml(comparison)} · ${escapeHtml(item.period_start)} t/m ${escapeHtml(item.period_end)}</p><div class="opportunity-score-grid">${opportunityScoreMarkup(item)}</div><div class="coverage-pills">${coverage}</div><details><summary>Waarom deze score?</summary><div class="opportunity-evidence">${contributors}</div><p class="formula-version">Formule ${escapeHtml(item.formula_version)}</p></details><button type="button" class="detail-button opportunity-action" data-opportunity-evaluation="${escapeHtml(item.id)}"${disabled}>Maak taak</button></article>`;
+}
+
 function renderContentAnalysis() {
   const data = state.contentAnalysis;
   if (!data) return;
@@ -814,7 +832,8 @@ function renderContentAnalysis() {
   const classified = opportunities.coverage?.classified_pages || 0;
   const gscPages = opportunities.coverage?.pages_with_gsc || 0;
   const deadEnds = journey.dead_end_opportunities || [];
-  $("#content-analysis-summary").innerHTML = [[classified,"Geclassificeerd"],[gscPages,"Met GSC-bewijs"],[(opportunities.opportunities || []).length,"Contentkansen"],[deadEnds.length,"Mogelijke eindpunten"]].map(([count,label]) => `<article class="card"><strong>${count}</strong><span>${label}</span></article>`).join("");
+  const scoredOpportunities = data.scoredOpportunities || [];
+  $("#content-analysis-summary").innerHTML = [[classified,"Geclassificeerd"],[gscPages,"Met GSC-bewijs"],[scoredOpportunities.length,"Gescoorde kansen"],[deadEnds.length,"Mogelijke eindpunten"]].map(([count,label]) => `<article class="card"><strong>${count}</strong><span>${label}</span></article>`).join("");
   $("#content-intent-distribution").innerHTML = distributionMarkup(opportunities.website_distribution);
   const stageTotals = Object.fromEntries(Object.entries(journey.stage_totals || {}).map(([stage, totals]) => [stage, totals.visits || 0]));
   $("#content-journey-summary").innerHTML = distributionMarkup(stageTotals);
@@ -839,7 +858,9 @@ function renderContentAnalysis() {
   const coverage = journey.coverage || {};
   $("#content-route-coverage").textContent = `Dekking — landingsgedrag: ${coverage.landing_continuation || "unknown"}; paginatransities: ${coverage.transitions || "unknown"}; microconversies: ${coverage.micro_conversions || "unknown"}. ${journey.interpretation}`;
 
-  $("#content-opportunity-list").innerHTML = (opportunities.opportunities || []).map((item) => `<article class="opportunity-row"><div class="opportunity-head"><h3>${escapeHtml(item.title)}</h3><strong>${Math.round((item.confidence || 0) * 100)}%</strong></div><p>${escapeHtml(item.description)}</p><div class="opportunity-evidence">${evidenceMarkup(item.evidence)}</div><button type="button" class="detail-button opportunity-action" data-content-opportunity="${escapeHtml(item.key)}">Maak taak</button></article>`).join("") || `<p class="content-loading">Geen kansen met voldoende bewijs in deze periode.</p>`;
+  const scoredMarkup = scoredOpportunities.map(scoredOpportunityMarkup).join("");
+  const contentMarkup = (opportunities.opportunities || []).map((item) => `<article class="opportunity-row"><div class="opportunity-head"><div><span class="eyebrow">INHOUDELIJK CONTROLEPUNT</span><h3>${escapeHtml(item.title)}</h3></div><strong>${Math.round((item.confidence || 0) * 100)}%</strong></div><p>${escapeHtml(item.description)}</p><div class="opportunity-evidence">${evidenceMarkup(item.evidence)}</div><button type="button" class="detail-button opportunity-action" data-content-opportunity="${escapeHtml(item.key)}">Maak taak</button></article>`).join("");
+  $("#content-opportunity-list").innerHTML = scoredMarkup + contentMarkup || `<p class="content-loading">Nog geen kansen berekend voor deze periode.</p>`;
   $("#content-branded-terms").value = (data.settings.branded_terms || []).join(", ");
   $("#content-sector-template").value = data.settings.sector_template || "";
 }
@@ -865,16 +886,17 @@ async function loadContentAnalysis() {
   $("#content-analysis-summary").innerHTML = Array.from({length: 4}, () => `<article class="card content-skeleton"><strong>&nbsp;</strong><span>&nbsp;</span></article>`).join("");
   document.querySelectorAll("[data-content-panel]").forEach((panel) => { if (!panel.classList.contains("hidden")) panel.setAttribute("aria-busy", "true"); });
   try {
-    const [opportunityResult, journeyResult, settingsResult] = await Promise.all([
+    const [opportunityResult, journeyResult, settingsResult, scoredResult] = await Promise.all([
       timedContentRequest(`/api/v1/websites/${websiteId}/content-analysis/opportunities?${query}`),
       timedContentRequest(`/api/v1/websites/${websiteId}/content-analysis/journey?${query}`),
       timedContentRequest(`/api/v1/websites/${websiteId}/content-analysis/settings`),
+      timedContentRequest(`/api/v1/websites/${websiteId}/opportunity-evaluations?limit=100&latest_only=true`),
     ]);
     const opportunities = opportunityResult.data;
     const journey = journeyResult.data;
     const settings = settingsResult.data;
-    state.contentAnalysis = {opportunities, journey, settings};
-    $("#content-analysis-context").textContent = `${start} t/m ${end} · kansen ${opportunityResult.milliseconds} ms · doorstroom ${journeyResult.milliseconds} ms · instellingen ${settingsResult.milliseconds} ms · bronnen en ontbrekende dekking worden per onderdeel vermeld.`;
+    state.contentAnalysis = {opportunities, journey, settings, scoredOpportunities: scoredResult.data};
+    $("#content-analysis-context").textContent = `${start} t/m ${end} · inhoud ${opportunityResult.milliseconds} ms · doorstroom ${journeyResult.milliseconds} ms · scores ${scoredResult.milliseconds} ms · bronnen en ontbrekende dekking worden per onderdeel vermeld.`;
     renderContentAnalysis();
   } catch (error) {
     $("#content-analysis-context").textContent = `Contentanalyse kon niet worden geladen: ${error.message}`;
@@ -891,6 +913,30 @@ async function createContentOpportunityTask(opportunityKey) {
   try {
     const result = await api(`/api/v1/websites/${websiteId}/content-analysis/opportunities/${opportunityKey}/task?period_start=${start}&period_end=${end}`, {method: "POST"});
     message.textContent = result.created ? "Taak aangemaakt." : "Deze kans heeft al een actieve taak.";
+  } catch (error) { message.textContent = `Taak kon niet worden aangemaakt: ${error.message}`; }
+}
+
+async function evaluateScoredOpportunities() {
+  const websiteId = $("#website-select").value;
+  const {start, end} = contentAnalysisDates();
+  const button = $("#evaluate-opportunities");
+  const message = $("#content-opportunity-message");
+  button.disabled = true; message.textContent = "Kansen worden berekend…";
+  try {
+    const result = await api(`/api/v1/websites/${websiteId}/opportunity-evaluations/evaluate?period_start=${start}&period_end=${end}`, {method: "POST"});
+    message.textContent = `${result.created} nieuwe kansen; ${result.existing} bestaande beoordelingen ongewijzigd.`;
+    await loadContentAnalysis();
+  } catch (error) { message.textContent = `Berekenen mislukt: ${error.message}`; }
+  finally { button.disabled = false; }
+}
+
+async function createScoredOpportunityTask(evaluationId) {
+  const websiteId = $("#website-select").value;
+  const message = $("#content-opportunity-message");
+  message.textContent = "Taak wordt aangemaakt…";
+  try {
+    await api(`/api/v1/websites/${websiteId}/opportunity-evaluations/${evaluationId}/task`, {method: "POST"});
+    message.textContent = "Taak is beschikbaar; een bestaande actieve taak wordt hergebruikt.";
   } catch (error) { message.textContent = `Taak kon niet worden aangemaakt: ${error.message}`; }
 }
 
@@ -2668,7 +2714,8 @@ $("#content-analysis-period").addEventListener("change", async (event) => { stat
 $("#content-analysis-tabs").addEventListener("click", (event) => { const button = event.target.closest("[data-content-tab]"); if (button) showContentAnalysisTab(button.dataset.contentTab); });
 $("#content-page-previous").addEventListener("click", () => { state.contentAnalysisPage -= 1; renderContentAnalysis(); });
 $("#content-page-next").addEventListener("click", () => { state.contentAnalysisPage += 1; renderContentAnalysis(); });
-$("#content-opportunity-list").addEventListener("click", (event) => { const button = event.target.closest("[data-content-opportunity]"); if (button) createContentOpportunityTask(button.dataset.contentOpportunity); });
+$("#content-opportunity-list").addEventListener("click", (event) => { const scoredButton = event.target.closest("[data-opportunity-evaluation]"); if (scoredButton) { createScoredOpportunityTask(scoredButton.dataset.opportunityEvaluation); return; } const button = event.target.closest("[data-content-opportunity]"); if (button) createContentOpportunityTask(button.dataset.contentOpportunity); });
+$("#evaluate-opportunities").addEventListener("click", evaluateScoredOpportunities);
 $("#content-settings-form").addEventListener("submit", saveContentSettings);
 $("#onboarding-form").addEventListener("submit", onboardClient);
 $("#website-form").addEventListener("submit", createWebsite);

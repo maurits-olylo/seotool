@@ -22,6 +22,9 @@ class OpportunityEvaluationRead(BaseModel):
     source_coverage: dict[str, object]
     contributors: list[dict[str, object]]
     evidence: list[dict[str, object]]
+    primary_url: str | None = None
+    previous_total_score: float | None = None
+    total_score_change: float | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

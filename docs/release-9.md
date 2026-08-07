@@ -80,3 +80,37 @@ Lokale acceptatie:
 - Ruff en de formattercontrole voor de fasebestanden slagen; Alembic blijft op de lineaire head
   `0055` en deze fase vereist geen nieuwe migration.
 - De volledige testsuite slaagt met 470 tests en alleen de bestaande Starlette/httpx-waarschuwing.
+
+## Fase 3 — Transparante API en interface
+
+Status: lokaal geïmplementeerd en nog niet gedeployed.
+
+- Het bestaande Contentscherm toont historische kansbeoordelingen zonder nieuwe hoofdnavigatie.
+- Iedere beoordeling toont de vier deelscores, totaalscore, prioriteitsklasse, bijdragers,
+  brondekking, formuleversie en het verschil met de vorige meting van dezelfde scope.
+- Ontbrekende bronnen blijven expliciet `onbekend`; een ontbrekende score wordt niet als nul
+  gepresenteerd. De onderliggende bijdragers zijn op aanvraag zichtbaar.
+- Berekenen gebeurt uitsluitend via de expliciete knop `Bereken kansen`; laden van het scherm
+  wijzigt geen data en activeert geen contentwijziging.
+- Een bruikbare kans kan handmatig naar de bestaande taakworkflow worden gepromoveerd. Een actieve
+  taak voor hetzelfde patroon en dezelfde scope wordt hergebruikt, zodat herhaald klikken geen
+  duplicaat maakt. Beoordelingen met onvoldoende bewijs kunnen geen taak worden.
+- De taak bewaart de evaluatie-, scope-, patroon- en formuleversie als verificatiecontext en koppelt
+  de primaire URL en geldige onderliggende issues.
+
+Acceptatie:
+
+- alle scores en ontbrekende dekking zijn zichtbaar en herleidbaar;
+- een vorige meting wordt alleen binnen dezelfde scope en formuleversie vergeleken;
+- berekenen en taakpromotie zijn expliciete gebruikersacties;
+- taakpromotie is tenantgebonden en dedupliceert actieve taken;
+- de bestaande contentcontrolepunten blijven beschikbaar naast de gescoorde kansen;
+- API-, UI-, lint- en regressietests slagen zonder nieuwe migration.
+
+Lokale acceptatie:
+
+- De API- en UI-regressies bevestigen URL-weergave, historische vergelijking, expliciete acties,
+  tenantisolatie en hergebruik van een bestaande actieve taak.
+- De fasebestanden voldoen aan Ruff en de JavaScript-syntaxcontrole; Alembic blijft op de lineaire
+  head `0055` en deze fase vereist geen migration.
+- De volledige testsuite slaagt met 472 tests en alleen de bestaande Starlette/httpx-waarschuwing.

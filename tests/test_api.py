@@ -210,6 +210,8 @@ def test_content_analysis_interface_exposes_evidence_and_coverage(client: TestCl
     assert 'id="content-analysis-nav"' in page.text
     assert 'id="content-analysis-view"' in page.text
     assert 'href="/ui/assets/content-analysis.css?v=20260807-1"' in page.text
+    assert 'href="/ui/assets/opportunity-scores.css?v=20260807-1"' in page.text
+    assert 'id="evaluate-opportunities"' in page.text
     for tab in ("overview", "pages", "clusters", "journey", "opportunities", "settings"):
         assert f'data-content-tab="{tab}"' in page.text
         assert f'id="content-tab-{tab}"' in page.text
