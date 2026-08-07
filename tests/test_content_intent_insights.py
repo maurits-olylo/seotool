@@ -90,6 +90,8 @@ def test_detects_material_question_without_price_answer() -> None:
     assert insights[0]["intent"] == "prijs"
     assert insights[0]["confidence"] == "hoog"
     assert insights[0]["impressions"] == 500
+    assert insights[0]["coverage_status"] == "missing"
+    assert insights[0]["evidence"][0]["source"] == "crawl"
 
 
 def test_ignores_question_that_is_clearly_answered() -> None:

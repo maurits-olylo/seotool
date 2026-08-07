@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.models.crawl import UrlSnapshot
 from app.models.integrations import SearchConsoleQueryMetric
 from app.models.website import Website
+from app.services.question_coverage import assess_question_coverage
 
 STOPWORDS = {
     "aan",
@@ -100,18 +101,6 @@ def _latest_snapshots(db: Session, url_ids: set[UUID]) -> dict[UUID, UrlSnapshot
     return snapshots
 
 
-def _snapshot_text(snapshot: UrlSnapshot) -> tuple[set[str], set[str]]:
-    headings = snapshot.headings or {}
-    heading_text = " ".join(
-        str(value)
-        for values in headings.values()
-        for value in (values if isinstance(values, list) else [])
-    )
-    prominent = _tokens(" ".join([snapshot.title or "", heading_text]))
-    full = prominent | _tokens(snapshot.meta_description) | _tokens(snapshot.main_content)
-    return prominent, full
-
-
 def build_content_intent_insights(
     db: Session,
     website_id: UUID,
@@ -158,27 +147,22 @@ def build_content_intent_insights(
         snapshot = snapshots.get(item.url_id)
         if not snapshot or not snapshot.main_content or (snapshot.word_count or 0) < 50:
             continue
-        label, intent_terms = _intent(query)
-        prominent, full = _snapshot_text(snapshot)
-        subject_tokens = query_tokens - intent_terms
-        subject_coverage = len(subject_tokens & full) / len(subject_tokens) if subject_tokens else 1
-        missing_intent = bool(intent_terms and not (intent_terms & full))
-        prominent_coverage = (
-            len(subject_tokens & prominent) / len(subject_tokens) if subject_tokens else 1
+        label, _ = _intent(query)
+        coverage = assess_question_coverage(
+            query,
+            title=snapshot.title,
+            headings=snapshot.headings,
+            meta_description=snapshot.meta_description,
+            main_content=snapshot.main_content,
         )
-        if not missing_intent and subject_coverage >= 0.6 and prominent_coverage >= 0.5:
+        if coverage.status == "answered":
             continue
-
-        if missing_intent or subject_coverage < 0.6:
-            confidence = "hoog"
-            reason = (
-                f"De gecrawlde inhoud dekt het onderwerp voor {subject_coverage * 100:.0f}%"
-                + (f" en bevat geen duidelijk {label}-signaal" if missing_intent else "")
-                + "."
-            )
-        else:
-            confidence = "middel"
-            reason = "Het onderwerp staat in de tekst, maar niet duidelijk in title of koppen."
+        confidence = {"high": "hoog", "medium": "middel", "low": "laag"}[coverage.confidence]
+        reason = {
+            "missing": "De vraag wordt niet aantoonbaar beantwoord.",
+            "partial": "De vraag wordt slechts gedeeltelijk beantwoord.",
+            "implicit": "Het antwoord is aanwezig, maar niet duidelijk vindbaar of geformuleerd.",
+        }[coverage.status]
         host_path = urlsplit(item.page_url).path or "/"
         insight = {
             "type": "content_intent_gap",
@@ -193,14 +177,15 @@ def build_content_intent_insights(
             "page_path": host_path,
             "intent": label,
             "confidence": confidence,
+            "coverage_status": coverage.status,
             "clicks": round(item.clicks, 1),
             "impressions": item.impressions,
             "position": round(item.position, 1),
-            "subject_coverage_percent": round(subject_coverage * 100),
-            "recommended_action": (
-                "Controleer de zoekintentie en voeg alleen een direct antwoord toe als dit "
-                "inhoudelijk bij deze pagina hoort; kies anders een geschiktere landingspagina."
-            ),
+            "subject_coverage_percent": round(coverage.subject_coverage * 100),
+            "passage_coverage_percent": round(coverage.passage_coverage * 100),
+            "missing_terms": list(coverage.missing_terms),
+            "evidence": list(coverage.evidence),
+            "recommended_action": coverage.recommended_action,
         }
         score = item.impressions / max(item.position, 1) * (1.5 if confidence == "hoog" else 1)
         insights.append((score, insight))
