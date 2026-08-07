@@ -3,6 +3,8 @@ from types import SimpleNamespace
 from uuid import UUID
 
 from app.db.session import SessionLocal
+from app.models.crawl import CrawlRun, UrlSnapshot
+from app.models.discovery import CrawlJob, Url
 from app.models.external_intelligence import (
     ExternalIntelligenceRequest,
     ExternalObservation,
@@ -160,8 +162,46 @@ def test_completed_evidence_exposes_only_user_relevant_result(
     monkeypatch.setattr(
         content_analysis, "enqueue_external_intelligence", lambda *_args, **_kwargs: True
     )
+    with SessionLocal() as db:
+        url = Url(
+            website_id=UUID(website_id),
+            normalized_url="https://evidence.example/kunststof-kozijnen",
+            current_status_code=200,
+            is_active=True,
+            is_indexable=True,
+        )
+        db.add(url)
+        db.flush()
+        job = CrawlJob(website_id=UUID(website_id), job_type="full_site_crawl")
+        db.add(job)
+        db.flush()
+        run = CrawlRun(
+            crawl_job_id=job.id,
+            website_id=UUID(website_id),
+            crawl_type="full_site_crawl",
+        )
+        db.add(run)
+        db.flush()
+        db.add(
+            UrlSnapshot(
+                url_id=url.id,
+                crawl_run_id=run.id,
+                requested_url=url.normalized_url,
+                final_url=url.normalized_url,
+                status_code=200,
+                content_type="text/html",
+                title="Kunststof kozijnen",
+                headings={"h1": ["Kunststof kozijnen"]},
+                main_content="Wij leveren isolerende kozijnen in verschillende kleuren.",
+                word_count=80,
+                is_indexable=True,
+            )
+        )
+        db.commit()
+        url_id = str(url.id)
     endpoint = f"/api/v1/websites/{website_id}/content-analysis/external-evidence"
-    created = client.post(endpoint, json=payload())
+    request_payload = {**payload(), "url_id": url_id}
+    created = client.post(endpoint, json=request_payload)
     request_id = created.json()["request_id"]
     observed_at = datetime(2026, 8, 8, 9, 30, tzinfo=UTC)
 
@@ -211,6 +251,9 @@ def test_completed_evidence_exposes_only_user_relevant_result(
     assert status.json()["observation_id"] == observation_id
     assert result.status_code == 200
     assert result.json()["question"] == payload()["question"]
+    assert result.json()["assessment"]["status"] == "observed_citation_gap"
+    assert result.json()["assessment"]["coverage_status"] == "missing"
+    assert result.json()["assessment"]["recommended_action"]
     assert result.json()["observations"][0]["observed_question"] == (
         "Wat kosten kunststof kozijnen?"
     )

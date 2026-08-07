@@ -43,9 +43,23 @@ class ExternalAiObservation(BaseModel):
     sources: list[ExternalEvidenceSource]
 
 
+class ExternalEvidenceAssessment(BaseModel):
+    status: Literal[
+        "insufficient_external_evidence",
+        "own_page_cited",
+        "observed_citation_gap",
+        "external_context_available",
+    ]
+    confidence: Literal["low", "medium", "high"]
+    coverage_status: Literal["answered", "partial", "implicit", "missing"]
+    summary: str
+    recommended_action: str | None = None
+
+
 class ExternalEvidenceResult(BaseModel):
     observation_id: UUID
     capability: Literal["ai_citations"]
     question: str
     observed_at: datetime
     observations: list[ExternalAiObservation]
+    assessment: ExternalEvidenceAssessment | None = None

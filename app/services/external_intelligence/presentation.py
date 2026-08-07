@@ -2,6 +2,7 @@ from typing import Any
 
 from app.models.external_intelligence import ExternalObservation
 from app.services.external_intelligence.contracts import ExternalQuestionEvidence
+from app.services.external_intelligence.interpretation import ExternalQuestionAssessment
 
 
 def public_evidence_payload(evidence: ExternalQuestionEvidence) -> dict[str, Any]:
@@ -48,7 +49,11 @@ def public_evidence_payload(evidence: ExternalQuestionEvidence) -> dict[str, Any
 
 
 def public_stored_ai_evidence(
-    observation: ExternalObservation, *, question: str
+    observation: ExternalObservation,
+    *,
+    question: str,
+    assessment: ExternalQuestionAssessment | None = None,
+    coverage_status: str | None = None,
 ) -> dict[str, Any]:
     """Expose stored AI evidence without provider, cost, answer text or task metadata."""
     raw_observations = observation.normalized_payload.get("observations", [])
@@ -76,10 +81,19 @@ def public_stored_ai_evidence(
                     "sources": sources,
                 }
             )
-    return {
+    payload: dict[str, Any] = {
         "observation_id": observation.id,
         "capability": "ai_citations",
         "question": question,
         "observed_at": observation.observed_at,
         "observations": items,
     }
+    if assessment and coverage_status:
+        payload["assessment"] = {
+            "status": assessment.status,
+            "confidence": assessment.confidence,
+            "coverage_status": coverage_status,
+            "summary": assessment.summary,
+            "recommended_action": assessment.recommended_action,
+        }
+    return payload

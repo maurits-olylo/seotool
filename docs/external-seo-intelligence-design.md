@@ -35,8 +35,12 @@ Implementatiestatus:
   globale activering, websiteactivering, positieve kostenraming, cache-, budget-, scope- en
   duplicaatcontrole; wachtrijweigering annuleert de reservering direct;
 - de Content-interface bevat een begrensde tab `Vragen`: een mens kiest één voorgestelde
-  vraag-paginacombinatie en ziet alleen de gebruikersstatus van de controle; provider, kosten,
-  technische queue en credentials blijven buiten HTML, JavaScript en browserconsole;
+  vraag-paginacombinatie en ziet na afronding meetmoment, onderzochte formulering en geciteerde
+  bronnen; provider, kosten, technische queue en credentials blijven buiten HTML, JavaScript en
+  browserconsole;
+- opgeslagen citation evidence wordt conservatief naast de nieuwste crawltekst gelegd; alleen een
+  niet-volledig beantwoorde pagina mét aangetroffen externe bronnen krijgt inhoudsadvies, zonder
+  automatisch een issue of taak te maken;
 - één observation wordt conservatief geïnterpreteerd en creëert geen autonome kwaliteitsclaim;
 - de feature en lege credentialconfiguratie staan standaard uit; scheduler, echte credentials en
   betaalde calls zijn nog bewust niet geactiveerd.

@@ -87,3 +87,60 @@ def assess_external_question_evidence(
         evidence=evidence,
         recommended_action=None,
     )
+
+
+def assess_stored_citation_evidence(
+    *,
+    page_url: str,
+    coverage: QuestionCoverageResult,
+    question: str,
+    citation_urls: tuple[str, ...],
+    observation_count: int,
+) -> ExternalQuestionAssessment:
+    """Interpret stored citations without reconstructing provider-specific observations."""
+    own_host = normalized_host(page_url)
+    citation_hosts = {normalized_host(url) for url in citation_urls if normalized_host(url)}
+    evidence = (
+        {
+            "source": "external_observation",
+            "question": question,
+            "citation_domains": sorted(citation_hosts),
+        },
+    )
+    if not citation_hosts:
+        return ExternalQuestionAssessment(
+            status="insufficient_external_evidence",
+            confidence="low",
+            summary="Bij deze meting zijn geen citeerbare bronnen aangetroffen.",
+            evidence=evidence,
+            recommended_action=None,
+        )
+    if own_host in citation_hosts:
+        return ExternalQuestionAssessment(
+            status="own_page_cited",
+            confidence="medium",
+            summary="De eigen website is in ten minste één gemeten antwoord als bron gebruikt.",
+            evidence=evidence,
+            recommended_action=None,
+        )
+    if coverage.status in {"missing", "partial", "implicit"}:
+        return ExternalQuestionAssessment(
+            status="observed_citation_gap",
+            confidence="medium" if observation_count > 1 else "low",
+            summary=(
+                "De pagina beantwoordt deze vraag nog niet aantoonbaar volledig, terwijl andere "
+                "bronnen bij deze meting wel zijn gebruikt."
+            ),
+            evidence=evidence,
+            recommended_action=coverage.recommended_action,
+        )
+    return ExternalQuestionAssessment(
+        status="external_context_available",
+        confidence="low",
+        summary=(
+            "De pagina beantwoordt de vraag aantoonbaar. Deze ene meting geeft geen reden om de "
+            "inhoud alleen voor citations aan te passen."
+        ),
+        evidence=evidence,
+        recommended_action=None,
+    )

@@ -11,6 +11,7 @@ from app.core.queue import enqueue_external_intelligence
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.content_analysis import ContentAnalysisSettings, UrlContentOverride
+from app.models.crawl import UrlSnapshot
 from app.models.discovery import Url
 from app.models.external_intelligence import ExternalIntelligenceRequest, ExternalObservation
 from app.models.website import WebsiteSettings
@@ -32,8 +33,10 @@ from app.services.content_opportunities import (
     create_opportunity_task,
 )
 from app.services.external_intelligence.contracts import QuestionEvidenceRequest
+from app.services.external_intelligence.interpretation import assess_stored_citation_evidence
 from app.services.external_intelligence.policy import admit_external_request
 from app.services.external_intelligence.presentation import public_stored_ai_evidence
+from app.services.question_coverage import assess_question_coverage
 from app.services.question_scope_selection import select_question_scopes
 from app.services.security_audit import record_security_event
 
@@ -236,7 +239,48 @@ def external_evidence_result(
     if not request or request.status != "succeeded":
         raise HTTPException(status_code=409, detail="Bewijs is nog niet beschikbaar")
     question = str(request.request_context.get("question") or "")
-    return public_stored_ai_evidence(observation, question=question)
+    assessment = None
+    coverage_status = None
+    if request.url_id:
+        url = db.get(Url, request.url_id)
+        snapshot = db.scalar(
+            select(UrlSnapshot)
+            .where(UrlSnapshot.url_id == request.url_id)
+            .order_by(UrlSnapshot.checked_at.desc())
+            .limit(1)
+        )
+        if url and snapshot:
+            coverage = assess_question_coverage(
+                question,
+                title=snapshot.title,
+                headings=snapshot.headings,
+                meta_description=snapshot.meta_description,
+                main_content=snapshot.main_content,
+            )
+            raw_observations = observation.normalized_payload.get("observations", [])
+            citation_urls = tuple(
+                str(source["url"])
+                for item in raw_observations
+                if isinstance(item, dict)
+                for source in item.get("sources", [])
+                if isinstance(source, dict) and isinstance(source.get("url"), str)
+            ) if isinstance(raw_observations, list) else ()
+            assessment = assess_stored_citation_evidence(
+                page_url=url.normalized_url,
+                coverage=coverage,
+                question=question,
+                citation_urls=citation_urls,
+                observation_count=(
+                    len(raw_observations) if isinstance(raw_observations, list) else 0
+                ),
+            )
+            coverage_status = coverage.status
+    return public_stored_ai_evidence(
+        observation,
+        question=question,
+        assessment=assessment,
+        coverage_status=coverage_status,
+    )
 
 
 def _external_state(

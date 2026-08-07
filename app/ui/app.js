@@ -972,7 +972,10 @@ function questionEvidenceDetailMarkup(detail) {
   const sources = observed.flatMap((item) => item.sources || []);
   const questions = [...new Set(observed.map((item) => item.observed_question).filter(Boolean))];
   const sourceMarkup = sources.length ? `<ul>${sources.map((source) => `<li><a href="${escapeHtml(source.url)}" target="_blank" rel="noopener">${escapeHtml(source.title || source.url)}</a></li>`).join("")}</ul>` : `<p>Bij deze meting zijn geen citeerbare bronnen aangetroffen.</p>`;
-  return `<div class="question-evidence-detail"><div><span class="eyebrow">AANGETROFFEN BEWIJS</span><strong>Gemeten ${new Date(detail.observed_at).toLocaleString("nl-NL")}</strong></div>${questions.length ? `<p>Aangetroffen formulering: ${escapeHtml(questions.join(" · "))}</p>` : ""}<h4>Geciteerde bronnen</h4>${sourceMarkup}</div>`;
+  const assessment = detail.assessment;
+  const coverageLabels = {answered:"Beantwoord",partial:"Gedeeltelijk beantwoord",implicit:"Niet duidelijk vindbaar",missing:"Niet aantoonbaar beantwoord"};
+  const assessmentMarkup = assessment ? `<section class="question-evidence-assessment"><div><span class="eyebrow">CONCLUSIE</span><span class="evidence-chip">${escapeHtml(coverageLabels[assessment.coverage_status] || assessment.coverage_status)}</span></div><p>${escapeHtml(assessment.summary)}</p>${assessment.recommended_action ? `<h4>Advies</h4><p>${escapeHtml(assessment.recommended_action)}</p>` : ""}</section>` : "";
+  return `<div class="question-evidence-detail">${assessmentMarkup}<div><span class="eyebrow">AANGETROFFEN BEWIJS</span><strong>Gemeten ${new Date(detail.observed_at).toLocaleString("nl-NL")}</strong></div>${questions.length ? `<p>Aangetroffen formulering: ${escapeHtml(questions.join(" · "))}</p>` : ""}<h4>Geciteerde bronnen</h4>${sourceMarkup}</div>`;
 }
 
 function renderQuestionScopes() {

@@ -12,7 +12,10 @@ from app.services.external_intelligence.contracts import (
     SourceReference,
     normalized_host,
 )
-from app.services.external_intelligence.interpretation import assess_external_question_evidence
+from app.services.external_intelligence.interpretation import (
+    assess_external_question_evidence,
+    assess_stored_citation_evidence,
+)
 from app.services.external_intelligence.presentation import public_evidence_payload
 from app.services.external_intelligence.providers.fake import FakeExternalEvidenceProvider
 from app.services.question_coverage import assess_question_coverage
@@ -166,4 +169,32 @@ def test_empty_observation_never_creates_a_gap() -> None:
     )
 
     assert assessment.status == "insufficient_external_evidence"
+    assert assessment.recommended_action is None
+
+
+def test_stored_citations_and_missing_page_answer_produce_conservative_advice() -> None:
+    assessment = assess_stored_citation_evidence(
+        page_url="https://eigen-site.nl/kunststof-kozijnen",
+        coverage=missing_answer(),
+        question="wat kosten kunststof kozijnen",
+        citation_urls=("https://voorbeeld-concurrent.nl/prijzen",),
+        observation_count=1,
+    )
+
+    assert assessment.status == "observed_citation_gap"
+    assert assessment.confidence == "low"
+    assert "deze meting" in assessment.summary.lower()
+    assert assessment.recommended_action is not None
+
+
+def test_stored_own_citation_never_creates_content_advice() -> None:
+    assessment = assess_stored_citation_evidence(
+        page_url="https://www.eigen-site.nl/kunststof-kozijnen",
+        coverage=missing_answer(),
+        question="wat kosten kunststof kozijnen",
+        citation_urls=("https://eigen-site.nl/kunststof-kozijnen",),
+        observation_count=1,
+    )
+
+    assert assessment.status == "own_page_cited"
     assert assessment.recommended_action is None

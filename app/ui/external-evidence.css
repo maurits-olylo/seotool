@@ -88,6 +88,21 @@
   overflow-wrap: anywhere;
 }
 
+.question-evidence-assessment {
+  margin: -2px -4px 16px;
+  padding: 14px 16px;
+  border-left: 4px solid var(--green);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.question-evidence-assessment > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 @media (max-width: 800px) {
   .question-scope-row {
     grid-template-columns: 1fr;
@@ -95,6 +110,12 @@
 
   .question-scope-action {
     justify-items: start;
+  }
+
+  .question-evidence-detail > div,
+  .question-evidence-assessment > div {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 
