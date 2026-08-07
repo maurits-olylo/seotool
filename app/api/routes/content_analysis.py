@@ -1,7 +1,8 @@
+from dataclasses import asdict
 from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -21,6 +22,7 @@ from app.services.content_opportunities import (
     build_content_opportunities,
     create_opportunity_task,
 )
+from app.services.question_scope_selection import select_question_scopes
 from app.services.security_audit import record_security_event
 
 router = APIRouter(prefix="/websites/{website_id}/content-analysis", tags=["content-analysis"])
@@ -73,6 +75,36 @@ def analytics_journey(
     if period_start > period_end:
         raise HTTPException(status_code=422, detail="Start date must not be after end date")
     return build_analytics_journey(db, website_id, period_start, period_end)
+
+
+@router.get("/question-scopes")
+def question_scopes(
+    website_id: UUID,
+    period_start: date,
+    period_end: date,
+    max_pages: int = Query(default=25, ge=1, le=100),
+    max_questions_per_page: int = Query(default=3, ge=1, le=10),
+    max_pages_per_family: int = Query(default=5, ge=1, le=20),
+    max_total: int = Query(default=60, ge=1, le=500),
+    minimum_impressions: int = Query(default=25, ge=1),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, object]:
+    require_website_access(db, principal, website_id)
+    if period_start > period_end:
+        raise HTTPException(status_code=422, detail="Start date must not be after end date")
+    selection = select_question_scopes(
+        db,
+        website_id=website_id,
+        period_start=period_start,
+        period_end=period_end,
+        max_pages=max_pages,
+        max_questions_per_page=max_questions_per_page,
+        max_pages_per_family=max_pages_per_family,
+        max_total=max_total,
+        minimum_impressions=minimum_impressions,
+    )
+    return asdict(selection)
 
 
 @router.post("/opportunities/{opportunity_key}/task", status_code=201)

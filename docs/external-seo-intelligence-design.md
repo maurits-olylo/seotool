@@ -12,6 +12,9 @@ Implementatiestatus:
   zijn lokaal beschikbaar;
 - requests, genormaliseerde observations en usage kunnen tenantgebonden worden opgeslagen; cache,
   dagelijkse idempotency, maandbudget en actieve-scopelimiet worden vóór toelating afgedwongen;
+- een read-only first-party selector kiest begrensd belangrijke vraag-paginacombinaties op basis
+  van GSC-vraag, indexeerbaarheid, paginabelang, contentrol en URL-familie; webshops hoeven daardoor
+  geen volledige URL × vraag-matrix op te bouwen;
 - één observation wordt conservatief geïnterpreteerd en creëert geen autonome kwaliteitsclaim;
 - de feature staat standaard uit; een echte provideradapter, credentials, scheduler en betaalde
   calls zijn nog bewust niet gebouwd.

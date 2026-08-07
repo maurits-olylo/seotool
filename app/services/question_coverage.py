@@ -37,6 +37,20 @@ INTENT_TERMS = {
     "method": {"monteer", "plaats", "vervang", "onderhoud", "repareer"},
     "suitability": {"geschikt", "mogelijk", "kan", "mag"},
 }
+QUESTION_WORDS = {
+    "hoe",
+    "wat",
+    "waarom",
+    "wanneer",
+    "welke",
+    "waar",
+    "wie",
+    "kan",
+    "kunnen",
+    "mag",
+    "moet",
+    "zijn",
+}
 
 
 @dataclass(frozen=True)
@@ -72,6 +86,13 @@ def question_intent(question: str) -> tuple[str | None, set[str]]:
         if matched:
             return label, matched
     return None, set()
+
+
+def is_question_like(value: str) -> bool:
+    normalized = unicodedata.normalize("NFKC", value).strip().lower()
+    first_word = next(iter(re.findall(r"[a-z0-9]+", normalized)), "")
+    intent, _ = question_intent(normalized)
+    return first_word in QUESTION_WORDS or intent is not None
 
 
 def _passages(content: str) -> list[str]:
