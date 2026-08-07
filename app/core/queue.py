@@ -167,6 +167,22 @@ def enqueue_integration_sync(
     )
 
 
+def enqueue_external_intelligence(request_id: str, *, website_id: str) -> bool:
+    if not get_settings().dataforseo_enabled:
+        return False
+    return _enqueue(
+        INTEGRATION_QUEUE,
+        "app.services.external_intelligence.execution.execute_queued_external_request",
+        request_id,
+        job_id=f"external-intelligence-{request_id}",
+        meta={
+            "website_id": website_id,
+            "job_type": "external_intelligence",
+            "external_request_id": request_id,
+        },
+    )
+
+
 def enqueue_retention_operation(operation_id: str, *, attempt: int = 0) -> bool:
     return _enqueue(
         MAINTENANCE_QUEUE,

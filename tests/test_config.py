@@ -45,6 +45,8 @@ def test_dataforseo_requires_credentials_only_when_enabled() -> None:
             dataforseo_enabled=True,
             dataforseo_login="fixture-login",
             dataforseo_password="fixture-password",
+            external_serp_estimated_cost_micros=1,
+            external_ai_citations_estimated_cost_micros=1,
         ).dataforseo_enabled
         is True
     )

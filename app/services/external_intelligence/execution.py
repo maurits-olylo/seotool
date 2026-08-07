@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import json
 from datetime import UTC, datetime, timedelta
@@ -7,6 +8,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.db.session import SessionLocal
 from app.models.external_intelligence import (
     ExternalIntelligenceRequest,
     ExternalObservation,
@@ -21,8 +23,26 @@ from app.services.external_intelligence.contracts import (
     SourceReference,
 )
 from app.services.external_intelligence.providers.dataforseo import DataForSeoResponseError
+from app.services.external_intelligence.providers.dataforseo_client import DataForSeoClient
 
 FRESHNESS = timedelta(days=7)
+
+
+def execute_queued_external_request(request_id: str) -> None:
+    with SessionLocal() as db:
+        request = db.get(ExternalIntelligenceRequest, UUID(request_id))
+        if request and request.status == "failed":
+            request.status = "pending"
+            request.finished_at = None
+            request.error_code = None
+            db.commit()
+        asyncio.run(
+            execute_external_request(
+                db,
+                request_id=UUID(request_id),
+                provider=DataForSeoClient(),
+            )
+        )
 
 
 class ExternalEvidenceProvider(Protocol):

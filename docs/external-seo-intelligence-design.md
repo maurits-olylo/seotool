@@ -30,6 +30,9 @@ Implementatiestatus:
 - een toegelaten HUMAN-scope kan provider-neutraal worden geclaimd en uitgevoerd; de betaalde call
   houdt geen langdurige databaselock vast en observation, usage en eindstatus worden daarna in één
   transactie vastgelegd; mislukking bewaart alleen een generieke foutcode en geen deelresultaat;
+- een provider-neutrale API zet een handmatig gekozen vraag/pagina pas op de integratiewachtrij na
+  globale activering, websiteactivering, positieve kostenraming, cache-, budget-, scope- en
+  duplicaatcontrole; wachtrijweigering annuleert de reservering direct;
 - één observation wordt conservatief geïnterpreteerd en creëert geen autonome kwaliteitsclaim;
 - de feature en lege credentialconfiguratie staan standaard uit; scheduler, echte credentials en
   betaalde calls zijn nog bewust niet geactiveerd.

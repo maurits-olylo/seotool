@@ -1,20 +1,24 @@
 from dataclasses import asdict
-from datetime import date
+from datetime import UTC, date, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
+from app.core.queue import enqueue_external_intelligence
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.content_analysis import ContentAnalysisSettings, UrlContentOverride
 from app.models.discovery import Url
+from app.models.external_intelligence import ExternalIntelligenceRequest
 from app.schemas.content_analysis import (
     ContentAnalysisSettingsData,
     ContentOverrideRead,
     ContentOverrideWrite,
 )
+from app.schemas.external_intelligence import ExternalEvidenceCreate, ExternalEvidenceState
 from app.services.analytics_journey import build_analytics_journey
 from app.services.authorization import require_website_access, require_website_write_access
 from app.services.content_analysis import analyze_website_content
@@ -22,6 +26,8 @@ from app.services.content_opportunities import (
     build_content_opportunities,
     create_opportunity_task,
 )
+from app.services.external_intelligence.contracts import QuestionEvidenceRequest
+from app.services.external_intelligence.policy import admit_external_request
 from app.services.question_scope_selection import select_question_scopes
 from app.services.security_audit import record_security_event
 
@@ -105,6 +111,94 @@ def question_scopes(
         minimum_impressions=minimum_impressions,
     )
     return asdict(selection)
+
+
+@router.post("/external-evidence", response_model=ExternalEvidenceState, status_code=202)
+def request_external_evidence(
+    website_id: UUID,
+    payload: ExternalEvidenceCreate,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> ExternalEvidenceState:
+    require_website_write_access(db, principal, website_id)
+    settings = get_settings()
+    if not settings.dataforseo_enabled:
+        raise HTTPException(status_code=503, detail="External evidence is not available")
+    if payload.url_id:
+        _url_for_website(db, website_id, payload.url_id)
+    estimate = (
+        settings.external_serp_estimated_cost_micros
+        if payload.capability == "serp"
+        else settings.external_ai_citations_estimated_cost_micros
+    )
+    admission = admit_external_request(
+        db,
+        website_id=website_id,
+        url_id=payload.url_id,
+        capability=payload.capability,
+        context=QuestionEvidenceRequest(
+            question=payload.question,
+            language=payload.language,
+            country=payload.country,
+            device=payload.device,
+            location=payload.location,
+        ),
+        reason="human_selected_question",
+        provider="dataforseo",
+        estimated_cost_micros=estimate,
+    )
+    if admission.status == "disabled":
+        raise HTTPException(status_code=409, detail="External evidence is not enabled")
+    if admission.status in {"budget_exceeded", "scope_limit_reached"}:
+        return ExternalEvidenceState(status=admission.status, capability=payload.capability)
+    if admission.status == "cached" and admission.observation:
+        return ExternalEvidenceState(
+            observation_id=admission.observation.id,
+            status="available",
+            capability=payload.capability,
+        )
+    if admission.status == "duplicate" and admission.request:
+        return _external_state(admission.request)
+    if not admission.request:
+        raise HTTPException(status_code=500, detail="External evidence request failed")
+    db.commit()
+    if not enqueue_external_intelligence(
+        str(admission.request.id), website_id=str(website_id)
+    ):
+        admission.request.status = "cancelled"
+        admission.request.finished_at = datetime.now(UTC)
+        db.commit()
+        raise HTTPException(status_code=503, detail="External evidence queue is unavailable")
+    return ExternalEvidenceState(
+        request_id=admission.request.id,
+        status="queued",
+        capability=payload.capability,
+    )
+
+
+@router.get(
+    "/external-evidence/{request_id}", response_model=ExternalEvidenceState
+)
+def external_evidence_status(
+    website_id: UUID,
+    request_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> ExternalEvidenceState:
+    require_website_access(db, principal, website_id)
+    request = db.get(ExternalIntelligenceRequest, request_id)
+    if not request or request.website_id != website_id:
+        raise HTTPException(status_code=404, detail="External evidence request not found")
+    return _external_state(request)
+
+
+def _external_state(request: ExternalIntelligenceRequest) -> ExternalEvidenceState:
+    public_status = "available" if request.status == "succeeded" else request.status
+    return ExternalEvidenceState(
+        request_id=request.id,
+        status=public_status,  # type: ignore[arg-type]
+        capability=request.capability,  # type: ignore[arg-type]
+    )
 
 
 @router.post("/opportunities/{opportunity_key}/task", status_code=201)

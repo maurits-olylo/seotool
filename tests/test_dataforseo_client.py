@@ -33,6 +33,8 @@ def settings(*, enabled: bool = True) -> Settings:
         dataforseo_enabled=enabled,
         dataforseo_login="fixture-login",
         dataforseo_password="fixture-password",
+        external_serp_estimated_cost_micros=1,
+        external_ai_citations_estimated_cost_micros=1,
     )
 
 

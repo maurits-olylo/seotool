@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     dataforseo_enabled: bool = False
     dataforseo_login: str = ""
     dataforseo_password: str = ""
+    external_serp_estimated_cost_micros: int = 0
+    external_ai_citations_estimated_cost_micros: int = 0
     mfa_enforcement_enabled: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -43,6 +45,14 @@ class Settings(BaseSettings):
         ):
             raise ValueError(
                 "DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD are required when DataForSEO is enabled"
+            )
+        if self.dataforseo_enabled and (
+            self.external_serp_estimated_cost_micros <= 0
+            or self.external_ai_citations_estimated_cost_micros <= 0
+        ):
+            raise ValueError(
+                "Positive external intelligence cost estimates are required when "
+                "DataForSEO is enabled"
             )
         if self.app_env == "production":
             if "seo:seo@" in self.database_url:
