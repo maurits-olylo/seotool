@@ -14,6 +14,7 @@ from app.api.routes import (
     context_assistant,
     crawls,
     discovery,
+    effects,
     exports,
     insights,
     integrations,
@@ -105,6 +106,7 @@ app.include_router(discovery.router, prefix="/api/v1", dependencies=[Depends(req
 app.include_router(crawls.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(issues.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(jobs.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
+app.include_router(effects.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(opportunities.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(
     recommendations.router,

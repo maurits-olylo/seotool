@@ -179,6 +179,17 @@ Lokale uitwerking:
 - Laat berekenen een expliciete gebruikersactie blijven.
 - Herbereken later gepland wanneer nieuwe brondata beschikbaar is; bewaar eerdere uitkomsten.
 
+Lokale uitwerking:
+
+- De Content-sectie bevat een afzonderlijke Effect-tab met expliciete berekenactie.
+- De gebruiker kiest via de bestaande periodekeuze het interventiecohort; eerdere evaluaties blijven
+  zichtbaar en worden niet bijgewerkt of verwijderd.
+- Het overzicht toont status, basis- en observatieperiode, KPI-verschillen, brondekking, URL-aantal,
+  overlap, methodeversie en de niet-causale bewijsnotitie.
+- De tenantgebonden API ondersteunt uitsluitend expliciet berekenen en historische resultaten lezen.
+- Geplande automatische hercontrole blijft buiten deze fase; de immutable opslag ondersteunt dit
+  later zonder bestaande uitkomsten te overschrijven.
+
 ### Later, alleen bij bewezen behoefte
 
 - Handmatige interventies zonder taak.

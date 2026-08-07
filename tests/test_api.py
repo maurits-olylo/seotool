@@ -164,7 +164,7 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
 def test_operations_status_ignores_stale_website_responses(client: TestClient) -> None:
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
-    assert 'src="/ui/assets/app.js?v=20260807-1"' in page.text
+    assert 'src="/ui/assets/app.js?v=20260807-2"' in page.text
     assert 'href="/ui/assets/actionable.css?v=20260731-4"' in page.text
     assert 'id="recommendation-task-section"' in page.text
     assert 'id="recommendation-task-content"' in page.text
@@ -217,7 +217,7 @@ def test_content_analysis_interface_exposes_evidence_and_coverage(client: TestCl
     assert 'id="evaluate-opportunities"' in page.text
     script = client.get("/ui/assets/app.js")
     assert 'contextAssistantFormMarkup("opportunity_evaluation"' in script.text
-    for tab in ("overview", "pages", "clusters", "journey", "opportunities", "settings"):
+    for tab in ("overview", "pages", "clusters", "journey", "opportunities", "effects", "settings"):
         assert f'data-content-tab="{tab}"' in page.text
         assert f'id="content-tab-{tab}"' in page.text
     assert script.status_code == 200
@@ -229,6 +229,9 @@ def test_content_analysis_interface_exposes_evidence_and_coverage(client: TestCl
     assert "journeyResult.milliseconds" in script.text
     assert "coverage.transitions" in script.text
     assert "contentAnalysisPage" in script.text
+    assert 'id="evaluate-effects"' in page.text
+    assert "function renderEffectEvaluations" in script.text
+    assert "/effect-evaluations/evaluate" in script.text
 
 
 def test_insights_interface_exposes_read_only_performance_questions(client: TestClient) -> None:

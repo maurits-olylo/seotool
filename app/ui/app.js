@@ -24,7 +24,7 @@ const labels = {
   pause_requested: "Pauze wordt voorbereid", paused: "Gepauzeerd",
   cancel_requested: "Stop wordt voorbereid", connected: "Gekoppeld", error: "Fout",
 };
-const state = { currentUser: null, currentView: "dashboard", clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], changesRequestId: 0, jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, contentAnalysis: null, contentAnalysisDays: 28, contentAnalysisTab: "overview", contentAnalysisPage: 1, crawlRuns: [], showCrawlArchive: false, activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, operationsRequestId: 0, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], urlCoverage: null, filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, selectedRecommendationTask: null, recommendationFeedback: [], recommendationDefinitions: null, recommendationTasks: [], taskNotifications: [], taskMembers: [], googleConnectionId: null, bingConnectionId: null, matomoConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
+const state = { currentUser: null, currentView: "dashboard", clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], changesRequestId: 0, jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, contentAnalysis: null, contentAnalysisDays: 28, contentAnalysisTab: "overview", contentAnalysisPage: 1, effectEvaluations: [], crawlRuns: [], showCrawlArchive: false, activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, operationsRequestId: 0, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], urlCoverage: null, filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, selectedRecommendationTask: null, recommendationFeedback: [], recommendationDefinitions: null, recommendationTasks: [], taskNotifications: [], taskMembers: [], googleConnectionId: null, bingConnectionId: null, matomoConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
 const VIEW_HASHES = {dashboard: "overzicht", tasks: "taken", actions: "analyse/acties", urls: "analyse/urls", changes: "analyse/wijzigingen", insights: "analyse/inzichten", contentAnalysis: "analyse/content", vacancies: "analyse/vacatures", reports: "rapportages", operations: "crawls-exports", clients: "instellingen/klanten-websites", team: "instellingen/team-toegang", integrations: "instellingen/integraties"};
 const LEGACY_HASHES = {rapportage: "reports", urls: "urls", wijzigingen: "changes", inzichten: "insights", vacatures: "vacancies", beheer: "operations", organisatie: "clients", integraties: "integrations", acties: "actions"};
 const ANALYSIS_VIEWS = new Set(["actions", "urls", "changes", "insights", "contentAnalysis", "vacancies"]);
@@ -884,6 +884,27 @@ function contextAnswerMarkup(result) {
   return `<p>${escapeHtml(result.answer)}</p><div class="context-answer-grid">${contextAnswerList("Gemeten feiten", result.facts)}${contextAnswerList("Interpretatie", result.interpretations)}${contextAnswerList("Ontbrekend bewijs", result.missing_evidence)}${contextAnswerList("Gebruikte bronnen", sources)}</div><p class="context-answer-meta">Confidence: ${escapeHtml(result.confidence)} · alleen-lezen; er zijn geen acties uitgevoerd.</p>`;
 }
 
+const effectStatusLabels = {too_early: "Te vroeg om te beoordelen", insufficient_data: "Onvoldoende data", not_comparable: "Niet vergelijkbaar", development_visible: "Ontwikkeling zichtbaar"};
+
+function effectDeltaMarkup(label, change) {
+  if (!change) return "";
+  const relative = change.relative_percent == null ? "geen bruikbare basis" : `${change.relative_percent >= 0 ? "+" : ""}${change.relative_percent}%`;
+  return `<div class="effect-metric"><span>${escapeHtml(label)}</span><strong>${escapeHtml(relative)}</strong><small>${change.absolute >= 0 ? "+" : ""}${escapeHtml(String(change.absolute))} absoluut</small></div>`;
+}
+
+function effectEvaluationMarkup(item) {
+  const gsc = item.metrics?.gsc?.changes || {};
+  const analytics = item.metrics?.analytics?.changes || {};
+  const gscCoverage = item.source_coverage?.gsc || {};
+  const analyticsCoverage = item.source_coverage?.analytics || {};
+  const evidence = (item.evidence || []).map((entry) => `<p class="effect-evidence">${escapeHtml(String(entry.message || entry.basis))}</p>`).join("");
+  return `<article class="effect-row"><div class="opportunity-head"><div><span class="eyebrow">${escapeHtml(effectStatusLabels[item.status] || item.status)}</span><h3>${escapeHtml(item.change_period_start)} t/m ${escapeHtml(item.change_period_end)}</h3></div><strong>${item.intervention_ids.length} interventie${item.intervention_ids.length === 1 ? "" : "s"}</strong></div><p>Basis ${escapeHtml(item.baseline_start)}–${escapeHtml(item.baseline_end)} · observatie ${escapeHtml(item.observation_start)}–${escapeHtml(item.observation_end)}</p><div class="effect-metrics">${effectDeltaMarkup("GSC-klikken", gsc.clicks)}${effectDeltaMarkup("GSC-impressies", gsc.impressions)}${effectDeltaMarkup("Bezoeken", analytics.visits)}${effectDeltaMarkup("Conversies", analytics.conversions)}</div><div class="coverage-pills"><span class="coverage-pill">GSC ${gscCoverage.baseline_days || 0}/${gscCoverage.expected_days || 28} + ${gscCoverage.observation_days || 0}/${gscCoverage.expected_days || 28} dagen</span><span class="coverage-pill">${escapeHtml((item.analytics_source || "analytics ontbreekt").toUpperCase())} ${analyticsCoverage.baseline_days || 0}/${analyticsCoverage.expected_days || 28} + ${analyticsCoverage.observation_days || 0}/${analyticsCoverage.expected_days || 28} dagen</span><span class="coverage-pill">${item.url_ids.length} URL's</span><span class="coverage-pill">${item.confidence_factors?.overlapping_urls || 0} overlap</span></div><details><summary>Bewijs en methode</summary>${evidence}<p class="formula-version">Methode ${escapeHtml(item.method_version)} · berekend ${new Date(item.created_at).toLocaleString("nl-NL")}</p></details></article>`;
+}
+
+function renderEffectEvaluations() {
+  $("#content-effect-list").innerHTML = state.effectEvaluations.map(effectEvaluationMarkup).join("") || `<p class="content-loading">Nog geen effectevaluaties. Alleen uitgevoerde taken met een concrete URL-scope worden meegenomen.</p>`;
+}
+
 async function submitContextQuestion(form, contextType, contextId) {
   const websiteId = $("#website-select").value;
   const answer = form.parentElement.querySelector(".context-answer");
@@ -939,6 +960,7 @@ function renderContentAnalysis() {
   $("#content-opportunity-list").innerHTML = scoredMarkup + contentMarkup || `<p class="content-loading">Nog geen kansen berekend voor deze periode.</p>`;
   $("#content-branded-terms").value = (data.settings.branded_terms || []).join(", ");
   $("#content-sector-template").value = data.settings.sector_template || "";
+  renderEffectEvaluations();
 }
 
 function showContentAnalysisTab(tab) {
@@ -962,23 +984,40 @@ async function loadContentAnalysis() {
   $("#content-analysis-summary").innerHTML = Array.from({length: 4}, () => `<article class="card content-skeleton"><strong>&nbsp;</strong><span>&nbsp;</span></article>`).join("");
   document.querySelectorAll("[data-content-panel]").forEach((panel) => { if (!panel.classList.contains("hidden")) panel.setAttribute("aria-busy", "true"); });
   try {
-    const [opportunityResult, journeyResult, settingsResult, scoredResult] = await Promise.all([
+    const [opportunityResult, journeyResult, settingsResult, scoredResult, effectsResult] = await Promise.all([
       timedContentRequest(`/api/v1/websites/${websiteId}/content-analysis/opportunities?${query}`),
       timedContentRequest(`/api/v1/websites/${websiteId}/content-analysis/journey?${query}`),
       timedContentRequest(`/api/v1/websites/${websiteId}/content-analysis/settings`),
       timedContentRequest(`/api/v1/websites/${websiteId}/opportunity-evaluations?limit=100&latest_only=true`),
+      timedContentRequest(`/api/v1/websites/${websiteId}/effect-evaluations?limit=25`),
     ]);
     const opportunities = opportunityResult.data;
     const journey = journeyResult.data;
     const settings = settingsResult.data;
     state.contentAnalysis = {opportunities, journey, settings, scoredOpportunities: scoredResult.data};
-    $("#content-analysis-context").textContent = `${start} t/m ${end} · inhoud ${opportunityResult.milliseconds} ms · doorstroom ${journeyResult.milliseconds} ms · scores ${scoredResult.milliseconds} ms · bronnen en ontbrekende dekking worden per onderdeel vermeld.`;
+    state.effectEvaluations = effectsResult.data;
+    $("#content-analysis-context").textContent = `${start} t/m ${end} · inhoud ${opportunityResult.milliseconds} ms · doorstroom ${journeyResult.milliseconds} ms · scores ${scoredResult.milliseconds} ms · effect ${effectsResult.milliseconds} ms · bronnen en ontbrekende dekking worden per onderdeel vermeld.`;
     renderContentAnalysis();
   } catch (error) {
     $("#content-analysis-context").textContent = `Contentanalyse kon niet worden geladen: ${error.message}`;
   } finally {
     document.querySelectorAll("[data-content-panel]").forEach((panel) => panel.removeAttribute("aria-busy"));
   }
+}
+
+async function evaluateEffects() {
+  const websiteId = $("#website-select").value;
+  const {start, end} = contentAnalysisDates();
+  const button = $("#evaluate-effects");
+  const message = $("#content-effect-message");
+  button.disabled = true; message.textContent = "Interventies en brondata worden vergeleken…";
+  try {
+    const result = await api(`/api/v1/websites/${websiteId}/effect-evaluations/evaluate?change_period_start=${start}&change_period_end=${end}`, {method: "POST"});
+    message.textContent = effectStatusLabels[result.status] || result.status;
+    await loadContentAnalysis();
+    showContentAnalysisTab("effects");
+  } catch (error) { message.textContent = `Effectberekening mislukt: ${error.message}`; }
+  finally { button.disabled = false; }
 }
 
 async function createContentOpportunityTask(opportunityKey) {
@@ -2796,6 +2835,7 @@ $("#content-page-next").addEventListener("click", () => { state.contentAnalysisP
 $("#content-opportunity-list").addEventListener("click", (event) => { const scoredButton = event.target.closest("[data-opportunity-evaluation]"); if (scoredButton) { createScoredOpportunityTask(scoredButton.dataset.opportunityEvaluation); return; } const button = event.target.closest("[data-content-opportunity]"); if (button) createContentOpportunityTask(button.dataset.contentOpportunity); });
 $("#content-opportunity-list").addEventListener("submit", (event) => { const form = event.target.closest(".context-question-form"); if (!form) return; event.preventDefault(); const context = form.closest("[data-context-type]"); submitContextQuestion(form, context.dataset.contextType, context.dataset.contextId); });
 $("#evaluate-opportunities").addEventListener("click", evaluateScoredOpportunities);
+$("#evaluate-effects").addEventListener("click", evaluateEffects);
 $("#issue-context-question-form").addEventListener("submit", (event) => { event.preventDefault(); if (state.selectedIssueId) submitContextQuestion(event.currentTarget, "issue", state.selectedIssueId); });
 $("#content-settings-form").addEventListener("submit", saveContentSettings);
 $("#onboarding-form").addEventListener("submit", onboardClient);
