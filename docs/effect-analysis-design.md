@@ -163,6 +163,16 @@ Lokale uitwerking:
 - Start met GSC en de ingestelde primaire analyticsbron.
 - Implementeer maturiteit, dekking, overlapdetectie en conservatieve conclusies.
 
+Lokale uitwerking:
+
+- `effect_evaluations` bewaart immutable resultaten met inputhash en methodeversie.
+- Methode 1 vergelijkt twee gelijke perioden van 28 dagen, hanteert 42 dagen maturiteit en vereist
+  minimaal 14 dagen GSC-dekking per periode.
+- Overlappende URL's worden binnen het cohort gededupliceerd en als confidencefactor geteld.
+- GSC wordt gecombineerd met exact één ingestelde primaire analyticsbron: GA4 of Matomo.
+- Per bron worden periode-, dekkings- en vergelijkbaarheidsgegevens expliciet opgeslagen.
+- `development_visible` beschrijft alleen waargenomen samenhang; causaliteit wordt niet geclaimd.
+
 ### Fase C — interface en hercontrole
 
 - Voeg een periodekeuze, cohortoverzicht, KPI-ontwikkeling en bewijsdetail toe.

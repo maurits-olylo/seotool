@@ -461,3 +461,9 @@ Alleen uitgevoerde taken met een concrete URL-scope komen in aanmerking. De mate
 expliciet en idempotent. Dit voorkomt dat een nog aangevulde taakscope tijdens een statuswijziging
 te vroeg wordt bevroren. Effectberekening en presentatie volgen in afzonderlijke fasen en blijven
 correlatie van causale attributie onderscheiden.
+
+`effect_evaluations` bewaart de versieerbare cohortberekening. Methode 1 vergelijkt twee perioden
+van 28 dagen rond een volwassen interventiecohort, dedupliceert overlappende URL's en combineert GSC
+met precies één primaire analyticsbron. Inputhash, methode, perioden, dekking, confidencefactoren en
+bewijs maken iedere uitkomst reproduceerbaar. Een zichtbare ontwikkeling blijft expliciet een
+waargenomen samenhang en geen bewezen effect.
