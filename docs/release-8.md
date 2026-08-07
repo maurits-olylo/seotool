@@ -143,11 +143,33 @@ Implementatie en lokale acceptatie:
 
 ## Fase 5 — Interface en performance
 
+Status: lokaal geïmplementeerd en nog niet gedeployed.
+
 - Voeg compacte schermen toe voor Overzicht, Pagina's, Clusters, Doorstroom, Kansen en Instellingen.
 - Toon bronnen, periode, dekking, confidence en zwaarst wegend bewijs bij iedere conclusie.
 - Bundel de uitgestelde Matomo-koppelingsuitleg en de roadmapafspraken voor parallel laden,
   skeletons, paginering en meetbare endpointdoorlooptijden.
 - Behoud bruikbaarheid zonder horizontale overflow op 390 px.
+
+Implementatie en lokale acceptatie:
+
+- De bestaande Analyse-navigatie bevat één compact Contentscherm met interne tabbladen voor
+  Overzicht, Pagina's, Clusters, Doorstroom, Kansen en Instellingen. Hierdoor blijft de
+  hoofdnavigatie beperkt en consistent met de bestaande informatiearchitectuur.
+- Kansen, journeydata en instellingen laden parallel. De interface toont de afzonderlijk gemeten
+  endpointdoorlooptijd, analyseperiode, primaire analyticsbron, brondekking en ontbrekende data.
+- De paginalijst rendert maximaal 25 regels per pagina. Distributies, clusters en kansen gebruiken
+  compacte kaarten en bewijslabels; een kans kan expliciet naar de bestaande taakworkflow worden
+  gepromoveerd.
+- Websitegebonden branded termen en het optionele sectorsjabloon zijn vanuit Instellingen
+  bewerkbaar. Opslaan start bewust geen automatische classificatie of crawl.
+- Pagina-naar-paginatransities en microconversies worden niet gesuggereerd wanneer de bron ze niet
+  levert. Het Doorstroomscherm vermeldt die dekking expliciet naast de statistisch onderbouwde
+  landing-eindpunten.
+- De visuele controle slaagt op desktop en 390 px. Op 390 px is de documentbreedte exact gelijk aan
+  de viewport; alleen de tabstrip scrollt horizontaal binnen zijn eigen begrenzing.
+- JavaScript-syntaxcontrole, Ruff, 72 gerichte API-, interface-, classificatie-, kans-, journey- en
+  Matomo-tests slagen. Alembic houdt één lineaire head op `0054`; deze fase heeft geen migration.
 
 ## Fase 6 — Integrale acceptatie en deployment
 

@@ -91,7 +91,7 @@ def test_analysis_pages_share_consistent_states_and_labels(client: TestClient) -
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
     assert 'href="/ui/assets/analysis-consistency.css' in page.text
-    assert page.text.count('<span class="eyebrow">ANALYSE</span><h1>') == 4
+    assert page.text.count('<span class="eyebrow">ANALYSE</span><h1>') == 5
     assert 'class="issue-table"' in page.text
     for element_id in ["url-empty", "change-empty", "vacancy-empty"]:
         assert f'id="{element_id}" class="empty hidden" role="status"' in page.text
@@ -162,7 +162,7 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
 def test_operations_status_ignores_stale_website_responses(client: TestClient) -> None:
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
-    assert 'src="/ui/assets/app.js?v=20260805-4"' in page.text
+    assert 'src="/ui/assets/app.js?v=20260807-1"' in page.text
     assert 'href="/ui/assets/actionable.css?v=20260731-4"' in page.text
     assert 'id="recommendation-task-section"' in page.text
     assert 'id="recommendation-task-content"' in page.text
@@ -202,6 +202,28 @@ def test_operations_status_ignores_stale_website_responses(client: TestClient) -
     assert "function saveRecommendationFeedback" in script.text
     assert 'id="recommendation-feedback-form"' in script.text
     assert "Vrije opmerkingen worden nooit klantoverstijgend gebruikt" in script.text
+
+
+def test_content_analysis_interface_exposes_evidence_and_coverage(client: TestClient) -> None:
+    page = client.get("/ui/assets/index.html")
+    assert page.status_code == 200
+    assert 'id="content-analysis-nav"' in page.text
+    assert 'id="content-analysis-view"' in page.text
+    assert 'href="/ui/assets/content-analysis.css?v=20260807-1"' in page.text
+    for tab in ("overview", "pages", "clusters", "journey", "opportunities", "settings"):
+        assert f'data-content-tab="{tab}"' in page.text
+        assert f'id="content-tab-{tab}"' in page.text
+
+    script = client.get("/ui/assets/app.js")
+    assert script.status_code == 200
+    assert 'contentAnalysis: "analyse/content"' in script.text
+    assert "Promise.all([" in script.text
+    assert "function renderContentAnalysis" in script.text
+    assert "function loadContentAnalysis" in script.text
+    assert "opportunityResult.milliseconds" in script.text
+    assert "journeyResult.milliseconds" in script.text
+    assert "coverage.transitions" in script.text
+    assert "contentAnalysisPage" in script.text
 
 
 def test_settings_and_integrations_have_responsive_states(client: TestClient) -> None:

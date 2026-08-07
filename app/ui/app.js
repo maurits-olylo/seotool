@@ -24,10 +24,10 @@ const labels = {
   pause_requested: "Pauze wordt voorbereid", paused: "Gepauzeerd",
   cancel_requested: "Stop wordt voorbereid", connected: "Gekoppeld", error: "Fout",
 };
-const state = { currentUser: null, currentView: "dashboard", clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], changesRequestId: 0, jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, crawlRuns: [], showCrawlArchive: false, activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, operationsRequestId: 0, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], urlCoverage: null, filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, selectedRecommendationTask: null, recommendationFeedback: [], recommendationDefinitions: null, recommendationTasks: [], taskNotifications: [], taskMembers: [], googleConnectionId: null, bingConnectionId: null, matomoConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
-const VIEW_HASHES = {dashboard: "overzicht", tasks: "taken", actions: "analyse/acties", urls: "analyse/urls", changes: "analyse/wijzigingen", insights: "analyse/inzichten", vacancies: "analyse/vacatures", reports: "rapportages", operations: "crawls-exports", clients: "instellingen/klanten-websites", team: "instellingen/team-toegang", integrations: "instellingen/integraties"};
+const state = { currentUser: null, currentView: "dashboard", clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], changesRequestId: 0, jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, contentAnalysis: null, contentAnalysisDays: 28, contentAnalysisTab: "overview", contentAnalysisPage: 1, crawlRuns: [], showCrawlArchive: false, activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, operationsRequestId: 0, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], urlCoverage: null, filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, selectedRecommendationTask: null, recommendationFeedback: [], recommendationDefinitions: null, recommendationTasks: [], taskNotifications: [], taskMembers: [], googleConnectionId: null, bingConnectionId: null, matomoConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
+const VIEW_HASHES = {dashboard: "overzicht", tasks: "taken", actions: "analyse/acties", urls: "analyse/urls", changes: "analyse/wijzigingen", insights: "analyse/inzichten", contentAnalysis: "analyse/content", vacancies: "analyse/vacatures", reports: "rapportages", operations: "crawls-exports", clients: "instellingen/klanten-websites", team: "instellingen/team-toegang", integrations: "instellingen/integraties"};
 const LEGACY_HASHES = {rapportage: "reports", urls: "urls", wijzigingen: "changes", inzichten: "insights", vacatures: "vacancies", beheer: "operations", organisatie: "clients", integraties: "integrations", acties: "actions"};
-const ANALYSIS_VIEWS = new Set(["actions", "urls", "changes", "insights", "vacancies"]);
+const ANALYSIS_VIEWS = new Set(["actions", "urls", "changes", "insights", "contentAnalysis", "vacancies"]);
 const SETTINGS_VIEWS = new Set(["clients", "team", "integrations"]);
 const CLIENT_STORAGE_KEY = "seo-monitor-client-id";
 const WEBSITE_STORAGE_KEY = "seo-monitor-website-id";
@@ -787,6 +787,125 @@ async function loadConsultantInsights() {
   renderConsultantInsights();
 }
 
+function contentAnalysisDates() {
+  const end = new Date();
+  end.setDate(end.getDate() - 1);
+  const start = new Date(end);
+  start.setDate(start.getDate() - state.contentAnalysisDays + 1);
+  return {start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10)};
+}
+
+function distributionMarkup(distribution = {}) {
+  const entries = Object.entries(distribution).sort((a, b) => b[1] - a[1]);
+  const total = entries.reduce((sum, item) => sum + item[1], 0) || 1;
+  return entries.map(([name, count]) => `<div class="distribution-row"><span>${escapeHtml(name.replaceAll("_", " "))}</span><span class="distribution-track"><i style="width:${Math.round(count / total * 100)}%"></i></span><strong>${count}</strong></div>`).join("") || `<p class="insight-empty">Nog geen geclassificeerde pagina’s.</p>`;
+}
+
+function evidenceMarkup(evidence = {}) {
+  return Object.entries(evidence).slice(0, 5).map(([key, value]) => `<span class="evidence-chip">${escapeHtml(key.replaceAll("_", " "))}: ${escapeHtml(Array.isArray(value) ? value.join(", ") : String(value))}</span>`).join("");
+}
+
+function renderContentAnalysis() {
+  const data = state.contentAnalysis;
+  if (!data) return;
+  const opportunities = data.opportunities;
+  const journey = data.journey;
+  const pages = opportunities.pages || [];
+  const classified = opportunities.coverage?.classified_pages || 0;
+  const gscPages = opportunities.coverage?.pages_with_gsc || 0;
+  const deadEnds = journey.dead_end_opportunities || [];
+  $("#content-analysis-summary").innerHTML = [[classified,"Geclassificeerd"],[gscPages,"Met GSC-bewijs"],[(opportunities.opportunities || []).length,"Contentkansen"],[deadEnds.length,"Mogelijke eindpunten"]].map(([count,label]) => `<article class="card"><strong>${count}</strong><span>${label}</span></article>`).join("");
+  $("#content-intent-distribution").innerHTML = distributionMarkup(opportunities.website_distribution);
+  const stageTotals = Object.fromEntries(Object.entries(journey.stage_totals || {}).map(([stage, totals]) => [stage, totals.visits || 0]));
+  $("#content-journey-summary").innerHTML = distributionMarkup(stageTotals);
+
+  const pageSize = 25;
+  const pageCount = Math.max(1, Math.ceil(pages.length / pageSize));
+  state.contentAnalysisPage = Math.min(state.contentAnalysisPage, pageCount);
+  const pageRows = pages.slice((state.contentAnalysisPage - 1) * pageSize, state.contentAnalysisPage * pageSize);
+  $("#content-page-rows").innerHTML = pageRows.map((page) => {
+    const coverage = Object.entries(page.source_coverage || {}).filter((item) => item[1]).map(([name]) => `<span class="coverage-pill">${escapeHtml(name.replaceAll("_", " "))}</span>`).join("") || `<span class="coverage-pill">Onbekend</span>`;
+    return `<tr><td><a class="content-page-url" href="${escapeHtml(page.url)}" target="_blank" rel="noopener">${escapeHtml(page.url)}</a></td><td>${escapeHtml(page.search_intent)}</td><td>${escapeHtml(page.journey_stage)}</td><td>${escapeHtml(page.content_role)}</td><td><span class="confidence-value">${Math.round((page.confidence || 0) * 100)}%</span>${page.overridden ? `<span class="coverage-pill">Handmatig</span>` : ""}</td><td><span class="coverage-pills">${coverage}</span></td></tr>`;
+  }).join("");
+  $("#content-page-count").textContent = `${pages.length} pagina’s`;
+  $("#content-page-label").textContent = `Pagina ${state.contentAnalysisPage} van ${pageCount}`;
+  $("#content-page-previous").disabled = state.contentAnalysisPage === 1;
+  $("#content-page-next").disabled = state.contentAnalysisPage === pageCount;
+
+  $("#content-cluster-list").innerHTML = Object.entries(opportunities.cluster_distribution || {}).map(([cluster, values]) => `<article class="cluster-row"><div class="cluster-head"><h3>/${escapeHtml(cluster === "/" ? "" : cluster)}</h3><strong>${Object.values(values).reduce((sum, count) => sum + count, 0)} pagina’s</strong></div><div class="cluster-values">${Object.entries(values).map(([intent, count]) => `<span>${escapeHtml(intent)} · ${count}</span>`).join("")}</div></article>`).join("") || `<p class="content-loading">Nog geen clusters beschikbaar.</p>`;
+
+  $("#content-analytics-source").textContent = journey.primary_source ? `Primaire bron: ${journey.primary_source.toUpperCase()}` : "Geen primaire bron";
+  $("#content-dead-end-list").innerHTML = deadEnds.map((item) => `<article class="opportunity-row"><div class="opportunity-head"><h3>${escapeHtml(item.url)}</h3><strong>${Math.round(item.confidence * 100)}% betrouwbaar</strong></div><p>${escapeHtml(item.recommendation)}</p><div class="opportunity-evidence"><span class="evidence-chip">Doorklik ${Math.round(item.continuation_rate * 100)}%</span><span class="evidence-chip">Referentie ${Math.round(item.benchmark_rate * 100)}%</span><span class="evidence-chip">${item.entry_visits} instapsessies</span></div></article>`).join("") || `<p class="content-loading">Geen statistisch betrouwbare onbedoelde landing-eindpunten gevonden.</p>`;
+  const coverage = journey.coverage || {};
+  $("#content-route-coverage").textContent = `Dekking — landingsgedrag: ${coverage.landing_continuation || "unknown"}; paginatransities: ${coverage.transitions || "unknown"}; microconversies: ${coverage.micro_conversions || "unknown"}. ${journey.interpretation}`;
+
+  $("#content-opportunity-list").innerHTML = (opportunities.opportunities || []).map((item) => `<article class="opportunity-row"><div class="opportunity-head"><h3>${escapeHtml(item.title)}</h3><strong>${Math.round((item.confidence || 0) * 100)}%</strong></div><p>${escapeHtml(item.description)}</p><div class="opportunity-evidence">${evidenceMarkup(item.evidence)}</div><button type="button" class="detail-button opportunity-action" data-content-opportunity="${escapeHtml(item.key)}">Maak taak</button></article>`).join("") || `<p class="content-loading">Geen kansen met voldoende bewijs in deze periode.</p>`;
+  $("#content-branded-terms").value = (data.settings.branded_terms || []).join(", ");
+  $("#content-sector-template").value = data.settings.sector_template || "";
+}
+
+function showContentAnalysisTab(tab) {
+  state.contentAnalysisTab = tab;
+  $("#content-analysis-tabs").querySelectorAll("button").forEach((button) => { const active = button.dataset.contentTab === tab; button.classList.toggle("active", active); button.setAttribute("aria-pressed", String(active)); });
+  document.querySelectorAll("[data-content-panel]").forEach((panel) => panel.classList.toggle("hidden", panel.id !== `content-tab-${tab}`));
+}
+
+async function timedContentRequest(path) {
+  const started = performance.now();
+  const data = await api(path);
+  return {data, milliseconds: Math.round(performance.now() - started)};
+}
+
+async function loadContentAnalysis() {
+  const websiteId = $("#website-select").value;
+  if (!websiteId) return;
+  const {start, end} = contentAnalysisDates();
+  const query = `period_start=${start}&period_end=${end}`;
+  $("#content-analysis-context").textContent = "Classificaties, kansen en doorstroom worden parallel geladen…";
+  $("#content-analysis-summary").innerHTML = Array.from({length: 4}, () => `<article class="card content-skeleton"><strong>&nbsp;</strong><span>&nbsp;</span></article>`).join("");
+  document.querySelectorAll("[data-content-panel]").forEach((panel) => { if (!panel.classList.contains("hidden")) panel.setAttribute("aria-busy", "true"); });
+  try {
+    const [opportunityResult, journeyResult, settingsResult] = await Promise.all([
+      timedContentRequest(`/api/v1/websites/${websiteId}/content-analysis/opportunities?${query}`),
+      timedContentRequest(`/api/v1/websites/${websiteId}/content-analysis/journey?${query}`),
+      timedContentRequest(`/api/v1/websites/${websiteId}/content-analysis/settings`),
+    ]);
+    const opportunities = opportunityResult.data;
+    const journey = journeyResult.data;
+    const settings = settingsResult.data;
+    state.contentAnalysis = {opportunities, journey, settings};
+    $("#content-analysis-context").textContent = `${start} t/m ${end} · kansen ${opportunityResult.milliseconds} ms · doorstroom ${journeyResult.milliseconds} ms · instellingen ${settingsResult.milliseconds} ms · bronnen en ontbrekende dekking worden per onderdeel vermeld.`;
+    renderContentAnalysis();
+  } catch (error) {
+    $("#content-analysis-context").textContent = `Contentanalyse kon niet worden geladen: ${error.message}`;
+  } finally {
+    document.querySelectorAll("[data-content-panel]").forEach((panel) => panel.removeAttribute("aria-busy"));
+  }
+}
+
+async function createContentOpportunityTask(opportunityKey) {
+  const websiteId = $("#website-select").value;
+  const {start, end} = contentAnalysisDates();
+  const message = $("#content-opportunity-message");
+  message.textContent = "Taak wordt aangemaakt…";
+  try {
+    const result = await api(`/api/v1/websites/${websiteId}/content-analysis/opportunities/${opportunityKey}/task?period_start=${start}&period_end=${end}`, {method: "POST"});
+    message.textContent = result.created ? "Taak aangemaakt." : "Deze kans heeft al een actieve taak.";
+  } catch (error) { message.textContent = `Taak kon niet worden aangemaakt: ${error.message}`; }
+}
+
+async function saveContentSettings(event) {
+  event.preventDefault();
+  const websiteId = $("#website-select").value;
+  const message = $("#content-settings-message");
+  const brandedTerms = $("#content-branded-terms").value.split(",").map((item) => item.trim()).filter(Boolean);
+  try {
+    await api(`/api/v1/websites/${websiteId}/content-analysis/settings`, {method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify({website_id: websiteId, branded_terms: brandedTerms, sector_template: $("#content-sector-template").value.trim() || null})});
+    message.textContent = "Instellingen opgeslagen. Een nieuwe classificatie gebeurt alleen via een expliciete analyseactie.";
+    await loadContentAnalysis();
+  } catch (error) { message.textContent = `Opslaan mislukt: ${error.message}`; }
+}
+
 async function pollIntegrationHistory(websiteId) {
   const button = $("#sync-integration-history"); const message = $("#integration-history-message");
   const result = await api(`/api/v1/websites/${websiteId}/integrations/history-sync`);
@@ -813,8 +932,8 @@ async function pollIntegrationHistory(websiteId) {
 function showView(view, updateHash = true) {
   if (state.currentUser?.role === "client") view = "reports";
   state.currentView = view;
-  const visibleView = view === "reports" ? "actions" : ["clients", "team"].includes(view) ? "organization" : view;
-  for (const name of ["dashboard", "tasks", "actions", "insights", "urls", "changes", "vacancies", "operations", "organization", "integrations"]) {
+  const visibleView = view === "reports" ? "actions" : ["clients", "team"].includes(view) ? "organization" : view === "contentAnalysis" ? "content-analysis" : view;
+  for (const name of ["dashboard", "tasks", "actions", "insights", "content-analysis", "urls", "changes", "vacancies", "operations", "organization", "integrations"]) {
     $(`#${name}-view`).classList.toggle("hidden", name !== visibleView);
   }
   updateNavigation(view);
@@ -832,6 +951,7 @@ function showView(view, updateHash = true) {
       $(selector).innerHTML = `<p class="insight-empty">Inzichten konden niet worden geladen. Probeer het later opnieuw.</p>`;
     }
   });
+  if (view === "contentAnalysis") loadContentAnalysis();
   if (["clients", "team"].includes(view)) { applyOrganizationPresentation(view); loadOrganization(); }
   if (view === "urls") renderUrls();
   if (view === "changes") loadChanges().catch(() => renderTableState("#change-rows", 5, "Wijzigingen konden niet worden geladen. Probeer het later opnieuw.", true));
@@ -858,7 +978,10 @@ function updateNavigation(view) {
     $(`#${group}-subnav`).classList.toggle("hidden", !open);
     $(`#${group}-nav`).setAttribute("aria-expanded", String(open));
   }
-  for (const name of [...ANALYSIS_VIEWS, ...SETTINGS_VIEWS]) $(`#${name}-nav`).classList.toggle("subnav-active", name === view);
+  for (const name of [...ANALYSIS_VIEWS, ...SETTINGS_VIEWS]) {
+    const navName = name === "contentAnalysis" ? "content-analysis" : name;
+    $(`#${navName}-nav`).classList.toggle("subnav-active", name === view);
+  }
   $("#app").classList.remove("mobile-nav-open");
   $("#mobile-nav-toggle").setAttribute("aria-expanded", "false");
 }
@@ -2438,7 +2561,7 @@ $("#confirm-mfa").addEventListener("click", async () => {
 $("#profile-toggle").addEventListener("click", () => { const open = $("#profile-popover").classList.toggle("hidden") === false; $("#profile-toggle").setAttribute("aria-expanded", String(open)); });
 $("#mobile-nav-toggle").addEventListener("click", () => { const open = $("#app").classList.toggle("mobile-nav-open"); $("#mobile-nav-toggle").setAttribute("aria-expanded", String(open)); });
 $("#client-select").addEventListener("change", async () => { localStorage.setItem(CLIENT_STORAGE_KEY, $("#client-select").value); localStorage.removeItem(WEBSITE_STORAGE_KEY); state.crawlRuns = []; state.changesRequestId += 1; state.changes = []; state.changeGroups = []; await loadWebsites(); if (state.currentView === "integrations") await loadIntegrations(); if (state.currentView === "dashboard") await loadDashboard(); });
-$("#website-select").addEventListener("change", async () => { localStorage.setItem(WEBSITE_STORAGE_KEY, $("#website-select").value); state.selectedReportSnapshotId = null; state.consultantInsights = null; state.operationsRequestId += 1; state.changesRequestId += 1; state.operationsLoading = false; state.crawlRuns = []; state.showCrawlArchive = false; state.activeCrawlJob = null; state.exports = []; state.changes = []; state.changeGroups = []; if (state.currentView === "changes") renderTableState("#change-rows", 5, "Wijzigingen worden geladen…"); if (state.currentView === "operations") renderOperations(); if (state.currentView === "changes") await loadChanges(); await loadIssues(); if (state.currentView === "integrations") await loadIntegrations(); if (state.currentView === "insights") await loadConsultantInsights(); if (state.currentView === "urls") renderUrls(); if (state.currentView === "vacancies") await loadJobListings(); if (state.currentView === "operations") await loadOperations(); if (state.currentView === "dashboard") await loadDashboard(); });
+$("#website-select").addEventListener("change", async () => { localStorage.setItem(WEBSITE_STORAGE_KEY, $("#website-select").value); state.selectedReportSnapshotId = null; state.consultantInsights = null; state.contentAnalysis = null; state.contentAnalysisPage = 1; state.operationsRequestId += 1; state.changesRequestId += 1; state.operationsLoading = false; state.crawlRuns = []; state.showCrawlArchive = false; state.activeCrawlJob = null; state.exports = []; state.changes = []; state.changeGroups = []; if (state.currentView === "changes") renderTableState("#change-rows", 5, "Wijzigingen worden geladen…"); if (state.currentView === "operations") renderOperations(); if (state.currentView === "changes") await loadChanges(); await loadIssues(); if (state.currentView === "integrations") await loadIntegrations(); if (state.currentView === "insights") await loadConsultantInsights(); if (state.currentView === "contentAnalysis") await loadContentAnalysis(); if (state.currentView === "urls") renderUrls(); if (state.currentView === "vacancies") await loadJobListings(); if (state.currentView === "operations") await loadOperations(); if (state.currentView === "dashboard") await loadDashboard(); });
 for (const selector of ["#severity-filter", "#scope-filter", "#nature-filter", "#type-filter", "#impact-filter"]) $(selector).addEventListener("change", () => { state.page = 1; render(); });
 $("#status-filter").addEventListener("change", loadIssues);
 $("#search-filter").addEventListener("input", () => { state.page = 1; render(); });
@@ -2514,6 +2637,7 @@ $("#tasks-nav").addEventListener("click", () => showView("tasks"));
 $("#actions-nav").addEventListener("click", () => showView("actions"));
 $("#reports-nav").addEventListener("click", () => showView("reports"));
 $("#insights-nav").addEventListener("click", () => showView("insights"));
+$("#content-analysis-nav").addEventListener("click", () => showView("contentAnalysis"));
 $("#urls-nav").addEventListener("click", () => showView("urls"));
 $("#changes-nav").addEventListener("click", () => showView("changes"));
 $("#vacancies-nav").addEventListener("click", () => showView("vacancies"));
@@ -2540,6 +2664,12 @@ $("#dashboard-priorities").addEventListener("click", (event) => {
 });
 $("#integration-warning-action").addEventListener("click", () => showView("integrations"));
 $("#insight-period").addEventListener("change", async (event) => { state.insightDays = Number(event.target.value); await loadConsultantInsights(); });
+$("#content-analysis-period").addEventListener("change", async (event) => { state.contentAnalysisDays = Number(event.target.value); state.contentAnalysisPage = 1; await loadContentAnalysis(); });
+$("#content-analysis-tabs").addEventListener("click", (event) => { const button = event.target.closest("[data-content-tab]"); if (button) showContentAnalysisTab(button.dataset.contentTab); });
+$("#content-page-previous").addEventListener("click", () => { state.contentAnalysisPage -= 1; renderContentAnalysis(); });
+$("#content-page-next").addEventListener("click", () => { state.contentAnalysisPage += 1; renderContentAnalysis(); });
+$("#content-opportunity-list").addEventListener("click", (event) => { const button = event.target.closest("[data-content-opportunity]"); if (button) createContentOpportunityTask(button.dataset.contentOpportunity); });
+$("#content-settings-form").addEventListener("submit", saveContentSettings);
 $("#onboarding-form").addEventListener("submit", onboardClient);
 $("#website-form").addEventListener("submit", createWebsite);
 $("#invitation-form").addEventListener("submit", createInvitation);
