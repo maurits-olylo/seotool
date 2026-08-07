@@ -12,8 +12,12 @@ groei. Bestaande taak-, URL-, classificatie- en metriekhistorie blijft de bron.
 
 - Migration `0056` voegt immutable `effect_interventions` toe zonder bestaande data te kopiëren of
   te herschrijven.
-- Alleen een taak met status `implemented` of `closed`, een implementatiemoment en minimaal één URL
-  kan expliciet als interventie worden vastgelegd.
+- Een taak met een volledige controlescope start bij status `implemented` automatisch een gerichte
+  verificatie.
+- Een bevestigde oplossing sluit de taak, resolveert het primaire issue en legt de interventie
+  automatisch en idempotent vast.
+- Een niet opgeloste taak keert terug naar `in_progress`; alleen een onzekere uitkomst vraagt
+  menselijke beoordeling.
 - De registratie bevriest taakdefinitie, implementatiemoment, URL-rollen en de toen geldige
   effectieve contentclassificatie.
 - De actie is tenantgebonden en idempotent. Herhaald vastleggen maakt geen duplicaat en wijzigt het
@@ -32,10 +36,11 @@ groei. Bestaande taak-, URL-, classificatie- en metriekhistorie blijft de bron.
 
 ## API en interface
 
-- Een uitgevoerde taak bevat de expliciete actie `Maak meetbaar`.
+- De normale taakworkflow bevat geen aparte verificatie- of meetbaarheidsactie.
 - De bestaande Content-sectie bevat een afzonderlijke Effect-tab en gebruikt de bestaande
   periodekeuze als interventiecohort.
-- `Bereken effect` is een expliciete mutatie; gewoon laden schrijft niets en start geen achtergrondtaak.
+- De scheduler hercontroleert te vroege of onvoldoende onderbouwde evaluaties automatisch.
+- De Effect-tab is read-only; gewoon laden schrijft niets en start geen achtergrondtaak.
 - Het overzicht toont cohort, basis- en observatieperiode, KPI-verschillen, brondekking, URL-aantal,
   overlap, methodeversie en een expliciete niet-causale bewijsnotitie.
 - Eerdere evaluaties blijven zichtbaar en worden nooit bij hercontrole overschreven.
@@ -50,7 +55,7 @@ groei. Bestaande taak-, URL-, classificatie- en metriekhistorie blijft de bron.
   historische evaluatielisting en periodevalidatie.
 - Een taaktype zonder automatische verificatieregel blijft leesbaar en toont een niet-ondersteunde
   verificatiestatus in plaats van een serverfout.
-- UI-tests bevestigen de taakactie, Effect-tab, expliciete berekenroute en cacheversie.
+- UI-tests bevestigen de automatische taakroute, read-only Effect-tab en cacheversie.
 - Beide migrations zijn additief en herschrijven geen data. Een extra releaseback-up is daarom niet
   vereist; een gezonde bestaande herstelroute blijft wel een deploymentvoorwaarde.
 
@@ -60,9 +65,9 @@ Staging moet vóór productie aantonen:
 
 - API, PostgreSQL en Redis zijn gezond op migration-head `0057`;
 - PageSpeed en JavaScript-rendering blijven uitgeschakeld;
-- taakdetail toont `Maak meetbaar` alleen voor uitgevoerde of afgesloten taken;
-- een synthetische uitgevoerde taak met URL-scope wordt exact één interventie;
-- dezelfde actie opnieuw uitvoeren meldt hergebruik en maakt geen duplicaat;
+- een synthetische taak met volledige URL-scope start bij `implemented` automatisch één controle;
+- `resolved` sluit de taak, resolveert het issue en maakt exact één interventie;
+- `not_resolved` zet de taak terug naar `in_progress`;
 - Effect toont correcte lege, te-vroege en onvoldoende-data toestanden;
 - laden van Content of Effect start geen crawl, import, taak of berekening;
 - desktop en 390 px hebben geen documentoverflow of browserfouten.

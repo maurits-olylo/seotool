@@ -1005,21 +1005,6 @@ async function loadContentAnalysis() {
   }
 }
 
-async function evaluateEffects() {
-  const websiteId = $("#website-select").value;
-  const {start, end} = contentAnalysisDates();
-  const button = $("#evaluate-effects");
-  const message = $("#content-effect-message");
-  button.disabled = true; message.textContent = "Interventies en brondata worden vergeleken…";
-  try {
-    const result = await api(`/api/v1/websites/${websiteId}/effect-evaluations/evaluate?change_period_start=${start}&change_period_end=${end}`, {method: "POST"});
-    message.textContent = effectStatusLabels[result.status] || result.status;
-    await loadContentAnalysis();
-    showContentAnalysisTab("effects");
-  } catch (error) { message.textContent = `Effectberekening mislukt: ${error.message}`; }
-  finally { button.disabled = false; }
-}
-
 async function createContentOpportunityTask(opportunityKey) {
   const websiteId = $("#website-select").value;
   const {start, end} = contentAnalysisDates();
@@ -2390,7 +2375,7 @@ function renderRecommendationTask(issue, supported = true) {
     planned: ["Start de uitvoering", "Zet de taak op ‘In uitvoering’ wanneer iemand ermee begint."],
     in_progress: ["Rond het werk af", "Voer de stappen uit en meld de taak daarna als ‘Uitgevoerd’."],
     waiting_for_input: ["Lever de ontbrekende input", "Zet de taak terug op ‘Gepland’ of ‘In uitvoering’ zodra de blokkade is opgelost."],
-    implemented: ["Controleer het resultaat", "Start de automatische controle om te bevestigen dat het probleem is opgelost."],
+    implemented: ["Controle loopt automatisch", "SEO Monitor controleert de uitvoering en werkt de taak daarna zelf bij."],
     closed: ["Geen actie nodig", "Deze taak is afgesloten. Heropen haar alleen wanneer opnieuw werk nodig is."],
   }[task.status] || ["Bepaal de volgende stap", "Werk de taakstatus bij zodra de situatie verandert."]);
   const controls = canWrite
@@ -2403,9 +2388,6 @@ function renderRecommendationTask(issue, supported = true) {
   const feedbackForm = canWrite && ["implemented", "closed"].includes(task.status)
     ? `<form id="recommendation-feedback-form" class="task-feedback-form"><h4>Uitvoeringsfeedback</h4><p>Deze gegevens blijven klantgebonden. Vrije opmerkingen worden nooit klantoverstijgend gebruikt.</p><div class="task-feedback-fields"><label>Werkelijke tijd (minuten)<input id="feedback-actual-minutes" type="number" min="0" max="100000"></label><label>Moeilijkheid<select id="feedback-difficulty"><option value="">Niet ingevuld</option><option value="easy">Makkelijker dan verwacht</option><option value="expected">Zoals verwacht</option><option value="hard">Moeilijker dan verwacht</option><option value="blocked">Geblokkeerd</option></select></label><label>Instructie bruikbaar<select id="feedback-helpful"><option value="">Niet ingevuld</option><option value="true">Ja</option><option value="false">Nee</option></select></label><label>Eindbeoordeling<select id="feedback-assessment"><option value="completed">Voltooid</option><option value="partially_completed">Deels voltooid</option><option value="not_completed">Niet voltooid</option></select></label><label class="task-feedback-check"><input id="feedback-missing-input" type="checkbox"> Benodigde input ontbrak</label><label class="task-feedback-check"><input id="feedback-missing-dependency" type="checkbox"> Afhankelijkheid was onduidelijk</label><label class="task-feedback-notes">Toelichting<textarea id="feedback-notes" maxlength="2000" placeholder="Optioneel en alleen binnen deze klant zichtbaar"></textarea></label></div><button class="primary-button" type="submit">Feedback opslaan</button></form>`
     : "";
-  const effectRegistration = canWrite && ["implemented", "closed"].includes(task.status)
-    ? `<section class="task-panel"><div class="task-section-heading"><span>05</span><div><small>Effectmeting</small><h4>Leg deze uitvoering vast</h4></div></div><p>Bevries de huidige URL-scope als meetbare interventie. Deze registratie kan later niet worden gewijzigd.</p><button id="register-effect-intervention" class="detail-button" type="button" ${task.urls?.length ? "" : "disabled"}>Maak meetbaar</button></section>`
-    : "";
   const verification = renderTaskVerification(canWrite);
   const decision = task.required_input.length
     ? `<section class="task-decision"><span>Eerst beslissen</span><strong>${escapeHtml(task.required_input[0])}</strong><div><p><b>Ja:</b> geef de pagina een logische, crawlbare plek in de sitestructuur.</p><p><b>Nee:</b> voeg haar samen of redirect haar en werk daarna de sitemap bij.</p></div></section>`
@@ -2413,20 +2395,7 @@ function renderRecommendationTask(issue, supported = true) {
   const nextStepPanel = decision
     ? ""
     : `<section class="task-next-step" aria-label="Volgende stap"><span>Volgende stap</span><div><strong>${escapeHtml(nextStep[0])}</strong><p>${escapeHtml(nextStep[1])}</p></div></section>`;
-  content.innerHTML = `<article class="task-card"><header class="task-card-head"><div><span class="task-kicker">Aanbevolen uitvoering</span><h3>${escapeHtml(task.title)}</h3><div class="task-meta"><span>${escapeHtml(taskRoleLabels[task.primary_role] || task.primary_role)}</span><span>${escapeHtml(effort)}</span><span class="task-priority ${escapeHtml(task.priority)}">${escapeHtml(labels[task.priority] || task.priority)} prioriteit</span></div></div><span class="task-status status-${escapeHtml(task.status)}">${escapeHtml(taskStatusLabels[task.status] || task.status)}</span></header>${nextStepPanel}${decision}<div class="task-columns"><section class="task-panel"><div class="task-section-heading"><span>01</span><h4>Wat moet ik doen?</h4></div><ol>${task.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol></section><section class="task-panel task-criteria"><div class="task-section-heading"><span>02</span><h4>Wanneer is het klaar?</h4></div><ul>${task.acceptance_criteria.map((criterion) => `<li>${escapeHtml(criterion)}</li>`).join("")}</ul></section></div>${controls}${verification}${effectRegistration}${feedbackSummary}${feedbackForm}</article>`;
-}
-
-async function registerEffectIntervention() {
-  const task = state.selectedRecommendationTask;
-  const button = $("#register-effect-intervention");
-  const message = $("#recommendation-task-message");
-  if (!task || !button) return;
-  button.disabled = true; message.textContent = "Meetbare interventie wordt vastgelegd…";
-  try {
-    const result = await api(`/api/v1/recommendation-tasks/${task.id}/effect-intervention`, {method: "POST"});
-    message.textContent = result.created ? "Taak is als meetbare interventie vastgelegd." : "Deze taak was al als meetbare interventie vastgelegd.";
-    button.textContent = "Meetbaar vastgelegd";
-  } catch (error) { message.textContent = `Vastleggen mislukt: ${error.message}`; button.disabled = false; }
+  content.innerHTML = `<article class="task-card"><header class="task-card-head"><div><span class="task-kicker">Aanbevolen uitvoering</span><h3>${escapeHtml(task.title)}</h3><div class="task-meta"><span>${escapeHtml(taskRoleLabels[task.primary_role] || task.primary_role)}</span><span>${escapeHtml(effort)}</span><span class="task-priority ${escapeHtml(task.priority)}">${escapeHtml(labels[task.priority] || task.priority)} prioriteit</span></div></div><span class="task-status status-${escapeHtml(task.status)}">${escapeHtml(taskStatusLabels[task.status] || task.status)}</span></header>${nextStepPanel}${decision}<div class="task-columns"><section class="task-panel"><div class="task-section-heading"><span>01</span><h4>Wat moet ik doen?</h4></div><ol>${task.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol></section><section class="task-panel task-criteria"><div class="task-section-heading"><span>02</span><h4>Wanneer is het klaar?</h4></div><ul>${task.acceptance_criteria.map((criterion) => `<li>${escapeHtml(criterion)}</li>`).join("")}</ul></section></div>${controls}${verification}${feedbackSummary}${feedbackForm}</article>`;
 }
 
 function renderTaskVerification(canWrite) {
@@ -2480,8 +2449,9 @@ function renderTaskVerification(canWrite) {
   }[task.recommendation_type] || [];
   const allowedRoles = [...new Set([...plan.required_roles, ...((task.urls || []).map((item) => item.role)), ...optionalRoles])];
   const scopeEditor = `<details class="task-scope" ${plan.missing_roles.length ? "open" : ""}><summary>Technische controlegegevens${plan.missing_roles.length ? " aanvullen" : " bekijken"}</summary><p class="task-scope-summary">${plan.url_count} pagina${plan.url_count === 1 ? "" : "’s"} in deze controle</p><ul>${scopeRows || "<li>Geen URL’s vastgelegd.</li>"}</ul>${canWrite ? `<form id="task-scope-form"><label>Functie van de pagina<select id="task-scope-role">${allowedRoles.map((role) => `<option value="${escapeHtml(role)}">${escapeHtml(roleLabels[role] || role)}</option>`).join("")}</select></label><label class="task-scope-url">Pagina-URL<input id="task-scope-url" type="url" required placeholder="https://voorbeeld.nl/pagina"></label><button class="detail-button" type="submit">Pagina toevoegen</button></form>` : ""}</details>`;
-  const button = canWrite
-    ? `<button id="start-recommendation-verification" class="detail-button verification-button" type="button" ${plan.can_request && !verificationActive ? "" : "disabled"}>${verificationActive ? "Controle loopt" : latest ? "Opnieuw controleren" : "Resultaat controleren"}</button>`
+  const manualRetry = ["error", "manual_review"].includes(task.verification_status);
+  const button = canWrite && manualRetry
+    ? `<button id="start-recommendation-verification" class="detail-button verification-button" type="button" ${plan.can_request && !verificationActive ? "" : "disabled"}>Controle opnieuw proberen</button>`
     : "";
   return `<section class="task-panel task-verification"><div class="task-verification-head"><div class="task-section-heading"><span>04</span><div><small>Na de uitvoering</small><h4>Automatische controle</h4></div></div>${button}</div>${scope}${scopeEditor}${result}</section>`;
 }
@@ -2797,7 +2767,6 @@ $("#recommendation-task-content").addEventListener("click", (event) => {
   if (event.target.closest("#create-recommendation-task")) createRecommendationTask();
   if (event.target.closest("#save-recommendation-task")) saveRecommendationTask();
   if (event.target.closest("#start-recommendation-verification")) startRecommendationVerification();
-  if (event.target.closest("#register-effect-intervention")) registerEffectIntervention();
   const removeScope = event.target.closest("[data-task-url-id]");
   if (removeScope) removeTaskScope(removeScope.dataset.taskUrlId);
 });
@@ -2852,7 +2821,6 @@ $("#content-page-next").addEventListener("click", () => { state.contentAnalysisP
 $("#content-opportunity-list").addEventListener("click", (event) => { const scoredButton = event.target.closest("[data-opportunity-evaluation]"); if (scoredButton) { createScoredOpportunityTask(scoredButton.dataset.opportunityEvaluation); return; } const button = event.target.closest("[data-content-opportunity]"); if (button) createContentOpportunityTask(button.dataset.contentOpportunity); });
 $("#content-opportunity-list").addEventListener("submit", (event) => { const form = event.target.closest(".context-question-form"); if (!form) return; event.preventDefault(); const context = form.closest("[data-context-type]"); submitContextQuestion(form, context.dataset.contextType, context.dataset.contextId); });
 $("#evaluate-opportunities").addEventListener("click", evaluateScoredOpportunities);
-$("#evaluate-effects").addEventListener("click", evaluateEffects);
 $("#issue-context-question-form").addEventListener("submit", (event) => { event.preventDefault(); if (state.selectedIssueId) submitContextQuestion(event.currentTarget, "issue", state.selectedIssueId); });
 $("#content-settings-form").addEventListener("submit", saveContentSettings);
 $("#onboarding-form").addEventListener("submit", onboardClient);

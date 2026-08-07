@@ -284,7 +284,18 @@ def patch_recommendation_task(
     task = _task_or_404(db, task_id)
     require_website_write_access(db, principal, task.website_id)
     try:
-        return update_task(db, task=task, payload=payload, principal=principal)
+        if payload.status == "implemented":
+            plan = verification_scope_plan(db, task=task)
+            if plan["supported"] and plan["missing_roles"]:
+                raise RecommendationTaskError(str(plan["blocking_reason"]))
+        updated = update_task(db, task=task, payload=payload, principal=principal)
+        if payload.status == "implemented":
+            if plan["supported"]:
+                request_verification(db, task=updated, principal=principal)
+            else:
+                updated.verification_status = "manual_review"
+                db.commit()
+        return updated
     except RecommendationTaskError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 

@@ -15,6 +15,8 @@ METHOD_VERSION = "1"
 PERIOD_DAYS = 28
 MINIMUM_MATURITY_DAYS = 42
 MINIMUM_COVERAGE_DAYS = 14
+INSUFFICIENT_DATA_RETRY_DAYS = 7
+VISIBLE_EFFECT_REFRESH_DAYS = 28
 
 
 def evaluate_effect_cohort(
@@ -154,6 +156,51 @@ def evaluate_effect_cohort(
     db.add(evaluation)
     db.flush()
     return evaluation
+
+
+def refresh_due_effect_evaluations(db: Session, *, as_of: date | None = None) -> int:
+    """Refresh intervention cohorts only when a meaningful recheck is due."""
+    as_of = as_of or datetime.now(UTC).date()
+    refreshed = 0
+    interventions = list(
+        db.scalars(select(EffectIntervention).order_by(EffectIntervention.implemented_at))
+    )
+    for intervention in interventions:
+        change_date = intervention.implemented_at.date()
+        latest = db.scalar(
+            select(EffectEvaluation)
+            .where(
+                EffectEvaluation.website_id == intervention.website_id,
+                EffectEvaluation.change_period_start == change_date,
+                EffectEvaluation.change_period_end == change_date,
+            )
+            .order_by(EffectEvaluation.created_at.desc())
+            .limit(1)
+        )
+        if not _effect_recheck_due(latest, change_date, as_of):
+            continue
+        evaluate_effect_cohort(
+            db,
+            intervention.website_id,
+            change_date,
+            change_date,
+            as_of=as_of,
+        )
+        refreshed += 1
+    return refreshed
+
+
+def _effect_recheck_due(
+    latest: EffectEvaluation | None, change_date: date, as_of: date
+) -> bool:
+    if latest is None:
+        return True
+    created_date = latest.created_at.date()
+    if latest.status == "too_early":
+        return as_of >= change_date + timedelta(days=MINIMUM_MATURITY_DAYS)
+    if latest.status in {"insufficient_data", "not_comparable"}:
+        return as_of >= created_date + timedelta(days=INSUFFICIENT_DATA_RETRY_DAYS)
+    return as_of >= created_date + timedelta(days=VISIBLE_EFFECT_REFRESH_DAYS)
 
 
 def _gsc_totals(

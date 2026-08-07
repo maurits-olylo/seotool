@@ -9,7 +9,7 @@ from app.models.effects import EffectEvaluation, EffectIntervention
 from app.models.integrations import GoogleAnalyticsMetric, SearchConsoleMetric
 from app.models.recommendations import RecommendationTask
 from app.models.website import Website, WebsiteSettings
-from app.services.effect_analysis import evaluate_effect_cohort
+from app.services.effect_analysis import evaluate_effect_cohort, refresh_due_effect_evaluations
 
 
 def _task(website_id):  # type: ignore[no-untyped-def]
@@ -144,6 +144,41 @@ def test_effect_cohort_marks_recent_intervention_too_early() -> None:
 
         assert evaluation.status == "too_early"
         assert evaluation.confidence_factors["mature"] is False
+
+
+def test_effect_cohort_is_refreshed_automatically_after_maturity() -> None:
+    with SessionLocal() as db:
+        website = Website(
+            client=Client(name="Automatic effect client"),
+            name="Automatic effect site",
+            base_url="https://automatic-effect.example",
+            settings=WebsiteSettings(),
+        )
+        db.add(website)
+        db.flush()
+        task = _task(website.id)
+        db.add(task)
+        db.flush()
+        db.add(
+            EffectIntervention(
+                website_id=website.id,
+                task_id=task.id,
+                implemented_at=datetime(2026, 1, 1, tzinfo=UTC),
+                intervention_version="1",
+                input_hash="c" * 64,
+                task_snapshot={},
+                url_context=[],
+                source_coverage={},
+            )
+        )
+        db.flush()
+        evaluate_effect_cohort(
+            db, website.id, date(2026, 1, 1), date(2026, 1, 1), as_of=date(2026, 1, 10)
+        )
+
+        assert refresh_due_effect_evaluations(db, as_of=date(2026, 1, 20)) == 0
+        assert refresh_due_effect_evaluations(db, as_of=date(2026, 2, 12)) == 1
+        assert db.query(EffectEvaluation).count() == 2
 
 
 def test_effect_evaluation_api_calculates_lists_and_validates(client: TestClient) -> None:

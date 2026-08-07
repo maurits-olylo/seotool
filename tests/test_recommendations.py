@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
@@ -9,6 +10,7 @@ from app.db.session import SessionLocal
 from app.models.client import Client
 from app.models.crawl import CrawlRun, UrlSnapshot
 from app.models.discovery import CrawlJob, Url
+from app.models.effects import EffectEvaluation, EffectIntervention
 from app.models.issues import ActivityLog, Issue, IssueOccurrence
 from app.models.recommendations import (
     RecommendationFeedback,
@@ -284,15 +286,14 @@ def test_recommendation_task_api_lifecycle(client, monkeypatch) -> None:  # type
         json={"status": "in_progress"},
     )
     assert in_progress.status_code == 200
-    implemented = client.patch(
+    incomplete_implementation = client.patch(
         f"/api/v1/recommendation-tasks/{task_id}",
         json={"status": "implemented"},
     )
-    assert implemented.status_code == 200
-    assert implemented.json()["implemented_at"] is not None
+    assert incomplete_implementation.status_code == 422
     incomplete_plan = client.get(f"/api/v1/recommendation-tasks/{task_id}/verification-plan").json()
     assert incomplete_plan["can_request"] is False
-    assert "source" in incomplete_plan["blocking_reason"]
+    assert incomplete_plan["missing_roles"] == ["source"]
     invalid_role = client.post(
         f"/api/v1/recommendation-tasks/{task_id}/urls",
         json={"role": "target", "url": "https://example.com/source"},
@@ -317,7 +318,7 @@ def test_recommendation_task_api_lifecycle(client, monkeypatch) -> None:  # type
     )
     assert duplicate_scope.status_code == 422
     complete_plan = client.get(f"/api/v1/recommendation-tasks/{task_id}/verification-plan").json()
-    assert complete_plan["can_request"] is True
+    assert complete_plan["can_request"] is False
     assert complete_plan["missing_roles"] == []
     assert complete_plan["url_count"] == 2
     removed_scope = client.delete(
@@ -335,10 +336,17 @@ def test_recommendation_task_api_lifecycle(client, monkeypatch) -> None:  # type
         json={"role": "source", "url": "https://example.com/source"},
     )
     assert restored_scope.status_code == 201
-    requested = client.post(f"/api/v1/recommendation-tasks/{task_id}/verifications")
-    assert requested.status_code == 202
-    assert requested.json()["status"] == "queued"
-    assert queued == [requested.json()["id"]]
+    implemented = client.patch(
+        f"/api/v1/recommendation-tasks/{task_id}",
+        json={"status": "implemented"},
+    )
+    assert implemented.status_code == 200
+    assert implemented.json()["implemented_at"] is not None
+    requested = client.get(
+        f"/api/v1/recommendation-tasks/{task_id}/verifications"
+    ).json()[0]
+    assert requested["status"] == "queued"
+    assert queued == [requested["id"]]
     duplicate_verification = client.post(f"/api/v1/recommendation-tasks/{task_id}/verifications")
     assert duplicate_verification.status_code == 409
     feedback = client.post(
@@ -433,6 +441,7 @@ def test_targeted_broken_link_verification_only_fetches_selected_urls(
     with SessionLocal() as db:
         website, source, _issue, task = _task_fixture(db)
         task.status = "implemented"
+        task.implemented_at = datetime.now(UTC)
         target = Url(
             website_id=website.id,
             normalized_url="https://example.com/defect",
@@ -501,6 +510,10 @@ def test_targeted_broken_link_verification_only_fetches_selected_urls(
         notification = db.query(TaskNotification).one()
         assert notification.notification_type == "verification_finished"
         assert notification.verification_id == verification.id
+        assert db.get(RecommendationTask, task.id).status == "closed"
+        assert db.get(Issue, task.primary_issue_id).status == "resolved"
+        assert db.query(EffectIntervention).filter_by(task_id=task.id).count() == 1
+        assert db.query(EffectEvaluation).filter_by(website_id=website.id).count() == 1
 
     execute_verification(str(verification_id))
     assert fetched == ["https://example.com/source"]

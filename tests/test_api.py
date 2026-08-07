@@ -202,8 +202,8 @@ def test_operations_status_ignores_stale_website_responses(client: TestClient) -
     assert "function createRecommendationTask" in script.text
     assert "function saveRecommendationTask" in script.text
     assert "function saveRecommendationFeedback" in script.text
-    assert "function registerEffectIntervention" in script.text
-    assert "/effect-intervention" in script.text
+    assert "function registerEffectIntervention" not in script.text
+    assert "/effect-intervention" not in script.text
     assert 'id="recommendation-feedback-form"' in script.text
     assert "Vrije opmerkingen worden nooit klantoverstijgend gebruikt" in script.text
 
@@ -231,9 +231,10 @@ def test_content_analysis_interface_exposes_evidence_and_coverage(client: TestCl
     assert "journeyResult.milliseconds" in script.text
     assert "coverage.transitions" in script.text
     assert "contentAnalysisPage" in script.text
-    assert 'id="evaluate-effects"' in page.text
+    assert 'id="evaluate-effects"' not in page.text
+    assert "volgt afgeronde en gecontroleerde taken automatisch" in page.text
     assert "function renderEffectEvaluations" in script.text
-    assert "/effect-evaluations/evaluate" in script.text
+    assert "/effect-evaluations/evaluate" not in script.text
 
 
 def test_insights_interface_exposes_read_only_performance_questions(client: TestClient) -> None:

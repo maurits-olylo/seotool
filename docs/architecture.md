@@ -457,13 +457,19 @@ implementatiemoment, de taakdefinitie, URL-scope en de op dat moment geldige eff
 contentclassificatie. Crawlwijzigingen, issues, verificaties en dagmetrics blijven in hun bestaande
 historische tabellen en worden later als bronbewijs gekoppeld; ze worden niet gekopieerd.
 
-Alleen uitgevoerde taken met een concrete URL-scope komen in aanmerking. De materialisatie is
-expliciet en idempotent. Dit voorkomt dat een nog aangevulde taakscope tijdens een statuswijziging
-te vroeg wordt bevroren. Effectberekening en presentatie volgen in afzonderlijke fasen en blijven
-correlatie van causale attributie onderscheiden.
+Alleen uitgevoerde taken met een concrete URL-scope komen in aanmerking. Zodra een taak als
+uitgevoerd wordt gemeld, start automatisch een gerichte verificatie. Een opgeloste uitkomst sluit
+de taak, resolveert het primaire issue en materialiseert idempotent de interventie. Een niet
+opgeloste uitkomst zet de taak terug naar `in_progress`; een onzekere uitkomst vraagt menselijke
+input. Hierdoor wordt de scope pas na bevestiging bevroren, zonder een extra gebruikersactie.
 
 `effect_evaluations` bewaart de versieerbare cohortberekening. Methode 1 vergelijkt twee perioden
 van 28 dagen rond een volwassen interventiecohort, dedupliceert overlappende URL's en combineert GSC
 met precies één primaire analyticsbron. Inputhash, methode, perioden, dekking, confidencefactoren en
 bewijs maken iedere uitkomst reproduceerbaar. Een zichtbare ontwikkeling blijft expliciet een
 waargenomen samenhang en geen bewezen effect.
+
+De scheduler herberekent te vroege evaluaties zodra de maturiteit van 42 dagen is bereikt,
+probeert onvoldoende databrondekking wekelijks opnieuw en ververst zichtbare ontwikkelingen iedere
+28 dagen. De Effect-tab is daarom alleen een historisch overzicht; handmatig registreren of
+berekenen is geen onderdeel van de normale workflow.

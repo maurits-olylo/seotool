@@ -60,6 +60,7 @@ REVOKE ALL ON TABLE integration_connections, login_attempts, oauth_states, secur
   user_invitations, user_sessions, users FROM seo_scheduler;
 GRANT INSERT, UPDATE, DELETE ON TABLE crawl_jobs, monthly_report_snapshots, retention_operations,
   website_integrations TO seo_scheduler;
+GRANT INSERT ON TABLE effect_evaluations TO seo_scheduler;
 GRANT UPDATE (id) ON TABLE websites TO seo_scheduler;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO seo_scheduler;
 

@@ -26,6 +26,8 @@ from app.models.recommendations import (
     RecommendationVerification,
 )
 from app.models.website import Website
+from app.services.effect_analysis import evaluate_effect_cohort
+from app.services.effect_interventions import materialize_task_intervention
 from app.services.html_extraction import INVALID_JSON_LD_MARKER
 from app.services.http_crawler import CrawlError, fetch_url
 from app.services.recommendation_library import get_recommendation_definition
@@ -817,6 +819,38 @@ def _finish(
     task = db.get(RecommendationTask, verification.task_id)
     if task is not None:
         outcome = str(verification.result.get("outcome") or verification.status)
+        previous_status = task.status
+        if outcome == "resolved":
+            task.status = "closed"
+            task.close_reason = "verified"
+            task.closed_at = finished
+            intervention = materialize_task_intervention(db, task)
+            if intervention is not None:
+                evaluate_effect_cohort(
+                    db,
+                    task.website_id,
+                    intervention.implemented_at.date(),
+                    intervention.implemented_at.date(),
+                )
+            issue = db.get(Issue, task.primary_issue_id) if task.primary_issue_id else None
+            if issue is not None and issue.status not in {"ignored", "accepted_risk"}:
+                issue.status = "resolved"
+                issue.resolved_at = finished
+        elif outcome == "not_resolved":
+            task.status = "in_progress"
+            task.implemented_at = None
+        elif outcome in {"probably_resolved", "partially_resolved", "manual_review_required"}:
+            task.status = "waiting_for_input"
+        if task.status != previous_status:
+            db.add(
+                RecommendationTaskEvent(
+                    task_id=task.id,
+                    event_type="verification_status_applied",
+                    previous_status=previous_status,
+                    new_status=task.status,
+                    details={"verification_id": str(verification.id), "outcome": outcome},
+                )
+            )
         add_task_notification(
             db,
             task=task,

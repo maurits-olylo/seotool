@@ -22,6 +22,7 @@ from app.models.reporting import MonthlyReportSnapshot
 from app.models.system import RetentionOperation
 from app.models.website import Website, WebsiteSettings
 from app.services.crawl_deployment import crawl_deployment_is_active
+from app.services.effect_analysis import refresh_due_effect_evaluations
 
 logger = structlog.get_logger()
 ACTIVE_CRAWL_STATUSES = (
@@ -319,6 +320,13 @@ def schedule_pending_retention_operations() -> int:
     return len(queued)
 
 
+def schedule_effect_evaluations() -> int:
+    with SessionLocal() as db:
+        refreshed = refresh_due_effect_evaluations(db)
+        db.commit()
+        return refreshed
+
+
 def _json_ready(value: object) -> object:
     if isinstance(value, (date, datetime)):
         return value.isoformat()
@@ -338,6 +346,7 @@ def main() -> None:
             integration_count = schedule_integration_syncs()
             report_count = schedule_monthly_report_snapshots()
             retention_count = schedule_pending_retention_operations()
+            effect_count = schedule_effect_evaluations()
             logger.info(
                 "scheduler_cycle",
                 jobs_created=crawl_count,
@@ -345,6 +354,7 @@ def main() -> None:
                 integration_syncs_created=integration_count,
                 report_snapshots_created=report_count,
                 retention_operations_queued=retention_count,
+                effect_evaluations_refreshed=effect_count,
             )
         except Exception:
             logger.exception("scheduler_cycle_failed")
