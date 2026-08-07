@@ -783,8 +783,29 @@ async function loadConsultantInsights() {
   $("#search-insight-list").innerHTML = `<p class="insight-empty">Inzichten worden geladen…</p>`;
   $("#content-insight-list").innerHTML = `<p class="insight-empty">Contentvragen worden geladen…</p>`;
   $("#conversion-insight-list").innerHTML = `<p class="insight-empty">Inzichten worden geladen…</p>`;
+  $("#performance-context-answer").innerHTML = "";
   state.consultantInsights = await api(`/api/v1/websites/${websiteId}/consultant-insights?days=${state.insightDays}`);
   renderConsultantInsights();
+}
+
+async function submitPerformanceContextQuestion(event) {
+  event.preventDefault();
+  const websiteId = $("#website-select").value;
+  const form = event.currentTarget;
+  const answer = $("#performance-context-answer");
+  const button = form.querySelector("button");
+  const question = $("#performance-context-question").value.trim();
+  if (!websiteId || !question) return;
+  const periodEnd = new Date();
+  periodEnd.setDate(periodEnd.getDate() - 1);
+  const periodEndValue = `${periodEnd.getFullYear()}-${String(periodEnd.getMonth() + 1).padStart(2, "0")}-${String(periodEnd.getDate()).padStart(2, "0")}`;
+  button.disabled = true;
+  answer.innerHTML = `<p>Gelijkwaardige perioden en pagina-aandrijvers worden vergeleken…</p>`;
+  try {
+    const result = await api(`/api/v1/websites/${websiteId}/context-assistant/answer`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({question, context_type: "website_performance", context_id: websiteId, period_end: periodEndValue, days: state.insightDays})});
+    answer.innerHTML = contextAnswerMarkup(result);
+  } catch (error) { answer.innerHTML = `<p>Vergelijking kon niet worden geladen: ${escapeHtml(error.message)}</p>`; }
+  finally { button.disabled = false; }
 }
 
 function contentAnalysisDates() {
@@ -2743,6 +2764,7 @@ $("#dashboard-priorities").addEventListener("click", (event) => {
 });
 $("#integration-warning-action").addEventListener("click", () => showView("integrations"));
 $("#insight-period").addEventListener("change", async (event) => { state.insightDays = Number(event.target.value); await loadConsultantInsights(); });
+$("#performance-context-question-form").addEventListener("submit", submitPerformanceContextQuestion);
 $("#content-analysis-period").addEventListener("change", async (event) => { state.contentAnalysisDays = Number(event.target.value); state.contentAnalysisPage = 1; await loadContentAnalysis(); });
 $("#content-analysis-tabs").addEventListener("click", (event) => { const button = event.target.closest("[data-content-tab]"); if (button) showContentAnalysisTab(button.dataset.contentTab); });
 $("#content-page-previous").addEventListener("click", () => { state.contentAnalysisPage -= 1; renderContentAnalysis(); });

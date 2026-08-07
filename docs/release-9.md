@@ -226,3 +226,38 @@ Lokale acceptatie:
 - Ontbrekende einddatum levert validatiefout `422`; een afwijkend websitecontext-ID wordt geweigerd.
 - De bestaande Matomo-providerregressies, Ruff en de volledige testsuite met 474 tests slagen;
   Alembic blijft op head `0055` en deze fase vereist geen migration of extra releaseback-up.
+
+## Fase 7 — Leadvergelijking in het Inzichtenscherm
+
+Status: lokaal geïmplementeerd en nog niet gedeployed.
+
+- Het bestaande Inzichtenscherm bevat een contextgebonden vraagformulier voor organische
+  leadontwikkeling, zonder nieuwe navigatie of los chatvenster.
+- De geselecteerde website, gekozen periode van 28 of 90 dagen en gisteren als volledig afgesloten
+  einddatum vormen expliciet de aanvraagcontext.
+- Alleen een expliciete submit verstuurt de vraag. Het laden of verversen van Inzichten start geen
+  assistentaanvraag en veroorzaakt geen mutatie.
+- Het antwoord hergebruikt de bestaande gescheiden presentatie voor feiten, interpretatie,
+  ontbrekend bewijs en interne bronnen. Pagina-aandrijvers blijven tekstueel herleidbaar tot
+  verkeer en conversieratio.
+- Een website- of periodewissel wist het lokale antwoord, zodat een resultaat nooit zichtbaar
+  blijft onder een andere context.
+- De primaire analyticsbron blijft leidend; de interface suggereert niet dat GA4 en Matomo worden
+  gecombineerd of dat samenhang causaliteit bewijst.
+
+Acceptatie:
+
+- iedere aanvraag bevat website-ID, websiteperformancecontext, einddatum en gekozen dagenaantal;
+- alleen 28 of 90 dagen kunnen vanuit deze interface worden verstuurd;
+- servertekst wordt ge-escaped en fouten blijven lokaal bij het formulier;
+- website- en periodewissels verwijderen het vorige antwoord;
+- UI-, JavaScript-, API-, lint- en regressietests slagen zonder nieuwe migration.
+
+Lokale acceptatie:
+
+- De UI-regressie bevestigt formulier, antwoordgebied, websiteperformancecontext en doorgegeven
+  dagenaantal; de bestaande API- en tenanttests blijven groen.
+- De einddatum gebruikt de lokale kalenderdag en voorkomt daardoor een UTC-dagverschuiving rond
+  middernacht in de ingestelde tijdzone.
+- Ruff, JavaScript-syntaxcontrole en de volledige testsuite met 475 tests slagen; Alembic blijft op
+  head `0055` en deze fase vereist geen migration of extra releaseback-up.

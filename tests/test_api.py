@@ -220,8 +220,6 @@ def test_content_analysis_interface_exposes_evidence_and_coverage(client: TestCl
     for tab in ("overview", "pages", "clusters", "journey", "opportunities", "settings"):
         assert f'data-content-tab="{tab}"' in page.text
         assert f'id="content-tab-{tab}"' in page.text
-
-    script = client.get("/ui/assets/app.js")
     assert script.status_code == 200
     assert 'contentAnalysis: "analyse/content"' in script.text
     assert "Promise.all([" in script.text
@@ -231,6 +229,18 @@ def test_content_analysis_interface_exposes_evidence_and_coverage(client: TestCl
     assert "journeyResult.milliseconds" in script.text
     assert "coverage.transitions" in script.text
     assert "contentAnalysisPage" in script.text
+
+
+def test_insights_interface_exposes_read_only_performance_questions(client: TestClient) -> None:
+    page = client.get("/ui/assets/index.html")
+    assert page.status_code == 200
+    assert 'id="performance-context-question-form"' in page.text
+    assert 'id="performance-context-answer"' in page.text
+    script = client.get("/ui/assets/app.js")
+    assert script.status_code == 200
+    assert "function submitPerformanceContextQuestion" in script.text
+    assert 'context_type: "website_performance"' in script.text
+    assert "days: state.insightDays" in script.text
 
 
 def test_settings_and_integrations_have_responsive_states(client: TestClient) -> None:
