@@ -1,5 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
+from fastapi.testclient import TestClient
+
 from app.db.session import SessionLocal
 from app.models.client import Client
 from app.models.content_analysis import UrlContentClassification, UrlContentOverride
@@ -111,3 +113,30 @@ def test_rejects_unimplemented_or_unscoped_task() -> None:
     with SessionLocal() as db:
         _website, _url, implemented_task, _implemented_at = _task(db)
         assert materialize_task_intervention(db, implemented_task) is None
+
+
+def test_effect_intervention_registration_api_is_explicit_and_idempotent(
+    client: TestClient,
+) -> None:
+    with SessionLocal() as db:
+        _website, url, task, _implemented_at = _task(db)
+        db.add(RecommendationTaskUrl(task_id=task.id, url_id=url.id, role="changed"))
+        db.commit()
+        task_id = task.id
+
+    first = client.post(f"/api/v1/recommendation-tasks/{task_id}/effect-intervention")
+    second = client.post(f"/api/v1/recommendation-tasks/{task_id}/effect-intervention")
+
+    assert first.status_code == 200
+    assert first.json()["created"] is True
+    assert second.status_code == 200
+    assert second.json()["created"] is False
+    assert second.json()["id"] == first.json()["id"]
+
+    with SessionLocal() as db:
+        _website, _url, unscoped_task, _implemented_at = _task(db)
+        db.commit()
+        unscoped_task_id = unscoped_task.id
+
+    rejected = client.post(f"/api/v1/recommendation-tasks/{unscoped_task_id}/effect-intervention")
+    assert rejected.status_code == 422

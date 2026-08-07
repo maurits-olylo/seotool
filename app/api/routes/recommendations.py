@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.discovery import Url
+from app.models.effects import EffectIntervention
 from app.models.issues import Issue
 from app.models.recommendations import (
     RecommendationFeedback,
@@ -18,6 +19,7 @@ from app.models.recommendations import (
     TaskNotification,
     TaskNotificationReceipt,
 )
+from app.schemas.effects import EffectInterventionRegistrationRead
 from app.schemas.recommendations import (
     RecommendationDefinitionRead,
     RecommendationFeedbackCreate,
@@ -32,6 +34,7 @@ from app.schemas.recommendations import (
     TaskNotificationRead,
 )
 from app.services.authorization import require_website_access, require_website_write_access
+from app.services.effect_interventions import materialize_task_intervention
 from app.services.recommendation_library import DEFINITIONS
 from app.services.recommendation_tasks import (
     RecommendationTaskError,
@@ -284,6 +287,28 @@ def patch_recommendation_task(
         return update_task(db, task=task, payload=payload, principal=principal)
     except RecommendationTaskError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post(
+    "/recommendation-tasks/{task_id}/effect-intervention",
+    response_model=EffectInterventionRegistrationRead,
+)
+def register_effect_intervention(
+    task_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, object]:
+    task = _task_or_404(db, task_id)
+    require_website_write_access(db, principal, task.website_id)
+    existing = db.scalar(select(EffectIntervention).where(EffectIntervention.task_id == task.id))
+    intervention = materialize_task_intervention(db, task)
+    if intervention is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Alleen een uitgevoerde taak met ten minste één URL kan meetbaar worden gemaakt",
+        )
+    db.commit()
+    return {"id": intervention.id, "task_id": task.id, "created": existing is None}
 
 
 @router.get(

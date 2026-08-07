@@ -187,6 +187,8 @@ Lokale uitwerking:
 - Het overzicht toont status, basis- en observatieperiode, KPI-verschillen, brondekking, URL-aantal,
   overlap, methodeversie en de niet-causale bewijsnotitie.
 - De tenantgebonden API ondersteunt uitsluitend expliciet berekenen en historische resultaten lezen.
+- Een uitgevoerde taak kan vanuit het taakdetail expliciet en idempotent als immutable interventie
+  worden vastgelegd; zonder URL-scope wordt dit geweigerd.
 - Geplande automatische hercontrole blijft buiten deze fase; de immutable opslag ondersteunt dit
   later zonder bestaande uitkomsten te overschrijven.
 

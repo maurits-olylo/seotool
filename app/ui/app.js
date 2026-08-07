@@ -2403,6 +2403,9 @@ function renderRecommendationTask(issue, supported = true) {
   const feedbackForm = canWrite && ["implemented", "closed"].includes(task.status)
     ? `<form id="recommendation-feedback-form" class="task-feedback-form"><h4>Uitvoeringsfeedback</h4><p>Deze gegevens blijven klantgebonden. Vrije opmerkingen worden nooit klantoverstijgend gebruikt.</p><div class="task-feedback-fields"><label>Werkelijke tijd (minuten)<input id="feedback-actual-minutes" type="number" min="0" max="100000"></label><label>Moeilijkheid<select id="feedback-difficulty"><option value="">Niet ingevuld</option><option value="easy">Makkelijker dan verwacht</option><option value="expected">Zoals verwacht</option><option value="hard">Moeilijker dan verwacht</option><option value="blocked">Geblokkeerd</option></select></label><label>Instructie bruikbaar<select id="feedback-helpful"><option value="">Niet ingevuld</option><option value="true">Ja</option><option value="false">Nee</option></select></label><label>Eindbeoordeling<select id="feedback-assessment"><option value="completed">Voltooid</option><option value="partially_completed">Deels voltooid</option><option value="not_completed">Niet voltooid</option></select></label><label class="task-feedback-check"><input id="feedback-missing-input" type="checkbox"> Benodigde input ontbrak</label><label class="task-feedback-check"><input id="feedback-missing-dependency" type="checkbox"> Afhankelijkheid was onduidelijk</label><label class="task-feedback-notes">Toelichting<textarea id="feedback-notes" maxlength="2000" placeholder="Optioneel en alleen binnen deze klant zichtbaar"></textarea></label></div><button class="primary-button" type="submit">Feedback opslaan</button></form>`
     : "";
+  const effectRegistration = canWrite && ["implemented", "closed"].includes(task.status)
+    ? `<section class="task-panel"><div class="task-section-heading"><span>05</span><div><small>Effectmeting</small><h4>Leg deze uitvoering vast</h4></div></div><p>Bevries de huidige URL-scope als meetbare interventie. Deze registratie kan later niet worden gewijzigd.</p><button id="register-effect-intervention" class="detail-button" type="button" ${task.urls?.length ? "" : "disabled"}>Maak meetbaar</button></section>`
+    : "";
   const verification = renderTaskVerification(canWrite);
   const decision = task.required_input.length
     ? `<section class="task-decision"><span>Eerst beslissen</span><strong>${escapeHtml(task.required_input[0])}</strong><div><p><b>Ja:</b> geef de pagina een logische, crawlbare plek in de sitestructuur.</p><p><b>Nee:</b> voeg haar samen of redirect haar en werk daarna de sitemap bij.</p></div></section>`
@@ -2410,7 +2413,20 @@ function renderRecommendationTask(issue, supported = true) {
   const nextStepPanel = decision
     ? ""
     : `<section class="task-next-step" aria-label="Volgende stap"><span>Volgende stap</span><div><strong>${escapeHtml(nextStep[0])}</strong><p>${escapeHtml(nextStep[1])}</p></div></section>`;
-  content.innerHTML = `<article class="task-card"><header class="task-card-head"><div><span class="task-kicker">Aanbevolen uitvoering</span><h3>${escapeHtml(task.title)}</h3><div class="task-meta"><span>${escapeHtml(taskRoleLabels[task.primary_role] || task.primary_role)}</span><span>${escapeHtml(effort)}</span><span class="task-priority ${escapeHtml(task.priority)}">${escapeHtml(labels[task.priority] || task.priority)} prioriteit</span></div></div><span class="task-status status-${escapeHtml(task.status)}">${escapeHtml(taskStatusLabels[task.status] || task.status)}</span></header>${nextStepPanel}${decision}<div class="task-columns"><section class="task-panel"><div class="task-section-heading"><span>01</span><h4>Wat moet ik doen?</h4></div><ol>${task.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol></section><section class="task-panel task-criteria"><div class="task-section-heading"><span>02</span><h4>Wanneer is het klaar?</h4></div><ul>${task.acceptance_criteria.map((criterion) => `<li>${escapeHtml(criterion)}</li>`).join("")}</ul></section></div>${controls}${verification}${feedbackSummary}${feedbackForm}</article>`;
+  content.innerHTML = `<article class="task-card"><header class="task-card-head"><div><span class="task-kicker">Aanbevolen uitvoering</span><h3>${escapeHtml(task.title)}</h3><div class="task-meta"><span>${escapeHtml(taskRoleLabels[task.primary_role] || task.primary_role)}</span><span>${escapeHtml(effort)}</span><span class="task-priority ${escapeHtml(task.priority)}">${escapeHtml(labels[task.priority] || task.priority)} prioriteit</span></div></div><span class="task-status status-${escapeHtml(task.status)}">${escapeHtml(taskStatusLabels[task.status] || task.status)}</span></header>${nextStepPanel}${decision}<div class="task-columns"><section class="task-panel"><div class="task-section-heading"><span>01</span><h4>Wat moet ik doen?</h4></div><ol>${task.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol></section><section class="task-panel task-criteria"><div class="task-section-heading"><span>02</span><h4>Wanneer is het klaar?</h4></div><ul>${task.acceptance_criteria.map((criterion) => `<li>${escapeHtml(criterion)}</li>`).join("")}</ul></section></div>${controls}${verification}${effectRegistration}${feedbackSummary}${feedbackForm}</article>`;
+}
+
+async function registerEffectIntervention() {
+  const task = state.selectedRecommendationTask;
+  const button = $("#register-effect-intervention");
+  const message = $("#recommendation-task-message");
+  if (!task || !button) return;
+  button.disabled = true; message.textContent = "Meetbare interventie wordt vastgelegd…";
+  try {
+    const result = await api(`/api/v1/recommendation-tasks/${task.id}/effect-intervention`, {method: "POST"});
+    message.textContent = result.created ? "Taak is als meetbare interventie vastgelegd." : "Deze taak was al als meetbare interventie vastgelegd.";
+    button.textContent = "Meetbaar vastgelegd";
+  } catch (error) { message.textContent = `Vastleggen mislukt: ${error.message}`; button.disabled = false; }
 }
 
 function renderTaskVerification(canWrite) {
@@ -2781,6 +2797,7 @@ $("#recommendation-task-content").addEventListener("click", (event) => {
   if (event.target.closest("#create-recommendation-task")) createRecommendationTask();
   if (event.target.closest("#save-recommendation-task")) saveRecommendationTask();
   if (event.target.closest("#start-recommendation-verification")) startRecommendationVerification();
+  if (event.target.closest("#register-effect-intervention")) registerEffectIntervention();
   const removeScope = event.target.closest("[data-task-url-id]");
   if (removeScope) removeTaskScope(removeScope.dataset.taskUrlId);
 });

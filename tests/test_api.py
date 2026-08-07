@@ -202,6 +202,8 @@ def test_operations_status_ignores_stale_website_responses(client: TestClient) -
     assert "function createRecommendationTask" in script.text
     assert "function saveRecommendationTask" in script.text
     assert "function saveRecommendationFeedback" in script.text
+    assert "function registerEffectIntervention" in script.text
+    assert "/effect-intervention" in script.text
     assert 'id="recommendation-feedback-form"' in script.text
     assert "Vrije opmerkingen worden nooit klantoverstijgend gebruikt" in script.text
 
