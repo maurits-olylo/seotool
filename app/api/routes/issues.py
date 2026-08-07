@@ -29,6 +29,7 @@ from app.schemas.issues import (
     IssueBulkAction,
     IssueBulkResult,
     IssueDetailRead,
+    IssueInspectionRead,
     IssueRead,
     IssueSuppressionRead,
     IssueUpdate,
@@ -39,6 +40,7 @@ from app.services.element_jumps import build_live_jump_url
 from app.services.internal_redirect_analysis import INTERNAL_REDIRECT_PATTERN_TYPE
 from app.services.issue_classification import issue_nature, issue_scope
 from app.services.issue_guidance import build_issue_guidance
+from app.services.issue_inspection import build_issue_inspection
 from app.services.pagination_analysis import PAGINATION_CHILD_ISSUE_TYPES
 from app.services.server_error_analysis import SERVER_ERROR_INCIDENT_TYPE
 from app.services.sitemap_redirect_analysis import SITEMAP_REDIRECT_PATTERN_TYPE
@@ -803,6 +805,30 @@ def get_issue(
         "elements": _issue_elements(db, issue, occurrence),
         "guidance": build_issue_guidance(issue, occurrence.evidence if occurrence else {}),
     }
+
+
+@router.get("/issues/{issue_id}/inspection", response_model=IssueInspectionRead)
+def get_issue_inspection(
+    issue_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, object]:
+    issue = db.get(Issue, issue_id)
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+    require_website_access(db, principal, issue.website_id)
+    occurrence = db.scalar(
+        select(IssueOccurrence)
+        .where(IssueOccurrence.issue_id == issue.id)
+        .order_by(IssueOccurrence.detected_at.desc())
+        .limit(1)
+    )
+    return build_issue_inspection(
+        db,
+        issue=issue,
+        occurrence=occurrence,
+        element_payloads=_issue_elements(db, issue, occurrence),
+    )
 
 
 def _issue_elements(

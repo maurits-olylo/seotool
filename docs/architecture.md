@@ -334,6 +334,12 @@ zichtbare tekst, doel, element-ID, selector, XPath, fragment, volgnummer en omli
 Issue-types worden aan dezelfde locatie gekoppeld zodra de crawler het bijbehorende signaal kan
 vaststellen. De live jump gebruikt alleen een bestaand ID, unieke zichtbare tekst of aantoonbaar
 unieke tekstcontext; ontbrekende elementen krijgen geen kunstmatige locatie.
+
+De issue-inspectie-API legt bovenop deze records een uniform, read-only contract. Zij groepeert
+locaties per historische snapshot, vermeldt meetmoment, crawlrun, renderstatus en de best beschikbare
+locator en onderscheidt exact gelokaliseerde van ontbrekende elementen. Een ontbrekend element
+krijgt uitsluitend een semantisch `missing`-target en nooit een verzonnen selector. Screenshot- of
+live renderbewijs wordt pas toegevoegd wanneer dat werkelijk als afzonderlijk artefact bestaat.
 Afbeeldingen en documenten krijgen een lichte HEAD-controle. Grote afbeeldingen (meer dan 2 MB) en
 documenten (meer dan 5 MB) leveren afzonderlijke issues op zonder de volledige bestanden te downloaden.
 

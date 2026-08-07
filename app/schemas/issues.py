@@ -112,6 +112,46 @@ class IssueDetailRead(IssueRead):
     guidance: IssueGuidanceRead
 
 
+class InspectionLocatorRead(BaseModel):
+    strategy: Literal["id", "css", "xpath", "text"]
+    value: str
+    reliable: bool
+
+
+class InspectionTargetRead(BaseModel):
+    kind: Literal["located", "missing"]
+    element_type: str
+    label: str
+    location_id: UUID | None
+    target_url: str | None
+    visible_text: str | None
+    html_fragment: str | None
+    locator: InspectionLocatorRead | None
+    jump_url: str | None = None
+
+
+class InspectionPageRead(BaseModel):
+    url_id: UUID
+    source_url: str
+    snapshot_id: UUID
+    crawl_run_id: UUID
+    captured_at: datetime
+    is_current_occurrence: bool
+    render_status: str
+    rendered_at: datetime | None
+    targets: list[InspectionTargetRead]
+
+
+class IssueInspectionRead(BaseModel):
+    issue_id: UUID
+    website_id: UUID
+    mode: Literal["historical"]
+    availability: Literal["available", "limited", "unavailable"]
+    reason: Literal["exact_location", "element_absent", "no_element_evidence"]
+    pages: list[InspectionPageRead]
+    live_recheck_available: bool
+
+
 class IssueUpdate(BaseModel):
     status: IssueStatus | None = None
     assigned_to: str | None = None

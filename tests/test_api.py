@@ -1441,6 +1441,84 @@ def test_issue_detail_returns_live_element_location(client: TestClient) -> None:
     assert len(payload["elements"]) == 1
     assert payload["elements"][0]["source_url"] == "https://example.com/article"
     assert payload["elements"][0]["jump_url"] == "https://example.com/article#oude-link"
+    inspection = client.get(f"/api/v1/issues/{issue_id}/inspection")
+    assert inspection.status_code == 200
+    assert inspection.json()["availability"] == "available"
+    assert inspection.json()["reason"] == "exact_location"
+    assert inspection.json()["mode"] == "historical"
+    assert inspection.json()["live_recheck_available"] is False
+    page = inspection.json()["pages"][0]
+    assert page["source_url"] == "https://example.com/article"
+    assert page["is_current_occurrence"] is True
+    assert page["render_status"] == "not_rendered"
+    assert page["targets"][0]["kind"] == "located"
+    assert page["targets"][0]["locator"] == {
+        "strategy": "id",
+        "value": "oude-link",
+        "reliable": True,
+    }
+
+
+def test_issue_inspection_represents_missing_element_without_fake_locator(
+    client: TestClient,
+) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Missing inspection"}).json()
+    website = client.post(
+        "/api/v1/websites",
+        json={
+            "client_id": customer["id"],
+            "name": "Missing element site",
+            "base_url": "https://missing.example",
+        },
+    ).json()
+    website_id = UUID(website["id"])
+    with SessionLocal() as db:
+        url = Url(website_id=website_id, normalized_url="https://missing.example/page")
+        job = CrawlJob(website_id=website_id, job_type="full_site_crawl")
+        db.add_all([url, job])
+        db.flush()
+        run = CrawlRun(crawl_job_id=job.id, website_id=website_id, crawl_type="full_site_crawl")
+        db.add(run)
+        db.flush()
+        snapshot = UrlSnapshot(
+            url_id=url.id,
+            crawl_run_id=run.id,
+            requested_url=url.normalized_url,
+            final_url=url.normalized_url,
+            status_code=200,
+            redirect_chain=[],
+        )
+        issue = Issue(
+            website_id=website_id,
+            url_id=url.id,
+            issue_type="missing_h1",
+            category="onpage",
+            severity="medium",
+            title="H1 ontbreekt",
+            description="Geen H1 gevonden.",
+            recommended_action="Voeg een H1 toe.",
+        )
+        db.add_all([snapshot, issue])
+        db.flush()
+        db.add(
+            IssueOccurrence(
+                issue_id=issue.id,
+                crawl_run_id=run.id,
+                snapshot_id=snapshot.id,
+                evidence={"h1_count": 0},
+            )
+        )
+        db.commit()
+        issue_id = issue.id
+
+    payload = client.get(f"/api/v1/issues/{issue_id}/inspection").json()
+    assert payload["availability"] == "limited"
+    assert payload["reason"] == "element_absent"
+    target = payload["pages"][0]["targets"][0]
+    assert target["kind"] == "missing"
+    assert target["element_type"] == "h1"
+    assert target["location_id"] is None
+    assert target["locator"] is None
 
 
 def test_grouped_broken_links_use_latest_matching_element_evidence(client: TestClient) -> None:
