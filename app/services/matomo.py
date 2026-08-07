@@ -305,13 +305,24 @@ async def sync_matomo(
             "visits": int(_number(row, "nb_visits")),
             "pageviews": int(_number(row, "nb_hits")),
             "unique_pageviews": int(_number(row, "nb_uniq_pageviews")),
+            "entry_visits": int(_number(row, "entry_nb_visits")),
+            "bounces": int(_number(row, "bounce_count")),
+            "exits": int(_number(row, "exit_nb_visits")),
             "conversions": _number(row, "nb_conversions"),
         }
         _merge_metric_row(
             page_rows_by_key,
             (website_id, metric_date, page_url),
             metric_row,
-            ("visits", "pageviews", "unique_pageviews", "conversions"),
+            (
+                "visits",
+                "pageviews",
+                "unique_pageviews",
+                "entry_visits",
+                "bounces",
+                "exits",
+                "conversions",
+            ),
         )
     page_rows = list(page_rows_by_key.values())
     matched = sum(row["url_id"] is not None for row in page_rows)
@@ -369,7 +380,8 @@ async def sync_matomo(
                 if _dated_rows(goals)
                 else "unknown"
             ),
-            "transitions": "unknown",
+            "transitions": "not_imported",
+            "landing_continuation": "available",
             "downloads": "unknown",
             "outbound_links": "unknown",
             "internal_search": "not_imported",

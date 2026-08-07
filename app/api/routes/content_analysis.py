@@ -14,6 +14,7 @@ from app.schemas.content_analysis import (
     ContentOverrideRead,
     ContentOverrideWrite,
 )
+from app.services.analytics_journey import build_analytics_journey
 from app.services.authorization import require_website_access, require_website_write_access
 from app.services.content_analysis import analyze_website_content
 from app.services.content_opportunities import (
@@ -58,6 +59,20 @@ def content_opportunities(
     if period_start > period_end:
         raise HTTPException(status_code=422, detail="Start date must not be after end date")
     return build_content_opportunities(db, website_id, period_start, period_end)
+
+
+@router.get("/journey")
+def analytics_journey(
+    website_id: UUID,
+    period_start: date,
+    period_end: date,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, object]:
+    require_website_access(db, principal, website_id)
+    if period_start > period_end:
+        raise HTTPException(status_code=422, detail="Start date must not be after end date")
+    return build_analytics_journey(db, website_id, period_start, period_end)
 
 
 @router.post("/opportunities/{opportunity_key}/task", status_code=201)

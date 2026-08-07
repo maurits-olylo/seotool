@@ -112,10 +112,34 @@ Implementatie en lokale acceptatie:
 
 ## Fase 4 — Klantreis en primaire analyticsbron
 
+Status: lokaal geïmplementeerd en nog niet gedeployed.
+
 - Voeg landingsgedrag, beschikbare vervolgstappen, microconversies en primaire conversies toe.
 - Presenteer routes als geobserveerde samenhang en claim geen causale attributie.
 - Toon ontbrekende transition- of eventdekking als onbekend.
 - Respecteer uitsluitend de expliciet gekozen primaire analyticsbron.
+
+Implementatie en lokale acceptatie:
+
+- De beveiligde journey-API gebruikt uitsluitend de gekozen primaire analyticsbron en telt GA4 en
+  Matomo nooit bij elkaar op. Gelockte classificatie-overrides bepalen de effectieve klantreisfase
+  en contentrol.
+- Matomo importeert naast paginaweergaven en conversies ook instapsessies, bounces en exits.
+  Migration `0054` voegt deze drie additieve velden zonder dataherschrijving toe.
+- Een mogelijk onbedoeld landing-eindpunt vereist minimaal 25 instapsessies, vijf vergelijkbare
+  pagina's met samen minimaal 200 instapsessies, minstens tien procentpunt praktisch verschil en
+  een eenzijdige exacte binomiale toets met minimaal 90% betrouwbaarheid.
+- Een Benjamini-Hochberg-correctie begrenst de false-discovery-rate op 10% wanneer meerdere
+  pagina's tegelijk worden getest. Pagina's met conversies, onvoldoende classificatie of een
+  logische navigatierol leveren geen signaal op.
+- De aanbeveling vraagt eerst te controleren of de pagina bewust een eindpunt is en stelt pas
+  daarna interne links of een CTA voor. Het signaal wordt niet als causaal defect gepresenteerd.
+- Echte pagina-naar-paginatransities worden niet uit bouncegegevens afgeleid. Matomo-transities
+  blijven expliciet `not_imported`; GA4-transities blijven `unknown`. BigQuery is voor het huidige
+  productdoel bewust niet toegevoegd.
+- Negentien cumulatieve Release 8-tests slagen, inclusief bronselectie, classificatie-overrides,
+  statistische drempels, Matomo-import en ruisfilters. Ruff is schoon en Alembic heeft één lineaire
+  head op `0054`.
 
 ## Fase 5 — Interface en performance
 

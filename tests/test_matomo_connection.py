@@ -123,7 +123,14 @@ def test_matomo_sync_stores_aggregates_and_url_coverage(monkeypatch) -> None:  #
         if method == "Actions.getPageUrls":
             return {
                 "2026-08-01": [
-                    {"label": "/programma", "nb_visits": 10, "nb_hits": 14},
+                    {
+                        "label": "/programma",
+                        "nb_visits": 10,
+                        "nb_hits": 14,
+                        "entry_nb_visits": 8,
+                        "bounce_count": 3,
+                        "exit_nb_visits": 4,
+                    },
                     {"label": "/onbekend?genre=kunst", "nb_visits": 2, "nb_hits": 3},
                 ]
             }
@@ -168,11 +175,14 @@ def test_matomo_sync_stores_aggregates_and_url_coverage(monkeypatch) -> None:  #
         assert result["matched_urls"] == 1
         assert result["url_match_rate"] == 0.5
         assert len(pages) == 2
+        matched_page = next(page for page in pages if page.url_id is not None)
+        assert (matched_page.entry_visits, matched_page.bounces, matched_page.exits) == (8, 3, 4)
         assert len(aggregates) == 2
         source, totals = analytics_page_totals(db, website.id, date(2026, 7, 1))
         assert source == "matomo"
         assert [(item.visits, item.users) for item in totals] == [(10, 0)]
-        assert mapping.settings["coverage"]["transitions"] == "unknown"
+        assert mapping.settings["coverage"]["transitions"] == "not_imported"
+        assert mapping.settings["coverage"]["landing_continuation"] == "available"
         assert mapping.settings["coverage"]["internal_search"] == "not_imported"
         assert mapping.settings["unmatched_url_variants"] == [
             "https://human.nl/onbekend?genre=kunst"

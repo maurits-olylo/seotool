@@ -309,6 +309,9 @@ class MatomoPageMetric(UUIDTimestampMixin, Base):
     visits: Mapped[int] = mapped_column(Integer, default=0)
     pageviews: Mapped[int] = mapped_column(Integer, default=0)
     unique_pageviews: Mapped[int] = mapped_column(Integer, default=0)
+    entry_visits: Mapped[int] = mapped_column(Integer, default=0)
+    bounces: Mapped[int] = mapped_column(Integer, default=0)
+    exits: Mapped[int] = mapped_column(Integer, default=0)
     conversions: Mapped[float] = mapped_column(Float, default=0)
 
 
