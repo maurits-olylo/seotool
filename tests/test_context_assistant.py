@@ -1,0 +1,226 @@
+from datetime import date
+
+from fastapi.testclient import TestClient
+from sqlalchemy import func, select
+
+from app.core.security import hash_password
+from app.db.session import SessionLocal
+from app.models.client import Client
+from app.models.crawl import CrawlRun
+from app.models.discovery import CrawlJob, Url
+from app.models.issues import ActivityLog, Issue, IssueOccurrence
+from app.models.recommendations import RecommendationTask
+from app.models.user import ClientMembership, User
+from app.models.website import Website
+from app.services.opportunity_scoring import (
+    calculate_opportunity_scores,
+    store_opportunity_evaluation,
+)
+
+
+def test_context_assistant_is_read_only_deterministic_and_tenant_bound(
+    client: TestClient,
+) -> None:
+    with SessionLocal() as db:
+        allowed_client = Client(name="Context assistant tenant")
+        hidden_client = Client(name="Hidden context assistant tenant")
+        db.add_all([allowed_client, hidden_client])
+        db.flush()
+        allowed_site = Website(
+            client_id=allowed_client.id,
+            name="Context site",
+            base_url="https://context.example.com",
+        )
+        hidden_site = Website(
+            client_id=hidden_client.id,
+            name="Hidden context site",
+            base_url="https://hidden-context.example.com",
+        )
+        user = User(
+            email="context-reader@example.com",
+            role="user",
+            password_hash=hash_password("context-reader-password"),
+        )
+        db.add_all([allowed_site, hidden_site, user])
+        db.flush()
+        db.add(ClientMembership(user_id=user.id, client_id=allowed_client.id, role="user"))
+        url = Url(
+            website_id=allowed_site.id,
+            normalized_url="https://context.example.com/page",
+        )
+        hidden_url = Url(
+            website_id=hidden_site.id,
+            normalized_url="https://hidden-context.example.com/page",
+        )
+        db.add_all([url, hidden_url])
+        db.flush()
+        issue = Issue(
+            website_id=allowed_site.id,
+            url_id=url.id,
+            issue_type="missing_title",
+            category="onpage",
+            severity="medium",
+            confidence="high",
+            title="Title ontbreekt",
+            description="De pagina heeft geen title.",
+            recommended_action="Voeg een unieke title toe.",
+        )
+        hidden_issue = Issue(
+            website_id=hidden_site.id,
+            url_id=hidden_url.id,
+            issue_type="missing_title",
+            category="onpage",
+            severity="medium",
+            confidence="high",
+            title="Verborgen title ontbreekt",
+            description="Verborgen klantdata.",
+            recommended_action="Verborgen actie.",
+        )
+        db.add_all([issue, hidden_issue])
+        db.flush()
+        issue_without_evidence = Issue(
+            website_id=allowed_site.id,
+            url_id=None,
+            issue_type="missing_meta_description",
+            category="onpage",
+            severity="low",
+            confidence="medium",
+            title="Description ontbreekt",
+            description="Er is nog geen afzonderlijke waarneming.",
+            recommended_action="Controleer de pagina.",
+        )
+        job = CrawlJob(
+            website_id=allowed_site.id,
+            job_type="full_site_crawl",
+            status="succeeded",
+        )
+        db.add_all([issue_without_evidence, job])
+        db.flush()
+        run = CrawlRun(
+            crawl_job_id=job.id,
+            website_id=allowed_site.id,
+            crawl_type="full_site_crawl",
+            status="succeeded",
+        )
+        db.add(run)
+        db.flush()
+        db.add(
+            IssueOccurrence(
+                issue_id=issue.id,
+                crawl_run_id=run.id,
+                evidence={"verification": "de volgende crawl vindt een unieke title"},
+            )
+        )
+        evaluation, _ = store_opportunity_evaluation(
+            db,
+            website_id=allowed_site.id,
+            primary_url_id=url.id,
+            scope_type="page",
+            scope_key=f"ctr:{url.id}",
+            period_start=date(2026, 7, 1),
+            period_end=date(2026, 7, 28),
+            scores=calculate_opportunity_scores(
+                potential=80, friction=70, evidence=75, feasibility=60
+            ),
+            source_coverage={
+                "gsc": True,
+                "crawler_issues": True,
+                "analytics": False,
+                "pattern": "ctr",
+            },
+            contributors=[{"dimension": "potential", "signal": "gsc_impressions", "value": 500}],
+            evidence=[{"source": "gsc", "impressions": 500}],
+        )
+        db.commit()
+        allowed_site_id = allowed_site.id
+        hidden_site_id = hidden_site.id
+        issue_id = issue.id
+        issue_without_evidence_id = issue_without_evidence.id
+        hidden_issue_id = hidden_issue.id
+        evaluation_id = evaluation.id
+
+    from app.main import app
+
+    browser = TestClient(app)
+    assert (
+        browser.post(
+            "/ui/login",
+            json={
+                "email": "context-reader@example.com",
+                "password": "context-reader-password",
+            },
+        ).status_code
+        == 204
+    )
+    payload = {
+        "question": "Wat betekent dit issue en wat moet ik controleren?",
+        "context_type": "issue",
+        "context_id": str(issue_id),
+    }
+    first = browser.post(
+        f"/api/v1/websites/{allowed_site_id}/context-assistant/answer", json=payload
+    )
+    second = browser.post(
+        f"/api/v1/websites/{allowed_site_id}/context-assistant/answer", json=payload
+    )
+    assert first.status_code == 200
+    assert first.json() == second.json()
+    assert first.json()["status"] == "answered"
+    assert first.json()["mutations_performed"] is False
+    assert first.json()["sources"][0]["record_id"] == str(issue_id)
+    assert first.json()["missing_evidence"] == []
+    assert [item["source_type"] for item in first.json()["sources"]] == [
+        "issue",
+        "issue_occurrence",
+    ]
+
+    missing = browser.post(
+        f"/api/v1/websites/{allowed_site_id}/context-assistant/answer",
+        json={**payload, "context_id": str(issue_without_evidence_id)},
+    )
+    assert missing.status_code == 200
+    assert missing.json()["status"] == "insufficient_evidence"
+    assert "geen afzonderlijk meetrecord" in missing.json()["missing_evidence"][0]
+
+    opportunity = browser.post(
+        f"/api/v1/websites/{allowed_site_id}/context-assistant/answer",
+        json={
+            "question": "Waarom heeft deze kans deze prioriteit?",
+            "context_type": "opportunity_evaluation",
+            "context_id": str(evaluation_id),
+        },
+    )
+    assert opportunity.status_code == 200
+    assert opportunity.json()["status"] == "answered"
+    assert any(
+        "Bron analytics ontbreekt" in item for item in opportunity.json()["missing_evidence"]
+    )
+    assert opportunity.json()["confidence"] == "high"
+
+    limited = browser.post(
+        f"/api/v1/websites/{allowed_site_id}/context-assistant/answer",
+        json={**payload, "question": "Welke andere tool is beter dan Semrush?"},
+    )
+    assert limited.status_code == 200
+    assert limited.json()["status"] == "scope_limited"
+    assert limited.json()["sources"] == []
+
+    assert (
+        browser.post(
+            f"/api/v1/websites/{allowed_site_id}/context-assistant/answer",
+            json={**payload, "context_id": str(hidden_issue_id)},
+        ).status_code
+        == 404
+    )
+    assert (
+        browser.post(
+            f"/api/v1/websites/{hidden_site_id}/context-assistant/answer",
+            json={**payload, "context_id": str(hidden_issue_id)},
+        ).status_code
+        == 403
+    )
+
+    with SessionLocal() as db:
+        assert db.scalar(select(func.count()).select_from(RecommendationTask)) == 0
+        assert db.scalar(select(func.count()).select_from(ActivityLog)) == 0
+        assert db.scalar(select(func.count()).select_from(CrawlJob)) == 1

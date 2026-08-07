@@ -114,3 +114,39 @@ Lokale acceptatie:
 - De fasebestanden voldoen aan Ruff en de JavaScript-syntaxcontrole; Alembic blijft op de lineaire
   head `0055` en deze fase vereist geen migration.
 - De volledige testsuite slaagt met 472 tests en alleen de bestaande Starlette/httpx-waarschuwing.
+
+## Fase 4 — Leesbaar en tenantgebonden assistentfundament
+
+Status: lokaal geïmplementeerd en nog niet gedeployed.
+
+- Een nieuw read-only antwoordendpoint behandelt vragen binnen één expliciet zichtbaar issue of
+  één opportunity-evaluatie. Website, contexttype en record-ID vormen samen de verplichte scope.
+- Antwoorden scheiden gemeten feiten, productinterpretaties, ontbrekend bewijs, confidence en
+  verwijzingen naar de gebruikte interne bronrecords.
+- Issue-antwoorden gebruiken uitsluitend de actuele issue-lifecycle, nieuwste opgeslagen
+  waarneming, betrokken URL en bestaande versieerbare issue-uitleg.
+- Opportunity-antwoorden gebruiken uitsluitend de historische deelscores, formuleversie,
+  meetperiode en brondekking. Ontbrekende bronnen blijven onbekend en worden niet als nul behandeld.
+- De eerste versie is deterministisch en gebruikt geen AI-provider. Dezelfde vraag en context
+  leveren dezelfde feitelijke kern op.
+- Algemene marktvergelijkingen, concurrentvragen en externe tooladviezen krijgen een korte
+  scopebegrenzing en worden niet via een publieke antwoordroute afgehandeld.
+- Het endpoint kan geen crawl, taak, export, statuswijziging of andere mutatie starten.
+
+Acceptatie:
+
+- een contextrecord buiten de gekozen website of tenant wordt niet zichtbaar;
+- ieder inhoudelijk antwoord noemt bronrecords en meetmomenten waar die beschikbaar zijn;
+- ontbrekend technisch bewijs verlaagt de confidence en blijft expliciet zichtbaar;
+- herhaalde identieke vragen schrijven niets en geven dezelfde feitelijke uitkomst;
+- scopevreemde vragen leveren geen externe aanbeveling of verzonnen klantdata;
+- API-, tenantisolatie-, read-only-, lint- en regressietests slagen zonder nieuwe migration.
+
+Lokale acceptatie:
+
+- De gerichte regressie bevestigt deterministische issue- en opportunity-antwoorden, expliciet
+  ontbrekend bewijs, interne bronverwijzingen, scopebegrenzing en tenantisolatie.
+- Voor en na de antwoordaanvragen blijven aantallen taken, activiteiten en crawljobs ongewijzigd.
+- Ruff slaagt voor de volledige repository; Alembic blijft op de lineaire head `0055` en deze fase
+  vereist geen migration.
+- De volledige testsuite slaagt met 473 tests en alleen de bestaande Starlette/httpx-waarschuwing.
