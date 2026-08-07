@@ -428,3 +428,23 @@ Titles en descriptions moeten bestaan en uniek zijn binnen die bevroren scope. H
 precies één niet-lege primaire kop. Structured-dataregels gebruiken het oorspronkelijke issuetype:
 een ontbrekende breadcrumb vereist `BreadcrumbList`; ongeldige JSON-LD vereist na herstel geldige,
 aanwezige schema-opmaak.
+
+## Opportunity-engine en contextuele data-assistent
+
+`opportunity_evaluations` bewaart historische, versieerbare beoordelingen per website en scope. De
+centrale formule combineert potentieel, beïnvloedbare frictie, bewijskracht en uitvoerbaarheid,
+maar maakt alleen een totaalscore wanneer alle noodzakelijke dimensies bekend zijn. Evalueren en
+promoveren naar een taak zijn expliciete acties; lezen van kansen of assistentantwoorden muteert
+geen data.
+
+De contextassistent blijft tenantgebonden aan één issue, opportunity of expliciete
+websiteperformanceperiode. Antwoorden scheiden gemeten feiten, productinterpretatie, ontbrekend
+bewijs en interne bronverwijzingen. Periodevergelijkingen gebruiken steeds dezelfde kalenderduur
+en uitsluitend de ingestelde primaire analyticsbron.
+
+De analyticskwaliteitslaag controleert GA4 en Matomo afzonderlijk. GA4 gebruikt alleen geselecteerde
+gekwalificeerde events per dag en landingspagina; Matomo gebruikt de eigen conversies en bezoeken.
+Sterke afwijkingen blijven als ruwe brondata bestaan, begrenzen afhankelijke conclusies en worden
+als providergebonden issue plus activiteitenhistorie opgeslagen. Eén schone hercontrole zet een
+issue op opgelost; de volgende schone controle verifieert het. Gezonde bronnen zonder eerder issue
+doorlopen dezelfde voorlopige en betrouwbare status via hun controlehistorie.

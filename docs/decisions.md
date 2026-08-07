@@ -1005,3 +1005,19 @@ maar niet namens een gebruiker afvinken. E-mail en externe kanalen blijven buite
 Gevolg: taak- en verificatiewerk blijft zichtbaar nadat een browser is gesloten, zonder gedeelde
 leesstatus tussen gebruikers of tenants. Migration `0042` voegt tabellen toe en verruimt alleen de
 rollenconstraint; bestaande taakdata wordt niet herschreven.
+
+## 2026-08-07 — Kansen en leadconclusies vereisen uitlegbaar en betrouwbaar bewijs
+
+Context: gecombineerde totaalscores, generieke conversietellers en opvallende eventpieken kunnen
+een overtuigende maar onjuiste groeikans of leadconclusie opleveren.
+
+Besluit: score kansen alleen vanuit versieerbare deelscores en benoemde bijdragers. Gebruik voor
+leadvergelijkingen precies één primaire analyticsbron. GA4 telt uitsluitend expliciet gekozen
+gekwalificeerde events; Matomo gebruikt uitsluitend eigen conversies en bezoeken. Bewaar sterke
+event-/sessie- of conversie-/bezoekafwijkingen ongewijzigd als brondata, maar verlaag confidence,
+toon een gevoeligheidsberekening en onderdruk conclusies zolang de gekozen meetperiode de sterke
+afwijking bevat. Geef het label `betrouwbaar` pas na twee schone controles.
+
+Gevolg: opportunity- en assistentuitkomsten blijven herleidbaar, tenantgebonden en read-only.
+Meetproblemen worden normale gededupliceerde issues met bewijs en verificatiehistorie, zonder GA4
+en Matomo te combineren of een algemene SEO-score te introduceren.

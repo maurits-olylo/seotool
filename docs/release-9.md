@@ -1,6 +1,7 @@
 # Release 9 — Opportunity-engine en contextuele data-assistent
 
-Status: fase 1 lokaal geïmplementeerd en nog niet gedeployed.
+Status: op 7 augustus 2026 lokaal geaccepteerd; staging- en productiedeployment volgen vanaf de
+exacte acceptatiecommit van fase 11.
 
 ## Doel en afbakening
 
@@ -378,3 +379,41 @@ Lokale acceptatie:
   JavaScript-syntaxcontrole slaagt.
 - Ruff en de volledige testsuite met 478 tests slagen; Alembic blijft op head `0055` en deze fase
   vereist geen migration of extra releaseback-up.
+
+## Fase 11 — Integrale lokale acceptatie
+
+Status: lokaal afgerond; staging- en productieacceptatie zijn nog niet uitgevoerd.
+
+- Release 9 omvat het versieerbare opportunityfundament, drie eerste deterministische patronen,
+  transparante taakpromotie, de tenantgebonden contextassistent, periodevergelijkingen voor
+  organische leads en providergebonden meetkwaliteitsbewaking.
+- Opportunityscores blijven uitleggen welke dimensies en bronnen bijdragen; ontbrekende data wordt
+  niet als nul behandeld en lage bewijskracht kan geen hoge prioriteit opleveren.
+- Assistentantwoorden blijven read-only en scheiden feiten, interpretatie en ontbrekend bewijs.
+  Samenhang wordt niet als oorzaak gepresenteerd.
+- GA4 en Matomo blijven afzonderlijke primaire bronnen. Een sterke meetafwijking begrenst
+  leadconclusies en volgt als gededupliceerd issue de bestaande lifecycle.
+- Er is geen externe AI-provider, SERP-bron of nieuwe algemene SEO-score toegevoegd.
+
+Lokale acceptatie:
+
+- Ruff slaagt voor de volledige repository en de JavaScript-syntaxcontrole van de interface is
+  groen.
+- De volledige testsuite slaagt met 478 tests en alleen de bestaande Starlette/httpx-waarschuwing.
+- Alembic heeft één lineaire head op `0055`; alleen de additieve opportunitymigration uit fase 1
+  is toegevoegd en bestaande data wordt niet herschreven.
+- De basisconfiguratie en productie-override zijn samen geldig; de zelfstandige stagingconfiguratie
+  is eveneens geldig met `.env.example`.
+- De release start bij laden geen crawl, import, taak of andere mutatie. Berekenen, synchroniseren,
+  vragen en taakpromotie blijven expliciete gebruikersacties.
+- De migration is additief en de overige fasen wijzigen geen schema. Een extra releaseback-up is
+  daarom niet nodig; de bestaande geverifieerde herstelroute blijft een deploymentvoorwaarde.
+
+Openstaande deploymentacceptatie:
+
+- Valideer op staging met uitsluitend synthetische data opportunityberekening, taakpromotie,
+  tenantisolatie, contextantwoorden en GA4- en Matomo-meetkwaliteitsstatussen.
+- Bevestig op staging en productie migration-head `0055`, gezonde geraakte services,
+  `PAGESPEED_ENABLED=false`, `RENDERING_ENABLED=false` en één expliciete primaire analyticsbron.
+- Controleer desktop en 390 px zonder documentoverflow of browserfouten en leg de exacte
+  releasecommit en uitkomsten hier vast voordat Release 9 als gedeployed wordt gekwalificeerd.
