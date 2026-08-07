@@ -33,6 +33,9 @@ Implementatiestatus:
 - een provider-neutrale API zet een handmatig gekozen vraag/pagina pas op de integratiewachtrij na
   globale activering, websiteactivering, positieve kostenraming, cache-, budget-, scope- en
   duplicaatcontrole; wachtrijweigering annuleert de reservering direct;
+- de Content-interface bevat een begrensde tab `Vragen`: een mens kiest één voorgestelde
+  vraag-paginacombinatie en ziet alleen de gebruikersstatus van de controle; provider, kosten,
+  technische queue en credentials blijven buiten HTML, JavaScript en browserconsole;
 - één observation wordt conservatief geïnterpreteerd en creëert geen autonome kwaliteitsclaim;
 - de feature en lege credentialconfiguratie staan standaard uit; scheduler, echte credentials en
   betaalde calls zijn nog bewust niet geactiveerd.

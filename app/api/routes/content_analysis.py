@@ -13,6 +13,7 @@ from app.db.session import get_db
 from app.models.content_analysis import ContentAnalysisSettings, UrlContentOverride
 from app.models.discovery import Url
 from app.models.external_intelligence import ExternalIntelligenceRequest
+from app.models.website import WebsiteSettings
 from app.schemas.content_analysis import (
     ContentAnalysisSettingsData,
     ContentOverrideRead,
@@ -110,7 +111,15 @@ def question_scopes(
         max_total=max_total,
         minimum_impressions=minimum_impressions,
     )
-    return asdict(selection)
+    website_settings = db.get(WebsiteSettings, website_id)
+    return {
+        **asdict(selection),
+        "external_evidence_available": bool(
+            get_settings().dataforseo_enabled
+            and website_settings
+            and website_settings.external_intelligence_enabled
+        ),
+    }
 
 
 @router.post("/external-evidence", response_model=ExternalEvidenceState, status_code=202)
@@ -141,7 +150,7 @@ def request_external_evidence(
             language=payload.language,
             country=payload.country,
             device=payload.device,
-            location=payload.location,
+            location=payload.location or _external_location(payload.country),
         ),
         reason="human_selected_question",
         provider="dataforseo",
@@ -199,6 +208,24 @@ def _external_state(request: ExternalIntelligenceRequest) -> ExternalEvidenceSta
         status=public_status,  # type: ignore[arg-type]
         capability=request.capability,  # type: ignore[arg-type]
     )
+
+
+def _external_location(country: str) -> str:
+    locations = {
+        "BE": "Belgium",
+        "DE": "Germany",
+        "FR": "France",
+        "GB": "United Kingdom",
+        "NL": "Netherlands",
+        "US": "United States",
+    }
+    try:
+        return locations[country.upper()]
+    except KeyError as error:
+        raise HTTPException(
+            status_code=422,
+            detail="Deze meetlocatie wordt nog niet ondersteund voor extra bewijs",
+        ) from error
 
 
 @router.post("/opportunities/{opportunity_key}/task", status_code=201)

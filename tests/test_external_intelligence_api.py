@@ -25,7 +25,6 @@ def payload() -> dict[str, object]:
         "language": "nl",
         "country": "NL",
         "device": "mobile",
-        "location": "Netherlands",
     }
 
 

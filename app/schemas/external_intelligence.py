@@ -10,7 +10,7 @@ class ExternalEvidenceCreate(BaseModel):
     language: str = Field(min_length=2, max_length=2)
     country: str = Field(min_length=2, max_length=2)
     device: Literal["desktop", "mobile"]
-    location: str = Field(min_length=1, max_length=120)
+    location: str | None = Field(default=None, min_length=1, max_length=120)
     url_id: UUID | None = None
 
 

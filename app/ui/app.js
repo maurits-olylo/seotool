@@ -24,7 +24,7 @@ const labels = {
   pause_requested: "Pauze wordt voorbereid", paused: "Gepauzeerd",
   cancel_requested: "Stop wordt voorbereid", connected: "Gekoppeld", error: "Fout",
 };
-const state = { currentUser: null, currentView: "dashboard", clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], changesRequestId: 0, jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, contentAnalysis: null, contentAnalysisDays: 28, contentAnalysisTab: "overview", contentAnalysisPage: 1, effectEvaluations: [], crawlRuns: [], showCrawlArchive: false, activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, operationsRequestId: 0, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], urlCoverage: null, filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, selectedRecommendationTask: null, recommendationFeedback: [], recommendationDefinitions: null, recommendationTasks: [], taskNotifications: [], taskMembers: [], googleConnectionId: null, bingConnectionId: null, matomoConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
+const state = { currentUser: null, currentView: "dashboard", clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], changesRequestId: 0, jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, contentAnalysis: null, contentAnalysisDays: 28, contentAnalysisTab: "overview", contentAnalysisPage: 1, questionScopes: null, externalEvidenceRequests: new Map(), effectEvaluations: [], crawlRuns: [], showCrawlArchive: false, activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, operationsRequestId: 0, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], urlCoverage: null, filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, selectedRecommendationTask: null, recommendationFeedback: [], recommendationDefinitions: null, recommendationTasks: [], taskNotifications: [], taskMembers: [], googleConnectionId: null, bingConnectionId: null, matomoConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
 const VIEW_HASHES = {dashboard: "overzicht", tasks: "taken", actions: "analyse/acties", urls: "analyse/urls", changes: "analyse/wijzigingen", insights: "analyse/inzichten", contentAnalysis: "analyse/content", vacancies: "analyse/vacatures", reports: "rapportages", operations: "crawls-exports", clients: "instellingen/klanten-websites", team: "instellingen/team-toegang", integrations: "instellingen/integraties"};
 const LEGACY_HASHES = {rapportage: "reports", urls: "urls", wijzigingen: "changes", inzichten: "insights", vacatures: "vacancies", beheer: "operations", organisatie: "clients", integraties: "integrations", acties: "actions"};
 const ANALYSIS_VIEWS = new Set(["actions", "urls", "changes", "insights", "contentAnalysis", "vacancies"]);
@@ -949,6 +949,7 @@ function renderContentAnalysis() {
   $("#content-page-next").disabled = state.contentAnalysisPage === pageCount;
 
   $("#content-cluster-list").innerHTML = Object.entries(opportunities.cluster_distribution || {}).map(([cluster, values]) => `<article class="cluster-row"><div class="cluster-head"><h3>/${escapeHtml(cluster === "/" ? "" : cluster)}</h3><strong>${Object.values(values).reduce((sum, count) => sum + count, 0)} pagina’s</strong></div><div class="cluster-values">${Object.entries(values).map(([intent, count]) => `<span>${escapeHtml(intent)} · ${count}</span>`).join("")}</div></article>`).join("") || `<p class="content-loading">Nog geen clusters beschikbaar.</p>`;
+  renderQuestionScopes();
 
   $("#content-analytics-source").textContent = journey.primary_source ? `Primaire bron: ${journey.primary_source.toUpperCase()}` : "Geen primaire bron";
   $("#content-dead-end-list").innerHTML = deadEnds.map((item) => `<article class="opportunity-row"><div class="opportunity-head"><h3>${escapeHtml(item.url)}</h3><strong>${Math.round(item.confidence * 100)}% betrouwbaar</strong></div><p>${escapeHtml(item.recommendation)}</p><div class="opportunity-evidence"><span class="evidence-chip">Doorklik ${Math.round(item.continuation_rate * 100)}%</span><span class="evidence-chip">Referentie ${Math.round(item.benchmark_rate * 100)}%</span><span class="evidence-chip">${item.entry_visits} instapsessies</span></div></article>`).join("") || `<p class="content-loading">Geen statistisch betrouwbare onbedoelde landing-eindpunten gevonden.</p>`;
@@ -961,6 +962,51 @@ function renderContentAnalysis() {
   $("#content-branded-terms").value = (data.settings.branded_terms || []).join(", ");
   $("#content-sector-template").value = data.settings.sector_template || "";
   renderEffectEvaluations();
+}
+
+function questionScopeKey(item) { return `${item.url_id}|${item.question}`; }
+
+function renderQuestionScopes() {
+  const selection = state.questionScopes;
+  if (!selection) { $("#content-question-list").innerHTML = `<p class="content-loading">Vragen worden geladen…</p>`; return; }
+  const available = selection.external_evidence_available;
+  const statusLabels = {queued:"Wordt voorbereid",pending:"Wordt voorbereid",running:"Wordt gecontroleerd",available:"Bewijs beschikbaar",failed:"Controle mislukt",cancelled:"Niet gestart",budget_exceeded:"Maandlimiet bereikt",scope_limit_reached:"Selectielimiet bereikt"};
+  $("#content-question-count").textContent = `${selection.candidates.length} voorgesteld`;
+  $("#content-question-list").innerHTML = selection.candidates.map((item) => {
+    const current = state.externalEvidenceRequests.get(questionScopeKey(item));
+    const requestStatus = current?.status;
+    const busy = ["queued", "pending", "running"].includes(requestStatus);
+    const disabled = !available || busy || requestStatus === "available";
+    return `<article class="question-scope-row"><div class="question-scope-copy"><h3>${escapeHtml(item.question)}</h3><a href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(item.url)}</a><div class="question-scope-meta"><span class="evidence-chip">${item.impressions} vertoningen</span><span class="evidence-chip">Positie ${item.position}</span><span class="evidence-chip">Prioriteit ${Math.round(item.selection_priority)}</span></div></div><div class="question-scope-action"><button type="button" class="detail-button" data-question-evidence="${escapeHtml(questionScopeKey(item))}" ${disabled ? "disabled" : ""}>${busy ? "Controleren…" : requestStatus === "available" ? "Gecontroleerd" : "Controleer AI-dekking"}</button>${requestStatus ? `<span class="question-scope-status ${requestStatus === "available" ? "available" : ""}">${escapeHtml(statusLabels[requestStatus] || requestStatus)}</span>` : ""}</div></article>`;
+  }).join("") || `<p class="content-loading">Geen relevante vragen gevonden binnen deze periode.</p>`;
+  $("#content-question-message").textContent = available ? "Kies alleen vragen waarvoor extra bewijs een beslissing kan verbeteren." : "Extra bewijs is voor deze website nog niet beschikbaar.";
+}
+
+async function requestQuestionEvidence(key) {
+  const item = state.questionScopes?.candidates.find((candidate) => questionScopeKey(candidate) === key);
+  if (!item) return;
+  const website = state.websites.find((entry) => entry.id === $("#website-select").value) || {};
+  state.externalEvidenceRequests.set(key, {status: "queued"}); renderQuestionScopes();
+  try {
+    const result = await api(`/api/v1/websites/${website.id}/content-analysis/external-evidence`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({capability:"ai_citations",question:item.question,language:website.language || "nl",country:website.country || "NL",device:"mobile",url_id:item.url_id})});
+    state.externalEvidenceRequests.set(key, result); renderQuestionScopes();
+    if (result.request_id && ["queued", "pending", "running"].includes(result.status)) pollQuestionEvidence(key, result.request_id, 0);
+  } catch (error) {
+    state.externalEvidenceRequests.set(key, {status:"failed"}); renderQuestionScopes();
+    $("#content-question-message").textContent = `Controle kon niet worden gestart: ${error.message}`;
+  }
+}
+
+async function pollQuestionEvidence(key, requestId, attempt) {
+  if (attempt >= 20 || !state.externalEvidenceRequests.has(key)) return;
+  window.setTimeout(async () => {
+    try {
+      const websiteId = $("#website-select").value;
+      const result = await api(`/api/v1/websites/${websiteId}/content-analysis/external-evidence/${requestId}`);
+      state.externalEvidenceRequests.set(key, result); renderQuestionScopes();
+      if (["pending", "running"].includes(result.status)) pollQuestionEvidence(key, requestId, attempt + 1);
+    } catch (error) { $("#content-question-message").textContent = `Status kon niet worden bijgewerkt: ${error.message}`; }
+  }, 3000);
 }
 
 function showContentAnalysisTab(tab) {
@@ -984,19 +1030,21 @@ async function loadContentAnalysis() {
   $("#content-analysis-summary").innerHTML = Array.from({length: 4}, () => `<article class="card content-skeleton"><strong>&nbsp;</strong><span>&nbsp;</span></article>`).join("");
   document.querySelectorAll("[data-content-panel]").forEach((panel) => { if (!panel.classList.contains("hidden")) panel.setAttribute("aria-busy", "true"); });
   try {
-    const [opportunityResult, journeyResult, settingsResult, scoredResult, effectsResult] = await Promise.all([
+    const [opportunityResult, journeyResult, settingsResult, scoredResult, effectsResult, questionResult] = await Promise.all([
       timedContentRequest(`/api/v1/websites/${websiteId}/content-analysis/opportunities?${query}`),
       timedContentRequest(`/api/v1/websites/${websiteId}/content-analysis/journey?${query}`),
       timedContentRequest(`/api/v1/websites/${websiteId}/content-analysis/settings`),
       timedContentRequest(`/api/v1/websites/${websiteId}/opportunity-evaluations?limit=100&latest_only=true`),
       timedContentRequest(`/api/v1/websites/${websiteId}/effect-evaluations?limit=25`),
+      timedContentRequest(`/api/v1/websites/${websiteId}/content-analysis/question-scopes?${query}`),
     ]);
     const opportunities = opportunityResult.data;
     const journey = journeyResult.data;
     const settings = settingsResult.data;
     state.contentAnalysis = {opportunities, journey, settings, scoredOpportunities: scoredResult.data};
     state.effectEvaluations = effectsResult.data;
-    $("#content-analysis-context").textContent = `${start} t/m ${end} · inhoud ${opportunityResult.milliseconds} ms · doorstroom ${journeyResult.milliseconds} ms · scores ${scoredResult.milliseconds} ms · effect ${effectsResult.milliseconds} ms · bronnen en ontbrekende dekking worden per onderdeel vermeld.`;
+    state.questionScopes = questionResult.data;
+    $("#content-analysis-context").textContent = `${start} t/m ${end} · inhoud ${opportunityResult.milliseconds} ms · doorstroom ${journeyResult.milliseconds} ms · scores ${scoredResult.milliseconds} ms · effect ${effectsResult.milliseconds} ms · vragen ${questionResult.milliseconds} ms · bronnen en ontbrekende dekking worden per onderdeel vermeld.`;
     renderContentAnalysis();
   } catch (error) {
     $("#content-analysis-context").textContent = `Contentanalyse kon niet worden geladen: ${error.message}`;
@@ -2710,7 +2758,7 @@ $("#confirm-mfa").addEventListener("click", async () => {
 $("#profile-toggle").addEventListener("click", () => { const open = $("#profile-popover").classList.toggle("hidden") === false; $("#profile-toggle").setAttribute("aria-expanded", String(open)); });
 $("#mobile-nav-toggle").addEventListener("click", () => { const open = $("#app").classList.toggle("mobile-nav-open"); $("#mobile-nav-toggle").setAttribute("aria-expanded", String(open)); });
 $("#client-select").addEventListener("change", async () => { localStorage.setItem(CLIENT_STORAGE_KEY, $("#client-select").value); localStorage.removeItem(WEBSITE_STORAGE_KEY); state.crawlRuns = []; state.changesRequestId += 1; state.changes = []; state.changeGroups = []; await loadWebsites(); if (state.currentView === "integrations") await loadIntegrations(); if (state.currentView === "dashboard") await loadDashboard(); });
-$("#website-select").addEventListener("change", async () => { localStorage.setItem(WEBSITE_STORAGE_KEY, $("#website-select").value); state.selectedReportSnapshotId = null; state.consultantInsights = null; state.contentAnalysis = null; state.contentAnalysisPage = 1; state.operationsRequestId += 1; state.changesRequestId += 1; state.operationsLoading = false; state.crawlRuns = []; state.showCrawlArchive = false; state.activeCrawlJob = null; state.exports = []; state.changes = []; state.changeGroups = []; if (state.currentView === "changes") renderTableState("#change-rows", 5, "Wijzigingen worden geladen…"); if (state.currentView === "operations") renderOperations(); if (state.currentView === "changes") await loadChanges(); await loadIssues(); if (state.currentView === "integrations") await loadIntegrations(); if (state.currentView === "insights") await loadConsultantInsights(); if (state.currentView === "contentAnalysis") await loadContentAnalysis(); if (state.currentView === "urls") renderUrls(); if (state.currentView === "vacancies") await loadJobListings(); if (state.currentView === "operations") await loadOperations(); if (state.currentView === "dashboard") await loadDashboard(); });
+$("#website-select").addEventListener("change", async () => { localStorage.setItem(WEBSITE_STORAGE_KEY, $("#website-select").value); state.selectedReportSnapshotId = null; state.consultantInsights = null; state.contentAnalysis = null; state.questionScopes = null; state.externalEvidenceRequests.clear(); state.contentAnalysisPage = 1; state.operationsRequestId += 1; state.changesRequestId += 1; state.operationsLoading = false; state.crawlRuns = []; state.showCrawlArchive = false; state.activeCrawlJob = null; state.exports = []; state.changes = []; state.changeGroups = []; if (state.currentView === "changes") renderTableState("#change-rows", 5, "Wijzigingen worden geladen…"); if (state.currentView === "operations") renderOperations(); if (state.currentView === "changes") await loadChanges(); await loadIssues(); if (state.currentView === "integrations") await loadIntegrations(); if (state.currentView === "insights") await loadConsultantInsights(); if (state.currentView === "contentAnalysis") await loadContentAnalysis(); if (state.currentView === "urls") renderUrls(); if (state.currentView === "vacancies") await loadJobListings(); if (state.currentView === "operations") await loadOperations(); if (state.currentView === "dashboard") await loadDashboard(); });
 for (const selector of ["#severity-filter", "#scope-filter", "#nature-filter", "#type-filter", "#impact-filter"]) $(selector).addEventListener("change", () => { state.page = 1; render(); });
 $("#status-filter").addEventListener("change", loadIssues);
 $("#search-filter").addEventListener("input", () => { state.page = 1; render(); });
@@ -2816,6 +2864,7 @@ $("#insight-period").addEventListener("change", async (event) => { state.insight
 $("#performance-context-question-form").addEventListener("submit", submitPerformanceContextQuestion);
 $("#content-analysis-period").addEventListener("change", async (event) => { state.contentAnalysisDays = Number(event.target.value); state.contentAnalysisPage = 1; await loadContentAnalysis(); });
 $("#content-analysis-tabs").addEventListener("click", (event) => { const button = event.target.closest("[data-content-tab]"); if (button) showContentAnalysisTab(button.dataset.contentTab); });
+$("#content-question-list").addEventListener("click", (event) => { const button = event.target.closest("[data-question-evidence]"); if (button) requestQuestionEvidence(button.dataset.questionEvidence); });
 $("#content-page-previous").addEventListener("click", () => { state.contentAnalysisPage -= 1; renderContentAnalysis(); });
 $("#content-page-next").addEventListener("click", () => { state.contentAnalysisPage += 1; renderContentAnalysis(); });
 $("#content-opportunity-list").addEventListener("click", (event) => { const scoredButton = event.target.closest("[data-opportunity-evaluation]"); if (scoredButton) { createScoredOpportunityTask(scoredButton.dataset.opportunityEvaluation); return; } const button = event.target.closest("[data-content-opportunity]"); if (button) createContentOpportunityTask(button.dataset.contentOpportunity); });
