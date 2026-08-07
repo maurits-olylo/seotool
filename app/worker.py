@@ -91,7 +91,7 @@ def main() -> None:
         queues,
         connection=get_redis(),
         name=worker_name(),
-    ).work()
+    ).work(with_scheduler=True)
 
 
 if __name__ == "__main__":

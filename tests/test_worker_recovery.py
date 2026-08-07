@@ -8,7 +8,7 @@ from app.models.client import Client
 from app.models.crawl import CrawlRun
 from app.models.discovery import CrawlJob
 from app.models.website import Website, WebsiteSettings
-from app.worker import recover_interrupted_crawls, worker_is_registered, worker_name
+from app.worker import main, recover_interrupted_crawls, worker_is_registered, worker_name
 
 
 def test_worker_name_is_unique_per_container() -> None:
@@ -39,6 +39,24 @@ def test_worker_health_rejects_missing_or_ended_registration() -> None:
 
     assert not worker_is_registered(missing, name="full-1-missing")
     assert not worker_is_registered(ended, name="full-1-ended")
+
+
+def test_worker_promotes_scheduled_retries(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    worker = Mock()
+    worker_factory = Mock(return_value=worker)
+    redis = Mock()
+    recover = Mock()
+    monkeypatch.setenv("WORKER_QUEUES", "crawls_full")
+    monkeypatch.setenv("WORKER_NAME", "full-1")
+    monkeypatch.setattr("app.worker.Worker", worker_factory)
+    monkeypatch.setattr("app.worker.get_redis", Mock(return_value=redis))
+    monkeypatch.setattr("app.worker.recover_interrupted_crawls", recover)
+
+    main()
+
+    recover.assert_called_once_with()
+    worker_factory.assert_called_once()
+    worker.work.assert_called_once_with(with_scheduler=True)
 
 
 def test_worker_restart_pauses_interrupted_crawl() -> None:
