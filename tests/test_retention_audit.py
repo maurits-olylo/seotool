@@ -14,6 +14,7 @@ from app.models.integrations import (
 from app.models.website import Website
 from app.services.crawl_deployment import start_deployment_drain
 from app.services.retention_audit import build_retention_audit, cleanup_element_locations
+from app.services.retention_policy import POLICY_VERSION
 
 SessionLocal = sessionmaker(bind=engine)
 
@@ -113,9 +114,17 @@ def test_retention_audit_exposes_versioned_policy_and_all_analytics_sources() ->
 
         result = build_retention_audit(db, as_of=date(2026, 8, 2))
 
-    assert result["policy_version"] == "2026-08-02-v1"
+    assert result["policy_version"] == POLICY_VERSION
     assert result["policies"]["google_analytics_metrics"]["retain_days"] == 1098
     assert result["policies"]["url_snapshots"]["automatic_cleanup"] is False
+    assert result["policies"]["external_observations"] == {
+        "dataset": "external_observations",
+        "retain_days": 180,
+        "automatic_cleanup": False,
+        "rationale": (
+            "Genormaliseerde externe evidence is tijdelijk; cleanup wordt nog niet geactiveerd."
+        ),
+    }
     assert result["websites"][0]["google_analytics_metrics"]["total"] == 1
     assert "permanent_history" in result["websites"][0]
 

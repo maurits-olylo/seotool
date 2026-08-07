@@ -10,6 +10,11 @@ from app.models.crawl import CrawlRun, ElementLocation, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url, UrlSource
 from app.models.effects import EffectEvaluation, EffectIntervention
 from app.models.exports import Export
+from app.models.external_intelligence import (
+    ExternalIntelligenceRequest,
+    ExternalObservation,
+    ExternalUsageRecord,
+)
 from app.models.integrations import (
     BingInboundLink,
     BingLinkTarget,
@@ -76,6 +81,9 @@ __all__ = [
     "ElementLocation",
     "EffectIntervention",
     "EffectEvaluation",
+    "ExternalIntelligenceRequest",
+    "ExternalObservation",
+    "ExternalUsageRecord",
     "CrawlDeploymentControl",
     "RetentionOperation",
     "QueueDeadLetter",

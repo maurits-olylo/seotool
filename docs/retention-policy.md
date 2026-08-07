@@ -1,6 +1,6 @@
 # Retentiebeleid
 
-Versie: `2026-08-02-v1`
+Versie: `2026-08-08-v2`
 
 ## Principes
 
@@ -30,6 +30,13 @@ Versie: `2026-08-02-v1`
 | URL-snapshots | Alleen audit; geen automatische verwijdering |
 | Wijzigingen | Alleen audit; geen automatische verwijdering |
 | Maandrapportages | Drie jaar volgens bestaande scheduler |
+| Externe intelligence-aanvragen | 1.098 dagen beoogd; voorlopig alleen audit |
+| Genormaliseerde externe observations | 180 dagen beoogd; voorlopig alleen audit |
+| Externe usage- en kostenregistratie | 1.098 dagen beoogd; voorlopig alleen audit |
+
+Externe provider-responses worden niet integraal opgeslagen. Alleen de begrensde genormaliseerde
+observation, brondekking, hashes, aanvraagcontext en kostenregistratie worden bewaard. Automatische
+verwijdering wordt pas geactiveerd nadat bewijsreferenties en een stagingproef zijn gecontroleerd.
 
 ## Uitvoering
 

@@ -45,6 +45,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
   bing_referring_anchors, bing_referring_domains, google_analytics_event_metrics,
   google_analytics_landing_page_event_metrics, google_analytics_metrics,
   integration_connections, matomo_aggregate_metrics, matomo_page_metrics,
+  external_intelligence_requests, external_observations, external_usage_records,
   performance_observations, search_console_metrics, search_console_query_metrics,
   url_inspection_results, website_integrations
 TO seo_integration;

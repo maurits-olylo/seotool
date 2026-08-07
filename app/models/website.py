@@ -43,6 +43,14 @@ class WebsiteSettings(Base):
             "crawl_queue_limit BETWEEN 1 AND 5",
             name="ck_website_settings_crawl_queue_limit",
         ),
+        CheckConstraint(
+            "external_monthly_budget_micros >= 0",
+            name="ck_website_settings_external_budget",
+        ),
+        CheckConstraint(
+            "external_active_scope_limit >= 0",
+            name="ck_website_settings_external_scope_limit",
+        ),
     )
 
     website_id: Mapped[uuid.UUID] = mapped_column(
@@ -63,3 +71,6 @@ class WebsiteSettings(Base):
     queue_priority: Mapped[int] = mapped_column(Integer, default=50)
     crawl_queue_limit: Mapped[int] = mapped_column(Integer, default=1)
     primary_analytics_source: Mapped[str | None] = mapped_column(String(20))
+    external_intelligence_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    external_monthly_budget_micros: Mapped[int] = mapped_column(Integer, default=0)
+    external_active_scope_limit: Mapped[int] = mapped_column(Integer, default=0)

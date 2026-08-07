@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 
-POLICY_VERSION = "2026-08-02-v1"
+POLICY_VERSION = "2026-08-08-v2"
 
 
 @dataclass(frozen=True)
@@ -93,6 +93,24 @@ POLICIES = {
             None,
             False,
             "Lifecycle-, taak-, verificatie- en auditgeschiedenis blijft permanent bewaard.",
+        ),
+        RetentionPolicy(
+            "external_intelligence_requests",
+            1098,
+            False,
+            "Bewaar aanvraag- en idempotency-audit; automatische verwijdering volgt pas na proef.",
+        ),
+        RetentionPolicy(
+            "external_observations",
+            180,
+            False,
+            "Genormaliseerde externe evidence is tijdelijk; cleanup wordt nog niet geactiveerd.",
+        ),
+        RetentionPolicy(
+            "external_usage_records",
+            1098,
+            False,
+            "Bewaar drie jaar kostenaudit voor unit economics en budgetcontrole.",
         ),
     )
 }

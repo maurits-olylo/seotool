@@ -10,9 +10,11 @@ Implementatiestatus:
   `missing`;
 - genormaliseerde SERP- en AI-citationcontracten, capability-protocols en Nederlandse fixtures
   zijn lokaal beschikbaar;
+- requests, genormaliseerde observations en usage kunnen tenantgebonden worden opgeslagen; cache,
+  dagelijkse idempotency, maandbudget en actieve-scopelimiet worden vóór toelating afgedwongen;
 - één observation wordt conservatief geïnterpreteerd en creëert geen autonome kwaliteitsclaim;
-- databaseopslag, echte provideradapter, credentials, scheduler en betaalde calls zijn nog bewust
-  niet gebouwd.
+- de feature staat standaard uit; een echte provideradapter, credentials, scheduler en betaalde
+  calls zijn nog bewust niet gebouwd.
 
 ## 1. Executive summary
 
