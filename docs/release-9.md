@@ -1,7 +1,7 @@
 # Release 9 — Opportunity-engine en contextuele data-assistent
 
-Status: op 7 augustus 2026 lokaal geaccepteerd; staging- en productiedeployment volgen vanaf de
-exacte acceptatiecommit van fase 11.
+Status: op 7 augustus 2026 lokaal en op staging geaccepteerd vanaf releasecommit `06f3863`;
+productiedeployment is nog niet uitgevoerd.
 
 ## Doel en afbakening
 
@@ -382,7 +382,7 @@ Lokale acceptatie:
 
 ## Fase 11 — Integrale lokale acceptatie
 
-Status: lokaal afgerond; staging- en productieacceptatie zijn nog niet uitgevoerd.
+Status: lokaal en op staging afgerond; productieacceptatie is nog niet uitgevoerd.
 
 - Release 9 omvat het versieerbare opportunityfundament, drie eerste deterministische patronen,
   transparante taakpromotie, de tenantgebonden contextassistent, periodevergelijkingen voor
@@ -409,11 +409,23 @@ Lokale acceptatie:
 - De migration is additief en de overige fasen wijzigen geen schema. Een extra releaseback-up is
   daarom niet nodig; de bestaande geverifieerde herstelroute blijft een deploymentvoorwaarde.
 
-Openstaande deploymentacceptatie:
+Stagingacceptatie:
 
-- Valideer op staging met uitsluitend synthetische data opportunityberekening, taakpromotie,
-  tenantisolatie, contextantwoorden en GA4- en Matomo-meetkwaliteitsstatussen.
-- Bevestig op staging en productie migration-head `0055`, gezonde geraakte services,
+- Releasecommit `06f3863` is via het vaste Git-archive en de interactieve NAS-route gedeployed.
+- API, PostgreSQL en Redis zijn gezond op migration-head `0055`; PageSpeed en
+  JavaScript-rendering blijven uitgeschakeld en alle Release-9-routes zijn aanwezig.
+- De synthetische stagingwebsite bevat bewust geen gekoppelde analytics of classificeerbare
+  crawldata. Content, kansen en Inzichten tonen daardoor correcte lege toestanden zonder een
+  berekening, import, crawl of assistentaanvraag te starten.
+- De contextassistent, expliciete knop `Bereken kansen` en providerneutrale analyticskwaliteitskaart
+  zijn aanwezig. Providerlogica en tenantisolatie blijven door de volledige regressieset gedekt.
+- De gemeten content-, doorstroom- en score-endpoints reageerden in 89–100 ms.
+- Op desktop en 390 px waren document- en viewportbreedte exact gelijk. Er was geen interne
+  overflow en de browser rapporteerde geen fouten of waarschuwingen.
+
+Openstaande productieacceptatie:
+
+- Bevestig op productie migration-head `0055`, gezonde geraakte services,
   `PAGESPEED_ENABLED=false`, `RENDERING_ENABLED=false` en één expliciete primaire analyticsbron.
-- Controleer desktop en 390 px zonder documentoverflow of browserfouten en leg de exacte
-  releasecommit en uitkomsten hier vast voordat Release 9 als gedeployed wordt gekwalificeerd.
+- Controleer Content, Inzichten en Integraties op desktop en 390 px zonder documentoverflow of
+  browserfouten en leg de uitkomsten hier vast voordat Release 9 als gedeployed wordt gekwalificeerd.
