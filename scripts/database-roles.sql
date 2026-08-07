@@ -35,6 +35,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
 TO seo_crawler;
 GRANT SELECT ON TABLE clients, crawl_deployment_control, issue_suppressions, website_settings, websites
 TO seo_crawler;
+GRANT SELECT ON TABLE google_analytics_metrics, search_console_metrics TO seo_crawler;
 GRANT UPDATE (id) ON TABLE crawl_deployment_control TO seo_crawler;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO seo_crawler;
 

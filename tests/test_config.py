@@ -169,6 +169,10 @@ def test_database_role_policy_protects_sensitive_tables() -> None:
     assert "integration_connections, login_attempts, oauth_states, security_audit_events" in policy
     assert "REVOKE CREATE ON SCHEMA public FROM PUBLIC" in policy
     assert "GRANT SELECT, UPDATE ON TABLE exports TO seo_export" in policy
+    assert (
+        "GRANT SELECT ON TABLE google_analytics_metrics, search_console_metrics TO seo_crawler"
+        in policy
+    )
     assert "GRANT UPDATE (id) ON TABLE crawl_deployment_control TO seo_crawler" in policy
     assert "GRANT UPDATE (id) ON TABLE websites TO seo_scheduler" in policy
 
