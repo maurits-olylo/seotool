@@ -13,6 +13,7 @@ from app.services.external_intelligence.contracts import (
     normalized_host,
 )
 from app.services.external_intelligence.interpretation import assess_external_question_evidence
+from app.services.external_intelligence.presentation import public_evidence_payload
 from app.services.external_intelligence.providers.fake import FakeExternalEvidenceProvider
 from app.services.question_coverage import assess_question_coverage
 
@@ -71,6 +72,16 @@ def test_normalized_contract_hides_provider_specific_payloads() -> None:
     assert evidence.serp.organic_results[0].domain == "voorbeeld-concurrent.nl"
     assert evidence.citations[0].platform == "google_ai_overview"
     assert not hasattr(evidence, "task_id")
+
+
+def test_public_evidence_hides_provider_identity_and_cost_metadata() -> None:
+    payload = public_evidence_payload(load_fixture())
+
+    assert "provider" not in str(payload).lower()
+    assert "dataforseo" not in str(payload).lower()
+    assert "cost" not in str(payload).lower()
+    assert payload["serp"] is not None
+    assert payload["ai_observations"]
 
 
 def test_fake_provider_returns_fixture_without_network() -> None:

@@ -36,6 +36,20 @@ def test_pagespeed_requires_key_only_when_enabled() -> None:
     assert Settings(pagespeed_enabled=True, pagespeed_api_key="test-key").pagespeed_enabled is True
 
 
+def test_dataforseo_requires_credentials_only_when_enabled() -> None:
+    assert Settings(dataforseo_enabled=False).dataforseo_enabled is False
+    with pytest.raises(ValidationError, match="DATAFORSEO_LOGIN"):
+        Settings(dataforseo_enabled=True)
+    assert (
+        Settings(
+            dataforseo_enabled=True,
+            dataforseo_login="fixture-login",
+            dataforseo_password="fixture-password",
+        ).dataforseo_enabled
+        is True
+    )
+
+
 def test_api_ports_are_bound_to_loopback() -> None:
     project_root = Path(__file__).resolve().parents[1]
     for compose_file in ("compose.yaml", "compose.prod.yaml", "compose.staging.yaml"):
@@ -123,6 +137,8 @@ def test_compose_limits_sensitive_environment_by_service() -> None:
         "TOKEN_ENCRYPTION_KEY",
         "INITIAL_SUPERUSER_PASSWORD",
         "PAGESPEED_API_KEY",
+        "DATAFORSEO_LOGIN",
+        "DATAFORSEO_PASSWORD",
     }
 
     assert "env_file" not in "\n".join(
@@ -134,6 +150,8 @@ def test_compose_limits_sensitive_environment_by_service() -> None:
     assert sensitive.isdisjoint(services["export-worker"]["environment"])
     assert sensitive.isdisjoint(services["scheduler"]["environment"])
     assert "TOKEN_ENCRYPTION_KEY" in services["integration-worker"]["environment"]
+    assert "DATAFORSEO_LOGIN" in services["integration-worker"]["environment"]
+    assert "DATAFORSEO_PASSWORD" in services["integration-worker"]["environment"]
     assert "INITIAL_SUPERUSER_PASSWORD" not in services["integration-worker"]["environment"]
     assert "privacy_ledger_data:/app/privacy-ledger" in services["api"]["volumes"]
     assert compose["volumes"]["privacy_ledger_data"]["name"] == (

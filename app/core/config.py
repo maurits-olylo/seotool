@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     render_artifact_retention_days: int = 90
     pagespeed_enabled: bool = False
     pagespeed_api_key: str = ""
+    dataforseo_enabled: bool = False
+    dataforseo_login: str = ""
+    dataforseo_password: str = ""
     mfa_enforcement_enabled: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -35,6 +38,12 @@ class Settings(BaseSettings):
     def validate_production_secrets(self) -> "Settings":
         if self.pagespeed_enabled and not self.pagespeed_api_key:
             raise ValueError("PAGESPEED_API_KEY is required when PageSpeed is enabled")
+        if self.dataforseo_enabled and not (
+            self.dataforseo_login and self.dataforseo_password
+        ):
+            raise ValueError(
+                "DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD are required when DataForSEO is enabled"
+            )
         if self.app_env == "production":
             if "seo:seo@" in self.database_url:
                 raise ValueError("Default database credentials are not allowed in production")

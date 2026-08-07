@@ -21,9 +21,15 @@ Implementatiestatus:
 - DataForSEO SERP- en LLM-mentionsresponses worden lokaal naar het provider-onafhankelijke contract
   vertaald met synthetische fixtures; alleen echte `sources` gelden als AI-citations en usage wordt
   in gehele USD-micro-eenheden vastgelegd;
+- een begrensde HTTP-client maakt de officiële SERP- en LLM-mentionsrequestvorm met Basic Auth,
+  vaste endpoints, maximale diepte/resultaten, responslimiet en gesaniteerde fouten; transporttests
+  gebruiken uitsluitend mocks;
+- provideridentiteit, providerkosten en providertaken zijn uitsluitend interne auditinformatie en
+  ontbreken contractueel in de gebruikerspresentatie; de gebruiker ziet alleen de waarneming,
+  het meetmoment, de dekking en de betrouwbaarheid;
 - één observation wordt conservatief geïnterpreteerd en creëert geen autonome kwaliteitsclaim;
-- de feature staat standaard uit; transport, credentials, scheduler en betaalde calls zijn nog
-  bewust niet gebouwd.
+- de feature en lege credentialconfiguratie staan standaard uit; scheduler, echte credentials en
+  betaalde calls zijn nog bewust niet geactiveerd.
 
 ## 1. Executive summary
 

@@ -138,6 +138,9 @@ services:
       TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-}
       PAGESPEED_ENABLED: ${PAGESPEED_ENABLED:-false}
       PAGESPEED_API_KEY: ${PAGESPEED_API_KEY:-}
+      DATAFORSEO_ENABLED: ${DATAFORSEO_ENABLED:-false}
+      DATAFORSEO_LOGIN: ${DATAFORSEO_LOGIN:-}
+      DATAFORSEO_PASSWORD: ${DATAFORSEO_PASSWORD:-}
       WORKER_QUEUES: integrations,maintenance,performance
       WORKER_NAME: integrations-1
     command: python -m app.worker
