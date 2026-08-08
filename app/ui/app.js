@@ -882,22 +882,18 @@ function evidenceMarkup(evidence = {}) {
   return Object.entries(evidence).slice(0, 5).map(([key, value]) => `<span class="evidence-chip">${escapeHtml(key.replaceAll("_", " "))}: ${escapeHtml(Array.isArray(value) ? value.join(", ") : String(value))}</span>`).join("");
 }
 
-const opportunityPatternLabels = {ctr: "CTR-kans", page_two: "Pagina-twee-kans", internal_link: "Interne-linkkans"};
+const opportunityPatternLabels = {ctr: "CTR-kans", page_two: "Pagina-twee-kans", internal_link: "Interne-linkkans", important_accessibility: "Belangrijke toegankelijkheidskans"};
 const opportunityPriorityLabels = {high_opportunity: "Hoge kans", opportunity: "Kans", monitor: "Volgen", insufficient_evidence: "Onvoldoende bewijs"};
-
-function opportunityScoreMarkup(item) {
-  const dimensions = [["Potentieel", item.potential_score], ["Frictie", item.friction_score], ["Bewijs", item.evidence_score], ["Uitvoerbaarheid", item.feasibility_score]];
-  return dimensions.map(([label, score]) => `<div class="opportunity-score-row"><span>${label}</span><span class="opportunity-score-track"><i style="width:${score ?? 0}%"></i></span><strong>${score == null ? "?" : Math.round(score)}</strong></div>`).join("");
-}
+const opportunityCoverageLabels = {gsc: "Zoekprestatie", crawler_issues: "Paginacontrole", analytics: "Gebruiksdata"};
 
 function scoredOpportunityMarkup(item) {
   const pattern = item.source_coverage?.pattern || "unknown";
-  const coverage = Object.entries(item.source_coverage || {}).filter(([key]) => key !== "pattern").map(([key, available]) => `<span class="coverage-pill ${available ? "" : "coverage-missing"}">${escapeHtml(key)}: ${available ? "aanwezig" : "onbekend"}</span>`).join("");
-  const contributors = (item.contributors || []).map((entry) => `<span class="evidence-chip">${escapeHtml(String(entry.signal || entry.dimension))}: ${escapeHtml(Array.isArray(entry.value) ? entry.value.join(", ") : String(entry.value ?? "onbekend"))}</span>`).join("");
+  const coverage = Object.entries(item.source_coverage || {}).filter(([key]) => key !== "pattern").map(([key, available]) => `<span class="coverage-pill ${available ? "" : "coverage-missing"}">${escapeHtml(opportunityCoverageLabels[key] || "Aanvullend signaal")}: ${available ? "aanwezig" : "onbekend"}</span>`).join("");
+  const prioritySummary = (item.contributors || []).find((entry) => entry.signal === "priority_summary")?.value || "De beschikbare factoren bepalen de volgorde.";
+  const contributors = (item.contributors || []).filter((entry) => entry.signal !== "priority_summary" && entry.label).map((entry) => `<span class="evidence-chip">${escapeHtml(String(entry.label))}: ${escapeHtml(Array.isArray(entry.value) ? entry.value.join(", ") : typeof entry.value === "object" ? JSON.stringify(entry.value) : String(entry.value ?? "onbekend"))}</span>`).join("");
   const comparison = item.previous_total_score == null ? "Eerste meting" : `${item.total_score_change >= 0 ? "+" : ""}${item.total_score_change} sinds vorige meting`;
-  const total = item.total_score == null ? "—" : Math.round(item.total_score);
   const disabled = item.priority_class === "insufficient_evidence" ? " disabled" : "";
-  return `<article class="opportunity-row scored-opportunity"><div class="opportunity-head"><div><span class="eyebrow">${escapeHtml(opportunityPatternLabels[pattern] || pattern)}</span><h3>${item.primary_url ? `<a href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener">${escapeHtml(item.primary_url)}</a>` : escapeHtml(item.scope_key)}</h3></div><strong class="opportunity-total">${total}/100</strong></div><p>${escapeHtml(opportunityPriorityLabels[item.priority_class] || item.priority_class)} · ${escapeHtml(comparison)} · ${escapeHtml(item.period_start)} t/m ${escapeHtml(item.period_end)}</p><div class="opportunity-score-grid">${opportunityScoreMarkup(item)}</div><div class="coverage-pills">${coverage}</div><details><summary>Waarom deze score?</summary><div class="opportunity-evidence">${contributors}</div><p class="formula-version">Formule ${escapeHtml(item.formula_version)}</p></details><button type="button" class="detail-button opportunity-action" data-opportunity-evaluation="${escapeHtml(item.id)}"${disabled}>Maak taak</button></article>`;
+  return `<article class="opportunity-row scored-opportunity"><div class="opportunity-head"><div><span class="eyebrow">${escapeHtml(opportunityPatternLabels[pattern] || pattern)}</span><h3>${item.primary_url ? `<a href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener">${escapeHtml(item.primary_url)}</a>` : escapeHtml(item.scope_key)}</h3></div><strong>${escapeHtml(opportunityPriorityLabels[item.priority_class] || item.priority_class)}</strong></div><p>${escapeHtml(String(prioritySummary))}</p><p>${escapeHtml(comparison)} · ${escapeHtml(item.period_start)} t/m ${escapeHtml(item.period_end)}</p><div class="coverage-pills">${coverage}</div><details><summary>Waarom deze prioriteit?</summary><div class="opportunity-evidence">${contributors}</div></details><button type="button" class="detail-button opportunity-action" data-opportunity-evaluation="${escapeHtml(item.id)}"${disabled}>Maak taak</button></article>`;
 }
 
 function contextAssistantFormMarkup(contextType, contextId, label) {

@@ -12,7 +12,9 @@ from app.models.discovery import Url
 from app.models.integrations import SearchConsoleMetric
 from app.models.issues import Issue
 from app.models.opportunities import OpportunityEvaluation
+from app.services.accessibility.rule_catalog import ACCESSIBILITY_ISSUE_TYPES
 from app.services.discovery_pages import is_discovery_only_page
+from app.services.opportunity_prioritization import priority_factors
 from app.services.opportunity_scoring import (
     OpportunityScores,
     calculate_opportunity_scores,
@@ -35,6 +37,7 @@ CTR_FRICTIONS = {
 }
 PAGE_TWO_FRICTIONS = {"thin_content", "near_duplicate_content"}
 INTERNAL_LINK_FRICTIONS = {"deep_page", "important_page_few_internal_links"}
+ACCESSIBILITY_FRICTIONS = ACCESSIBILITY_ISSUE_TYPES
 MINIMUM_PERIOD_DAYS = 28
 PATTERN_VERSION = "opportunity-patterns-2026-08-07-v1"
 
@@ -131,7 +134,12 @@ def _evidence_score(impressions: int, period_days: int, *, threshold: int) -> fl
 
 
 def _contributors(
-    pattern: str, metrics: PageMetrics, issues: list[Issue]
+    pattern: str,
+    metrics: PageMetrics,
+    issues: list[Issue],
+    *,
+    url: Url,
+    feasibility: str,
 ) -> list[dict[str, object]]:
     return [
         {
@@ -158,6 +166,14 @@ def _contributors(
             "value": f"{PATTERN_VERSION}:{pattern}",
             "direction": "context",
         },
+        *priority_factors(
+            url=url,
+            issues=issues,
+            reach=1,
+            feasibility=feasibility,
+            has_search_evidence=metrics.impressions > 0,
+            impressions=metrics.impressions,
+        ),
     ]
 
 
@@ -172,6 +188,7 @@ def _store_pattern(
     metrics: PageMetrics,
     matching_issues: list[Issue],
     scores: OpportunityScores,
+    feasibility: str,
 ) -> tuple[OpportunityEvaluation, bool]:
     return store_opportunity_evaluation(
         db,
@@ -183,12 +200,18 @@ def _store_pattern(
         period_end=period_end,
         scores=scores,
         source_coverage={
-            "gsc": True,
+            "gsc": metrics.impressions > 0,
             "crawler_issues": True,
             "analytics": False,
             "pattern": pattern,
         },
-        contributors=_contributors(pattern, metrics, matching_issues),
+        contributors=_contributors(
+            pattern,
+            metrics,
+            matching_issues,
+            url=url,
+            feasibility=feasibility,
+        ),
         evidence=[
             {
                 "source": "gsc",
@@ -214,12 +237,18 @@ def evaluate_website_opportunities(
         raise ValueError(f"Opportunity periods must contain at least {MINIMUM_PERIOD_DAYS} days")
     metrics_by_url = _metrics_by_url(db, website_id, period_start, period_end)
     issues_by_url = _issues_by_url(db, website_id)
+    important_accessibility_url_ids = {
+        url_id
+        for url_id, issues in issues_by_url.items()
+        if any(issue.issue_type in ACCESSIBILITY_FRICTIONS for issue in issues)
+    }
+    candidate_url_ids = set(metrics_by_url) | important_accessibility_url_ids
     urls = {
         url.id: url
         for url in db.scalars(
             select(Url).where(
                 Url.website_id == website_id,
-                Url.id.in_(set(metrics_by_url)),
+                Url.id.in_(candidate_url_ids),
                 Url.is_active.is_(True),
                 Url.is_indexable.is_(True),
                 Url.current_status_code == 200,
@@ -230,16 +259,16 @@ def evaluate_website_opportunities(
     classifications = _latest_classifications(db, website_id)
     created = 0
     existing = 0
-    skipped = len(metrics_by_url) - len(urls)
+    skipped = len(candidate_url_ids) - len(urls)
 
     for url_id, url in urls.items():
         if is_discovery_only_page(url.normalized_url, canonicals.get(url_id)):
             skipped += 1
             continue
-        metrics = metrics_by_url[url_id]
+        metrics = metrics_by_url.get(url_id, PageMetrics())
         issues = issues_by_url.get(url_id, [])
         issue_types = {issue.issue_type for issue in issues}
-        candidates: list[tuple[str, set[str], OpportunityScores]] = []
+        candidates: list[tuple[str, set[str], OpportunityScores, str]] = []
 
         if (
             metrics.impressions >= 250
@@ -257,6 +286,7 @@ def evaluate_website_opportunities(
                         evidence=_evidence_score(metrics.impressions, period_days, threshold=250),
                         feasibility=85,
                     ),
+                    "direct",
                 )
             )
 
@@ -279,6 +309,7 @@ def evaluate_website_opportunities(
                         evidence=_evidence_score(metrics.impressions, period_days, threshold=150),
                         feasibility=60,
                     ),
+                    "needs_content_input",
                 )
             )
 
@@ -297,10 +328,34 @@ def evaluate_website_opportunities(
                         evidence=_evidence_score(metrics.impressions, period_days, threshold=150),
                         feasibility=80,
                     ),
+                    "direct",
                 )
             )
 
-        for pattern, relevant_types, scores in candidates:
+        accessibility_issues = [
+            issue for issue in issues if issue.issue_type in ACCESSIBILITY_FRICTIONS
+        ]
+        if url.is_important and accessibility_issues:
+            confidence = (
+                75
+                if all(issue.confidence == "high" for issue in accessibility_issues)
+                else 55
+            )
+            candidates.append(
+                (
+                    "important_accessibility",
+                    ACCESSIBILITY_FRICTIONS,
+                    calculate_opportunity_scores(
+                        potential=max(75, _score_potential(metrics.impressions, threshold=50)),
+                        friction=85,
+                        evidence=confidence,
+                        feasibility=65,
+                    ),
+                    "needs_technical_research",
+                )
+            )
+
+        for pattern, relevant_types, scores, feasibility in candidates:
             relevant = [issue for issue in issues if issue.issue_type in relevant_types]
             _evaluation, was_created = _store_pattern(
                 db,
@@ -312,6 +367,7 @@ def evaluate_website_opportunities(
                 metrics=metrics,
                 matching_issues=relevant,
                 scores=scores,
+                feasibility=feasibility,
             )
             created += int(was_created)
             existing += int(not was_created)

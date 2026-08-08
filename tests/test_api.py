@@ -224,6 +224,11 @@ def test_operations_status_ignores_stale_website_responses(client: TestClient) -
     assert "state.exports = [];" in script.text
     assert "function loadIssueRecommendation" in script.text
     assert "function loadTaskCenter" in script.text
+    assert 'gsc: "Zoekprestatie"' in script.text
+    assert 'crawler_issues: "Paginacontrole"' in script.text
+    assert "Waarom deze prioriteit?" in script.text
+    assert "opportunityScoreMarkup" not in script.text
+    assert "${total}/100" not in script.text
     assert "function renderTaskNotifications" in script.text
     assert "function taskAssigneeOptions" in script.text
     assert 'id="recommendation-task-owner"' in script.text

@@ -42,6 +42,59 @@ def _issue(url: Url, issue_type: str, *, status: str = "new") -> Issue:
     )
 
 
+def test_engine_prioritizes_important_accessibility_page_without_search_data() -> None:
+    with SessionLocal() as db:
+        customer = Client(name="Cross-domain priority")
+        website = Website(
+            client=customer,
+            name="Cross-domain priority site",
+            base_url="https://priority.example.com",
+        )
+        db.add(website)
+        db.flush()
+        page = Url(
+            website_id=website.id,
+            normalized_url="https://priority.example.com/contact",
+            current_status_code=200,
+            is_active=True,
+            is_indexable=True,
+            is_important=True,
+        )
+        db.add(page)
+        db.flush()
+        issue = _issue(page, "accessibility_label")
+        issue.category = "accessibility"
+        issue.severity = "high"
+        db.add(issue)
+        db.commit()
+
+        result = evaluate_website_opportunities(
+            db,
+            website.id,
+            date(2026, 7, 1),
+            date(2026, 7, 28),
+        )
+        evaluation = db.scalar(select(OpportunityEvaluation))
+
+        assert result == {"created": 1, "existing": 0, "skipped": 0}
+        assert evaluation is not None
+        assert evaluation.source_coverage == {
+            "gsc": False,
+            "crawler_issues": True,
+            "analytics": False,
+            "pattern": "important_accessibility",
+        }
+        factors = {item["signal"]: item for item in evaluation.contributors if "label" in item}
+        assert factors["priority_summary"]["value"] == (
+            "Impact op SEO en toegankelijkheid; belangrijke pagina."
+        )
+        assert factors["evidence_completeness"]["missing_sources"] == ["zoekprestatie"]
+        assert factors["important_page_context"]["value"] == {
+            "important_url": True,
+            "observed_demand": 0,
+        }
+
+
 def test_engine_combines_potential_and_matching_friction_without_duplicates() -> None:
     with SessionLocal() as db:
         customer = Client(name="Opportunity engine")

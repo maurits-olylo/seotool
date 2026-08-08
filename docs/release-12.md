@@ -1,6 +1,7 @@
 # Release 12 — Continuous Website Improvement-pilot
 
-Status: fase B lokaal en op staging geaccepteerd; nog niet naar productie gedeployed.
+Status: fase C lokaal en op staging geaccepteerd; fase D lokaal in uitvoering; nog niet naar
+productie gedeployed.
 
 ## Doel en afbakening
 
@@ -112,7 +113,32 @@ Definitieve stagingacceptatie:
 - API en database bleven na de volledige workflow gezond;
 - gereedsignaal: `release-12-phase-c-staging-ok`.
 
+## Fase D — uitlegbare cross-domainprioritering
+
+Status: lokaal geïmplementeerd en getest; stagingacceptatie volgt.
+
+- de bestaande kansberekening blijft intern beschikbaar voor reproduceerbare sortering, maar de
+  interface toont geen universele `/100`-score meer;
+- iedere kans legt prioriteit uit via impactdomeinen, bereik, bewijs, uitvoerbaarheid, urgentie en
+  businesscontext;
+- ontbrekend bewijs verlaagt de zekerheid zonder een aantoonbaar probleem te verbergen;
+- een belangrijke pagina met een hard accessibilityissue kan ook zonder zoekprestatiegegevens als
+  cross-domainkans worden opgenomen;
+- bronlabels in de gebruikersinterface zijn functioneel en noemen geen externe leverancier;
+- bestaande SEO-kansen gebruiken dezelfde factorgerichte uitleg, zodat geen tweede workflow of
+  apart accessibilitydashboard ontstaat.
+
+Acceptatie vereist minimaal een kans met gecombineerde SEO- en accessibilityimpact, een kandidaat
+zonder zoekdata, een bestaande SEO-kans met dezelfde uitlegstructuur en een controle dat de UI geen
+algemene score of leveranciersnaam toont.
+
+Lokale acceptatie:
+
+- belangrijke accessibilitypagina zonder zoekdata en bestaande SEO-kansen: geautomatiseerd getest;
+- gebruikersinterface toont factorgerichte prioriteit en functionele bronlabels zonder `/100`-score;
+- volledige regressiesuite: 558 geslaagd, alleen de bestaande Starlette/httpx-waarschuwing;
+- Ruff, JavaScript-syntax en diffcontrole: geslaagd.
+
 ## Volgende fase
 
-Na lokale eindcontrole en stagingacceptatie kan fase D starten met uitlegbare cross-domain
-prioritering. Fase D start pas na afzonderlijke bevestiging.
+Na lokale eindcontrole volgt de stagingacceptatie van fase D.
