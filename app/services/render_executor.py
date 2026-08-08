@@ -83,6 +83,11 @@ def execute_render_observation(observation_id: str) -> None:
             observation.comparison = {
                 **comparison,
                 "browser_request_count": result.request_count,
+                "screenshot_element_boxes": result.element_boxes or [],
+                "screenshot_viewport": {
+                    "width": result.screenshot_width,
+                    "height": result.screenshot_height,
+                },
             }
             db.commit()
             logger.info(

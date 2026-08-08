@@ -2430,6 +2430,15 @@ function inspectionTargetMarkup(target) {
   return `<article class="inspection-target ${kind}"><strong>${escapeHtml(title)}</strong>${target.visible_text ? `<p>${escapeHtml(target.visible_text)}</p>` : ""}<p>${escapeHtml(locator)}</p></article>`;
 }
 
+function inspectionOverlayMarkup(target, page) {
+  if (!target.box || !page.screenshot_width || !page.screenshot_height) return "";
+  const left = Math.max(0, Math.min(100, target.box.x / page.screenshot_width * 100));
+  const top = Math.max(0, Math.min(100, target.box.y / page.screenshot_height * 100));
+  const width = Math.max(0, Math.min(100 - left, target.box.width / page.screenshot_width * 100));
+  const height = Math.max(0, Math.min(100 - top, target.box.height / page.screenshot_height * 100));
+  return `<span class="inspection-overlay" style="left:${left}%;top:${top}%;width:${width}%;height:${height}%" aria-hidden="true"></span>`;
+}
+
 async function loadIssueInspection(issueId) {
   const section = $("#issue-inspection");
   const content = $("#issue-inspection-content");
@@ -2442,7 +2451,7 @@ async function loadIssueInspection(issueId) {
       content.innerHTML = `<p class="inspection-empty">Voor dit issue is geen historische paginaweergave beschikbaar. Gebruik het technische bewijs hierboven.</p>`;
       return;
     }
-    content.innerHTML = inspection.pages.map((page) => `<article class="inspection-page"><div class="inspection-meta"><span>Gemeten ${new Date(page.captured_at).toLocaleString("nl-NL")}</span><span>${page.is_current_occurrence ? "Actuele issuewaarneming" : "Eerdere waarneming"}</span></div>${page.screenshot_url ? `<div class="inspection-frame"><img src="${escapeHtml(page.screenshot_url)}" alt="Historische schermweergave van ${escapeHtml(page.source_url)}"></div>` : `<p class="inspection-empty">Van dit meetmoment is geen schermweergave bewaard.</p>`}<div class="inspection-targets">${page.targets.map(inspectionTargetMarkup).join("")}</div></article>`).join("");
+    content.innerHTML = inspection.pages.map((page) => `<article class="inspection-page"><div class="inspection-meta"><span>Gemeten ${new Date(page.captured_at).toLocaleString("nl-NL")}</span><span>${page.is_current_occurrence ? "Actuele issuewaarneming" : "Eerdere waarneming"}</span></div>${page.screenshot_url ? `<div class="inspection-frame"><img src="${escapeHtml(page.screenshot_url)}" alt="Historische schermweergave van ${escapeHtml(page.source_url)}">${page.targets.map((target) => inspectionOverlayMarkup(target, page)).join("")}</div>` : `<p class="inspection-empty">Van dit meetmoment is geen schermweergave bewaard.</p>`}<div class="inspection-targets">${page.targets.map(inspectionTargetMarkup).join("")}</div></article>`).join("");
   } catch (error) {
     section.classList.remove("hidden");
     $("#issue-inspection-status").textContent = "Niet beschikbaar";

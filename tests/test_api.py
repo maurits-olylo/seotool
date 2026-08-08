@@ -167,7 +167,7 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
 def test_operations_status_ignores_stale_website_responses(client: TestClient) -> None:
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
-    assert 'src="/ui/assets/app.js?v=20260808-7"' in page.text
+    assert 'src="/ui/assets/app.js?v=20260808-8"' in page.text
     assert 'href="/ui/assets/actionable.css?v=20260731-4"' in page.text
     assert 'id="recommendation-task-section"' in page.text
     assert 'id="recommendation-task-content"' in page.text
@@ -1472,6 +1472,21 @@ def test_issue_detail_returns_live_element_location(
                 screenshot_width=1365,
                 screenshot_height=768,
                 screenshot_expires_at=datetime.now(UTC) + timedelta(days=90),
+                comparison={
+                    "screenshot_element_boxes": [
+                        {
+                            "element_type": "a",
+                            "element_id": "oude-link",
+                            "target_url": target.normalized_url,
+                            "visible_text": "Oud artikel",
+                            "occurrence_index": 1,
+                            "x": 100,
+                            "y": 200,
+                            "width": 160,
+                            "height": 40,
+                        }
+                    ]
+                },
             )
         )
         db.commit()
@@ -1511,6 +1526,12 @@ def test_issue_detail_returns_live_element_location(
         "strategy": "id",
         "value": "oude-link",
         "reliable": True,
+    }
+    assert page["targets"][0]["box"] == {
+        "x": 100.0,
+        "y": 200.0,
+        "width": 160.0,
+        "height": 40.0,
     }
     screenshot = client.get(page["screenshot_url"])
     assert screenshot.status_code == 200

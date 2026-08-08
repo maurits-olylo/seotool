@@ -27,6 +27,19 @@ def test_renderer_blocks_private_and_heavy_requests(monkeypatch) -> None:  # typ
     assert playwright.routes == ["continue", "abort", "abort", "continue"]
     assert playwright.context_options["service_workers"] == "block"
     assert playwright.context_options["accept_downloads"] is False
+    assert result.element_boxes == [
+        {
+            "element_type": "a",
+            "element_id": "cta",
+            "target_url": "https://example.com/contact",
+            "visible_text": "Contact",
+            "occurrence_index": 1,
+            "x": 20,
+            "y": 30,
+            "width": 120,
+            "height": 40,
+        }
+    ]
 
 
 def test_renderer_enforces_request_limit(monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -86,6 +99,26 @@ class _Page:
 
     def screenshot(self, **_kwargs) -> bytes:  # type: ignore[no-untyped-def]
         return b"png"
+
+    def locator(self, _selector: str):  # type: ignore[no-untyped-def]
+        return _Locator()
+
+
+class _Locator:
+    def evaluate_all(self, _script: str) -> list[dict[str, object]]:
+        return [
+            {
+                "element_type": "a",
+                "element_id": "cta",
+                "target_url": "https://example.com/contact",
+                "visible_text": "Contact",
+                "occurrence_index": 1,
+                "x": 20,
+                "y": 30,
+                "width": 120,
+                "height": 40,
+            }
+        ]
 
 
 class _Context:

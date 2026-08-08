@@ -27,6 +27,9 @@ def test_executor_stores_comparison_and_reconciles_issues(monkeypatch) -> None: 
             ),
             browser_name="chromium",
             request_count=7,
+            element_boxes=[
+                {"element_id": "cta", "x": 1, "y": 2, "width": 3, "height": 4}
+            ],
         ),
     )
 
@@ -39,6 +42,7 @@ def test_executor_stores_comparison_and_reconciles_issues(monkeypatch) -> None: 
         assert stored.status == "succeeded"
         assert stored.rendered_at is not None
         assert stored.comparison["browser_request_count"] == 7
+        assert stored.comparison["screenshot_element_boxes"][0]["element_id"] == "cta"
         assert stored.comparison["javascript_dependent_content"] is True
         assert "javascript_dependent_content" in issues
         assert "javascript_only_links" in issues

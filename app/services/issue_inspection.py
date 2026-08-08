@@ -117,8 +117,10 @@ def _located_target(
         "location_id": location.id,
         "target_url": location.target_url,
         "visible_text": location.visible_text,
+        "occurrence_index": location.occurrence_index,
         "html_fragment": location.html_fragment,
         "locator": _best_locator(location),
+        "box": None,
         "jump_url": payload.get("jump_url"),
     }
 
@@ -149,6 +151,14 @@ def _inspection_page(
     render = db.scalar(
         select(RenderObservation).where(RenderObservation.source_snapshot_id == snapshot.id)
     )
+    render_boxes = (
+        render.comparison.get("screenshot_element_boxes", [])
+        if render and isinstance(render.comparison, dict)
+        else []
+    )
+    resolved_targets = [
+        {**target, "box": _matching_box(target, render_boxes)} for target in targets
+    ]
     return {
         "url_id": snapshot.url_id,
         "source_url": url.normalized_url if url else snapshot.requested_url,
@@ -173,8 +183,42 @@ def _inspection_page(
         "screenshot_width": render.screenshot_width if render else None,
         "screenshot_height": render.screenshot_height if render else None,
         "screenshot_expires_at": render.screenshot_expires_at if render else None,
-        "targets": targets,
+        "targets": resolved_targets,
     }
+
+
+def _matching_box(
+    target: dict[str, object], boxes: object
+) -> dict[str, float] | None:
+    if target.get("kind") != "located" or not isinstance(boxes, list):
+        return None
+    locator = target.get("locator")
+    candidates = [box for box in boxes if isinstance(box, dict)]
+    if isinstance(locator, dict) and locator.get("strategy") == "id":
+        candidates = [
+            box for box in candidates if box.get("element_id") == locator.get("value")
+        ]
+    else:
+        candidates = [
+            box
+            for box in candidates
+            if box.get("element_type") == target.get("element_type")
+            and box.get("target_url") == target.get("target_url")
+            and box.get("visible_text") == target.get("visible_text")
+            and box.get("occurrence_index") == target.get("occurrence_index")
+        ]
+    if len(candidates) != 1:
+        return None
+    box = candidates[0]
+    try:
+        values = {name: float(box[name]) for name in ("x", "y", "width", "height")}
+    except (KeyError, TypeError, ValueError):
+        return None
+    if values["width"] <= 0 or values["height"] <= 0:
+        return None
+    if any(value < 0 for value in values.values()):
+        return None
+    return values
 
 
 def _issue_snapshot(

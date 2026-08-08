@@ -1,6 +1,6 @@
 # Release 11 — Visuele issue-inspectie
 
-Status: fasen 1, 2 en 3 lokaal geïmplementeerd; nog niet gedeployed.
+Status: fasen 1 tot en met 4 lokaal geïmplementeerd; nog niet gedeployed.
 
 ## Fase 1 — Uniform inspectiecontract
 
@@ -64,3 +64,17 @@ wanneer de browserrender die betrouwbaar en viewportgebonden kan opslaan.
 - Verlopen, ontbrekende en onveilige artefactpaden leveren geen bestand op.
 - De interface onderscheidt exact, beperkt en ontbrekend visueel bewijs.
 - De screenshot is historisch gelabeld en wordt niet als live hercontrole gepresenteerd.
+
+## Fase 4 — Betrouwbare elementmarkering
+
+De browserrender bewaart naast de vaste viewport-screenshot maximaal vijfhonderd zichtbare
+elementgeometrieën in de bestaande comparison-metadata. De inspectieservice koppelt een issue alleen
+aan een kader bij één eenduidige ID-match of één exacte combinatie van elementtype, doel, tekst en
+volgnummer. Dubbele, ongeldige of ontbrekende matches leveren bewust geen overlay op.
+
+## Acceptatie fase 4
+
+- Geometrie is gebonden aan dezelfde vaste viewport als de screenshot.
+- Alleen positieve, eenduidig gekoppelde rechthoeken worden gepubliceerd.
+- De interface schaalt het kader mee met de responsieve screenshot.
+- Oude screenshots zonder geometrie blijven zonder fout en zonder kunstmatige markering werken.

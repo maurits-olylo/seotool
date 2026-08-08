@@ -125,8 +125,10 @@ class InspectionTargetRead(BaseModel):
     location_id: UUID | None
     target_url: str | None
     visible_text: str | None
+    occurrence_index: int | None = None
     html_fragment: str | None
     locator: InspectionLocatorRead | None
+    box: dict[str, float] | None = None
     jump_url: str | None = None
 
 

@@ -7,6 +7,7 @@ from app.services.url_normalization import InvalidUrlError
 MAX_BROWSER_REQUESTS = 100
 MAX_RENDERED_HTML_BYTES = 5_000_000
 MAX_SCREENSHOT_BYTES = 2_000_000
+MAX_ELEMENT_BOXES = 500
 BLOCKED_RESOURCE_TYPES = {"font", "image", "media"}
 
 
@@ -22,6 +23,7 @@ class BrowserRenderResult:
     screenshot_png: bytes | None = None
     screenshot_width: int = 1365
     screenshot_height: int = 768
+    element_boxes: list[dict[str, object]] | None = None
 
 
 def render_page_html(
@@ -84,6 +86,34 @@ def render_page_html(
             page.wait_for_timeout(min(max(settle_time_ms, 0), 2_000))
             html = page.content()
             try:
+                element_boxes = page.locator(
+                    "a,button,h1,h2,h3,img,video,audio,source,iframe"
+                ).evaluate_all(
+                    r"""elements => {
+                  const counts = new Map();
+                  return elements.slice(0, 500).map(element => {
+                    const rect = element.getBoundingClientRect();
+                    const tag = element.tagName.toLowerCase();
+                    const rawText = element.innerText || element.getAttribute('alt') || '';
+                    const text = rawText.trim().replace(/\s+/g, ' ').slice(0, 500);
+                    const target = element.href || element.currentSrc || element.src || null;
+                    const key = `${tag}|${text}|${target || ''}`;
+                    const occurrence = (counts.get(key) || 0) + 1;
+                    counts.set(key, occurrence);
+                    return {
+                      element_type: tag, element_id: element.id || null,
+                      target_url: target, visible_text: text || null,
+                      occurrence_index: occurrence, x: rect.x, y: rect.y,
+                      width: rect.width, height: rect.height
+                    };
+                  }).filter(item => item.width > 0 && item.height > 0 &&
+                    item.x < 1365 && item.y < 768 &&
+                    item.x + item.width > 0 && item.y + item.height > 0);
+                }"""
+                )
+            except Exception:
+                element_boxes = []
+            try:
                 screenshot_png = page.screenshot(type="png", full_page=False)
             except Exception:
                 screenshot_png = None
@@ -105,4 +135,5 @@ def render_page_html(
         browser_name="chromium",
         request_count=request_count,
         screenshot_png=screenshot_png,
+        element_boxes=element_boxes[:MAX_ELEMENT_BOXES],
     )
