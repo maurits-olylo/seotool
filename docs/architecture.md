@@ -348,6 +348,10 @@ Bij een expliciete live issuehercontrole mag de observatie daarnaast één betro
 locator uit het historische elementbewijs bevatten. De browser scrolt alleen bij exact één actuele
 DOM-match en legt daarna viewport en elementgeometrie vast. Ontbrekende, onbetrouwbare of ambigue
 doelen vallen terug op een gewone viewportopname; zij krijgen geen verzonnen visuele locatie.
+Wanneer één issue elementbewijs op meerdere bronpagina's heeft, blijft het inspectiecontract alle
+pagina's teruggeven maar rendert de interface één geselecteerde snapshot tegelijk. Een gerichte
+live hercontrole mag alleen die snapshot gebruiken nadat de API heeft vastgesteld dat zij tot de
+geautoriseerde issue-inspectie behoort.
 Afbeeldingen en documenten krijgen een lichte HEAD-controle. Grote afbeeldingen (meer dan 2 MB) en
 documenten (meer dan 5 MB) leveren afzonderlijke issues op zonder de volledige bestanden te downloaden.
 

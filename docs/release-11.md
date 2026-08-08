@@ -1,6 +1,6 @@
 # Release 11 — Visuele issue-inspectie
 
-Status: fasen 1 tot en met 6 lokaal geïmplementeerd; nog niet gedeployed.
+Status: fasen 1 tot en met 7 lokaal geïmplementeerd; nog niet gedeployed.
 
 ## Fase 1 — Uniform inspectiecontract
 
@@ -120,3 +120,24 @@ tot geforceerd scrollen. De live controle blijft dan als gewone viewportwaarnemi
 - Elementgeometrie en screenshot worden pas na een geslaagde focuspoging vastgelegd.
 - Een ongeldig, verdwenen of dubbel element breekt de render niet en levert geen kunstmatige focus.
 - Reguliere renderwaarnemingen zonder issuefocus behouden hun bestaande gedrag.
+
+## Fase 7 — Schaalbare inspectie van meerdere bronpagina's
+
+Issues met bewijs op meerdere bronpagina's laden in het issuedetail nog maar één geselecteerde
+paginaweergave tegelijk. Een compacte paginakeuze toont URL en positie binnen de bewijsset. De
+actuele issuewaarneming is de standaardselectie; tijdens verversen blijft de handmatig gekozen
+snapshot behouden zolang die nog beschikbaar is.
+
+De live-hercontroleroute accepteert optioneel de geselecteerde snapshot. De server controleert dat
+de snapshot werkelijk bij de inspectie van dit issue hoort voordat een renderwaarneming wordt
+aangemaakt. Daardoor kan een gebruiker gericht één bronpagina controleren zonder stilzwijgend de
+eerste URL of een willekeurige andere tenantpagina te laten renderen.
+
+## Acceptatie fase 7
+
+- Bij meerdere bronpagina's wordt slechts één screenshot tegelijk in de interface geladen.
+- De selector toont de bron-URL en de positie binnen de volledige bewijsset.
+- Een gekozen pagina blijft geselecteerd tijdens statusverversing en live polling.
+- Live hercontrole gebruikt exact de geselecteerde snapshot.
+- Een onbekende of niet bij het issue horende snapshot wordt geweigerd zonder taak aan te maken.
+- Op 390 px staat de paginakeuze onder elkaar zonder horizontale overflow.

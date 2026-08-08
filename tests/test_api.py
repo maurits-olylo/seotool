@@ -167,7 +167,11 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
 def test_operations_status_ignores_stale_website_responses(client: TestClient) -> None:
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
-    assert 'src="/ui/assets/app.js?v=20260808-9"' in page.text
+    assert 'src="/ui/assets/app.js?v=20260808-10"' in page.text
+    assert 'href="/ui/assets/issue-inspection.css?v=20260808-4"' in page.text
+    script = client.get("/ui/assets/app.js").text
+    assert "issue-inspection-page-select" in script
+    assert "snapshot_id=${encodeURIComponent(state.selectedInspectionSnapshotId)}" in script
     assert 'href="/ui/assets/actionable.css?v=20260731-4"' in page.text
     assert 'id="recommendation-task-section"' in page.text
     assert 'id="recommendation-task-content"' in page.text
@@ -1550,8 +1554,17 @@ def test_issue_detail_returns_live_element_location(
         "app.api.routes.issues.enqueue_render_observation",
         lambda observation_id, **_kwargs: enqueued.append(observation_id) or True,
     )
-    recheck = client.post(f"/api/v1/issues/{issue_id}/inspection/recheck")
-    repeated = client.post(f"/api/v1/issues/{issue_id}/inspection/recheck")
+    unknown_page = client.post(
+        f"/api/v1/issues/{issue_id}/inspection/recheck"
+        "?snapshot_id=00000000-0000-0000-0000-000000000000"
+    )
+    assert unknown_page.status_code == 409
+    recheck = client.post(
+        f"/api/v1/issues/{issue_id}/inspection/recheck?snapshot_id={snapshot_id}"
+    )
+    repeated = client.post(
+        f"/api/v1/issues/{issue_id}/inspection/recheck?snapshot_id={snapshot_id}"
+    )
 
     assert recheck.status_code == 202
     assert recheck.json()["status"] == "pending"

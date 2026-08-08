@@ -845,6 +845,7 @@ def get_issue_inspection(
 )
 def start_issue_inspection_recheck(
     issue_id: UUID,
+    snapshot_id: UUID | None = Query(default=None),
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> IssueInspectionRecheckRead:
@@ -869,9 +870,18 @@ def start_issue_inspection_recheck(
     pages = inspection["pages"]
     if not pages:
         raise HTTPException(status_code=409, detail="No inspectable page is available")
-    selected_page = next(
-        (page for page in pages if page["is_current_occurrence"]), pages[0]
-    )
+    if snapshot_id is not None:
+        selected_page = next(
+            (page for page in pages if page["snapshot_id"] == snapshot_id), None
+        )
+        if selected_page is None:
+            raise HTTPException(
+                status_code=409, detail="Selected inspection page is not available"
+            )
+    else:
+        selected_page = next(
+            (page for page in pages if page["is_current_occurrence"]), pages[0]
+        )
     snapshot = db.scalar(
         select(UrlSnapshot)
         .where(UrlSnapshot.id == selected_page["snapshot_id"])

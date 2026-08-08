@@ -24,7 +24,7 @@ const labels = {
   pause_requested: "Pauze wordt voorbereid", paused: "Gepauzeerd",
   cancel_requested: "Stop wordt voorbereid", connected: "Gekoppeld", error: "Fout",
 };
-const state = { currentUser: null, currentView: "dashboard", clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], changesRequestId: 0, jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, contentAnalysis: null, contentAnalysisDays: 28, contentAnalysisTab: "overview", contentAnalysisPage: 1, questionScopes: null, externalEvidenceRequests: new Map(), effectEvaluations: [], crawlRuns: [], showCrawlArchive: false, activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, operationsRequestId: 0, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], urlCoverage: null, filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, selectedRecommendationTask: null, recommendationFeedback: [], recommendationDefinitions: null, recommendationTasks: [], taskNotifications: [], taskMembers: [], googleConnectionId: null, bingConnectionId: null, matomoConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
+const state = { currentUser: null, currentView: "dashboard", clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], changesRequestId: 0, jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, contentAnalysis: null, contentAnalysisDays: 28, contentAnalysisTab: "overview", contentAnalysisPage: 1, questionScopes: null, externalEvidenceRequests: new Map(), effectEvaluations: [], crawlRuns: [], showCrawlArchive: false, activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, operationsRequestId: 0, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], urlCoverage: null, filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, selectedInspectionSnapshotId: null, selectedRecommendationTask: null, recommendationFeedback: [], recommendationDefinitions: null, recommendationTasks: [], taskNotifications: [], taskMembers: [], googleConnectionId: null, bingConnectionId: null, matomoConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
 const VIEW_HASHES = {dashboard: "overzicht", tasks: "taken", actions: "analyse/acties", urls: "analyse/urls", changes: "analyse/wijzigingen", insights: "analyse/inzichten", contentAnalysis: "analyse/content", vacancies: "analyse/vacatures", reports: "rapportages", operations: "crawls-exports", clients: "instellingen/klanten-websites", team: "instellingen/team-toegang", integrations: "instellingen/integraties"};
 const LEGACY_HASHES = {rapportage: "reports", urls: "urls", wijzigingen: "changes", inzichten: "insights", vacatures: "vacancies", beheer: "operations", organisatie: "clients", integraties: "integrations", acties: "actions"};
 const ANALYSIS_VIEWS = new Set(["actions", "urls", "changes", "insights", "contentAnalysis", "vacancies"]);
@@ -2340,6 +2340,7 @@ async function restoreSelectedSuppressions() {
 
 async function showIssue(issueId) {
   state.selectedIssueId = issueId;
+  state.selectedInspectionSnapshotId = null;
   state.selectedRecommendationTask = null;
   state.recommendationFeedback = [];
   $("#issue-context-question").value = "";
@@ -2450,7 +2451,11 @@ async function loadIssueInspection(issueId) {
     const recheckButton = $("#issue-inspection-recheck");
     const canRecheck = inspection.live_recheck_available && ["superuser", "admin"].includes(state.currentUser?.role);
     recheckButton.classList.toggle("hidden", !canRecheck);
-    const busy = inspection.pages.some((page) => ["pending", "running"].includes(page.render_status));
+    const selectedPage = inspection.pages.find((page) => page.snapshot_id === state.selectedInspectionSnapshotId)
+      || inspection.pages.find((page) => page.is_current_occurrence)
+      || inspection.pages[0];
+    state.selectedInspectionSnapshotId = selectedPage?.snapshot_id || null;
+    const busy = selectedPage && ["pending", "running"].includes(selectedPage.render_status);
     recheckButton.disabled = busy;
     recheckButton.textContent = busy ? "Live controle loopt…" : "Live opnieuw controleren";
     const statusLabels = {available:"Exact elementbewijs",limited:"Beperkt bewijs",unavailable:"Geen visueel bewijs"};
@@ -2459,7 +2464,9 @@ async function loadIssueInspection(issueId) {
       content.innerHTML = `<p class="inspection-empty">Voor dit issue is geen historische paginaweergave beschikbaar. Gebruik het technische bewijs hierboven.</p>`;
       return;
     }
-    content.innerHTML = inspection.pages.map((page) => `<article class="inspection-page"><div class="inspection-meta"><span>${page.render_source === "live_recheck" && page.rendered_at ? `Live weergegeven ${new Date(page.rendered_at).toLocaleString("nl-NL")}` : `Gemeten ${new Date(page.captured_at).toLocaleString("nl-NL")}`}</span><span>${page.is_current_occurrence ? "Actuele issuewaarneming" : "Eerdere waarneming"}</span></div>${page.screenshot_url ? `<div class="inspection-frame"><img src="${escapeHtml(page.screenshot_url)}" alt="Historische schermweergave van ${escapeHtml(page.source_url)}">${page.targets.map((target) => inspectionOverlayMarkup(target, page)).join("")}</div>` : `<p class="inspection-empty">Van dit meetmoment is geen schermweergave bewaard.</p>`}<div class="inspection-targets">${page.targets.map(inspectionTargetMarkup).join("")}</div></article>`).join("");
+    const selectedIndex = inspection.pages.indexOf(selectedPage);
+    const pageNavigation = inspection.pages.length > 1 ? `<div class="inspection-page-navigation"><label for="issue-inspection-page-select">Bronpagina</label><select id="issue-inspection-page-select">${inspection.pages.map((page, index) => `<option value="${escapeHtml(page.snapshot_id)}" ${index === selectedIndex ? "selected" : ""}>${index + 1}. ${escapeHtml(page.source_url)}</option>`).join("")}</select><span>${selectedIndex + 1} van ${inspection.pages.length}</span></div>` : "";
+    content.innerHTML = `${pageNavigation}<article class="inspection-page"><div class="inspection-meta"><span>${selectedPage.render_source === "live_recheck" && selectedPage.rendered_at ? `Live weergegeven ${new Date(selectedPage.rendered_at).toLocaleString("nl-NL")}` : `Gemeten ${new Date(selectedPage.captured_at).toLocaleString("nl-NL")}`}</span><span>${selectedPage.is_current_occurrence ? "Actuele issuewaarneming" : "Eerdere waarneming"}</span></div>${selectedPage.screenshot_url ? `<div class="inspection-frame"><img src="${escapeHtml(selectedPage.screenshot_url)}" alt="Historische schermweergave van ${escapeHtml(selectedPage.source_url)}">${selectedPage.targets.map((target) => inspectionOverlayMarkup(target, selectedPage)).join("")}</div>` : `<p class="inspection-empty">Van dit meetmoment is geen schermweergave bewaard.</p>`}<div class="inspection-targets">${selectedPage.targets.map(inspectionTargetMarkup).join("")}</div></article>`;
     return inspection;
   } catch (error) {
     section.classList.remove("hidden");
@@ -2477,7 +2484,8 @@ async function startIssueInspectionRecheck() {
   button.disabled = true;
   message.textContent = "Live controle wordt gestart…";
   try {
-    await api(`/api/v1/issues/${issueId}/inspection/recheck`, {method:"POST"});
+    const selectedPage = state.selectedInspectionSnapshotId ? `?snapshot_id=${encodeURIComponent(state.selectedInspectionSnapshotId)}` : "";
+    await api(`/api/v1/issues/${issueId}/inspection/recheck${selectedPage}`, {method:"POST"});
     message.textContent = "Live controle loopt. De historische weergave blijft zichtbaar.";
     pollIssueInspection(issueId, 0);
   } catch (error) {
@@ -2992,6 +3000,11 @@ $("#clients-nav").addEventListener("click", () => showView("clients"));
 $("#team-nav").addEventListener("click", () => showView("team"));
 $("#integrations-nav").addEventListener("click", () => showView("integrations"));
 $("#issue-inspection-recheck").addEventListener("click", startIssueInspectionRecheck);
+$("#issue-inspection-content").addEventListener("change", (event) => {
+  if (event.target.id !== "issue-inspection-page-select") return;
+  state.selectedInspectionSnapshotId = event.target.value;
+  loadIssueInspection(state.selectedIssueId);
+});
 $("#save-external-evidence-controls").addEventListener("click", saveExternalEvidenceControls);
 $("#notification-toggle").addEventListener("click", () => { const open = $("#notification-popover").classList.toggle("hidden") === false; $("#notification-toggle").setAttribute("aria-expanded", String(open)); });
 $("#notification-all-tasks").addEventListener("click", () => { $("#notification-popover").classList.add("hidden"); $("#notification-toggle").setAttribute("aria-expanded", "false"); showView("tasks"); });
