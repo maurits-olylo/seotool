@@ -185,7 +185,7 @@ class _Page:
         self.owner.focus_targets.append(target)
         return self.owner.focus_match_count
 
-    def add_script_tag(self, *, path: str) -> None:
+    def add_init_script(self, *, path: str) -> None:
         self.owner.injected_scripts.append(path)
 
     def locator(self, _selector: str):  # type: ignore[no-untyped-def]

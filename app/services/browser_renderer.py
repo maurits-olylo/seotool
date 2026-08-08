@@ -76,6 +76,8 @@ def render_page_html(
             )
             page = context.new_page()
             page.set_default_timeout(timeout_seconds * 1_000)
+            if run_accessibility:
+                page.add_init_script(path=AXE_SOURCE_PATH)
 
             def route_request(route: Any) -> None:
                 nonlocal request_count
@@ -169,7 +171,6 @@ def render_page_html(
 
 def _run_accessibility(page: Any) -> dict[str, object]:
     try:
-        page.add_script_tag(path=AXE_SOURCE_PATH)
         result = page.evaluate(
             """async options => await axe.run(document, {
               runOnly: {type: 'rule', values: options.rules},
