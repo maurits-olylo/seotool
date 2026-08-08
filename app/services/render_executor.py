@@ -95,6 +95,7 @@ def execute_render_observation(observation_id: str) -> None:
                 },
                 "inspection_focus": focus_target if isinstance(focus_target, dict) else None,
                 "inspection_focus_applied": result.focus_applied,
+                "inspection_focus_status": result.focus_status,
             }
             db.commit()
             logger.info(

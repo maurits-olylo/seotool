@@ -173,6 +173,11 @@ def _inspection_page(
     resolved_targets = [
         {**target, "box": _matching_box(target, render_boxes)} for target in targets
     ]
+    render_source = (
+        "live_recheck"
+        if render and "live_issue_inspection" in (render.trigger_reasons or [])
+        else "crawl_render"
+    )
     return {
         "url_id": snapshot.url_id,
         "source_url": url.normalized_url if url else snapshot.requested_url,
@@ -188,11 +193,8 @@ def _inspection_page(
         ),
         "render_status": latest_render.status if latest_render else "not_rendered",
         "rendered_at": render.rendered_at if render else None,
-        "render_source": (
-            "live_recheck"
-            if render and "live_issue_inspection" in (render.trigger_reasons or [])
-            else "crawl_render"
-        ),
+        "render_source": render_source,
+        "live_target_status": _live_target_status(render, render_source),
         "screenshot_available": bool(
             render
             and render.screenshot_key
@@ -204,6 +206,25 @@ def _inspection_page(
         "screenshot_expires_at": render.screenshot_expires_at if render else None,
         "targets": resolved_targets,
     }
+
+
+def _live_target_status(
+    render: RenderObservation | None, render_source: str
+) -> str:
+    if render is None or render_source != "live_recheck" or render.status != "succeeded":
+        return "not_checked"
+    focus_status = (
+        render.comparison.get("inspection_focus_status")
+        if isinstance(render.comparison, dict)
+        else None
+    )
+    return {
+        "focused": "found",
+        "not_found": "not_found",
+        "ambiguous": "ambiguous",
+        "invalid": "inconclusive",
+        "failed": "inconclusive",
+    }.get(str(focus_status), "not_checked")
 
 
 def _matching_box(

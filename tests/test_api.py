@@ -167,8 +167,8 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
 def test_operations_status_ignores_stale_website_responses(client: TestClient) -> None:
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
-    assert 'src="/ui/assets/app.js?v=20260808-10"' in page.text
-    assert 'href="/ui/assets/issue-inspection.css?v=20260808-4"' in page.text
+    assert 'src="/ui/assets/app.js?v=20260808-11"' in page.text
+    assert 'href="/ui/assets/issue-inspection.css?v=20260808-5"' in page.text
     script = client.get("/ui/assets/app.js").text
     assert "issue-inspection-page-select" in script
     assert "snapshot_id=${encodeURIComponent(state.selectedInspectionSnapshotId)}" in script
@@ -1519,6 +1519,7 @@ def test_issue_detail_returns_live_element_location(
     assert page["source_url"] == "https://example.com/article"
     assert page["is_current_occurrence"] is True
     assert page["render_status"] == "succeeded"
+    assert page["live_target_status"] == "not_checked"
     assert page["screenshot_available"] is True
     assert page["screenshot_url"] == (
         f"/api/v1/issues/{issue_id}/inspection/screenshots/{snapshot_id}"

@@ -1,4 +1,6 @@
-from app.services.issue_inspection import _matching_box
+from types import SimpleNamespace
+
+from app.services.issue_inspection import _live_target_status, _matching_box
 
 
 def test_matching_box_requires_one_positive_exact_match() -> None:
@@ -55,3 +57,19 @@ def test_matching_box_uses_full_signature_without_stable_id() -> None:
 
     assert _matching_box(target, [matching]) is not None
     assert _matching_box(target, [{**matching, "occurrence_index": 1}]) is None
+
+
+def test_live_target_status_distinguishes_fresh_render_outcomes() -> None:
+    render = SimpleNamespace(
+        status="succeeded",
+        comparison={"inspection_focus_status": "focused"},
+    )
+
+    assert _live_target_status(render, "live_recheck") == "found"
+    render.comparison["inspection_focus_status"] = "not_found"
+    assert _live_target_status(render, "live_recheck") == "not_found"
+    render.comparison["inspection_focus_status"] = "ambiguous"
+    assert _live_target_status(render, "live_recheck") == "ambiguous"
+    render.comparison["inspection_focus_status"] = "failed"
+    assert _live_target_status(render, "live_recheck") == "inconclusive"
+    assert _live_target_status(render, "crawl_render") == "not_checked"

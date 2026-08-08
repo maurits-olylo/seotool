@@ -88,7 +88,7 @@ def test_executor_passes_inspection_focus_to_renderer(monkeypatch) -> None:  # t
             html="<html><body><button id='cta'>Actie</button></body></html>",
             browser_name="chromium",
             request_count=1,
-            focus_applied=True,
+            focus_status="focused",
         )
 
     monkeypatch.setattr("app.services.render_executor.render_page_html", render)
@@ -99,6 +99,7 @@ def test_executor_passes_inspection_focus_to_renderer(monkeypatch) -> None:  # t
         assert received == [{"focus_target": {"strategy": "id", "value": "cta"}}]
         assert stored is not None
         assert stored.comparison["inspection_focus_applied"] is True
+        assert stored.comparison["inspection_focus_status"] == "focused"
 
 
 def _observation(db) -> RenderObservation:  # type: ignore[no-untyped-def]

@@ -352,6 +352,10 @@ Wanneer één issue elementbewijs op meerdere bronpagina's heeft, blijft het ins
 pagina's teruggeven maar rendert de interface één geselecteerde snapshot tegelijk. Een gerichte
 live hercontrole mag alleen die snapshot gebruiken nadat de API heeft vastgesteld dat zij tot de
 geautoriseerde issue-inspectie behoort.
+Een voltooide live observatie bewaart bovendien het resultaat van de actuele locatormatch:
+gevonden, niet gevonden, ambigu of technisch onbeslist. Dit resultaat beschrijft alleen visueel
+inspectiebewijs en stuurt de issue-lifecycle niet aan; oplossen en verifiëren vereisen nog steeds de
+reguliere gecontroleerde workflow.
 Afbeeldingen en documenten krijgen een lichte HEAD-controle. Grote afbeeldingen (meer dan 2 MB) en
 documenten (meer dan 5 MB) leveren afzonderlijke issues op zonder de volledige bestanden te downloaden.
 

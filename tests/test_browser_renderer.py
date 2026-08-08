@@ -65,6 +65,7 @@ def test_renderer_focuses_reliable_issue_target_before_screenshot(monkeypatch) -
     )
 
     assert result.focus_applied is True
+    assert result.focus_status == "focused"
     assert playwright.focus_targets == [{"strategy": "id", "value": "cta"}]
     assert playwright.capture_events == ["focus", "geometry", "screenshot"]
 
@@ -80,7 +81,22 @@ def test_renderer_ignores_invalid_focus_without_failing(monkeypatch) -> None:  #
     )
 
     assert result.focus_applied is False
+    assert result.focus_status == "invalid"
     assert playwright.focus_targets == []
+
+
+def test_renderer_reports_ambiguous_focus(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setattr(browser_renderer, "validate_public_http_url", lambda _url: None)
+    playwright = _PlaywrightFactory([], focus_match_count=2)
+
+    result = browser_renderer.render_page_html(
+        "https://example.com/",
+        focus_target={"strategy": "text", "value": "Meer"},
+        playwright_factory=playwright,
+    )
+
+    assert result.focus_status == "ambiguous"
+    assert result.focus_applied is False
 
 
 @dataclass
@@ -130,10 +146,10 @@ class _Page:
         self.owner.capture_events.append("screenshot")
         return b"png"
 
-    def evaluate(self, _script: str, target: dict[str, object]) -> bool:
+    def evaluate(self, _script: str, target: dict[str, object]) -> int:
         self.owner.capture_events.append("focus")
         self.owner.focus_targets.append(target)
-        return target == {"strategy": "id", "value": "cta"}
+        return self.owner.focus_match_count
 
     def locator(self, _selector: str):  # type: ignore[no-untyped-def]
         return _Locator(self.owner)
@@ -211,12 +227,13 @@ class _PlaywrightContext:
 
 
 class _PlaywrightFactory:
-    def __init__(self, requests) -> None:  # type: ignore[no-untyped-def]
+    def __init__(self, requests, *, focus_match_count: int = 1) -> None:  # type: ignore[no-untyped-def]
         self.requests = requests
         self.routes: list[str] = []
         self.context_options: dict[str, object] = {}
         self.focus_targets: list[dict[str, object]] = []
         self.capture_events: list[str] = []
+        self.focus_match_count = focus_match_count
 
     def __call__(self):  # type: ignore[no-untyped-def]
         return _PlaywrightContext(self, self.requests)

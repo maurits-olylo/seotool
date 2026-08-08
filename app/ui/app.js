@@ -2442,6 +2442,18 @@ function inspectionOverlayMarkup(target, page) {
   return `<span class="inspection-overlay" style="left:${left}%;top:${top}%;width:${width}%;height:${height}%" aria-hidden="true"></span>`;
 }
 
+function inspectionLiveStatusMarkup(page) {
+  if (page.render_source !== "live_recheck" || page.live_target_status === "not_checked") return "";
+  const statuses = {
+    found: ["found", "Element live gevonden"],
+    not_found: ["not-found", "Element live niet gevonden"],
+    ambiguous: ["ambiguous", "Meerdere live matches"],
+    inconclusive: ["inconclusive", "Live locatie niet vastgesteld"],
+  };
+  const [className, label] = statuses[page.live_target_status] || statuses.inconclusive;
+  return `<span class="inspection-live-status ${className}">${label}</span>`;
+}
+
 async function loadIssueInspection(issueId) {
   const section = $("#issue-inspection");
   const content = $("#issue-inspection-content");
@@ -2466,7 +2478,7 @@ async function loadIssueInspection(issueId) {
     }
     const selectedIndex = inspection.pages.indexOf(selectedPage);
     const pageNavigation = inspection.pages.length > 1 ? `<div class="inspection-page-navigation"><label for="issue-inspection-page-select">Bronpagina</label><select id="issue-inspection-page-select">${inspection.pages.map((page, index) => `<option value="${escapeHtml(page.snapshot_id)}" ${index === selectedIndex ? "selected" : ""}>${index + 1}. ${escapeHtml(page.source_url)}</option>`).join("")}</select><span>${selectedIndex + 1} van ${inspection.pages.length}</span></div>` : "";
-    content.innerHTML = `${pageNavigation}<article class="inspection-page"><div class="inspection-meta"><span>${selectedPage.render_source === "live_recheck" && selectedPage.rendered_at ? `Live weergegeven ${new Date(selectedPage.rendered_at).toLocaleString("nl-NL")}` : `Gemeten ${new Date(selectedPage.captured_at).toLocaleString("nl-NL")}`}</span><span>${selectedPage.is_current_occurrence ? "Actuele issuewaarneming" : "Eerdere waarneming"}</span></div>${selectedPage.screenshot_url ? `<div class="inspection-frame"><img src="${escapeHtml(selectedPage.screenshot_url)}" alt="Historische schermweergave van ${escapeHtml(selectedPage.source_url)}">${selectedPage.targets.map((target) => inspectionOverlayMarkup(target, selectedPage)).join("")}</div>` : `<p class="inspection-empty">Van dit meetmoment is geen schermweergave bewaard.</p>`}<div class="inspection-targets">${selectedPage.targets.map(inspectionTargetMarkup).join("")}</div></article>`;
+    content.innerHTML = `${pageNavigation}<article class="inspection-page"><div class="inspection-meta"><span>${selectedPage.render_source === "live_recheck" && selectedPage.rendered_at ? `Live weergegeven ${new Date(selectedPage.rendered_at).toLocaleString("nl-NL")}` : `Gemeten ${new Date(selectedPage.captured_at).toLocaleString("nl-NL")}`}</span><span>${selectedPage.is_current_occurrence ? "Actuele issuewaarneming" : "Eerdere waarneming"}</span>${inspectionLiveStatusMarkup(selectedPage)}</div>${selectedPage.screenshot_url ? `<div class="inspection-frame"><img src="${escapeHtml(selectedPage.screenshot_url)}" alt="Historische schermweergave van ${escapeHtml(selectedPage.source_url)}">${selectedPage.targets.map((target) => inspectionOverlayMarkup(target, selectedPage)).join("")}</div>` : `<p class="inspection-empty">Van dit meetmoment is geen schermweergave bewaard.</p>`}<div class="inspection-targets">${selectedPage.targets.map(inspectionTargetMarkup).join("")}</div></article>`;
     return inspection;
   } catch (error) {
     section.classList.remove("hidden");

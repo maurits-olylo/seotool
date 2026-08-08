@@ -142,6 +142,9 @@ class InspectionPageRead(BaseModel):
     render_status: str
     rendered_at: datetime | None
     render_source: Literal["crawl_render", "live_recheck"]
+    live_target_status: Literal[
+        "not_checked", "found", "not_found", "ambiguous", "inconclusive"
+    ]
     screenshot_available: bool
     screenshot_url: str | None
     screenshot_width: int | None

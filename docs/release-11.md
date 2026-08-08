@@ -1,6 +1,6 @@
 # Release 11 — Visuele issue-inspectie
 
-Status: fasen 1 tot en met 7 lokaal geïmplementeerd; nog niet gedeployed.
+Status: fasen 1 tot en met 8 lokaal geïmplementeerd; nog niet gedeployed.
 
 ## Fase 1 — Uniform inspectiecontract
 
@@ -141,3 +141,23 @@ eerste URL of een willekeurige andere tenantpagina te laten renderen.
 - Live hercontrole gebruikt exact de geselecteerde snapshot.
 - Een onbekende of niet bij het issue horende snapshot wordt geweigerd zonder taak aan te maken.
 - Op 390 px staat de paginakeuze onder elkaar zonder horizontale overflow.
+
+## Fase 8 — Eenduidige live elementuitkomst
+
+Een voltooide live hercontrole vermeldt nu afzonderlijk of het historische doelelement in de
+actuele DOM exact één keer is gevonden, niet is gevonden, meerdere keren voorkomt of niet
+betrouwbaar kon worden vastgesteld. Alleen een unieke match wordt naar de viewport gescrold en kan
+een live overlay krijgen. De interface toont de uitkomst naast het meetmoment en blijft het
+historische elementbewijs als zodanig presenteren.
+
+Deze uitkomst is inspectiebewijs en geen automatische issuebeslissing. Een niet gevonden element
+kan betekenen dat een defecte link of CTA is verwijderd, maar ook dat pagina-opmaak is gewijzigd.
+Oplossen en verifiëren blijven daarom via de bestaande taak-, crawl- en issue-lifecycle lopen.
+
+## Acceptatie fase 8
+
+- Een unieke actuele DOM-match wordt als `found` gepubliceerd en visueel bevestigd.
+- Nul matches, meerdere matches en technische onzekerheid krijgen verschillende uitkomsten.
+- Een historische of nog lopende observatie meldt nooit ten onrechte een live uitkomst.
+- Alleen `found` geldt als geslaagde focus; overige uitkomsten krijgen geen kunstmatig kader.
+- De interface gebruikt begrijpelijke Nederlandse labels en verandert de issue-status niet.
