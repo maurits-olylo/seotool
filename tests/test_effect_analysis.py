@@ -6,7 +6,11 @@ from app.db.session import SessionLocal
 from app.models.client import Client
 from app.models.discovery import Url
 from app.models.effects import EffectEvaluation, EffectIntervention
-from app.models.integrations import GoogleAnalyticsMetric, SearchConsoleMetric
+from app.models.integrations import (
+    GoogleAnalyticsMetric,
+    SearchConsoleMetric,
+    SearchConsoleQueryMetric,
+)
 from app.models.recommendations import RecommendationTask
 from app.models.website import Website, WebsiteSettings
 from app.services.effect_analysis import evaluate_effect_cohort, refresh_due_effect_evaluations
@@ -57,7 +61,7 @@ def test_effect_cohort_is_versioned_deduplicated_and_non_causal() -> None:
             implemented_at=datetime(2026, 1, 15, tzinfo=UTC),
             intervention_version="1",
             input_hash="a" * 64,
-            task_snapshot={},
+            task_snapshot={"question": "wat kost seo advies"},
             url_context=[{"url_id": str(url.id), "role": "changed"}],
             source_coverage={},
         )
@@ -89,6 +93,17 @@ def test_effect_cohort_is_versioned_deduplicated_and_non_causal() -> None:
                             active_users=sessions - 2,
                             key_events=conversions,
                         ),
+                        SearchConsoleQueryMetric(
+                            website_id=website.id,
+                            url_id=url.id,
+                            date=metric_date,
+                            query="Wat kost SEO advies",
+                            page_url=url.normalized_url,
+                            clicks=clicks / 2,
+                            impressions=impressions // 2,
+                            ctr=(clicks / 2) / (impressions // 2),
+                            position=5,
+                        ),
                     ]
                 )
         db.flush()
@@ -105,6 +120,8 @@ def test_effect_cohort_is_versioned_deduplicated_and_non_causal() -> None:
         assert first.status == "development_visible"
         assert first.analytics_source == "ga4"
         assert first.metrics["gsc"]["changes"]["clicks"]["relative_percent"] == 100.0
+        assert first.metrics["question_gsc"]["changes"]["clicks"]["relative_percent"] == 100.0
+        assert first.source_coverage["question_gsc"]["scope_count"] == 1
         assert first.evidence[0]["basis"] == "observed_correlation"
 
 

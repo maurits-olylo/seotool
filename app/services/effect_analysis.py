@@ -8,10 +8,16 @@ from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
 
 from app.models.effects import EffectEvaluation, EffectIntervention
-from app.models.integrations import GoogleAnalyticsMetric, MatomoPageMetric, SearchConsoleMetric
+from app.models.integrations import (
+    GoogleAnalyticsMetric,
+    MatomoPageMetric,
+    SearchConsoleMetric,
+    SearchConsoleQueryMetric,
+)
 from app.services.analytics_provider import primary_analytics_source
+from app.services.content_analysis import normalize_query
 
-METHOD_VERSION = "1"
+METHOD_VERSION = "2"
 PERIOD_DAYS = 28
 MINIMUM_MATURITY_DAYS = 42
 MINIMUM_COVERAGE_DAYS = 14
@@ -50,6 +56,17 @@ def evaluate_effect_cohort(
         if item.get("url_id")
     )
     url_ids = sorted(UUID(value) for value in url_counts)
+    question_scopes = sorted(
+        {
+            (UUID(str(context["url_id"])), normalize_query(str(question)))
+            for intervention in interventions
+            for question in [intervention.task_snapshot.get("question")]
+            if isinstance(question, str) and question.strip()
+            for context in intervention.url_context
+            if context.get("url_id")
+        },
+        key=lambda item: (str(item[0]), item[1]),
+    )
     earliest = min(
         (item.implemented_at.date() for item in interventions), default=change_period_start
     )
@@ -61,6 +78,12 @@ def evaluate_effect_cohort(
 
     gsc_before = _gsc_totals(db, website_id, url_ids, baseline_start, baseline_end)
     gsc_after = _gsc_totals(db, website_id, url_ids, observation_start, observation_end)
+    question_gsc_before = _gsc_question_totals(
+        db, website_id, question_scopes, baseline_start, baseline_end
+    )
+    question_gsc_after = _gsc_question_totals(
+        db, website_id, question_scopes, observation_start, observation_end
+    )
     analytics_source = primary_analytics_source(db, website_id)
     analytics_before = _analytics_totals(
         db, website_id, url_ids, baseline_start, baseline_end, analytics_source
@@ -70,6 +93,7 @@ def evaluate_effect_cohort(
     )
     metrics = {
         "gsc": _comparison(gsc_before, gsc_after),
+        "question_gsc": _comparison(question_gsc_before, question_gsc_after),
         "analytics": _comparison(analytics_before, analytics_after),
     }
     if not interventions:
@@ -85,6 +109,12 @@ def evaluate_effect_cohort(
         "gsc": {
             "baseline_days": gsc_before["days"],
             "observation_days": gsc_after["days"],
+            "expected_days": PERIOD_DAYS,
+        },
+        "question_gsc": {
+            "scope_count": len(question_scopes),
+            "baseline_days": question_gsc_before["days"],
+            "observation_days": question_gsc_after["days"],
             "expected_days": PERIOD_DAYS,
         },
         "analytics": {
@@ -262,6 +292,51 @@ def _analytics_totals(
         "visits": int(total_visits or 0),
         "users": int(total_users or 0),
         "conversions": float(total_conversions or 0),
+    }
+
+
+def _gsc_question_totals(
+    db: Session,
+    website_id: UUID,
+    scopes: list[tuple[UUID, str]],
+    start: date,
+    end: date,
+) -> dict[str, float | int]:
+    if not scopes:
+        return {"days": 0, "clicks": 0.0, "impressions": 0, "ctr": 0.0, "position": 0.0}
+    allowed = set(scopes)
+    rows = db.execute(
+        select(
+            SearchConsoleQueryMetric.url_id,
+            SearchConsoleQueryMetric.query,
+            SearchConsoleQueryMetric.date,
+            SearchConsoleQueryMetric.clicks,
+            SearchConsoleQueryMetric.impressions,
+            SearchConsoleQueryMetric.position,
+        ).where(
+            SearchConsoleQueryMetric.website_id == website_id,
+            SearchConsoleQueryMetric.url_id.in_({url_id for url_id, _question in scopes}),
+            SearchConsoleQueryMetric.date.between(start, end),
+        )
+    )
+    clicks = 0.0
+    impressions = 0
+    weighted_position = 0.0
+    days: set[date] = set()
+    for url_id, query, metric_date, row_clicks, row_impressions, position in rows:
+        if (url_id, normalize_query(str(query))) not in allowed:
+            continue
+        row_impressions = int(row_impressions or 0)
+        clicks += float(row_clicks or 0)
+        impressions += row_impressions
+        weighted_position += float(position or 0) * row_impressions
+        days.add(metric_date)
+    return {
+        "days": len(days),
+        "clicks": clicks,
+        "impressions": impressions,
+        "ctr": clicks / impressions if impressions else 0.0,
+        "position": weighted_position / impressions if impressions else 0.0,
     }
 
 

@@ -94,6 +94,7 @@ def test_materializes_versioned_task_scope_with_historical_context() -> None:
         assert second is first
         assert db.query(EffectIntervention).count() == 1
         assert first.task_snapshot["recommendation_type"] == "improve_landing_page"
+        assert first.task_snapshot["question"] is None
         assert first.url_context[0]["classification_id"] == str(classification.id)
         assert first.url_context[0]["search_intent"] == "transactional"
         assert first.url_context[0]["journey_stage"] == "consideration"

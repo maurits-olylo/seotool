@@ -44,6 +44,7 @@ def materialize_task_intervention(
         "category": task.category,
         "title": task.title,
         "primary_issue_id": str(task.primary_issue_id) if task.primary_issue_id else None,
+        "question": task.verification_spec.get("question"),
     }
     payload = {
         "task_id": str(task.id),
