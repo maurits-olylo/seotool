@@ -1,8 +1,9 @@
 import json
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
@@ -20,6 +21,7 @@ from app.models.issues import (
     IssueOccurrence,
     IssueSuppression,
 )
+from app.models.rendering import RenderObservation
 from app.models.user import User
 from app.schemas.issues import (
     ChangeDetailRead,
@@ -42,6 +44,7 @@ from app.services.issue_classification import issue_nature, issue_scope
 from app.services.issue_guidance import build_issue_guidance
 from app.services.issue_inspection import build_issue_inspection
 from app.services.pagination_analysis import PAGINATION_CHILD_ISSUE_TYPES
+from app.services.render_artifacts import render_artifact_path
 from app.services.server_error_analysis import SERVER_ERROR_INCIDENT_TYPE
 from app.services.sitemap_redirect_analysis import SITEMAP_REDIRECT_PATTERN_TYPE
 from app.services.template_issue_analysis import TEMPLATE_CLUSTER_DIAGNOSIS_TYPES
@@ -828,6 +831,65 @@ def get_issue_inspection(
         issue=issue,
         occurrence=occurrence,
         element_payloads=_issue_elements(db, issue, occurrence),
+    )
+
+
+@router.get("/issues/{issue_id}/inspection/screenshots/{snapshot_id}")
+def get_issue_inspection_screenshot(
+    issue_id: UUID,
+    snapshot_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> FileResponse:
+    issue = db.get(Issue, issue_id)
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+    require_website_access(db, principal, issue.website_id)
+    occurrence = db.scalar(
+        select(IssueOccurrence)
+        .where(IssueOccurrence.issue_id == issue.id)
+        .order_by(IssueOccurrence.detected_at.desc())
+        .limit(1)
+    )
+    inspection = build_issue_inspection(
+        db,
+        issue=issue,
+        occurrence=occurrence,
+        element_payloads=_issue_elements(db, issue, occurrence),
+    )
+    if not any(
+        page["snapshot_id"] == snapshot_id and page["screenshot_available"]
+        for page in inspection["pages"]
+    ):
+        raise HTTPException(status_code=404, detail="Inspection screenshot not found")
+    render = db.scalar(
+        select(RenderObservation).where(
+            RenderObservation.website_id == issue.website_id,
+            RenderObservation.source_snapshot_id == snapshot_id,
+        )
+    )
+    if (
+        not render
+        or not render.screenshot_key
+        or not render.screenshot_expires_at
+        or (
+            render.screenshot_expires_at.replace(tzinfo=UTC)
+            if render.screenshot_expires_at.tzinfo is None
+            else render.screenshot_expires_at
+        )
+        <= datetime.now(UTC)
+    ):
+        raise HTTPException(status_code=404, detail="Inspection screenshot not found")
+    try:
+        path = render_artifact_path(render.screenshot_key)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Inspection screenshot not found") from exc
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Inspection screenshot not found")
+    return FileResponse(
+        path,
+        media_type="image/png",
+        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
     )
 
 

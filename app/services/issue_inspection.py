@@ -1,4 +1,5 @@
 from collections import defaultdict
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -15,6 +16,13 @@ MISSING_ELEMENT_TYPES = {
     "missing_meta_description": "meta_description",
     "missing_breadcrumb_schema": "breadcrumb_schema",
 }
+
+
+def _not_expired(value: datetime | None) -> bool:
+    if value is None:
+        return False
+    normalized = value.replace(tzinfo=UTC) if value.tzinfo is None else value
+    return normalized > datetime.now(UTC)
 
 
 def build_issue_inspection(
@@ -71,6 +79,13 @@ def build_issue_inspection(
                     occurrence=occurrence,
                 )
             )
+
+    for page in pages:
+        page["screenshot_url"] = (
+            f"/api/v1/issues/{issue.id}/inspection/screenshots/{page['snapshot_id']}"
+            if page["screenshot_available"]
+            else None
+        )
 
     if any(target["kind"] == "located" for page in pages for target in page["targets"]):
         availability = "available"
@@ -149,7 +164,12 @@ def _inspection_page(
         ),
         "render_status": render.status if render else "not_rendered",
         "rendered_at": render.rendered_at if render else None,
-        "screenshot_available": bool(render and render.screenshot_key),
+        "screenshot_available": bool(
+            render
+            and render.screenshot_key
+            and _not_expired(render.screenshot_expires_at)
+        ),
+        "screenshot_url": None,
         "screenshot_width": render.screenshot_width if render else None,
         "screenshot_height": render.screenshot_height if render else None,
         "screenshot_expires_at": render.screenshot_expires_at if render else None,

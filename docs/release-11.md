@@ -1,6 +1,6 @@
 # Release 11 — Visuele issue-inspectie
 
-Status: fasen 1 en 2 lokaal geïmplementeerd; nog niet gedeployed.
+Status: fasen 1, 2 en 3 lokaal geïmplementeerd; nog niet gedeployed.
 
 ## Fase 1 — Uniform inspectiecontract
 
@@ -45,3 +45,22 @@ artefacten ouder dan de ingestelde retentieperiode verwijderd; standaard is dat 
 - Opslag is atomair, privé en inhoudelijk gehasht.
 - Productie en staging hebben elk een afzonderlijk persistent artefactvolume.
 - Rendering blijft standaard uitgeschakeld.
+
+## Fase 3 — Historische inspectie in het issuedetail
+
+Het issuedetail toont nu het bestaande inspectiecontract als een aparte historische
+inspectiesectie. Een bewaarde screenshot wordt uitsluitend via een tenant-geautoriseerde,
+issuegebonden route geleverd; interne opslagsleutels blijven verborgen. De gebruiker ziet het
+meetmoment, of dit de actuele issuewaarneming is en welke gevonden of ontbrekende elementen bij het
+bewijs horen. Als geen screenshot of elementbewijs bestaat, blijft de technische bewijsroute
+zichtbaar zonder een visuele locatie te suggereren.
+
+Deze fase tekent nog geen elementoverlay in de afbeelding. Exacte geometrie wordt pas toegevoegd
+wanneer de browserrender die betrouwbaar en viewportgebonden kan opslaan.
+
+## Acceptatie fase 3
+
+- Alleen een gebruiker met toegang tot de website kan het screenshotbestand ophalen.
+- Verlopen, ontbrekende en onveilige artefactpaden leveren geen bestand op.
+- De interface onderscheidt exact, beperkt en ontbrekend visueel bewijs.
+- De screenshot is historisch gelabeld en wordt niet als live hercontrole gepresenteerd.

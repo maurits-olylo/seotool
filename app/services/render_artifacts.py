@@ -16,6 +16,20 @@ class StoredRenderArtifact:
     expires_at: datetime
 
 
+def render_artifact_path(key: str) -> Path:
+    """Resolve an internal artifact key without allowing path traversal."""
+    parts = Path(key).parts
+    if len(parts) != 2 or any(part in {"", ".", ".."} for part in parts):
+        raise ValueError("Invalid render artifact key")
+    if not parts[1].endswith(".png"):
+        raise ValueError("Invalid render artifact type")
+    root = Path(get_settings().render_artifact_dir).resolve()
+    candidate = (root / parts[0] / parts[1]).resolve()
+    if root not in candidate.parents:
+        raise ValueError("Invalid render artifact path")
+    return candidate
+
+
 def store_render_screenshot(
     website_id: UUID, observation_id: UUID, content: bytes
 ) -> StoredRenderArtifact:

@@ -1,4 +1,6 @@
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
+from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
@@ -165,7 +167,7 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
 def test_operations_status_ignores_stale_website_responses(client: TestClient) -> None:
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
-    assert 'src="/ui/assets/app.js?v=20260808-6"' in page.text
+    assert 'src="/ui/assets/app.js?v=20260808-7"' in page.text
     assert 'href="/ui/assets/actionable.css?v=20260731-4"' in page.text
     assert 'id="recommendation-task-section"' in page.text
     assert 'id="recommendation-task-content"' in page.text
@@ -1385,7 +1387,9 @@ def test_bulk_issue_actions_suppress_restore_and_audit(client: TestClient) -> No
         assert any(item.activity_type == "issue_suppression_restored" for item in activities)
 
 
-def test_issue_detail_returns_live_element_location(client: TestClient) -> None:
+def test_issue_detail_returns_live_element_location(
+    client: TestClient, tmp_path: Path, monkeypatch
+) -> None:  # type: ignore[no-untyped-def]
     customer = client.post("/api/v1/clients", json={"name": "Element UI"}).json()
     website = client.post(
         "/api/v1/websites",
@@ -1472,6 +1476,15 @@ def test_issue_detail_returns_live_element_location(client: TestClient) -> None:
         )
         db.commit()
         issue_id = issue.id
+        snapshot_id = snapshot.id
+
+    artifact = tmp_path / str(website_id) / "inspection.png"
+    artifact.parent.mkdir()
+    artifact.write_bytes(b"\x89PNG\r\n\x1a\nfixture")
+    monkeypatch.setattr(
+        "app.services.render_artifacts.get_settings",
+        lambda: SimpleNamespace(render_artifact_dir=str(tmp_path)),
+    )
 
     payload = client.get(f"/api/v1/issues/{issue_id}").json()
     assert len(payload["elements"]) == 1
@@ -1488,6 +1501,9 @@ def test_issue_detail_returns_live_element_location(client: TestClient) -> None:
     assert page["is_current_occurrence"] is True
     assert page["render_status"] == "succeeded"
     assert page["screenshot_available"] is True
+    assert page["screenshot_url"] == (
+        f"/api/v1/issues/{issue_id}/inspection/screenshots/{snapshot_id}"
+    )
     assert page["screenshot_width"] == 1365
     assert page["screenshot_height"] == 768
     assert page["targets"][0]["kind"] == "located"
@@ -1496,6 +1512,11 @@ def test_issue_detail_returns_live_element_location(client: TestClient) -> None:
         "value": "oude-link",
         "reliable": True,
     }
+    screenshot = client.get(page["screenshot_url"])
+    assert screenshot.status_code == 200
+    assert screenshot.headers["content-type"] == "image/png"
+    assert screenshot.headers["cache-control"] == "private, no-store"
+    assert screenshot.content.startswith(b"\x89PNG")
 
 
 def test_issue_inspection_represents_missing_element_without_fake_locator(

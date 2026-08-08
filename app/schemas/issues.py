@@ -140,6 +140,7 @@ class InspectionPageRead(BaseModel):
     render_status: str
     rendered_at: datetime | None
     screenshot_available: bool
+    screenshot_url: str | None
     screenshot_width: int | None
     screenshot_height: int | None
     screenshot_expires_at: datetime | None

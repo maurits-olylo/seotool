@@ -2344,6 +2344,8 @@ async function showIssue(issueId) {
   state.recommendationFeedback = [];
   $("#issue-context-question").value = "";
   $("#issue-context-answer").innerHTML = "";
+  $("#issue-inspection").classList.add("hidden");
+  $("#issue-inspection-content").innerHTML = "";
   const summary = state.issues.find((item) => item.id === issueId);
   $("#detail-title").textContent = summary?.title || "Issuedetail";
   const summaryUrl = summary ? issueUrl(summary) : "";
@@ -2417,7 +2419,35 @@ async function showIssue(issueId) {
   $("#source-heading").textContent = `Bronpagina’s met dit signaal (${sourceUrls.length})`;
   $("#detail-sources").innerHTML = sourceUrls.map((source) => `<li><a href="${escapeHtml(source)}" target="_blank" rel="noopener">${escapeHtml(source)}</a></li>`).join("");
   $("#source-section").classList.toggle("hidden", sourceUrls.length === 0);
+  await loadIssueInspection(issue.id);
   await loadIssueRecommendation(issue);
+}
+
+function inspectionTargetMarkup(target) {
+  const kind = target.kind === "missing" ? "missing" : "located";
+  const title = kind === "missing" ? "Element ontbreekt" : target.label;
+  const locator = target.locator ? `${target.locator.strategy.toUpperCase()}: ${target.locator.value}` : "Geen betrouwbare locator beschikbaar";
+  return `<article class="inspection-target ${kind}"><strong>${escapeHtml(title)}</strong>${target.visible_text ? `<p>${escapeHtml(target.visible_text)}</p>` : ""}<p>${escapeHtml(locator)}</p></article>`;
+}
+
+async function loadIssueInspection(issueId) {
+  const section = $("#issue-inspection");
+  const content = $("#issue-inspection-content");
+  try {
+    const inspection = await api(`/api/v1/issues/${issueId}/inspection`);
+    section.classList.remove("hidden");
+    const statusLabels = {available:"Exact elementbewijs",limited:"Beperkt bewijs",unavailable:"Geen visueel bewijs"};
+    $("#issue-inspection-status").textContent = statusLabels[inspection.availability] || inspection.availability;
+    if (!inspection.pages.length) {
+      content.innerHTML = `<p class="inspection-empty">Voor dit issue is geen historische paginaweergave beschikbaar. Gebruik het technische bewijs hierboven.</p>`;
+      return;
+    }
+    content.innerHTML = inspection.pages.map((page) => `<article class="inspection-page"><div class="inspection-meta"><span>Gemeten ${new Date(page.captured_at).toLocaleString("nl-NL")}</span><span>${page.is_current_occurrence ? "Actuele issuewaarneming" : "Eerdere waarneming"}</span></div>${page.screenshot_url ? `<div class="inspection-frame"><img src="${escapeHtml(page.screenshot_url)}" alt="Historische schermweergave van ${escapeHtml(page.source_url)}"></div>` : `<p class="inspection-empty">Van dit meetmoment is geen schermweergave bewaard.</p>`}<div class="inspection-targets">${page.targets.map(inspectionTargetMarkup).join("")}</div></article>`).join("");
+  } catch (error) {
+    section.classList.remove("hidden");
+    $("#issue-inspection-status").textContent = "Niet beschikbaar";
+    content.innerHTML = `<p class="inspection-empty">De historische inspectie kon niet worden geladen.</p>`;
+  }
 }
 
 async function loadIssueRecommendation(issue) {
