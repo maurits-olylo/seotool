@@ -246,6 +246,9 @@ def test_completed_evidence_exposes_only_user_relevant_result(
 
     status = client.get(f"{endpoint}/{request_id}")
     result = client.get(f"{endpoint}/observations/{observation_id}")
+    task_endpoint = f"{endpoint}/observations/{observation_id}/task"
+    first_task = client.post(task_endpoint)
+    repeated_task = client.post(task_endpoint)
 
     assert status.status_code == 200
     assert status.json()["observation_id"] == observation_id
@@ -254,6 +257,13 @@ def test_completed_evidence_exposes_only_user_relevant_result(
     assert result.json()["assessment"]["status"] == "observed_citation_gap"
     assert result.json()["assessment"]["coverage_status"] == "missing"
     assert result.json()["assessment"]["recommended_action"]
+    assert first_task.status_code == 201
+    assert first_task.json()["created"] is True
+    assert repeated_task.status_code == 201
+    assert repeated_task.json() == {
+        "task_id": first_task.json()["task_id"],
+        "created": False,
+    }
     assert result.json()["observations"][0]["observed_question"] == (
         "Wat kosten kunststof kozijnen?"
     )
@@ -270,3 +280,4 @@ def test_completed_evidence_exposes_only_user_relevant_result(
         "interne technische melding",
     ):
         assert internal_value not in hidden
+        assert internal_value not in first_task.text.lower()

@@ -31,6 +31,7 @@ from app.services.content_analysis import analyze_website_content
 from app.services.content_opportunities import (
     build_content_opportunities,
     create_opportunity_task,
+    create_question_gap_task,
 )
 from app.services.external_intelligence.contracts import QuestionEvidenceRequest
 from app.services.external_intelligence.interpretation import assess_stored_citation_evidence
@@ -281,6 +282,39 @@ def external_evidence_result(
         assessment=assessment,
         coverage_status=coverage_status,
     )
+
+
+@router.post("/external-evidence/observations/{observation_id}/task", status_code=201)
+def create_external_evidence_task(
+    website_id: UUID,
+    observation_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, object]:
+    require_website_write_access(db, principal, website_id)
+    result = external_evidence_result(website_id, observation_id, db, principal)
+    assessment = result.get("assessment")
+    observation = db.get(ExternalObservation, observation_id)
+    request = db.get(ExternalIntelligenceRequest, observation.request_id) if observation else None
+    if (
+        not isinstance(assessment, dict)
+        or assessment.get("status") != "observed_citation_gap"
+        or not assessment.get("recommended_action")
+        or not request
+        or not request.url_id
+    ):
+        raise HTTPException(status_code=409, detail="Voor deze meting is geen inhoudstaak nodig")
+    task, created = create_question_gap_task(
+        db,
+        website_id=website_id,
+        url_id=request.url_id,
+        question=str(result["question"]),
+        summary=str(assessment["summary"]),
+        recommended_action=str(assessment["recommended_action"]),
+        observation_id=observation_id,
+        principal=principal,
+    )
+    return {"task_id": str(task.id), "created": created}
 
 
 def _external_state(

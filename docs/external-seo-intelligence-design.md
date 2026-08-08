@@ -40,7 +40,8 @@ Implementatiestatus:
   browserconsole;
 - opgeslagen citation evidence wordt conservatief naast de nieuwste crawltekst gelegd; alleen een
   niet-volledig beantwoorde pagina mét aangetroffen externe bronnen krijgt inhoudsadvies, zonder
-  automatisch een issue of taak te maken;
+  automatisch een issue of taak te maken; de gebruiker kan zo'n onderbouwd advies handmatig als
+  gededupliceerde contenttaak naar de bestaande taakworkflow sturen;
 - één observation wordt conservatief geïnterpreteerd en creëert geen autonome kwaliteitsclaim;
 - de feature en lege credentialconfiguratie staan standaard uit; scheduler, echte credentials en
   betaalde calls zijn nog bewust niet geactiveerd.

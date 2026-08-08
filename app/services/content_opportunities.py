@@ -321,3 +321,86 @@ def create_opportunity_task(
     db.commit()
     db.refresh(task)
     return task, True
+
+
+def create_question_gap_task(
+    db: Session,
+    *,
+    website_id: UUID,
+    url_id: UUID,
+    question: str,
+    summary: str,
+    recommended_action: str,
+    observation_id: UUID,
+    principal: Principal,
+) -> tuple[RecommendationTask, bool]:
+    """Create one active content task for a measured question/page gap."""
+    normalized_question = " ".join(question.lower().split())
+    scope_key = f"{url_id}:{normalized_question}"
+    existing_tasks = db.scalars(
+        select(RecommendationTask).where(
+            RecommendationTask.website_id == website_id,
+            RecommendationTask.recommendation_type == "content_question_gap",
+            RecommendationTask.status.in_(ACTIVE_TASK_STATUSES),
+        )
+    )
+    for task in existing_tasks:
+        if task.verification_spec.get("scope_key") == scope_key:
+            return task, False
+    task = RecommendationTask(
+        website_id=website_id,
+        created_by_user_id=principal.user_id,
+        recommendation_type="content_question_gap",
+        definition_version=OPPORTUNITY_DEFINITION_VERSION,
+        title=f"Beantwoord de vraag: {question}"[:255],
+        category="content_opportunity",
+        primary_role="content_editor",
+        supporting_roles=["seo_specialist"],
+        priority="normal",
+        priority_reason="Relevante zoekvraag met crawlbewijs en een begrensde externe waarneming.",
+        effort_confidence="low",
+        feasibility="review_required",
+        action=recommended_action,
+        rationale=summary,
+        steps=[
+            "Controleer of de vraag bij de rol van deze pagina past.",
+            "Voeg of verbeter het antwoord volgens het advies.",
+            "Meld de taak gereed voor controle in de normale taakworkflow.",
+        ],
+        acceptance_criteria=[
+            "De vraag wordt direct, specifiek en inhoudelijk controleerbaar beantwoord.",
+            "De aanpassing past bij de rol van de pagina en bevat geen onbewezen claims.",
+        ],
+        verification_spec={
+            "scope_key": scope_key,
+            "question": question,
+            "observation_id": str(observation_id),
+            "automated_verification": False,
+        },
+    )
+    db.add(task)
+    db.flush()
+    db.add(RecommendationTaskUrl(task_id=task.id, url_id=url_id, role="page"))
+    label = actor_label(db, principal)
+    db.add_all(
+        [
+            RecommendationTaskEvent(
+                task_id=task.id,
+                actor_user_id=principal.user_id,
+                actor_label=label,
+                event_type="created",
+                new_status=task.status,
+                details={"scope_key": scope_key},
+            ),
+            ActivityLog(
+                website_id=website_id,
+                actor=label,
+                activity_type="content_question_gap_task_created",
+                summary=f"Taak aangemaakt: {task.title}",
+                details={"task_id": str(task.id), "url_id": str(url_id)},
+            ),
+        ]
+    )
+    db.commit()
+    db.refresh(task)
+    return task, True
