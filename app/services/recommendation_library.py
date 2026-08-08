@@ -240,6 +240,20 @@ DEFINITIONS = (
         ("changed",),
     ),
     RecommendationDefinition(
+        "content_question_gap",
+        "1",
+        frozenset(),
+        "Beantwoord een relevante zoekvraag",
+        "content",
+        ("seo_analytics",),
+        "normal",
+        (20, 90),
+        "needs_content_input",
+        ("Controleer de paginarol.", "Voeg een direct en controleerbaar antwoord toe."),
+        ("De vraag wordt aantoonbaar op de gekoppelde pagina beantwoord.",),
+        ("page",),
+    ),
+    RecommendationDefinition(
         "repair_job_posting_markup",
         "1",
         frozenset(

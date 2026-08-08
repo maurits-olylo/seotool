@@ -30,6 +30,7 @@ from app.services.effect_analysis import evaluate_effect_cohort
 from app.services.effect_interventions import materialize_task_intervention
 from app.services.html_extraction import INVALID_JSON_LD_MARKER
 from app.services.http_crawler import CrawlError, fetch_url
+from app.services.question_coverage import assess_question_coverage
 from app.services.recommendation_library import get_recommendation_definition
 from app.services.recommendation_tasks import (
     RecommendationTaskError,
@@ -221,6 +222,7 @@ def execute_verification(verification_id: str) -> None:
                     if verification.scope.get("issue_type")
                     else None
                 ),
+                verification_spec=task.verification_spec,
             )
             outcome = _outcome(rules)
             verification.rules = rules
@@ -331,6 +333,7 @@ def _fetch_urls(verification_type: str, roles: dict[str, list[Url]]) -> list[Url
         "add_primary_heading": "changed",
         "add_meta_description": "changed",
         "repair_structured_data": "changed",
+        "content_question_gap": "page",
     }.get(verification_type, "source")
     requested = list(roles[primary_role])
     optional = {
@@ -344,6 +347,7 @@ def _fetch_urls(verification_type: str, roles: dict[str, list[Url]]) -> list[Url
         "add_primary_heading": "sample",
         "add_meta_description": "sample",
         "repair_structured_data": "sample",
+        "content_question_gap": None,
     }[verification_type]
     if optional and optional in roles:
         requested.extend(roles[optional])
@@ -357,6 +361,7 @@ def _evaluate(
     run_id: uuid.UUID,
     *,
     issue_type: str | None = None,
+    verification_spec: dict[str, object] | None = None,
 ) -> list[dict[str, object]]:
     snapshots = {
         item.url_id: item
@@ -369,6 +374,7 @@ def _evaluate(
         "add_primary_heading": "changed",
         "add_meta_description": "changed",
         "repair_structured_data": "changed",
+        "content_question_gap": "page",
     }.get(verification_type, "source")
     source_urls = roles[primary_role]
     source_snapshots = [snapshots.get(item.id) for item in source_urls]
@@ -689,6 +695,40 @@ def _evaluate(
                         "invalid_json_ld_blocks": invalid_blocks,
                         "schema_types": snapshot.schema_types if snapshot else [],
                         "required_type": ("BreadcrumbList" if breadcrumb_required else None),
+                    },
+                }
+            )
+    elif verification_type == "content_question_gap":
+        question = str((verification_spec or {}).get("question") or "").strip()
+        if not question:
+            raise ValueError("Question coverage verification requires a question")
+        for url in roles["page"]:
+            snapshot = snapshots.get(url.id)
+            if snapshot is None:
+                rules.append(
+                    {
+                        "rule": f"question_answered:{url.id}",
+                        "status": "error",
+                        "evidence": {"coverage_status": "unknown"},
+                    }
+                )
+                continue
+            coverage = assess_question_coverage(
+                question,
+                title=snapshot.title,
+                headings=snapshot.headings,
+                meta_description=snapshot.meta_description,
+                main_content=snapshot.main_content,
+            )
+            rules.append(
+                {
+                    "rule": f"question_answered:{url.id}",
+                    "status": "passed" if coverage.status == "answered" else "failed",
+                    "evidence": {
+                        "coverage_status": coverage.status,
+                        "confidence": coverage.confidence,
+                        "subject_coverage": coverage.subject_coverage,
+                        "passage_coverage": coverage.passage_coverage,
                     },
                 }
             )

@@ -42,6 +42,9 @@ Implementatiestatus:
   niet-volledig beantwoorde pagina mét aangetroffen externe bronnen krijgt inhoudsadvies, zonder
   automatisch een issue of taak te maken; de gebruiker kan zo'n onderbouwd advies handmatig als
   gededupliceerde contenttaak naar de bestaande taakworkflow sturen;
+- na gereedmelden haalt de bestaande gerichte verificatie alleen de gekoppelde pagina opnieuw op;
+  dezelfde conservatieve vraagdekking sluit de taak bij een aantoonbaar antwoord of zet haar bij
+  onvoldoende dekking terug naar uitvoering, zonder een nieuwe betaalde externe meting;
 - één observation wordt conservatief geïnterpreteerd en creëert geen autonome kwaliteitsclaim;
 - de feature en lege credentialconfiguratie staan standaard uit; scheduler, echte credentials en
   betaalde calls zijn nog bewust niet geactiveerd.

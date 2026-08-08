@@ -9,6 +9,7 @@ from app.models.external_intelligence import (
     ExternalIntelligenceRequest,
     ExternalObservation,
 )
+from app.models.recommendations import RecommendationTask
 from app.models.website import WebsiteSettings
 
 
@@ -162,6 +163,11 @@ def test_completed_evidence_exposes_only_user_relevant_result(
     monkeypatch.setattr(
         content_analysis, "enqueue_external_intelligence", lambda *_args, **_kwargs: True
     )
+    verification_jobs: list[str] = []
+    monkeypatch.setattr(
+        "app.services.recommendation_verifications.enqueue_recommendation_verification",
+        lambda verification_id, **_kwargs: verification_jobs.append(verification_id) or True,
+    )
     with SessionLocal() as db:
         url = Url(
             website_id=UUID(website_id),
@@ -264,6 +270,22 @@ def test_completed_evidence_exposes_only_user_relevant_result(
         "task_id": first_task.json()["task_id"],
         "created": False,
     }
+    with SessionLocal() as db:
+        task = db.get(RecommendationTask, UUID(first_task.json()["task_id"]))
+        assert task is not None
+        assert task.verification_spec["automated_verification"] is True
+    started = client.patch(
+        f"/api/v1/recommendation-tasks/{first_task.json()['task_id']}",
+        json={"status": "in_progress"},
+    )
+    assert started.status_code == 200
+    implemented = client.patch(
+        f"/api/v1/recommendation-tasks/{first_task.json()['task_id']}",
+        json={"status": "implemented"},
+    )
+    assert implemented.status_code == 200
+    assert implemented.json()["verification_status"] == "queued"
+    assert len(verification_jobs) == 1
     assert result.json()["observations"][0]["observed_question"] == (
         "Wat kosten kunststof kozijnen?"
     )

@@ -81,8 +81,8 @@ def _task_fixture(db):  # type: ignore[no-untyped-def]
 
 
 def test_library_contains_compact_unique_mvp() -> None:
-    assert len(DEFINITIONS) == 20
-    assert len({definition.key for definition in DEFINITIONS}) == 20
+    assert len(DEFINITIONS) == 21
+    assert len({definition.key for definition in DEFINITIONS}) == 21
     assert recommendation_for_issue_type("internally_linked_404").key == (
         "repair_broken_internal_link"
     )
@@ -227,7 +227,7 @@ def test_recommendation_task_api_lifecycle(client, monkeypatch) -> None:  # type
 
     definitions = client.get("/api/v1/recommendation-types")
     assert definitions.status_code == 200
-    assert len(definitions.json()) == 20
+    assert len(definitions.json()) == 21
 
     created = client.post(f"/api/v1/issues/{issue_id}/recommendation-task")
     assert created.status_code == 201
@@ -608,6 +608,10 @@ def test_additional_verification_rules_resolve_redirect_missing_and_indexability
                     title="Unieke paginatitel",
                     meta_description="Unieke en relevante omschrijving.",
                     headings={"h1": ["Heldere primaire kop"]},
+                    main_content=(
+                        "Kunststof kozijnen kosten gemiddeld tussen 700 en 1.200 euro per raam. "
+                        "De prijs hangt af van formaat, glaskeuze en montage."
+                    ),
                     schema_types=["BreadcrumbList"],
                     schema_data=[{"@type": "BreadcrumbList"}],
                     is_indexable=True,
@@ -669,6 +673,13 @@ def test_additional_verification_rules_resolve_redirect_missing_and_indexability
             run.id,
             issue_type="missing_breadcrumb_schema",
         )
+        question_rules = _evaluate(
+            db,
+            "content_question_gap",
+            {"page": [onpage]},
+            run.id,
+            verification_spec={"question": "wat kosten kunststof kozijnen"},
+        )
 
         assert {rule["status"] for rule in redirect_rules} == {"passed"}
         assert {rule["status"] for rule in missing_rules} == {"passed"}
@@ -678,6 +689,8 @@ def test_additional_verification_rules_resolve_redirect_missing_and_indexability
         assert {rule["status"] for rule in heading_rules} == {"passed"}
         assert {rule["status"] for rule in description_rules} == {"passed"}
         assert {rule["status"] for rule in schema_rules} == {"passed"}
+        assert {rule["status"] for rule in question_rules} == {"passed"}
+        assert question_rules[-1]["evidence"]["coverage_status"] == "answered"
 
 
 def test_redirect_and_canonical_verification_validate_destination_quality() -> None:

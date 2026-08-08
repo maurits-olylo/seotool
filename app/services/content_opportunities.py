@@ -375,7 +375,7 @@ def create_question_gap_task(
             "scope_key": scope_key,
             "question": question,
             "observation_id": str(observation_id),
-            "automated_verification": False,
+            "automated_verification": True,
         },
     )
     db.add(task)

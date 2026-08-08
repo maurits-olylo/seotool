@@ -49,6 +49,7 @@ SCOPED_VERIFICATION_TYPES = {
     "add_primary_heading",
     "add_meta_description",
     "repair_structured_data",
+    "content_question_gap",
 }
 VERIFICATION_URL_ROLES = {
     "repair_broken_internal_link": {"source", "broken_target", "replacement_target"},
@@ -61,6 +62,7 @@ VERIFICATION_URL_ROLES = {
     "add_primary_heading": {"changed", "sample"},
     "add_meta_description": {"changed", "sample"},
     "repair_structured_data": {"changed", "sample"},
+    "content_question_gap": {"page"},
 }
 
 
