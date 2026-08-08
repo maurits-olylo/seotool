@@ -1,6 +1,6 @@
 # Release 12 — Continuous Website Improvement-pilot
 
-Status: fase B lokaal geïmplementeerd en getest; nog niet gedeployed.
+Status: fase B lokaal en op staging geaccepteerd; nog niet naar productie gedeployed.
 
 ## Doel en afbakening
 
@@ -17,7 +17,7 @@ leidend. Accessibility is een bron en bewijsdomein binnen die keten.
 
 ## Fase B — accessibility-fundament
 
-Status: lokaal geïmplementeerd en getest.
+Status: lokaal en op staging geïmplementeerd en getest.
 
 - axe-core `4.12.1` wordt lokaal in de renderimage opgenomen; er is geen CDN- of runtime-download;
 - analyse draait optioneel in dezelfde Playwright-pagina en alleen bij een expliciet aangevraagde
@@ -36,8 +36,12 @@ Status: lokaal geïmplementeerd en getest.
 - volledige testsuite: 553 geslaagd, alleen de bestaande Starlette/httpx-waarschuwing;
 - Ruff en diffcontrole: geslaagd;
 - lokale imagebuild: niet uitgevoerd omdat de Docker-engine niet actief was;
-- de stagingimagebuild en een synthetische browserproef zijn daarom verplichte acceptatiepunten
-  voordat fase B als deploymentgereed geldt.
+- stagingimagebuild: geslaagd vanaf hotfixcommit `4611bf2`;
+- de eerste stagingproef vond een CSP-conflict bij injectie via `add_script_tag`; axe wordt daarom
+  vóór navigatie als Playwright-initscript geladen zonder de pagina-CSP te wijzigen;
+- de herhaalde synthetische browserproef bevestigde axe-core `4.12.1`, tien pilotregels, een gezonde
+  renderworker en een gezonde API en database;
+- gereedsignaal: `release-12-phase-b-staging-ok`.
 
 ## Volgende fase
 
