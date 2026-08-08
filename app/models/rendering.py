@@ -9,7 +9,6 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -19,8 +18,6 @@ from app.models.common import UUIDTimestampMixin
 
 class RenderObservation(UUIDTimestampMixin, Base):
     __tablename__ = "render_observations"
-    __table_args__ = (UniqueConstraint("source_snapshot_id"),)
-
     website_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("websites.id", ondelete="CASCADE"), index=True
     )

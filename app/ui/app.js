@@ -2346,6 +2346,8 @@ async function showIssue(issueId) {
   $("#issue-context-answer").innerHTML = "";
   $("#issue-inspection").classList.add("hidden");
   $("#issue-inspection-content").innerHTML = "";
+  $("#issue-inspection-message").textContent = "";
+  $("#issue-inspection-recheck").classList.add("hidden");
   const summary = state.issues.find((item) => item.id === issueId);
   $("#detail-title").textContent = summary?.title || "Issuedetail";
   const summaryUrl = summary ? issueUrl(summary) : "";
@@ -2445,18 +2447,55 @@ async function loadIssueInspection(issueId) {
   try {
     const inspection = await api(`/api/v1/issues/${issueId}/inspection`);
     section.classList.remove("hidden");
+    const recheckButton = $("#issue-inspection-recheck");
+    const canRecheck = inspection.live_recheck_available && ["superuser", "admin"].includes(state.currentUser?.role);
+    recheckButton.classList.toggle("hidden", !canRecheck);
+    const busy = inspection.pages.some((page) => ["pending", "running"].includes(page.render_status));
+    recheckButton.disabled = busy;
+    recheckButton.textContent = busy ? "Live controle loopt…" : "Live opnieuw controleren";
     const statusLabels = {available:"Exact elementbewijs",limited:"Beperkt bewijs",unavailable:"Geen visueel bewijs"};
     $("#issue-inspection-status").textContent = statusLabels[inspection.availability] || inspection.availability;
     if (!inspection.pages.length) {
       content.innerHTML = `<p class="inspection-empty">Voor dit issue is geen historische paginaweergave beschikbaar. Gebruik het technische bewijs hierboven.</p>`;
       return;
     }
-    content.innerHTML = inspection.pages.map((page) => `<article class="inspection-page"><div class="inspection-meta"><span>Gemeten ${new Date(page.captured_at).toLocaleString("nl-NL")}</span><span>${page.is_current_occurrence ? "Actuele issuewaarneming" : "Eerdere waarneming"}</span></div>${page.screenshot_url ? `<div class="inspection-frame"><img src="${escapeHtml(page.screenshot_url)}" alt="Historische schermweergave van ${escapeHtml(page.source_url)}">${page.targets.map((target) => inspectionOverlayMarkup(target, page)).join("")}</div>` : `<p class="inspection-empty">Van dit meetmoment is geen schermweergave bewaard.</p>`}<div class="inspection-targets">${page.targets.map(inspectionTargetMarkup).join("")}</div></article>`).join("");
+    content.innerHTML = inspection.pages.map((page) => `<article class="inspection-page"><div class="inspection-meta"><span>${page.render_source === "live_recheck" && page.rendered_at ? `Live weergegeven ${new Date(page.rendered_at).toLocaleString("nl-NL")}` : `Gemeten ${new Date(page.captured_at).toLocaleString("nl-NL")}`}</span><span>${page.is_current_occurrence ? "Actuele issuewaarneming" : "Eerdere waarneming"}</span></div>${page.screenshot_url ? `<div class="inspection-frame"><img src="${escapeHtml(page.screenshot_url)}" alt="Historische schermweergave van ${escapeHtml(page.source_url)}">${page.targets.map((target) => inspectionOverlayMarkup(target, page)).join("")}</div>` : `<p class="inspection-empty">Van dit meetmoment is geen schermweergave bewaard.</p>`}<div class="inspection-targets">${page.targets.map(inspectionTargetMarkup).join("")}</div></article>`).join("");
+    return inspection;
   } catch (error) {
     section.classList.remove("hidden");
     $("#issue-inspection-status").textContent = "Niet beschikbaar";
     content.innerHTML = `<p class="inspection-empty">De historische inspectie kon niet worden geladen.</p>`;
+    return null;
   }
+}
+
+async function startIssueInspectionRecheck() {
+  const issueId = state.selectedIssueId;
+  if (!issueId) return;
+  const button = $("#issue-inspection-recheck");
+  const message = $("#issue-inspection-message");
+  button.disabled = true;
+  message.textContent = "Live controle wordt gestart…";
+  try {
+    await api(`/api/v1/issues/${issueId}/inspection/recheck`, {method:"POST"});
+    message.textContent = "Live controle loopt. De historische weergave blijft zichtbaar.";
+    pollIssueInspection(issueId, 0);
+  } catch (error) {
+    message.textContent = error.message;
+    button.disabled = false;
+  }
+}
+
+function pollIssueInspection(issueId, attempt) {
+  if (attempt >= 40 || state.selectedIssueId !== issueId) return;
+  window.setTimeout(async () => {
+    if (state.selectedIssueId !== issueId) return;
+    const inspection = await loadIssueInspection(issueId);
+    if (!inspection) return;
+    const busy = inspection.pages.some((page) => ["pending", "running"].includes(page.render_status));
+    if (busy) pollIssueInspection(issueId, attempt + 1);
+    else $("#issue-inspection-message").textContent = inspection.pages.some((page) => page.render_status === "failed") ? "Live controle is mislukt; het historische bewijs blijft beschikbaar." : "Live controle afgerond.";
+  }, 3000);
 }
 
 async function loadIssueRecommendation(issue) {
@@ -2952,6 +2991,7 @@ $("#operations-nav").addEventListener("click", () => showView("operations"));
 $("#clients-nav").addEventListener("click", () => showView("clients"));
 $("#team-nav").addEventListener("click", () => showView("team"));
 $("#integrations-nav").addEventListener("click", () => showView("integrations"));
+$("#issue-inspection-recheck").addEventListener("click", startIssueInspectionRecheck);
 $("#save-external-evidence-controls").addEventListener("click", saveExternalEvidenceControls);
 $("#notification-toggle").addEventListener("click", () => { const open = $("#notification-popover").classList.toggle("hidden") === false; $("#notification-toggle").setAttribute("aria-expanded", String(open)); });
 $("#notification-all-tasks").addEventListener("click", () => { $("#notification-popover").classList.add("hidden"); $("#notification-toggle").setAttribute("aria-expanded", "false"); showView("tasks"); });

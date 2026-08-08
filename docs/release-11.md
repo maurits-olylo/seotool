@@ -1,6 +1,6 @@
 # Release 11 — Visuele issue-inspectie
 
-Status: fasen 1 tot en met 4 lokaal geïmplementeerd; nog niet gedeployed.
+Status: fasen 1 tot en met 5 lokaal geïmplementeerd; nog niet gedeployed.
 
 ## Fase 1 — Uniform inspectiecontract
 
@@ -78,3 +78,25 @@ volgnummer. Dubbele, ongeldige of ontbrekende matches leveren bewust geen overla
 - Alleen positieve, eenduidig gekoppelde rechthoeken worden gepubliceerd.
 - De interface schaalt het kader mee met de responsieve screenshot.
 - Oude screenshots zonder geometrie blijven zonder fout en zonder kunstmatige markering werken.
+
+## Fase 5 — Expliciete live hercontrole
+
+Een beheerder kan vanuit het issuedetail één expliciete live hercontrole starten. De controle
+gebruikt de bestaande beveiligde renderqueue en blijft achter dezelfde standaard uitgeschakelde
+rendering-featureflag. Tijdens de hercontrole blijft het historische screenshot zichtbaar; de
+interface toont daarnaast de actuele wachtrij- of uitvoerstatus en ververst het resultaat
+automatisch.
+
+Een live hercontrole wordt als afzonderlijke renderwaarneming opgeslagen. Daardoor overschrijft
+een nieuwe meting het oorspronkelijke crawlbewijs niet. Een rijvergrendeling en hergebruik van een
+al actieve waarneming voorkomen dat dubbel klikken meerdere gelijktijdige controles voor dezelfde
+snapshot start. De start wordt als security-event vastgelegd.
+
+## Acceptatie fase 5
+
+- Alleen een beheerder met toegang tot de website kan een live hercontrole starten.
+- Zonder ingeschakelde rendering of inspecteerbare snapshot wordt geen taak aangemaakt.
+- Herhaald starten tijdens een lopende controle levert dezelfde renderwaarneming op.
+- Historisch bewijs blijft beschikbaar terwijl de nieuwe controle wacht of draait.
+- De interface onderscheidt crawlbewijs van een live hercontrole en meldt slagen of mislukken.
+- Er ontstaan geen automatische browseraanroepen; rendering blijft standaard uitgeschakeld.

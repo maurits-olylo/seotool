@@ -7,6 +7,8 @@ from fastapi.responses import FileResponse
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
+from app.core.queue import enqueue_render_observation
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.common import utc_now
@@ -32,6 +34,7 @@ from app.schemas.issues import (
     IssueBulkResult,
     IssueDetailRead,
     IssueInspectionRead,
+    IssueInspectionRecheckRead,
     IssueRead,
     IssueSuppressionRead,
     IssueUpdate,
@@ -45,6 +48,7 @@ from app.services.issue_guidance import build_issue_guidance
 from app.services.issue_inspection import build_issue_inspection
 from app.services.pagination_analysis import PAGINATION_CHILD_ISSUE_TYPES
 from app.services.render_artifacts import render_artifact_path
+from app.services.security_audit import record_security_event
 from app.services.server_error_analysis import SERVER_ERROR_INCIDENT_TYPE
 from app.services.sitemap_redirect_analysis import SITEMAP_REDIRECT_PATTERN_TYPE
 from app.services.template_issue_analysis import TEMPLATE_CLUSTER_DIAGNOSIS_TYPES
@@ -834,6 +838,99 @@ def get_issue_inspection(
     )
 
 
+@router.post(
+    "/issues/{issue_id}/inspection/recheck",
+    response_model=IssueInspectionRecheckRead,
+    status_code=202,
+)
+def start_issue_inspection_recheck(
+    issue_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> IssueInspectionRecheckRead:
+    issue = db.get(Issue, issue_id)
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+    website = require_website_access(db, principal, issue.website_id, admin=True)
+    if not get_settings().rendering_enabled:
+        raise HTTPException(status_code=409, detail="Live inspection is not available")
+    occurrence = db.scalar(
+        select(IssueOccurrence)
+        .where(IssueOccurrence.issue_id == issue.id)
+        .order_by(IssueOccurrence.detected_at.desc())
+        .limit(1)
+    )
+    inspection = build_issue_inspection(
+        db,
+        issue=issue,
+        occurrence=occurrence,
+        element_payloads=_issue_elements(db, issue, occurrence),
+    )
+    pages = inspection["pages"]
+    if not pages:
+        raise HTTPException(status_code=409, detail="No inspectable page is available")
+    selected_page = next(
+        (page for page in pages if page["is_current_occurrence"]), pages[0]
+    )
+    snapshot = db.scalar(
+        select(UrlSnapshot)
+        .where(UrlSnapshot.id == selected_page["snapshot_id"])
+        .with_for_update()
+    )
+    if not snapshot:
+        raise HTTPException(status_code=409, detail="Inspection snapshot no longer exists")
+    active = list(
+        db.scalars(
+            select(RenderObservation).where(
+                RenderObservation.website_id == issue.website_id,
+                RenderObservation.source_snapshot_id == snapshot.id,
+                RenderObservation.status.in_(("pending", "running")),
+            )
+        )
+    )
+    existing = next(
+        (
+            item
+            for item in active
+            if "live_issue_inspection" in (item.trigger_reasons or [])
+        ),
+        None,
+    )
+    if existing:
+        return IssueInspectionRecheckRead(
+            observation_id=existing.id, status=existing.status
+        )
+    observation = RenderObservation(
+        website_id=issue.website_id,
+        url_id=snapshot.url_id,
+        source_snapshot_id=snapshot.id,
+        status="pending",
+        trigger_reasons=["live_issue_inspection", f"issue:{issue.id}"],
+    )
+    db.add(observation)
+    db.flush()
+    record_security_event(
+        db,
+        event_type="issue_inspection_recheck",
+        result="queued",
+        summary="Live issue inspection queued",
+        actor_user_id=principal.user_id,
+        client_id=website.client_id,
+        target_type="issue",
+        target_id=issue.id,
+        details={"observation_id": str(observation.id)},
+    )
+    db.commit()
+    if not enqueue_render_observation(
+        str(observation.id), website_id=str(issue.website_id)
+    ):
+        observation.status = "failed"
+        observation.error_message = "Render queue unavailable"
+        db.commit()
+        raise HTTPException(status_code=503, detail="Live inspection queue is unavailable")
+    return IssueInspectionRecheckRead(observation_id=observation.id, status="pending")
+
+
 @router.get("/issues/{issue_id}/inspection/screenshots/{snapshot_id}")
 def get_issue_inspection_screenshot(
     issue_id: UUID,
@@ -863,10 +960,14 @@ def get_issue_inspection_screenshot(
     ):
         raise HTTPException(status_code=404, detail="Inspection screenshot not found")
     render = db.scalar(
-        select(RenderObservation).where(
+        select(RenderObservation)
+        .where(
             RenderObservation.website_id == issue.website_id,
             RenderObservation.source_snapshot_id == snapshot_id,
+            RenderObservation.screenshot_key.is_not(None),
         )
+        .order_by(RenderObservation.created_at.desc())
+        .limit(1)
     )
     if (
         not render

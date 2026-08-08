@@ -141,6 +141,7 @@ class InspectionPageRead(BaseModel):
     is_current_occurrence: bool
     render_status: str
     rendered_at: datetime | None
+    render_source: Literal["crawl_render", "live_recheck"]
     screenshot_available: bool
     screenshot_url: str | None
     screenshot_width: int | None
@@ -157,6 +158,11 @@ class IssueInspectionRead(BaseModel):
     reason: Literal["exact_location", "element_absent", "no_element_evidence"]
     pages: list[InspectionPageRead]
     live_recheck_available: bool
+
+
+class IssueInspectionRecheckRead(BaseModel):
+    observation_id: UUID
+    status: Literal["pending", "running", "succeeded", "failed"]
 
 
 class IssueUpdate(BaseModel):

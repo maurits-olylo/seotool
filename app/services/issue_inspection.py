@@ -5,6 +5,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models.crawl import ElementLocation, UrlSnapshot
 from app.models.discovery import Url
 from app.models.issues import Issue, IssueOccurrence
@@ -103,7 +104,7 @@ def build_issue_inspection(
         "availability": availability,
         "reason": reason,
         "pages": pages,
-        "live_recheck_available": False,
+        "live_recheck_available": bool(pages and get_settings().rendering_enabled),
     }
 
 
@@ -148,8 +149,21 @@ def _inspection_page(
     if snapshot is None:
         raise RuntimeError("Inspection snapshot no longer exists")
     url = db.get(Url, snapshot.url_id)
-    render = db.scalar(
-        select(RenderObservation).where(RenderObservation.source_snapshot_id == snapshot.id)
+    renders = list(
+        db.scalars(
+            select(RenderObservation)
+            .where(RenderObservation.source_snapshot_id == snapshot.id)
+            .order_by(RenderObservation.created_at.desc())
+        )
+    )
+    latest_render = renders[0] if renders else None
+    render = next(
+        (
+            item
+            for item in renders
+            if item.screenshot_key and _not_expired(item.screenshot_expires_at)
+        ),
+        None,
     )
     render_boxes = (
         render.comparison.get("screenshot_element_boxes", [])
@@ -172,8 +186,13 @@ def _inspection_page(
                 or occurrence.crawl_run_id == snapshot.crawl_run_id
             )
         ),
-        "render_status": render.status if render else "not_rendered",
+        "render_status": latest_render.status if latest_render else "not_rendered",
         "rendered_at": render.rendered_at if render else None,
+        "render_source": (
+            "live_recheck"
+            if render and "live_issue_inspection" in (render.trigger_reasons or [])
+            else "crawl_render"
+        ),
         "screenshot_available": bool(
             render
             and render.screenshot_key
