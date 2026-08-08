@@ -11,13 +11,10 @@ def set_staging_render_acceptance_resolved(resolved: bool) -> None:
     _resolved = resolved
 
 
-def staging_render_acceptance_html() -> str:
-    heading = (
-        '<h1 id="acceptance-heading">Herstelde acceptatiepagina</h1>'
-        if _resolved
-        else ""
-    )
-    state = "resolved" if _resolved else "missing-h1"
+def staging_render_acceptance_html(*, resolved: bool | None = None) -> str:
+    page_resolved = _resolved if resolved is None else resolved
+    heading = '<h1 id="acceptance-heading">Herstelde acceptatiepagina</h1>' if page_resolved else ""
+    state = "resolved" if page_resolved else "missing-h1"
     return f"""<!doctype html>
 <html lang="nl">
 <head>

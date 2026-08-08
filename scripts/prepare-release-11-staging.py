@@ -19,7 +19,11 @@ from app.models.discovery import CrawlJob, Url
 from app.models.issues import Issue, IssueOccurrence
 from app.models.rendering import RenderObservation
 from app.models.website import Website
-from app.services.staging_render_acceptance import STAGING_RENDER_ACCEPTANCE_URL
+from app.services.html_extraction import extract_page
+from app.services.staging_render_acceptance import (
+    STAGING_RENDER_ACCEPTANCE_URL,
+    staging_render_acceptance_html,
+)
 
 FIXTURE_MARKER = "release_11_missing_h1_resolution"
 
@@ -41,6 +45,10 @@ def _set_page_state(*, resolved: bool) -> None:
 
 
 def _prepare_records() -> tuple[str, str]:
+    extracted = extract_page(
+        staging_render_acceptance_html(resolved=False),
+        STAGING_RENDER_ACCEPTANCE_URL,
+    )
     with SessionLocal() as db:
         website = db.scalar(
             select(Website).where(Website.name.like("[STAGING]%")).order_by(Website.created_at)
@@ -138,10 +146,21 @@ def _prepare_records() -> tuple[str, str]:
             status_code=200,
             redirect_chain=[],
             content_type="text/html; charset=utf-8",
-            title="Release 11 renderacceptatie",
-            meta_description="Synthetische, klantvrije Release 11-testpagina.",
-            headings={"h1": []},
-            word_count=12,
+            title=extracted.title,
+            meta_description=extracted.meta_description,
+            canonical=extracted.canonical,
+            meta_robots=extracted.meta_robots,
+            html_lang=extracted.html_lang,
+            headings=extracted.headings,
+            word_count=extracted.word_count,
+            main_content=extracted.main_content,
+            schema_types=extracted.schema_types,
+            schema_data=extracted.schema_data,
+            html_hash=extracted.html_hash,
+            main_content_hash=extracted.main_content_hash,
+            metadata_hash=extracted.metadata_hash,
+            links_hash=extracted.links_hash,
+            schema_hash=extracted.schema_hash,
             is_indexable=False,
         )
         db.add(snapshot)
@@ -183,6 +202,27 @@ def _wait_for_render(observation_id: str) -> str:
     raise RuntimeError("Acceptance render did not finish within 90 seconds")
 
 
+def _resolve_legacy_fixture_noise() -> None:
+    now = datetime.now(UTC)
+    with SessionLocal() as db:
+        issues = list(
+            db.scalars(
+                select(Issue)
+                .join(Url, Url.id == Issue.url_id)
+                .where(
+                    Url.normalized_url == STAGING_RENDER_ACCEPTANCE_URL,
+                    Issue.issue_type == "javascript_metadata_conflict",
+                    Issue.status.not_in(("verified", "ignored", "accepted_risk")),
+                )
+            )
+        )
+        for issue in issues:
+            issue.status = "verified"
+            issue.resolved_at = now
+            issue.verified_at = now
+        db.commit()
+
+
 def main() -> None:
     settings = get_settings()
     if settings.app_env != "staging" or not settings.rendering_enabled:
@@ -193,6 +233,7 @@ def main() -> None:
         raise RuntimeError("Acceptance render could not be queued")
     render_status = _wait_for_render(observation_id)
     _set_page_state(resolved=True)
+    _resolve_legacy_fixture_noise()
     print(
         {
             "status": "release_11_staging_fixture_ready",

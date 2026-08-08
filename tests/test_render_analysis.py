@@ -6,6 +6,10 @@ from app.services.render_analysis import (
     render_issue_signals,
     select_render_candidates,
 )
+from app.services.staging_render_acceptance import (
+    STAGING_RENDER_ACCEPTANCE_URL,
+    staging_render_acceptance_html,
+)
 
 
 def test_selects_only_bounded_diverse_risk_pages() -> None:
@@ -87,6 +91,25 @@ def test_detects_content_that_disappears_during_rendering() -> None:
     }
 
 
+def test_staging_fixture_does_not_create_unrelated_render_issue() -> None:
+    extracted = extract_page(
+        staging_render_acceptance_html(resolved=False),
+        STAGING_RENDER_ACCEPTANCE_URL,
+    )
+    snapshot = UrlSnapshot(
+        word_count=extracted.word_count,
+        main_content_hash=extracted.main_content_hash,
+        metadata_hash=extracted.metadata_hash,
+        canonical=extracted.canonical,
+        meta_robots=extracted.meta_robots,
+        schema_hash=extracted.schema_hash,
+    )
+
+    comparison = compare_rendered_page(snapshot, extracted)
+
+    assert render_issue_signals(comparison) == []
+
+
 def _record(
     url: str,
     *,
@@ -100,9 +123,7 @@ def _record(
     )
 
 
-def _snapshot(
-    *, words: int, content_type: str = "text/html; charset=utf-8"
-) -> UrlSnapshot:
+def _snapshot(*, words: int, content_type: str = "text/html; charset=utf-8") -> UrlSnapshot:
     return UrlSnapshot(
         status_code=200,
         content_type=content_type,
