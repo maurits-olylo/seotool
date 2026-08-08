@@ -47,8 +47,7 @@ Status: lokaal en op staging geïmplementeerd en getest.
 
 ## Fase C — grouping en workflow
 
-Status: lokaal geïmplementeerd en integraal getest; stagingacceptatie wordt na een fixturecorrectie
-herhaald.
+Status: lokaal en op staging geïmplementeerd en integraal geaccepteerd.
 
 - ieder hard accessibilityissue bewaart een deterministische componenthandtekening op basis van
   regel en begrensde selector;
@@ -101,6 +100,17 @@ Derde stagingpoging:
 - de cleanup selecteert voortaan eerst unieke taak-ID's en laadt daarna de taken zonder vergelijking
   van JSON-waarden;
 - een statische regressietest bewaakt dat de fixture geen `DISTINCT` op taakrecords herintroduceert.
+
+Definitieve stagingacceptatie:
+
+- API, database, Redis en renderworker waren gezond;
+- twee synthetische issues met dezelfde componenthandtekening zijn tot één taak gebundeld;
+- axe-core heeft beide herstelde pagina's opnieuw gecontroleerd en twee historische
+  renderwaarnemingen opgeslagen;
+- verificatie `bec1fe36-fd78-4b99-83b0-c3b82af0d1de` is geslaagd en de taak is automatisch
+  afgehandeld;
+- API en database bleven na de volledige workflow gezond;
+- gereedsignaal: `release-12-phase-c-staging-ok`.
 
 ## Volgende fase
 
