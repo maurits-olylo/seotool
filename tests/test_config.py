@@ -226,6 +226,8 @@ def test_render_artifact_volume_is_initialized_before_worker() -> None:
         initializer = compose["services"]["render-artifacts-init"]
         worker = compose["services"]["render-worker"]
         assert initializer["user"] == "root"
+        assert initializer["cap_drop"] == ["ALL"]
+        assert initializer["cap_add"] == ["CHOWN", "FOWNER"]
         assert initializer["restart"] == "no"
         assert initializer["profiles"] == ["rendering"]
         assert initializer["volumes"] == [f"{volume_name}:/app/render-artifacts"]

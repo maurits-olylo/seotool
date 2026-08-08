@@ -188,6 +188,8 @@ migrationketen en OpenAPI-routes zijn gezamenlijk gecontroleerd. Zowel productie
 een aparte, alleen via het profiel `rendering` actieve volume-initialisatie. Die zet uitsluitend de
 root van het screenshotvolume op gebruiker `pwuser` en modus `0700` voordat de niet-root
 renderworker start. Dit werkt ook wanneer Compose het named volume al eerder root-owned aanmaakte.
+De initialisatietaak houdt `cap_drop: ALL` en krijgt uitsluitend `CHOWN` en `FOWNER` terug voor deze
+ene volumebewerking; netwerktoegang en overige Linux-capabilities blijven uitgesloten.
 
 Migration `0060` verwijdert alleen de unieke constraint op `source_snapshot_id`; er is geen
 dataherschrijving. Voor staging is daarom geen extra databaseback-up nodig. Voor productie wordt

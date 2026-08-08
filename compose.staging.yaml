@@ -97,6 +97,7 @@ services:
       context: .
       dockerfile: Dockerfile.render
     user: root
+    cap_add: [CHOWN, FOWNER]
     command: ["install", "-d", "-o", "pwuser", "-g", "pwuser", "-m", "700", "/app/render-artifacts"]
     volumes: ["staging_render_artifacts_data:/app/render-artifacts"]
     networks: [backend]
