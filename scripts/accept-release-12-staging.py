@@ -79,17 +79,20 @@ def _prepare() -> tuple[str, str]:
             )
         )
         if issue_ids:
-            previous_tasks = list(
+            previous_task_ids = set(
                 db.scalars(
-                    select(RecommendationTask)
-                    .join(
-                        RecommendationTaskIssue,
-                        RecommendationTaskIssue.task_id == RecommendationTask.id,
+                    select(RecommendationTaskIssue.task_id).where(
+                        RecommendationTaskIssue.issue_id.in_(issue_ids)
                     )
-                    .where(RecommendationTaskIssue.issue_id.in_(issue_ids))
-                    .distinct()
                 )
             )
+            previous_tasks = list(
+                db.scalars(
+                    select(RecommendationTask).where(
+                        RecommendationTask.id.in_(previous_task_ids)
+                    )
+                )
+            ) if previous_task_ids else []
             for previous_task in previous_tasks:
                 db.delete(previous_task)
             db.commit()

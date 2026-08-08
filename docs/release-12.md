@@ -93,6 +93,15 @@ Tweede stagingpoging:
 - de fixture ruimt een eerder afgebroken synthetische taak op voordat zij opnieuw begint;
 - fase C blijft onbevestigd totdat rollenconfiguratie en de volledige fixture slagen.
 
+Derde stagingpoging:
+
+- de rollenconfiguratie is toegepast en de services zijn gezond;
+- de herhaalcleanup gebruikte ten onrechte `DISTINCT` op een volledig taakrecord met JSON-kolommen,
+  wat PostgreSQL niet ondersteunt;
+- de cleanup selecteert voortaan eerst unieke taak-ID's en laadt daarna de taken zonder vergelijking
+  van JSON-waarden;
+- een statische regressietest bewaakt dat de fixture geen `DISTINCT` op taakrecords herintroduceert.
+
 ## Volgende fase
 
 Na lokale eindcontrole en stagingacceptatie kan fase D starten met uitlegbare cross-domain

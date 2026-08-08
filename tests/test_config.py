@@ -221,6 +221,14 @@ def test_database_role_configurator_does_not_source_environment_files() -> None:
     assert compose["services"]["database-roles"]["cap_drop"] == ["ALL"]
 
 
+def test_release_12_staging_cleanup_does_not_distinct_json_task_rows() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    fixture = (project_root / "scripts/accept-release-12-staging.py").read_text()
+
+    assert "select(RecommendationTaskIssue.task_id)" in fixture
+    assert ".distinct()" not in fixture
+
+
 def test_render_artifact_volume_is_initialized_before_worker() -> None:
     project_root = Path(__file__).resolve().parents[1]
     for filename, volume_name in (
