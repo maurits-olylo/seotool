@@ -356,6 +356,10 @@ Een voltooide live observatie bewaart bovendien het resultaat van de actuele loc
 gevonden, niet gevonden, ambigu of technisch onbeslist. Dit resultaat beschrijft alleen visueel
 inspectiebewijs en stuurt de issue-lifecycle niet aan; oplossen en verifiëren vereisen nog steeds de
 reguliere gecontroleerde workflow.
+Voor ondersteunde ontbrekende elementen bevat de live observatie in plaats van een locator een
+semantisch elementtype. De bestaande gerenderde HTML-extractie controleert H1, title, meta
+description of BreadcrumbList en bewaart alleen `present` of `still_absent`. Ook dit is
+inspectiebewijs; de crawler blijft verantwoordelijk voor resolve en verify.
 Afbeeldingen en documenten krijgen een lichte HEAD-controle. Grote afbeeldingen (meer dan 2 MB) en
 documenten (meer dan 5 MB) leveren afzonderlijke issues op zonder de volledige bestanden te downloaden.
 

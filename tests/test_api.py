@@ -167,7 +167,7 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
 def test_operations_status_ignores_stale_website_responses(client: TestClient) -> None:
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
-    assert 'src="/ui/assets/app.js?v=20260808-11"' in page.text
+    assert 'src="/ui/assets/app.js?v=20260808-12"' in page.text
     assert 'href="/ui/assets/issue-inspection.css?v=20260808-5"' in page.text
     script = client.get("/ui/assets/app.js").text
     assert "issue-inspection-page-select" in script
@@ -1585,6 +1585,7 @@ def test_issue_detail_returns_live_element_location(
 
 def test_issue_inspection_represents_missing_element_without_fake_locator(
     client: TestClient,
+    monkeypatch,
 ) -> None:
     customer = client.post("/api/v1/clients", json={"name": "Missing inspection"}).json()
     website = client.post(
@@ -1643,6 +1644,19 @@ def test_issue_inspection_represents_missing_element_without_fake_locator(
     assert target["element_type"] == "h1"
     assert target["location_id"] is None
     assert target["locator"] is None
+
+    live_settings = SimpleNamespace(rendering_enabled=True)
+    monkeypatch.setattr("app.api.routes.issues.get_settings", lambda: live_settings)
+    monkeypatch.setattr("app.services.issue_inspection.get_settings", lambda: live_settings)
+    monkeypatch.setattr(
+        "app.api.routes.issues.enqueue_render_observation", lambda *_args, **_kwargs: True
+    )
+    recheck = client.post(f"/api/v1/issues/{issue_id}/inspection/recheck")
+    assert recheck.status_code == 202
+    with SessionLocal() as db:
+        queued = db.get(RenderObservation, UUID(recheck.json()["observation_id"]))
+        assert queued is not None
+        assert queued.comparison == {"inspection_absence": {"element_type": "h1"}}
 
 
 def test_grouped_broken_links_use_latest_matching_element_evidence(client: TestClient) -> None:

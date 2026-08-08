@@ -213,6 +213,17 @@ def _live_target_status(
 ) -> str:
     if render is None or render_source != "live_recheck" or render.status != "succeeded":
         return "not_checked"
+    absence_status = (
+        render.comparison.get("inspection_absence_status")
+        if isinstance(render.comparison, dict)
+        else None
+    )
+    if absence_status == "present":
+        return "present"
+    if absence_status == "still_absent":
+        return "missing_confirmed"
+    if absence_status == "inconclusive":
+        return "inconclusive"
     focus_status = (
         render.comparison.get("inspection_focus_status")
         if isinstance(render.comparison, dict)

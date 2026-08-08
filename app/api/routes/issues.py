@@ -947,7 +947,14 @@ def _inspection_focus(page: dict[str, object]) -> dict[str, object]:
     if not isinstance(targets, list):
         return {}
     for target in targets:
-        if not isinstance(target, dict) or target.get("kind") != "located":
+        if not isinstance(target, dict):
+            continue
+        if target.get("kind") == "missing":
+            element_type = target.get("element_type")
+            if element_type in {"h1", "title", "meta_description", "breadcrumb_schema"}:
+                return {"inspection_absence": {"element_type": element_type}}
+            continue
+        if target.get("kind") != "located":
             continue
         locator = target.get("locator")
         if not isinstance(locator, dict) or locator.get("reliable") is not True:

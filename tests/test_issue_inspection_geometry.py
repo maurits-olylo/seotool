@@ -72,4 +72,8 @@ def test_live_target_status_distinguishes_fresh_render_outcomes() -> None:
     assert _live_target_status(render, "live_recheck") == "ambiguous"
     render.comparison["inspection_focus_status"] = "failed"
     assert _live_target_status(render, "live_recheck") == "inconclusive"
+    render.comparison["inspection_absence_status"] = "still_absent"
+    assert _live_target_status(render, "live_recheck") == "missing_confirmed"
+    render.comparison["inspection_absence_status"] = "present"
+    assert _live_target_status(render, "live_recheck") == "present"
     assert _live_target_status(render, "crawl_render") == "not_checked"

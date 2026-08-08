@@ -102,6 +102,30 @@ def test_executor_passes_inspection_focus_to_renderer(monkeypatch) -> None:  # t
         assert stored.comparison["inspection_focus_status"] == "focused"
 
 
+def test_executor_checks_if_missing_element_is_live_present(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    with SessionLocal() as db:
+        observation = _observation(db)
+        observation.comparison = {"inspection_absence": {"element_type": "h1"}}
+        observation_id = str(observation.id)
+        db.commit()
+
+    monkeypatch.setattr(
+        "app.services.render_executor.render_page_html",
+        lambda _url: BrowserRenderResult(
+            html="<html><body><h1>Nieuwe kop</h1></body></html>",
+            browser_name="chromium",
+            request_count=1,
+        ),
+    )
+    execute_render_observation(observation_id)
+
+    with SessionLocal() as db:
+        stored = db.get(RenderObservation, observation.id)
+        assert stored is not None
+        assert stored.comparison["inspection_absence"] == {"element_type": "h1"}
+        assert stored.comparison["inspection_absence_status"] == "present"
+
+
 def _observation(db) -> RenderObservation:  # type: ignore[no-untyped-def]
     website = Website(
         client=Client(name="Render client"),

@@ -2449,6 +2449,8 @@ function inspectionLiveStatusMarkup(page) {
     not_found: ["not-found", "Element live niet gevonden"],
     ambiguous: ["ambiguous", "Meerdere live matches"],
     inconclusive: ["inconclusive", "Live locatie niet vastgesteld"],
+    present: ["found", "Element is live aanwezig"],
+    missing_confirmed: ["not-found", "Element ontbreekt live nog"],
   };
   const [className, label] = statuses[page.live_target_status] || statuses.inconclusive;
   return `<span class="inspection-live-status ${className}">${label}</span>`;

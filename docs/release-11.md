@@ -1,6 +1,6 @@
 # Release 11 — Visuele issue-inspectie
 
-Status: fasen 1 tot en met 8 lokaal geïmplementeerd; nog niet gedeployed.
+Status: fasen 1 tot en met 9 lokaal geïmplementeerd; nog niet gedeployed.
 
 ## Fase 1 — Uniform inspectiecontract
 
@@ -161,3 +161,22 @@ Oplossen en verifiëren blijven daarom via de bestaande taak-, crawl- en issue-l
 - Een historische of nog lopende observatie meldt nooit ten onrechte een live uitkomst.
 - Alleen `found` geldt als geslaagde focus; overige uitkomsten krijgen geen kunstmatig kader.
 - De interface gebruikt begrijpelijke Nederlandse labels en verandert de issue-status niet.
+
+## Fase 9 — Live controle van ontbrekende elementen
+
+Voor historische issues over een ontbrekende H1, title, meta description of BreadcrumbList bewaart
+de live renderopdracht nu een begrensde afwezigheidscontrole. Na rendering controleert de bestaande
+HTML-extractie of het element in de actuele pagina nog ontbreekt of inmiddels aanwezig is. Daarvoor
+wordt geen selector verzonnen en geen extra browseraanroep uitgevoerd.
+
+De interface toont `Element ontbreekt live nog` of `Element is live aanwezig`. Een aanwezig element
+is een sterk herstelsignaal, maar geen formele verificatie: de gewone crawler moet het issue via de
+bestaande lifecycle oplossen en bij de volgende geslaagde controle verifiëren.
+
+## Acceptatie fase 9
+
+- Alleen ondersteunde ontbrekende-elementtypen krijgen een live afwezigheidscontrole.
+- H1, title, meta description en BreadcrumbList gebruiken de bestaande renderextractie.
+- Een live aanwezig element wordt onderscheiden van een nog steeds ontbrekend element.
+- Ontbrekende elementen krijgen nooit een kunstmatige locator of overlay.
+- De controle start geen extra netwerkverzoek en verandert de issue-status niet.

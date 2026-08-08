@@ -9,7 +9,7 @@ from app.models.crawl import UrlLink, UrlSnapshot
 from app.models.discovery import Url
 from app.models.rendering import RenderObservation
 from app.services.browser_renderer import render_page_html
-from app.services.html_extraction import extract_page
+from app.services.html_extraction import ExtractedPage, extract_page
 from app.services.issue_engine import reconcile_issues
 from app.services.render_analysis import compare_rendered_page, render_issue_signals
 from app.services.render_artifacts import store_render_screenshot
@@ -39,6 +39,7 @@ def execute_render_observation(observation_id: str) -> None:
             db.commit()
 
             focus_target = observation.comparison.get("inspection_focus")
+            absence_target = observation.comparison.get("inspection_absence")
             result = (
                 render_page_html(url.normalized_url, focus_target=focus_target)
                 if isinstance(focus_target, dict)
@@ -96,6 +97,10 @@ def execute_render_observation(observation_id: str) -> None:
                 "inspection_focus": focus_target if isinstance(focus_target, dict) else None,
                 "inspection_focus_applied": result.focus_applied,
                 "inspection_focus_status": result.focus_status,
+                "inspection_absence": (
+                    absence_target if isinstance(absence_target, dict) else None
+                ),
+                "inspection_absence_status": _absence_status(rendered, absence_target),
             }
             db.commit()
             logger.info(
@@ -114,3 +119,18 @@ def execute_render_observation(observation_id: str) -> None:
                 db.commit()
         logger.exception("render_observation_failed", observation_id=observation_id)
         raise
+
+
+def _absence_status(rendered: ExtractedPage, target: object) -> str:
+    if not isinstance(target, dict):
+        return "not_requested"
+    element_type = target.get("element_type")
+    checks = {
+        "h1": bool(rendered.headings.get("h1")),
+        "title": bool(rendered.title),
+        "meta_description": bool(rendered.meta_description),
+        "breadcrumb_schema": "BreadcrumbList" in rendered.schema_types,
+    }
+    if not isinstance(element_type, str) or element_type not in checks:
+        return "inconclusive"
+    return "present" if checks[element_type] else "still_absent"
