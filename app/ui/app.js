@@ -492,6 +492,38 @@ async function loadIntegrations() {
     $("#matomo-property-mapping").classList.add("hidden");
   }
   await loadPrimaryAnalyticsSource().catch(() => {});
+  await loadExternalEvidenceControls().catch((error) => {
+    $("#external-evidence-controls-message").textContent = error.message;
+  });
+}
+
+async function loadExternalEvidenceControls() {
+  const websiteId = $("#website-select").value;
+  const panel = $("#external-evidence-controls");
+  if (!websiteId) { panel.classList.add("hidden"); return; }
+  panel.classList.remove("hidden");
+  const controls = await api(`/api/v1/websites/${websiteId}/content-analysis/external-evidence-controls`);
+  $("#external-evidence-enabled").checked = controls.enabled;
+  $("#external-evidence-enabled").disabled = !controls.available;
+  $("#external-evidence-monthly-limit").value = controls.monthly_check_limit || 25;
+  $("#external-evidence-active-limit").value = controls.active_question_limit || 5;
+  $("#save-external-evidence-controls").disabled = !controls.available;
+  $("#external-evidence-summary").textContent = controls.available
+    ? `${controls.checks_completed_this_month} afgerond deze maand · ${controls.checks_in_progress} bezig · ${controls.active_questions} actief`
+    : "Deze functie is nog niet beschikbaar in deze omgeving.";
+}
+
+async function saveExternalEvidenceControls() {
+  const websiteId = $("#website-select").value;
+  const message = $("#external-evidence-controls-message");
+  const button = $("#save-external-evidence-controls");
+  button.disabled = true; message.textContent = "Instellingen worden opgeslagen…";
+  try {
+    await api(`/api/v1/websites/${websiteId}/content-analysis/external-evidence-controls`, {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify({enabled:$("#external-evidence-enabled").checked, monthly_check_limit:Number($("#external-evidence-monthly-limit").value), active_question_limit:Number($("#external-evidence-active-limit").value)})});
+    message.textContent = "Instellingen opgeslagen.";
+    await loadExternalEvidenceControls();
+  } catch (error) { message.textContent = error.message; }
+  finally { button.disabled = false; }
 }
 
 function showMatomoConnect() {
@@ -2881,6 +2913,7 @@ $("#operations-nav").addEventListener("click", () => showView("operations"));
 $("#clients-nav").addEventListener("click", () => showView("clients"));
 $("#team-nav").addEventListener("click", () => showView("team"));
 $("#integrations-nav").addEventListener("click", () => showView("integrations"));
+$("#save-external-evidence-controls").addEventListener("click", saveExternalEvidenceControls);
 $("#notification-toggle").addEventListener("click", () => { const open = $("#notification-popover").classList.toggle("hidden") === false; $("#notification-toggle").setAttribute("aria-expanded", String(open)); });
 $("#notification-all-tasks").addEventListener("click", () => { $("#notification-popover").classList.add("hidden"); $("#notification-toggle").setAttribute("aria-expanded", "false"); showView("tasks"); });
 $("#notification-list").addEventListener("click", (event) => { const button = event.target.closest("[data-notification-id]"); if (button) openTaskNotification(button.dataset.notificationId, button.dataset.taskId); });

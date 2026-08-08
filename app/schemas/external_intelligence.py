@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ExternalEvidenceCreate(BaseModel):
@@ -29,6 +29,27 @@ class ExternalEvidenceState(BaseModel):
         "scope_limit_reached",
     ]
     capability: Literal["serp", "ai_citations"]
+
+
+class ExternalEvidenceControlsUpdate(BaseModel):
+    enabled: bool
+    monthly_check_limit: int = Field(ge=0, le=1000)
+    active_question_limit: int = Field(ge=0, le=100)
+
+    @model_validator(mode="after")
+    def validate_enabled_limits(self) -> "ExternalEvidenceControlsUpdate":
+        if self.enabled and (
+            self.monthly_check_limit < 1 or self.active_question_limit < 1
+        ):
+            raise ValueError("Enabled controls require positive limits")
+        return self
+
+
+class ExternalEvidenceControlsRead(ExternalEvidenceControlsUpdate):
+    available: bool
+    checks_completed_this_month: int
+    checks_in_progress: int
+    active_questions: int
 
 
 class ExternalEvidenceSource(BaseModel):

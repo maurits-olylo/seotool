@@ -3,7 +3,7 @@ from datetime import UTC, date, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -13,7 +13,11 @@ from app.db.session import get_db
 from app.models.content_analysis import ContentAnalysisSettings, UrlContentOverride
 from app.models.crawl import UrlSnapshot
 from app.models.discovery import Url
-from app.models.external_intelligence import ExternalIntelligenceRequest, ExternalObservation
+from app.models.external_intelligence import (
+    ExternalIntelligenceRequest,
+    ExternalObservation,
+    ExternalUsageRecord,
+)
 from app.models.website import WebsiteSettings
 from app.schemas.content_analysis import (
     ContentAnalysisSettingsData,
@@ -21,6 +25,8 @@ from app.schemas.content_analysis import (
     ContentOverrideWrite,
 )
 from app.schemas.external_intelligence import (
+    ExternalEvidenceControlsRead,
+    ExternalEvidenceControlsUpdate,
     ExternalEvidenceCreate,
     ExternalEvidenceResult,
     ExternalEvidenceState,
@@ -42,6 +48,63 @@ from app.services.question_scope_selection import select_question_scopes
 from app.services.security_audit import record_security_event
 
 router = APIRouter(prefix="/websites/{website_id}/content-analysis", tags=["content-analysis"])
+
+
+def _month_start(now: datetime) -> datetime:
+    return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
+def _external_evidence_controls(
+    db: Session, website_id: UUID
+) -> ExternalEvidenceControlsRead:
+    app_settings = get_settings()
+    website_settings = db.get(WebsiteSettings, website_id)
+    estimate = app_settings.external_ai_citations_estimated_cost_micros
+    budget = website_settings.external_monthly_budget_micros if website_settings else 0
+    now = datetime.now(UTC)
+    completed = db.scalar(
+        select(func.count(ExternalUsageRecord.id)).where(
+            ExternalUsageRecord.website_id == website_id,
+            ExternalUsageRecord.capability == "ai_citations",
+            ExternalUsageRecord.recorded_at >= _month_start(now),
+        )
+    )
+    active_request_keys = set(
+        db.scalars(
+            select(ExternalIntelligenceRequest.cache_key).where(
+                ExternalIntelligenceRequest.website_id == website_id,
+                ExternalIntelligenceRequest.capability == "ai_citations",
+                ExternalIntelligenceRequest.status.in_(("pending", "running")),
+            )
+        )
+    )
+    active_observation_keys = set(
+        db.scalars(
+            select(ExternalObservation.cache_key).where(
+                ExternalObservation.website_id == website_id,
+                ExternalObservation.capability == "ai_citations",
+                ExternalObservation.expires_at > now,
+            )
+        )
+    )
+    in_progress = db.scalar(
+        select(func.count(ExternalIntelligenceRequest.id)).where(
+            ExternalIntelligenceRequest.website_id == website_id,
+            ExternalIntelligenceRequest.capability == "ai_citations",
+            ExternalIntelligenceRequest.status.in_(("pending", "running")),
+        )
+    )
+    return ExternalEvidenceControlsRead(
+        available=bool(app_settings.dataforseo_enabled and estimate > 0),
+        enabled=bool(website_settings and website_settings.external_intelligence_enabled),
+        monthly_check_limit=budget // estimate if estimate > 0 else 0,
+        active_question_limit=(
+            website_settings.external_active_scope_limit if website_settings else 0
+        ),
+        checks_completed_this_month=int(completed or 0),
+        checks_in_progress=int(in_progress or 0),
+        active_questions=len(active_request_keys | active_observation_keys),
+    )
 
 
 def _url_for_website(db: Session, website_id: UUID, url_id: UUID) -> Url:
@@ -129,6 +192,40 @@ def question_scopes(
             and website_settings.external_intelligence_enabled
         ),
     }
+
+
+@router.get("/external-evidence-controls", response_model=ExternalEvidenceControlsRead)
+def external_evidence_controls(
+    website_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> ExternalEvidenceControlsRead:
+    require_website_access(db, principal, website_id)
+    return _external_evidence_controls(db, website_id)
+
+
+@router.put("/external-evidence-controls", response_model=ExternalEvidenceControlsRead)
+def update_external_evidence_controls(
+    website_id: UUID,
+    payload: ExternalEvidenceControlsUpdate,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> ExternalEvidenceControlsRead:
+    require_website_write_access(db, principal, website_id)
+    app_settings = get_settings()
+    if payload.enabled and not app_settings.dataforseo_enabled:
+        raise HTTPException(status_code=409, detail="Extra evidence is not available")
+    settings = db.get(WebsiteSettings, website_id)
+    if not settings:
+        raise HTTPException(status_code=404, detail="Website settings not found")
+    settings.external_intelligence_enabled = payload.enabled
+    settings.external_active_scope_limit = payload.active_question_limit
+    settings.external_monthly_budget_micros = (
+        payload.monthly_check_limit
+        * app_settings.external_ai_citations_estimated_cost_micros
+    )
+    db.commit()
+    return _external_evidence_controls(db, website_id)
 
 
 @router.post("/external-evidence", response_model=ExternalEvidenceState, status_code=202)

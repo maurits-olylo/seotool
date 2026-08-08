@@ -1,6 +1,6 @@
 # Externe SEO-intelligence — analyse en ontwerp
 
-Status: ontwerpbesluit; kosteloze contractvoorbereiding gestart
+Status: eerste verticale AI-citationslice operationeel voorbereid
 Datum: 2026-08-08  
 Scope: externe SERP-, autoriteits-, concurrentie- en keywordcontext
 
@@ -48,6 +48,9 @@ Implementatiestatus:
 - na een geslaagde verificatie bewaart Effect de gekoppelde vraag in het immutable
   interventiesnapshot en vergelijkt voor precies die vraag-paginacombinatie GSC-klikken,
   vertoningen, CTR en positie vóór en na de wijziging; dit blijft correlatie en geen causaliteit;
+- beheerders kunnen de aanvullende dekkingcontrole per website in de interface activeren en daar
+  een maandlimiet en maximaal aantal actieve vragen instellen; de kaart toont alleen afgeronde,
+  lopende en actieve controles en maakt bron, kostenmodel en credentials niet zichtbaar;
 - één observation wordt conservatief geïnterpreteerd en creëert geen autonome kwaliteitsclaim;
 - de feature en lege credentialconfiguratie staan standaard uit; scheduler, echte credentials en
   betaalde calls zijn nog bewust niet geactiveerd.

@@ -73,6 +73,57 @@ def test_external_evidence_is_unavailable_by_default(client) -> None:  # type: i
         assert db.query(ExternalIntelligenceRequest).count() == 0
 
 
+def test_external_evidence_controls_are_provider_neutral(client, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    website_id = create_website(client)
+    enable_global(monkeypatch, estimate=800)
+    endpoint = (
+        f"/api/v1/websites/{website_id}/content-analysis/external-evidence-controls"
+    )
+
+    updated = client.put(
+        endpoint,
+        json={
+            "enabled": True,
+            "monthly_check_limit": 20,
+            "active_question_limit": 4,
+        },
+    )
+    current = client.get(endpoint)
+
+    assert updated.status_code == 200
+    assert current.status_code == 200
+    assert current.json() == {
+        "available": True,
+        "enabled": True,
+        "monthly_check_limit": 20,
+        "active_question_limit": 4,
+        "checks_completed_this_month": 0,
+        "checks_in_progress": 0,
+        "active_questions": 0,
+    }
+    with SessionLocal() as db:
+        settings = db.get(WebsiteSettings, UUID(website_id))
+        assert settings is not None
+        assert settings.external_monthly_budget_micros == 16_000
+    for hidden_value in ("dataforseo", "provider", "cost", "micros"):
+        assert hidden_value not in current.text.lower()
+
+
+def test_external_evidence_controls_cannot_enable_unavailable_service(client) -> None:  # type: ignore[no-untyped-def]
+    website_id = create_website(client)
+    response = client.put(
+        f"/api/v1/websites/{website_id}/content-analysis/external-evidence-controls",
+        json={
+            "enabled": True,
+            "monthly_check_limit": 20,
+            "active_question_limit": 4,
+        },
+    )
+
+    assert response.status_code == 409
+    assert "provider" not in response.text.lower()
+
+
 def test_human_selection_enqueues_once_and_response_hides_provider(
     client, monkeypatch
 ) -> None:  # type: ignore[no-untyped-def]
