@@ -7,7 +7,10 @@ from app.services.accessibility.rule_catalog import (
     PILOT_RULE_IDS,
 )
 from app.services.security import validate_public_http_url
-from app.services.staging_render_acceptance import STAGING_RENDER_ACCEPTANCE_URL
+from app.services.staging_render_acceptance import (
+    STAGING_ACCESSIBILITY_ACCEPTANCE_URLS,
+    STAGING_RENDER_ACCEPTANCE_URL,
+)
 from app.services.url_normalization import InvalidUrlError
 
 MAX_BROWSER_REQUESTS = 100
@@ -24,7 +27,10 @@ class RenderError(RuntimeError):
 def _validate_render_url(url: str) -> None:
     from app.core.config import get_settings
 
-    if get_settings().app_env == "staging" and url == STAGING_RENDER_ACCEPTANCE_URL:
+    if get_settings().app_env == "staging" and url in {
+        STAGING_RENDER_ACCEPTANCE_URL,
+        *STAGING_ACCESSIBILITY_ACCEPTANCE_URLS,
+    }:
         return
     validate_public_http_url(url)
 

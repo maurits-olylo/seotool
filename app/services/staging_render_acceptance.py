@@ -1,6 +1,10 @@
 from html import escape
 
 STAGING_RENDER_ACCEPTANCE_URL = "http://api:8000/staging/render-acceptance"
+STAGING_ACCESSIBILITY_ACCEPTANCE_URLS = (
+    "http://api:8000/staging/accessibility-acceptance/component-a",
+    "http://api:8000/staging/accessibility-acceptance/component-b",
+)
 STAGING_ACCEPTANCE_SCENARIO = "missing_h1_resolution"
 
 _resolved = False
@@ -40,6 +44,22 @@ def staging_render_acceptance_html(*, resolved: bool | None = None) -> str:
     <span class="badge">Synthetische stagingtest</span>
     {heading}
     <p>Deze pagina bevat geen klantdata en is uitsluitend beschikbaar in staging.</p>
+  </main>
+</body>
+</html>"""
+
+
+def staging_accessibility_acceptance_html(*, resolved: bool | None = None) -> str:
+    page_resolved = _resolved if resolved is None else resolved
+    button_text = "Verder" if page_resolved else ""
+    return f"""<!doctype html>
+<html lang="nl">
+<head><meta charset="utf-8"><title>Accessibility acceptatie</title></head>
+<body>
+  <main>
+    <h1>Accessibility acceptatie</h1>
+    <p>Deze synthetische pagina bevat geen klantdata.</p>
+    <button class="shared-acceptance-action">{button_text}</button>
   </main>
 </body>
 </html>"""

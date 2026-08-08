@@ -63,6 +63,8 @@ Status: lokaal geïmplementeerd en integraal getest; nog niet op staging geaccep
   geverifieerd en kan de bestaande effectmeting starten;
 - een blijvende overtreding brengt de taak terug naar `in_progress`; een later terugkerende
   overtreding heropent het bestaande issue als regressie zonder duplicaat.
+- de herbruikbare stagingfixture gebruikt twee synthetische, klantvrije pagina's met hetzelfde
+  component en controleert bundeling, herstel, twee renderwaarnemingen en automatische sluiting.
 
 Lokale acceptatie:
 

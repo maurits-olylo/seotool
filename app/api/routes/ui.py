@@ -25,6 +25,7 @@ from app.services.oauth import decrypt_token
 from app.services.security_audit import record_security_event
 from app.services.staging_render_acceptance import (
     set_staging_render_acceptance_resolved,
+    staging_accessibility_acceptance_html,
     staging_render_acceptance_html,
 )
 
@@ -117,6 +118,16 @@ def update_staging_render_acceptance_page(
         raise HTTPException(status_code=404)
     set_staging_render_acceptance_resolved(payload.resolved)
     return {"status": "ok", "resolved": payload.resolved}
+
+
+@router.get("/staging/accessibility-acceptance/{component}", include_in_schema=False)
+def staging_accessibility_acceptance_page(component: str) -> HTMLResponse:
+    if get_settings().app_env != "staging" or component not in {"component-a", "component-b"}:
+        raise HTTPException(status_code=404)
+    return HTMLResponse(
+        staging_accessibility_acceptance_html(),
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.post("/ui/login", include_in_schema=False, status_code=status.HTTP_204_NO_CONTENT)
