@@ -80,6 +80,9 @@ Staging gebruikt uitsluitend `compose.staging.yaml`, `.env.staging` en de vaste 
 actieve crawlworkers of scheduler opgenomen. Alleen voor een gecontroleerde browserproef kan de
 afzonderlijke renderworker tijdelijk met het profiel `rendering` worden gestart; de featureflag
 blijft daarbij standaard uit.
+Hetzelfde profiel start eerst `render-artifacts-init`. Deze begrensde taak maakt alleen de root van
+het staging-artefactvolume schrijfbaar voor de niet-root renderworker en stopt daarna succesvol.
+De API houdt het volume read-only gemount.
 
 Maak na het uitpakken van een release in de interactieve NAS-shell een eigen configuratie. Gebruik
 andere geheimen dan productie en plaats uitsluitend synthetische testdata in deze database:

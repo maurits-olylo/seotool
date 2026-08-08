@@ -181,6 +181,19 @@ services:
     cpu_shares: 256
     mem_limit: 1g
     restart: unless-stopped
+  render-artifacts-init:
+    <<: *app-hardening
+    profiles: ["rendering"]
+    build:
+      context: .
+      dockerfile: Dockerfile.render
+    user: root
+    command: ["install", "-d", "-o", "pwuser", "-g", "pwuser", "-m", "700", "/app/render-artifacts"]
+    volumes: ["render_artifacts_data:/app/render-artifacts"]
+    networks: [backend]
+    cpu_shares: 64
+    mem_limit: 128m
+    restart: "no"
   render-worker:
     <<: *app-hardening
     profiles: ["rendering"]
@@ -205,6 +218,7 @@ services:
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
+      render-artifacts-init: {condition: service_completed_successfully}
     healthcheck:
       test: ["CMD", "python", "-c", "from app.worker import worker_is_registered; assert worker_is_registered()"]
       interval: 30s

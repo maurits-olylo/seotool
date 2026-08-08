@@ -1,6 +1,6 @@
 # Release 11 — Visuele issue-inspectie
 
-Status: fasen 1 tot en met 9 lokaal geïmplementeerd; nog niet gedeployed.
+Status: fasen 1 tot en met 10 lokaal geïmplementeerd en integraal geaccepteerd; nog niet gedeployed.
 
 ## Fase 1 — Uniform inspectiecontract
 
@@ -180,3 +180,27 @@ bestaande lifecycle oplossen en bij de volgende geslaagde controle verifiëren.
 - Een live aanwezig element wordt onderscheiden van een nog steeds ontbrekend element.
 - Ontbrekende elementen krijgen nooit een kunstmatige locator of overlay.
 - De controle start geen extra netwerkverzoek en verandert de issue-status niet.
+
+## Fase 10 — Integrale lokale releaseacceptatie
+
+De volledige applicatiesuite, linting, JavaScript-syntaxis, productie- en staging-Compose,
+migrationketen en OpenAPI-routes zijn gezamenlijk gecontroleerd. Zowel productie als staging heeft
+een aparte, alleen via het profiel `rendering` actieve volume-initialisatie. Die zet uitsluitend de
+root van het screenshotvolume op gebruiker `pwuser` en modus `0700` voordat de niet-root
+renderworker start. Dit werkt ook wanneer Compose het named volume al eerder root-owned aanmaakte.
+
+Migration `0060` verwijdert alleen de unieke constraint op `source_snapshot_id`; er is geen
+dataherschrijving. Voor staging is daarom geen extra databaseback-up nodig. Voor productie wordt
+wel de normale pre-deploymentback-up gebruikt, omdat een schemadowngrade na meerdere live
+observaties niet meer zonder een expliciete datakeuze kan worden uitgevoerd. Een applicatierollback
+mag de database in dat geval veilig op `0060` laten staan.
+
+## Acceptatie fase 10
+
+- Productie- en staging-Compose zijn geldig met en zonder het renderingprofiel.
+- De renderworker start pas nadat het artefactvolume bruikbaar is voor `pwuser`.
+- API houdt read-only toegang; alleen de renderworker schrijft screenshots.
+- Crawler- en API-databaserollen hebben de benodigde bestaande tabelrechten.
+- Alembic heeft exact één head: `0060`.
+- Inspectie-, hercontrole- en screenshotroutes staan in OpenAPI.
+- Rendering en de renderworker blijven standaard uitgeschakeld.

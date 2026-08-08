@@ -70,6 +70,7 @@ def test_application_containers_are_hardened() -> None:
         "crawl-worker-3",
         "integration-worker",
         "export-worker",
+        "render-artifacts-init",
         "render-worker",
         "scheduler",
         "migrate",
@@ -92,7 +93,13 @@ def test_staging_application_containers_are_hardened() -> None:
     project_root = Path(__file__).resolve().parents[1]
     compose = yaml.safe_load((project_root / "compose.staging.yaml").read_text())
 
-    for service_name in ("api", "render-worker", "migrate", "database-roles"):
+    for service_name in (
+        "api",
+        "render-artifacts-init",
+        "render-worker",
+        "migrate",
+        "database-roles",
+    ):
         service = compose["services"][service_name]
         assert service["read_only"] is True
         assert service["cap_drop"] == ["ALL"]
@@ -207,6 +214,24 @@ def test_database_role_configurator_does_not_source_environment_files() -> None:
     assert "--profile tools run --rm database-roles" in script
     assert compose["services"]["database-roles"]["read_only"] is True
     assert compose["services"]["database-roles"]["cap_drop"] == ["ALL"]
+
+
+def test_render_artifact_volume_is_initialized_before_worker() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    for filename, volume_name in (
+        ("compose.yaml", "render_artifacts_data"),
+        ("compose.staging.yaml", "staging_render_artifacts_data"),
+    ):
+        compose = yaml.safe_load((project_root / filename).read_text())
+        initializer = compose["services"]["render-artifacts-init"]
+        worker = compose["services"]["render-worker"]
+        assert initializer["user"] == "root"
+        assert initializer["restart"] == "no"
+        assert initializer["profiles"] == ["rendering"]
+        assert initializer["volumes"] == [f"{volume_name}:/app/render-artifacts"]
+        assert worker["depends_on"]["render-artifacts-init"] == {
+            "condition": "service_completed_successfully"
+        }
 
 
 def test_crawler_network_is_separated_from_other_egress() -> None:
