@@ -1,7 +1,4 @@
-import json
-import os
 import sys
-import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
@@ -32,18 +29,6 @@ from app.services.staging_render_acceptance import (
 
 FIXTURE_MARKER = "release_12_accessibility_component_workflow"
 ISSUE_TYPE = "accessibility_button_name"
-
-
-def _set_page_state(*, resolved: bool) -> None:
-    request = urllib.request.Request(
-        "http://api:8000/staging/render-acceptance",
-        data=json.dumps({"resolved": resolved}).encode(),
-        headers={"Content-Type": "application/json", "X-API-Key": os.environ["API_KEY"]},
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=5) as response:
-        if response.status != 200:
-            raise RuntimeError("Acceptance page state could not be updated")
 
 
 def _prepare() -> tuple[str, str]:
@@ -207,9 +192,7 @@ def _prepare() -> tuple[str, str]:
 
 
 def main() -> None:
-    _set_page_state(resolved=False)
     task_id, verification_id = _prepare()
-    _set_page_state(resolved=True)
     execute_verification(verification_id)
     with SessionLocal() as db:
         task = db.get(RecommendationTask, UUID(task_id))
@@ -231,8 +214,5 @@ def main() -> None:
                 "render_observations": 2,
             }
         )
-    _set_page_state(resolved=False)
-
-
 if __name__ == "__main__":
     main()

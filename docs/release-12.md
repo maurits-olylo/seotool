@@ -47,7 +47,8 @@ Status: lokaal en op staging geïmplementeerd en getest.
 
 ## Fase C — grouping en workflow
 
-Status: lokaal en op staging geïmplementeerd en integraal geaccepteerd.
+Status: lokaal geïmplementeerd en integraal getest; stagingacceptatie wordt na een fixturecorrectie
+herhaald.
 
 - ieder hard accessibilityissue bewaart een deterministische componenthandtekening op basis van
   regel en begrensde selector;
@@ -73,14 +74,14 @@ Lokale acceptatie:
 - volledige regressiesuite: 556 geslaagd, alleen de bestaande Starlette/httpx-waarschuwing;
 - Ruff en diffcontrole: geslaagd.
 
-Stagingacceptatie:
+Eerste stagingpoging:
 
 - API en renderworker zijn vanaf fixturecommit `074bd82` herbouwd en gezond gestart;
-- twee synthetische pagina's met dezelfde componenthandtekening zijn tot één taak gebundeld;
-- na synthetisch herstel zijn beide pagina's via axe op de renderqueue hercontroleerd;
-- de verificatie eindigde als `passed` en de taak sloot automatisch als geverifieerd;
-- API en database bleven gezond;
-- gereedsignaal: `release-12-phase-c-staging-ok`.
+- de fixture stopte terecht voordat klantvrije testdata werd verwerkt, omdat de renderworker geen
+  algemene API-key bevat;
+- de fixture wordt gecorrigeerd naar vaste herstelde live pagina's en heeft daardoor geen secret of
+  muterende API-aanroep meer nodig;
+- fase C is pas geaccepteerd nadat de volledige fixture alsnog slaagt.
 
 ## Volgende fase
 

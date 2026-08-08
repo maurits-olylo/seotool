@@ -125,7 +125,7 @@ def staging_accessibility_acceptance_page(component: str) -> HTMLResponse:
     if get_settings().app_env != "staging" or component not in {"component-a", "component-b"}:
         raise HTTPException(status_code=404)
     return HTMLResponse(
-        staging_accessibility_acceptance_html(),
+        staging_accessibility_acceptance_html(resolved=True),
         headers={"Cache-Control": "no-store"},
     )
 
