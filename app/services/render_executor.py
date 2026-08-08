@@ -8,6 +8,11 @@ from app.models.common import utc_now
 from app.models.crawl import UrlLink, UrlSnapshot
 from app.models.discovery import Url
 from app.models.rendering import RenderObservation
+from app.services.accessibility.normalization import (
+    accessibility_issue_signals,
+    normalize_axe_result,
+)
+from app.services.accessibility.rule_catalog import ACCESSIBILITY_ISSUE_TYPES
 from app.services.browser_renderer import render_page_html
 from app.services.html_extraction import ExtractedPage, extract_page
 from app.services.issue_engine import reconcile_issues
@@ -40,11 +45,13 @@ def execute_render_observation(observation_id: str) -> None:
 
             focus_target = observation.comparison.get("inspection_focus")
             absence_target = observation.comparison.get("inspection_absence")
-            result = (
-                render_page_html(url.normalized_url, focus_target=focus_target)
-                if isinstance(focus_target, dict)
-                else render_page_html(url.normalized_url)
-            )
+            accessibility_requested = observation.comparison.get("accessibility_requested") is True
+            render_options: dict[str, object] = {}
+            if isinstance(focus_target, dict):
+                render_options["focus_target"] = focus_target
+            if accessibility_requested:
+                render_options["run_accessibility"] = True
+            result = render_page_html(url.normalized_url, **render_options)
             rendered = extract_page(result.html, url.normalized_url)
             static_links = set(
                 db.scalars(
@@ -59,6 +66,13 @@ def execute_render_observation(observation_id: str) -> None:
                 snapshot, rendered, static_internal_links=static_links
             )
             signals = render_issue_signals(comparison)
+            accessibility = (
+                normalize_axe_result(result.accessibility_result)
+                if result.accessibility_result is not None
+                else None
+            )
+            if accessibility is not None:
+                signals.extend(accessibility_issue_signals(accessibility))
             reconcile_issues(
                 db,
                 website_id=observation.website_id,
@@ -66,7 +80,11 @@ def execute_render_observation(observation_id: str) -> None:
                 crawl_run_id=snapshot.crawl_run_id,
                 snapshot_id=snapshot.id,
                 signals=signals,
-                checked_issue_types=RENDER_ISSUE_TYPES,
+                checked_issue_types=(
+                    RENDER_ISSUE_TYPES | ACCESSIBILITY_ISSUE_TYPES
+                    if accessibility_requested
+                    else RENDER_ISSUE_TYPES
+                ),
             )
             observation.status = "succeeded"
             observation.rendered_at = utc_now()
@@ -101,6 +119,8 @@ def execute_render_observation(observation_id: str) -> None:
                     absence_target if isinstance(absence_target, dict) else None
                 ),
                 "inspection_absence_status": _absence_status(rendered, absence_target),
+                "accessibility_requested": accessibility_requested,
+                "accessibility": accessibility,
             }
             db.commit()
             logger.info(

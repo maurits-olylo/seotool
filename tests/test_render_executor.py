@@ -126,6 +126,47 @@ def test_executor_checks_if_missing_element_is_live_present(monkeypatch) -> None
         assert stored.comparison["inspection_absence_status"] == "present"
 
 
+def test_executor_reconciles_requested_accessibility_results(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    with SessionLocal() as db:
+        observation = _observation(db)
+        observation.comparison = {"accessibility_requested": True}
+        observation_id = str(observation.id)
+        db.commit()
+
+    received: list[dict[str, object]] = []
+
+    def render(_url: str, **kwargs: object) -> BrowserRenderResult:
+        received.append(kwargs)
+        return BrowserRenderResult(
+            html="<html lang='nl'><head><title>Test</title></head><body></body></html>",
+            browser_name="chromium",
+            request_count=1,
+            accessibility_result={
+                "testEngine": {"version": "4.12.1"},
+                "violations": [
+                    {
+                        "id": "button-name",
+                        "impact": "critical",
+                        "nodes": [{"target": ["#buy"], "html": "<button id='buy'></button>"}],
+                    }
+                ],
+                "incomplete": [],
+            },
+        )
+
+    monkeypatch.setattr("app.services.render_executor.render_page_html", render)
+    execute_render_observation(observation_id)
+
+    with SessionLocal() as db:
+        stored = db.get(RenderObservation, observation.id)
+        issue = db.scalar(select(Issue).where(Issue.issue_type == "accessibility_button_name"))
+        assert received == [{"run_accessibility": True}]
+        assert stored is not None
+        assert stored.comparison["accessibility"]["engine_version"] == "4.12.1"
+        assert issue is not None
+        assert issue.category == "accessibility"
+
+
 def _observation(db) -> RenderObservation:  # type: ignore[no-untyped-def]
     website = Website(
         client=Client(name="Render client"),

@@ -1,6 +1,11 @@
 from dataclasses import dataclass
 from typing import Any
 
+from app.services.accessibility.rule_catalog import (
+    AXE_SOURCE_PATH,
+    MAX_ACCESSIBILITY_NODES,
+    PILOT_RULE_IDS,
+)
 from app.services.security import validate_public_http_url
 from app.services.staging_render_acceptance import STAGING_RENDER_ACCEPTANCE_URL
 from app.services.url_normalization import InvalidUrlError
@@ -34,6 +39,7 @@ class BrowserRenderResult:
     screenshot_height: int = 768
     element_boxes: list[dict[str, object]] | None = None
     focus_status: str = "not_requested"
+    accessibility_result: dict[str, object] | None = None
 
     @property
     def focus_applied(self) -> bool:
@@ -46,6 +52,7 @@ def render_page_html(
     timeout_seconds: int = 20,
     settle_time_ms: int = 1_000,
     focus_target: dict[str, object] | None = None,
+    run_accessibility: bool = False,
     playwright_factory: Any | None = None,
 ) -> BrowserRenderResult:
     """Render one public page in an isolated context with bounded network activity."""
@@ -100,6 +107,7 @@ def render_page_html(
                 raise RenderError("Browser navigation returned no response")
             page.wait_for_timeout(min(max(settle_time_ms, 0), 2_000))
             html = page.content()
+            accessibility_result = _run_accessibility(page) if run_accessibility else None
             focus_status = _focus_page_element(page, focus_target)
             if focus_status == "focused":
                 page.wait_for_timeout(100)
@@ -155,7 +163,39 @@ def render_page_html(
         screenshot_png=screenshot_png,
         element_boxes=element_boxes[:MAX_ELEMENT_BOXES],
         focus_status=focus_status,
+        accessibility_result=accessibility_result,
     )
+
+
+def _run_accessibility(page: Any) -> dict[str, object]:
+    try:
+        page.add_script_tag(path=AXE_SOURCE_PATH)
+        result = page.evaluate(
+            """async options => await axe.run(document, {
+              runOnly: {type: 'rule', values: options.rules},
+              resultTypes: ['violations', 'incomplete'],
+              selectors: true,
+              ancestry: true
+            })""",
+            {"rules": list(PILOT_RULE_IDS)},
+        )
+    except Exception as exc:
+        raise RenderError(f"Accessibility analysis failed: {type(exc).__name__}") from exc
+    if not isinstance(result, dict):
+        raise RenderError("Accessibility analysis returned an invalid result")
+    node_count = 0
+    for key in ("violations", "incomplete"):
+        findings = result.get(key)
+        if not isinstance(findings, list):
+            continue
+        node_count += sum(
+            len(item.get("nodes", []))
+            for item in findings
+            if isinstance(item, dict) and isinstance(item.get("nodes"), list)
+        )
+    if node_count > MAX_ACCESSIBILITY_NODES:
+        raise RenderError("Accessibility analysis exceeds maximum finding count")
+    return result
 
 
 def _focus_page_element(page: Any, focus_target: dict[str, object] | None) -> str:

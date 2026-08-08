@@ -114,6 +114,23 @@ def test_renderer_reports_ambiguous_focus(monkeypatch) -> None:  # type: ignore[
     assert result.focus_applied is False
 
 
+def test_renderer_runs_bounded_accessibility_rules_when_requested(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setattr(browser_renderer, "validate_public_http_url", lambda _url: None)
+    playwright = _PlaywrightFactory([])
+    playwright.accessibility_result = {
+        "testEngine": {"version": "4.12.1"},
+        "violations": [],
+        "incomplete": [],
+    }
+
+    result = browser_renderer.render_page_html(
+        "https://example.com/", run_accessibility=True, playwright_factory=playwright
+    )
+
+    assert playwright.injected_scripts == [browser_renderer.AXE_SOURCE_PATH]
+    assert result.accessibility_result == playwright.accessibility_result
+
+
 @dataclass
 class _Request:
     url: str
@@ -162,9 +179,14 @@ class _Page:
         return b"png"
 
     def evaluate(self, _script: str, target: dict[str, object]) -> int:
+        if "axe.run" in _script:
+            return self.owner.accessibility_result
         self.owner.capture_events.append("focus")
         self.owner.focus_targets.append(target)
         return self.owner.focus_match_count
+
+    def add_script_tag(self, *, path: str) -> None:
+        self.owner.injected_scripts.append(path)
 
     def locator(self, _selector: str):  # type: ignore[no-untyped-def]
         return _Locator(self.owner)
@@ -249,6 +271,8 @@ class _PlaywrightFactory:
         self.focus_targets: list[dict[str, object]] = []
         self.capture_events: list[str] = []
         self.focus_match_count = focus_match_count
+        self.injected_scripts: list[str] = []
+        self.accessibility_result: dict[str, object] = {}
 
     def __call__(self):  # type: ignore[no-untyped-def]
         return _PlaywrightContext(self, self.requests)
