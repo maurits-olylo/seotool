@@ -200,6 +200,11 @@ def test_database_role_policy_protects_sensitive_tables() -> None:
         "GRANT SELECT ON TABLE google_analytics_metrics, search_console_metrics TO seo_crawler"
         in policy
     )
+    assert (
+        "GRANT SELECT, INSERT ON TABLE effect_interventions, effect_evaluations TO seo_crawler"
+        in policy
+    )
+    assert "url_content_classifications, url_content_overrides TO seo_crawler" in policy
     assert "GRANT UPDATE (id) ON TABLE crawl_deployment_control TO seo_crawler" in policy
     assert "GRANT UPDATE (id) ON TABLE websites TO seo_scheduler" in policy
     assert "external_intelligence_requests, external_observations, external_usage_records" in policy

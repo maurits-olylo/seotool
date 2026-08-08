@@ -83,6 +83,16 @@ Eerste stagingpoging:
   muterende API-aanroep meer nodig;
 - fase C is pas geaccepteerd nadat de volledige fixture alsnog slaagt.
 
+Tweede stagingpoging:
+
+- beide axe-renderwaarnemingen slaagden;
+- de verificatie stopte bij effectmaterialisatie doordat het versieerbare crawlerrollenbeleid geen
+  rechten op de in Release 10 toegevoegde effecttabellen bevatte;
+- het rollenbeleid krijgt alleen de noodzakelijke leesrechten op effectbronnen en lees-/invoegrecht
+  op `effect_interventions` en `effect_evaluations`;
+- de fixture ruimt een eerder afgebroken synthetische taak op voordat zij opnieuw begint;
+- fase C blijft onbevestigd totdat rollenconfiguratie en de volledige fixture slagen.
+
 ## Volgende fase
 
 Na lokale eindcontrole en stagingacceptatie kan fase D starten met uitlegbare cross-domain

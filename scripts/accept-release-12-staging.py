@@ -69,6 +69,31 @@ def _prepare() -> tuple[str, str]:
                 db.flush()
             urls.append(url)
 
+        issue_ids = set(
+            db.scalars(
+                select(Issue.id).where(
+                    Issue.website_id == website.id,
+                    Issue.url_id.in_([url.id for url in urls]),
+                    Issue.issue_type == ISSUE_TYPE,
+                )
+            )
+        )
+        if issue_ids:
+            previous_tasks = list(
+                db.scalars(
+                    select(RecommendationTask)
+                    .join(
+                        RecommendationTaskIssue,
+                        RecommendationTaskIssue.task_id == RecommendationTask.id,
+                    )
+                    .where(RecommendationTaskIssue.issue_id.in_(issue_ids))
+                    .distinct()
+                )
+            )
+            for previous_task in previous_tasks:
+                db.delete(previous_task)
+            db.commit()
+
         job = CrawlJob(
             website_id=website.id,
             job_type="full_page_analysis",

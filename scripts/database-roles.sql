@@ -36,6 +36,9 @@ TO seo_crawler;
 GRANT SELECT ON TABLE clients, crawl_deployment_control, issue_suppressions, website_settings, websites
 TO seo_crawler;
 GRANT SELECT ON TABLE google_analytics_metrics, search_console_metrics TO seo_crawler;
+GRANT SELECT ON TABLE matomo_page_metrics, search_console_query_metrics,
+  url_content_classifications, url_content_overrides TO seo_crawler;
+GRANT SELECT, INSERT ON TABLE effect_interventions, effect_evaluations TO seo_crawler;
 GRANT UPDATE (id) ON TABLE crawl_deployment_control TO seo_crawler;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO seo_crawler;
 
