@@ -165,6 +165,18 @@ def test_executor_reconciles_requested_accessibility_results(monkeypatch) -> Non
         assert stored.comparison["accessibility"]["engine_version"] == "4.12.1"
         assert issue is not None
         assert issue.category == "accessibility"
+        issue.status = "resolved"
+        stored.status = "pending"
+        db.commit()
+
+    execute_render_observation(observation_id)
+
+    with SessionLocal() as db:
+        reopened = db.scalar(
+            select(Issue).where(Issue.issue_type == "accessibility_button_name")
+        )
+        assert reopened is not None
+        assert reopened.status == "new"
 
 
 def _observation(db) -> RenderObservation:  # type: ignore[no-untyped-def]

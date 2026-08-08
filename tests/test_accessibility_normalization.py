@@ -56,3 +56,6 @@ def test_creates_issues_only_for_certain_violations() -> None:
     assert signals[0].category == "accessibility"
     assert signals[0].severity == "high"
     assert signals[0].evidence["accessibility"]["node_count"] == 1
+    assert signals[0].evidence["accessibility"]["component_signature"].startswith(
+        "axe:button-name:"
+    )

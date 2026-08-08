@@ -45,5 +45,33 @@ Status: lokaal en op staging geïmplementeerd en getest.
 
 ## Volgende fase
 
-Fase C voegt componenthandtekeningen, bereik, multi-issue taakcreatie, gerichte verificatie en
-regressie toe. Zij start pas na afzonderlijke bevestiging.
+## Fase C — grouping en workflow
+
+Status: lokaal geïmplementeerd en integraal getest; nog niet op staging geaccepteerd.
+
+- ieder hard accessibilityissue bewaart een deterministische componenthandtekening op basis van
+  regel en begrensde selector;
+- positionele selectorindexen worden genormaliseerd, zodat hetzelfde gedeelde component over
+  meerdere pagina's herkenbaar blijft;
+- taakcreatie koppelt maximaal vijftig actieve issues met dezelfde regel, componenthandtekening en
+  website aan één bestaande `RecommendationTask`;
+- iedere betrokken URL krijgt de rol `changed`; een andere component of tenant wordt nooit
+  stilzwijgend toegevoegd;
+- de bestaande automatische overgang naar `implemented` plant de hercontrole op de renderqueue;
+- iedere voorbeeldpagina krijgt een historische `RenderObservation` met axe-resultaat;
+- alleen wanneer de oorspronkelijke regel op alle voorbeelden verdwenen is, sluit de taak als
+  geverifieerd en kan de bestaande effectmeting starten;
+- een blijvende overtreding brengt de taak terug naar `in_progress`; een later terugkerende
+  overtreding heropent het bestaande issue als regressie zonder duplicaat.
+
+Lokale acceptatie:
+
+- componentnormalisatie, multi-issue bundeling, tenantscope, renderqueuekeuze, positieve
+  hercontrole en regressie zijn geautomatiseerd getest;
+- volledige regressiesuite: 556 geslaagd, alleen de bestaande Starlette/httpx-waarschuwing;
+- Ruff en diffcontrole: geslaagd.
+
+## Volgende fase
+
+Na lokale eindcontrole en stagingacceptatie kan fase D starten met uitlegbare cross-domain
+prioritering. Fase D start pas na afzonderlijke bevestiging.

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.queue import (
+    RENDER_QUEUE,
     VERIFICATION_QUEUE,
     enqueue_recommendation_verification,
     queue_has_capacity,
@@ -22,9 +23,11 @@ from app.models.issues import ActivityLog, Issue
 from app.models.recommendations import (
     RecommendationTask,
     RecommendationTaskEvent,
+    RecommendationTaskIssue,
     RecommendationTaskUrl,
     RecommendationVerification,
 )
+from app.models.rendering import RenderObservation
 from app.models.website import Website
 from app.services.effect_analysis import evaluate_effect_cohort
 from app.services.effect_interventions import materialize_task_intervention
@@ -37,6 +40,7 @@ from app.services.recommendation_tasks import (
     actor_label,
     verification_scope_plan,
 )
+from app.services.render_executor import execute_render_observation
 from app.services.robots import RobotsRules
 from app.services.snapshot import store_fetch_result
 from app.services.task_notifications import add_task_notification
@@ -71,7 +75,12 @@ def request_verification(
     )
     if existing:
         raise RecommendationTaskError("Voor deze taak loopt al een verificatie.")
-    if get_settings().app_env != "test" and not queue_has_capacity(VERIFICATION_QUEUE):
+    queue_name = (
+        RENDER_QUEUE
+        if task.recommendation_type == "repair_accessibility_component"
+        else VERIFICATION_QUEUE
+    )
+    if get_settings().app_env != "test" and not queue_has_capacity(queue_name):
         raise RecommendationTaskError("De verificatiewachtrij is tijdelijk vol.")
 
     task_urls = list(
@@ -97,7 +106,7 @@ def request_verification(
         website_id=task.website_id,
         job_type="recommendation_verification",
         settings_snapshot={"verification_scope": scope_urls},
-        queue_name=VERIFICATION_QUEUE,
+        queue_name=queue_name,
         queue_priority=priority,
     )
     db.add(job)
@@ -147,6 +156,7 @@ def request_verification(
             str(verification.id),
             website_id=str(task.website_id),
             priority=priority,
+            queue_name=queue_name,
         )
         if queued is False:
             raise RuntimeError("De verificatiewachtrij is tijdelijk vol.")
@@ -194,6 +204,9 @@ def execute_verification(verification_id: str) -> None:
             website = db.get(Website, task.website_id)
             if website is None:
                 raise RuntimeError("Website bestaat niet meer.")
+            if task.recommendation_type == "repair_accessibility_component":
+                _execute_accessibility_verification(db, verification, task, job, run)
+                return
             from app.jobs import _load_robots_rules
 
             robots = _load_robots_rules(db, job)
@@ -270,6 +283,118 @@ def execute_verification(verification_id: str) -> None:
                 _fail(db, verification, task, job, str(exc))
             logger.exception("recommendation_verification_failed", verification_id=verification_id)
             raise
+
+
+def _execute_accessibility_verification(
+    db: Session,
+    verification: RecommendationVerification,
+    task: RecommendationTask,
+    job: CrawlJob,
+    run: CrawlRun,
+) -> None:
+    task_urls = list(
+        db.scalars(
+            select(RecommendationTaskUrl).where(
+                RecommendationTaskUrl.task_id == task.id,
+                RecommendationTaskUrl.role == "changed",
+            )
+        )
+    )
+    issues = list(
+        db.scalars(
+            select(Issue)
+            .join(RecommendationTaskIssue, RecommendationTaskIssue.issue_id == Issue.id)
+            .where(RecommendationTaskIssue.task_id == task.id)
+        )
+    )
+    issue_type_by_url = {
+        issue.url_id: issue.issue_type for issue in issues if issue.url_id is not None
+    }
+    rules: list[dict[str, object]] = []
+    observation_ids: list[str] = []
+    for task_url in task_urls:
+        snapshot = db.scalar(
+            select(UrlSnapshot)
+            .where(UrlSnapshot.url_id == task_url.url_id)
+            .order_by(UrlSnapshot.checked_at.desc())
+            .limit(1)
+        )
+        if snapshot is None:
+            rules.append(
+                {
+                    "rule": f"accessibility_recheck:{task_url.url_id}",
+                    "status": "error",
+                    "evidence": {"reason": "Geen bronsnapshot beschikbaar."},
+                }
+            )
+            continue
+        observation = RenderObservation(
+            website_id=task.website_id,
+            url_id=task_url.url_id,
+            source_snapshot_id=snapshot.id,
+            status="pending",
+            trigger_reasons=["recommendation_verification", "accessibility_recheck"],
+            comparison={
+                "accessibility_requested": True,
+                "recommendation_verification_id": str(verification.id),
+            },
+        )
+        db.add(observation)
+        db.commit()
+        execute_render_observation(str(observation.id))
+        db.expire_all()
+        stored = db.get(RenderObservation, observation.id)
+        if stored is None or stored.status != "succeeded":
+            raise RuntimeError("Accessibility-hercontrole heeft geen resultaat opgeleverd.")
+        observation_ids.append(str(stored.id))
+        accessibility = stored.comparison.get("accessibility")
+        violations = (
+            accessibility.get("violations", [])
+            if isinstance(accessibility, dict)
+            else []
+        )
+        active_rule_ids = {
+            str(item.get("rule_id"))
+            for item in violations
+            if isinstance(item, dict) and item.get("rule_id")
+        }
+        expected_issue_type = issue_type_by_url.get(task_url.url_id)
+        expected_rule_id = (
+            expected_issue_type.removeprefix("accessibility_").replace("_", "-")
+            if expected_issue_type
+            else None
+        )
+        passed = bool(expected_rule_id and expected_rule_id not in active_rule_ids)
+        rules.append(
+            {
+                "rule": f"accessibility_recheck:{task_url.url_id}",
+                "status": "passed" if passed else "failed",
+                "evidence": {
+                    "expected_rule_id": expected_rule_id,
+                    "active_rule_ids": sorted(active_rule_ids),
+                    "render_observation_id": str(stored.id),
+                },
+            }
+        )
+        run.phase_current += 1
+        run.crawled_urls += 1
+
+    outcome = _outcome(rules)
+    verification.rules = rules
+    verification.result = {
+        "outcome": outcome,
+        "render_observation_ids": observation_ids,
+        "rule_counts": {
+            state: sum(rule["status"] == state for rule in rules)
+            for state in ("passed", "failed", "error")
+        },
+    }
+    verification.status = STATUS_FOR_OUTCOME[outcome]
+    task.verification_status = verification.status
+    run.status = job.status = (
+        "succeeded" if outcome in {"resolved", "probably_resolved"} else "partially_succeeded"
+    )
+    _finish(db, verification, job, run)
 
 
 def _fetch_scoped_url(

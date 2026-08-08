@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Literal
 
+from app.services.accessibility.rule_catalog import ACCESSIBILITY_ISSUE_TYPES
+
 RecommendationRole = Literal["content", "development", "seo_analytics", "project_management"]
 RecommendationPriority = Literal["critical", "high", "normal", "low"]
 Feasibility = Literal[
@@ -30,6 +32,27 @@ class RecommendationDefinition:
 
 
 DEFINITIONS = (
+    RecommendationDefinition(
+        "repair_accessibility_component",
+        "1",
+        frozenset(ACCESSIBILITY_ISSUE_TYPES),
+        "Herstel het gedeelde toegankelijkheidsprobleem",
+        "development",
+        ("content",),
+        "high",
+        (30, 180),
+        "needs_technical_research",
+        (
+            "Open het elementbewijs van de gekoppelde pagina's.",
+            "Bepaal het gedeelde component of template en herstel daar de oorzaak.",
+            "Publiceer de wijziging en laat dezelfde pagina's automatisch hercontroleren.",
+        ),
+        (
+            "Dezelfde accessibilityregel slaagt op alle gecontroleerde voorbeelden.",
+            "De wijziging veroorzaakt geen nieuwe accessibilityovertreding op die voorbeelden.",
+        ),
+        ("changed",),
+    ),
     RecommendationDefinition(
         "repair_broken_internal_link",
         "2",

@@ -104,10 +104,14 @@ def enqueue_crawl_job(
 
 
 def enqueue_recommendation_verification(
-    verification_id: str, *, website_id: str | None = None, priority: int = 50
+    verification_id: str,
+    *,
+    website_id: str | None = None,
+    priority: int = 50,
+    queue_name: str = VERIFICATION_QUEUE,
 ) -> bool:
     return _enqueue(
-        VERIFICATION_QUEUE,
+        queue_name,
         "app.services.recommendation_verifications.execute_verification",
         verification_id,
         job_id=f"recommendation-verification-{verification_id}",

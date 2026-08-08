@@ -81,8 +81,8 @@ def _task_fixture(db):  # type: ignore[no-untyped-def]
 
 
 def test_library_contains_compact_unique_mvp() -> None:
-    assert len(DEFINITIONS) == 21
-    assert len({definition.key for definition in DEFINITIONS}) == 21
+    assert len(DEFINITIONS) == 22
+    assert len({definition.key for definition in DEFINITIONS}) == 22
     assert recommendation_for_issue_type("internally_linked_404").key == (
         "repair_broken_internal_link"
     )
@@ -227,7 +227,7 @@ def test_recommendation_task_api_lifecycle(client, monkeypatch) -> None:  # type
 
     definitions = client.get("/api/v1/recommendation-types")
     assert definitions.status_code == 200
-    assert len(definitions.json()) == 21
+    assert len(definitions.json()) == 22
 
     created = client.post(f"/api/v1/issues/{issue_id}/recommendation-task")
     assert created.status_code == 201

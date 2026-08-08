@@ -1,5 +1,6 @@
 from typing import Any
 
+from app.services.accessibility.grouping import component_signature
 from app.services.accessibility.rule_catalog import (
     AXE_CORE_VERSION,
     MAX_NODES_PER_RULE,
@@ -41,6 +42,9 @@ def accessibility_issue_signals(evidence: dict[str, object]) -> list[IssueSignal
             continue
         rule = PILOT_RULE_BY_ID[rule_id]
         node_count = int(finding.get("node_count", 0))
+        nodes = finding.get("nodes")
+        first_node = nodes[0] if isinstance(nodes, list) and nodes else None
+        target = first_node.get("target") if isinstance(first_node, dict) else None
         signals.append(
             IssueSignal(
                 issue_type=f"accessibility_{rule_id.replace('-', '_')}",
@@ -56,6 +60,7 @@ def accessibility_issue_signals(evidence: dict[str, object]) -> list[IssueSignal
                     "accessibility": {
                         "engine": evidence.get("engine"),
                         "engine_version": evidence.get("engine_version"),
+                        "component_signature": component_signature(rule_id, target),
                         **finding,
                     }
                 },

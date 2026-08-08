@@ -18,6 +18,7 @@ from app.models.recommendations import (
 from app.models.user import ClientMembership, User
 from app.models.website import Website
 from app.schemas.recommendations import RecommendationFeedbackCreate, RecommendationTaskUpdate
+from app.services.accessibility.grouping import accessibility_issue_group
 from app.services.recommendation_library import (
     get_recommendation_definition,
     recommendation_for_issue_type,
@@ -39,6 +40,7 @@ ALLOWED_TRANSITIONS = {
 PRIORITY_RANK = {"low": 0, "normal": 1, "high": 2, "critical": 3}
 SEVERITY_PRIORITY = {"low": "low", "medium": "normal", "high": "high"}
 SCOPED_VERIFICATION_TYPES = {
+    "repair_accessibility_component",
     "repair_broken_internal_link",
     "replace_redirected_internal_link",
     "restore_or_redirect_missing_page",
@@ -52,6 +54,7 @@ SCOPED_VERIFICATION_TYPES = {
     "content_question_gap",
 }
 VERIFICATION_URL_ROLES = {
+    "repair_accessibility_component": {"changed"},
     "repair_broken_internal_link": {"source", "broken_target", "replacement_target"},
     "replace_redirected_internal_link": {"source", "target", "expected_target"},
     "restore_or_redirect_missing_page": {"old", "new"},
@@ -78,11 +81,30 @@ def actor_label(db: Session, principal: Principal) -> str:
 def create_task_from_issue(
     db: Session, *, issue: Issue, principal: Principal
 ) -> RecommendationTask:
+    issues = accessibility_issue_group(db, issue)
+    return create_task_from_issues(db, issues=issues, principal=principal)
+
+
+def create_task_from_issues(
+    db: Session, *, issues: list[Issue], principal: Principal
+) -> RecommendationTask:
+    if not issues:
+        raise RecommendationTaskError("Een taak vereist minimaal één issue.")
+    issue = issues[0]
     definition = recommendation_for_issue_type(issue.issue_type)
     if definition is None:
         raise RecommendationTaskError(
             f"Voor issuetype {issue.issue_type} bestaat nog geen taakdefinitie."
         )
+    if any(item.website_id != issue.website_id for item in issues):
+        raise RecommendationTaskError("Gekoppelde issues moeten bij dezelfde website horen.")
+    if any(
+        (item_definition := recommendation_for_issue_type(item.issue_type)) is None
+        or item_definition.key != definition.key
+        for item in issues
+    ):
+        raise RecommendationTaskError("Gekoppelde issues vereisen dezelfde taakdefinitie.")
+    issue_ids = {item.id for item in issues}
     existing = db.scalar(
         select(RecommendationTask)
         .join(
@@ -90,7 +112,7 @@ def create_task_from_issue(
             RecommendationTaskIssue.task_id == RecommendationTask.id,
         )
         .where(
-            RecommendationTaskIssue.issue_id == issue.id,
+            RecommendationTaskIssue.issue_id.in_(issue_ids),
             RecommendationTask.recommendation_type == definition.key,
             RecommendationTask.status.in_(ACTIVE_TASK_STATUSES),
         )
@@ -99,9 +121,15 @@ def create_task_from_issue(
     if existing:
         raise RecommendationTaskError("Voor dit issue bestaat al een actieve taak.")
 
-    priority = _strongest_priority(
-        definition.default_priority,
-        SEVERITY_PRIORITY.get(issue.severity, "normal"),
+    priority = definition.default_priority
+    for item in issues:
+        priority = _strongest_priority(
+            priority,
+            SEVERITY_PRIORITY.get(item.severity, "normal"),
+        )
+    strongest_severity = max(
+        (item.severity for item in issues),
+        key=lambda value: PRIORITY_RANK[SEVERITY_PRIORITY.get(value, "normal")],
     )
     task = RecommendationTask(
         website_id=issue.website_id,
@@ -116,7 +144,8 @@ def create_task_from_issue(
         priority=priority,
         priority_reason=(
             f"Standaardprioriteit {definition.default_priority}; het bronsignaal heeft "
-            f"ernst {issue.severity} en confidence {issue.confidence}."
+            f"sterkste ernst {strongest_severity}; "
+            f"{len(issues)} gekoppelde signalen."
         ),
         effort_min_minutes=definition.effort_minutes[0] if definition.effort_minutes else None,
         effort_max_minutes=definition.effort_minutes[1] if definition.effort_minutes else None,
@@ -127,17 +156,27 @@ def create_task_from_issue(
         steps=list(definition.steps),
         required_input=list(definition.required_input),
         acceptance_criteria=list(definition.completion_criteria),
-        verification_spec={"scope": list(definition.verification_scope)},
+        verification_spec={
+            "scope": list(definition.verification_scope),
+            "linked_issue_ids": [str(item.id) for item in issues],
+        },
     )
     db.add(task)
     db.flush()
-    db.add(RecommendationTaskIssue(task_id=task.id, issue_id=issue.id))
-    for url_id, role in _task_url_scope_from_issue(
-        db,
-        issue=issue,
-        verification_type=definition.key,
-        default_scope=definition.verification_scope,
-    ):
+    db.add_all(
+        RecommendationTaskIssue(task_id=task.id, issue_id=item.id) for item in issues
+    )
+    url_scope = {
+        scoped
+        for item in issues
+        for scoped in _task_url_scope_from_issue(
+            db,
+            issue=item,
+            verification_type=definition.key,
+            default_scope=definition.verification_scope,
+        )
+    }
+    for url_id, role in sorted(url_scope, key=lambda item: (str(item[0]), item[1])):
         db.add(
             RecommendationTaskUrl(
                 task_id=task.id,
@@ -155,7 +194,8 @@ def create_task_from_issue(
                 event_type="created",
                 new_status=task.status,
                 details={
-                    "issue_id": str(issue.id),
+                    "issue_ids": [str(item.id) for item in issues],
+                    "issue_count": len(issues),
                     "definition_version": definition.version,
                 },
             ),
@@ -164,7 +204,11 @@ def create_task_from_issue(
                 actor=label,
                 activity_type="recommendation_task_created",
                 summary=f"Taak aangemaakt: {task.title}",
-                details={"task_id": str(task.id), "issue_id": str(issue.id)},
+                details={
+                    "task_id": str(task.id),
+                    "issue_ids": [str(item.id) for item in issues],
+                    "issue_count": len(issues),
+                },
             ),
         ]
     )
