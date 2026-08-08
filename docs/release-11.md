@@ -1,7 +1,6 @@
 # Release 11 — Visuele issue-inspectie
 
-Status: fasen 1 tot en met 10 lokaal geïmplementeerd en integraal geaccepteerd; staging technisch
-gedeployed, visuele eindacceptatie in uitvoering.
+Status: afgerond en geaccepteerd in staging en productie op 8 augustus 2026.
 
 ## Fase 1 — Uniform inspectiecontract
 
@@ -223,3 +222,41 @@ zonder externe website, productie-integratie of klantcrawl.
 De fixture is de eerste ingang in de herbruikbare acceptatiecatalogus uit
 `docs/acceptance-roadmap.md`. Nieuwe scenario's krijgen later een eigen vaste ID en exacte
 staging-URL; de renderer krijgt nooit een algemene uitzondering voor interne adressen.
+
+## Eindacceptatie staging
+
+- Releasecommit `358aa1b` is via het vaste Git-archive en de interactieve NAS-route gedeployed.
+- API, PostgreSQL, Redis en renderworker waren gezond op migration-head `0060`.
+- De synthetische fixture maakte uitsluitend het bedoelde actieve `missing_h1`-issue aan; een
+  eerdere fout-positieve `javascript_metadata_conflict` is geverifieerd en de regressie is afgedekt.
+- De historische inspectie behield de screenshot en meldde `Element ontbreekt`.
+- De expliciete live hercontrole eindigde met `Element is live aanwezig`, zonder de historische
+  waarneming te overschrijven.
+- De browser rapporteerde geen fouten of waarschuwingen.
+
+## Eindacceptatie productie
+
+- Voor migraties `0058` tot en met `0060` is de bestaande versleutelde productieback-up volledig
+  aangemaakt en gecontroleerd.
+- API, integration-worker, renderworker, PostgreSQL en Redis waren na herstart gezond.
+- De database rapporteerde exact één head: `0060`.
+- Rendering was actief voor API en renderworker; de renderworker was geregistreerd en kon naar het
+  afzonderlijke artefactvolume schrijven.
+- Inspectie- en hercontroleroutes stonden in OpenAPI en de publieke healthcheck meldde database en
+  API gezond.
+- De crawl-drain is na alle controles veilig hervat zonder wachtende taken te hervatten.
+- De productie-interface laadde bestaande klantdata en een bestaand `missing_h1`-issue toonde
+  historische inspectie, beperkt bewijs, ontbrekend element en de knop voor live hercontrole.
+- Er is tijdens productieacceptatie bewust geen live render van een klantpagina gestart; de
+  muterende end-to-end-flow was al met synthetische stagingdata bewezen.
+- De browser rapporteerde geen fouten of waarschuwingen.
+
+## Operationele leerpunten
+
+- Wanneer een environmentbestand de regel `RENDERING_ENABLED` nog niet bevat, kan een vervangende
+  `sed`-opdracht niets wijzigen. Controleer vóór toekomstige releases of de sleutel bestaat en voeg
+  haar gecontroleerd toe wanneer zij ontbreekt.
+- Houd lange NAS-ketens binnen een praktisch kopieerbare lengte. Een blijvende `>`-prompt betekent
+  dat de shell op ontbrekende invoer wacht en dat de keten nog niet is uitgevoerd.
+- Ga na een migratie, deployment of correctie uit van een verbroken stagingtunnel en open die vóór
+  browseracceptatie opnieuw.
