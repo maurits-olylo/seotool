@@ -1,6 +1,21 @@
 from dataclasses import dataclass
 
 from app.services import browser_renderer
+from app.services.staging_render_acceptance import STAGING_RENDER_ACCEPTANCE_URL
+
+
+def test_renderer_allows_only_exact_internal_acceptance_page_in_staging(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setattr(
+        "app.core.config.get_settings", lambda: type("Settings", (), {"app_env": "staging"})()
+    )
+    browser_renderer._validate_render_url(STAGING_RENDER_ACCEPTANCE_URL)
+
+    def reject(_url: str) -> None:
+        raise browser_renderer.InvalidUrlError("private")
+
+    monkeypatch.setattr(browser_renderer, "validate_public_http_url", reject)
+    with __import__("pytest").raises(browser_renderer.InvalidUrlError):
+        browser_renderer._validate_render_url(f"{STAGING_RENDER_ACCEPTANCE_URL}/other")
 
 
 def test_renderer_blocks_private_and_heavy_requests(monkeypatch) -> None:  # type: ignore[no-untyped-def]

@@ -1,6 +1,7 @@
 # Release 11 — Visuele issue-inspectie
 
-Status: fasen 1 tot en met 10 lokaal geïmplementeerd en integraal geaccepteerd; nog niet gedeployed.
+Status: fasen 1 tot en met 10 lokaal geïmplementeerd en integraal geaccepteerd; staging technisch
+gedeployed, visuele eindacceptatie in uitvoering.
 
 ## Fase 1 — Uniform inspectiecontract
 
@@ -206,3 +207,19 @@ mag de database in dat geval veilig op `0060` laten staan.
 - Alembic heeft exact één head: `0060`.
 - Inspectie-, hercontrole- en screenshotroutes staan in OpenAPI.
 - Rendering en de renderworker blijven standaard uitgeschakeld.
+
+## Stagingacceptatiefixture
+
+Staging bevat één synthetische renderpagina op `/staging/render-acceptance`. De pagina bevat geen
+klantdata en begint zonder H1. Een geautoriseerde technische aanvraag kan de pagina omschakelen
+naar een herstelde toestand met exact één H1. Productie en alle andere omgevingen geven voor beide
+routes `404`.
+
+De renderworker mag uitsluitend in `APP_ENV=staging` de exacte interne URL van deze pagina openen.
+Andere interne URL's blijven onder de bestaande SSRF-blokkade vallen. Hierdoor kunnen historische
+screenshotopslag en de live uitkomst `Element is live aanwezig` end-to-end worden geaccepteerd,
+zonder externe website, productie-integratie of klantcrawl.
+
+De fixture is de eerste ingang in de herbruikbare acceptatiecatalogus uit
+`docs/acceptance-roadmap.md`. Nieuwe scenario's krijgen later een eigen vaste ID en exacte
+staging-URL; de renderer krijgt nooit een algemene uitzondering voor interne adressen.

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.services.security import validate_public_http_url
+from app.services.staging_render_acceptance import STAGING_RENDER_ACCEPTANCE_URL
 from app.services.url_normalization import InvalidUrlError
 
 MAX_BROWSER_REQUESTS = 100
@@ -13,6 +14,14 @@ BLOCKED_RESOURCE_TYPES = {"font", "image", "media"}
 
 class RenderError(RuntimeError):
     pass
+
+
+def _validate_render_url(url: str) -> None:
+    from app.core.config import get_settings
+
+    if get_settings().app_env == "staging" and url == STAGING_RENDER_ACCEPTANCE_URL:
+        return
+    validate_public_http_url(url)
 
 
 @dataclass(frozen=True)
@@ -40,7 +49,7 @@ def render_page_html(
     playwright_factory: Any | None = None,
 ) -> BrowserRenderResult:
     """Render one public page in an isolated context with bounded network activity."""
-    validate_public_http_url(url)
+    _validate_render_url(url)
     if playwright_factory is None:
         try:
             from playwright.sync_api import sync_playwright
@@ -75,7 +84,7 @@ def render_page_html(
                     route.continue_()
                     return
                 try:
-                    validate_public_http_url(request.url)
+                    _validate_render_url(request.url)
                 except InvalidUrlError:
                     route.abort("blockedbyclient")
                     return
@@ -134,7 +143,7 @@ def render_page_html(
     except Exception as exc:
         raise RenderError(f"Browser rendering failed: {type(exc).__name__}") from exc
 
-    validate_public_http_url(final_url)
+    _validate_render_url(final_url)
     if len(html.encode("utf-8")) > MAX_RENDERED_HTML_BYTES:
         raise RenderError("Rendered HTML exceeds maximum size")
     if screenshot_png is not None and len(screenshot_png) > MAX_SCREENSHOT_BYTES:

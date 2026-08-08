@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
@@ -12,6 +12,7 @@ from app.core.config import get_settings
 from app.core.security import (
     create_session_token,
     hash_password,
+    require_api_key,
     revoke_session_token,
     session_ttl_seconds,
     session_user_id,
@@ -22,6 +23,10 @@ from app.models.user import LoginAttempt, User
 from app.services.mfa import consume_recovery_code, valid_totp_counter
 from app.services.oauth import decrypt_token
 from app.services.security_audit import record_security_event
+from app.services.staging_render_acceptance import (
+    set_staging_render_acceptance_resolved,
+    staging_render_acceptance_html,
+)
 
 router = APIRouter(tags=["interface"])
 UI_ROOT = Path(__file__).resolve().parents[2] / "ui"
@@ -31,6 +36,10 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
     mfa_code: str | None = None
+
+
+class StagingRenderAcceptanceState(BaseModel):
+    resolved: bool
 
 
 DUMMY_PASSWORD_HASH = hash_password("invalid-login-password")
@@ -87,6 +96,27 @@ def terms() -> FileResponse:
 @router.get("/uitnodiging", include_in_schema=False)
 def invitation_page() -> FileResponse:
     return FileResponse(UI_ROOT / "invitation.html")
+
+
+@router.get("/staging/render-acceptance", include_in_schema=False)
+def staging_render_acceptance_page() -> HTMLResponse:
+    if get_settings().app_env != "staging":
+        raise HTTPException(status_code=404)
+    return HTMLResponse(
+        staging_render_acceptance_html(),
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.post("/staging/render-acceptance", include_in_schema=False)
+def update_staging_render_acceptance_page(
+    payload: StagingRenderAcceptanceState,
+    _: None = Depends(require_api_key),
+) -> dict[str, object]:
+    if get_settings().app_env != "staging":
+        raise HTTPException(status_code=404)
+    set_staging_render_acceptance_resolved(payload.resolved)
+    return {"status": "ok", "resolved": payload.resolved}
 
 
 @router.post("/ui/login", include_in_schema=False, status_code=status.HTTP_204_NO_CONTENT)

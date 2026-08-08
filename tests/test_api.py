@@ -42,6 +42,31 @@ def test_health(client: TestClient) -> None:
     assert response.json()["status"] == "ok"
 
 
+def test_render_acceptance_page_is_staging_only(client: TestClient, monkeypatch) -> None:
+    settings = SimpleNamespace(app_env="staging")
+    monkeypatch.setattr("app.api.routes.ui.get_settings", lambda: settings)
+
+    initial = client.get("/staging/render-acceptance")
+    assert initial.status_code == 200
+    assert initial.headers["cache-control"] == "no-store"
+    assert 'data-acceptance-scenario="missing_h1_resolution"' in initial.text
+    assert 'data-acceptance-state="missing-h1"' in initial.text
+    assert '<h1 id="acceptance-heading">' not in initial.text
+
+    updated = client.post("/staging/render-acceptance", json={"resolved": True})
+    assert updated.status_code == 200
+    assert updated.json() == {"status": "ok", "resolved": True}
+    resolved = client.get("/staging/render-acceptance")
+    assert 'data-acceptance-state="resolved"' in resolved.text
+    assert '<h1 id="acceptance-heading">Herstelde acceptatiepagina</h1>' in resolved.text
+
+    settings.app_env = "production"
+    assert client.get("/staging/render-acceptance").status_code == 404
+    assert client.post(
+        "/staging/render-acceptance", json={"resolved": False}
+    ).status_code == 404
+
+
 def test_issue_bulk_controls_and_client_logic_are_served(client: TestClient) -> None:
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
