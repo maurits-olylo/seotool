@@ -24,6 +24,7 @@ class BrowserRenderResult:
     screenshot_width: int = 1365
     screenshot_height: int = 768
     element_boxes: list[dict[str, object]] | None = None
+    focus_applied: bool = False
 
 
 def render_page_html(
@@ -31,6 +32,7 @@ def render_page_html(
     *,
     timeout_seconds: int = 20,
     settle_time_ms: int = 1_000,
+    focus_target: dict[str, object] | None = None,
     playwright_factory: Any | None = None,
 ) -> BrowserRenderResult:
     """Render one public page in an isolated context with bounded network activity."""
@@ -85,6 +87,9 @@ def render_page_html(
                 raise RenderError("Browser navigation returned no response")
             page.wait_for_timeout(min(max(settle_time_ms, 0), 2_000))
             html = page.content()
+            focus_applied = _focus_page_element(page, focus_target)
+            if focus_applied:
+                page.wait_for_timeout(100)
             try:
                 element_boxes = page.locator(
                     "a,button,h1,h2,h3,img,video,audio,source,iframe"
@@ -136,4 +141,43 @@ def render_page_html(
         request_count=request_count,
         screenshot_png=screenshot_png,
         element_boxes=element_boxes[:MAX_ELEMENT_BOXES],
+        focus_applied=focus_applied,
     )
+
+
+def _focus_page_element(page: Any, focus_target: dict[str, object] | None) -> bool:
+    if not isinstance(focus_target, dict):
+        return False
+    strategy = focus_target.get("strategy")
+    value = focus_target.get("value")
+    if strategy not in {"id", "css", "text"} or not isinstance(value, str) or not value:
+        return False
+    try:
+        return bool(
+            page.evaluate(
+                r"""target => {
+                  let matches = [];
+                  if (target.strategy === 'id') {
+                    const element = document.getElementById(target.value);
+                    matches = element ? [element] : [];
+                  } else if (target.strategy === 'css') {
+                    try { matches = Array.from(document.querySelectorAll(target.value)); }
+                    catch (_) { return false; }
+                  } else {
+                    const normalized = target.value.trim().replace(/\s+/g, ' ');
+                    matches = Array.from(document.querySelectorAll(
+                      'a,button,h1,h2,h3,img,video,audio,source,iframe'
+                    )).filter(element => {
+                      const raw = element.innerText || element.getAttribute('alt') || '';
+                      return raw.trim().replace(/\s+/g, ' ') === normalized;
+                    });
+                  }
+                  if (matches.length !== 1) return false;
+                  matches[0].scrollIntoView({block: 'center', inline: 'nearest'});
+                  return true;
+                }""",
+                {"strategy": strategy, "value": value[:1_000]},
+            )
+        )
+    except Exception:
+        return False

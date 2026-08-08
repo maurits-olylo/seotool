@@ -1,6 +1,6 @@
 # Release 11 — Visuele issue-inspectie
 
-Status: fasen 1 tot en met 5 lokaal geïmplementeerd; nog niet gedeployed.
+Status: fasen 1 tot en met 6 lokaal geïmplementeerd; nog niet gedeployed.
 
 ## Fase 1 — Uniform inspectiecontract
 
@@ -100,3 +100,23 @@ snapshot start. De start wordt als security-event vastgelegd.
 - Historisch bewijs blijft beschikbaar terwijl de nieuwe controle wacht of draait.
 - De interface onderscheidt crawlbewijs van een live hercontrole en meldt slagen of mislukken.
 - Er ontstaan geen automatische browseraanroepen; rendering blijft standaard uitgeschakeld.
+
+## Fase 6 — Gerichte live inspectie
+
+Een live hercontrole gebruikt het eerste betrouwbaar gelokaliseerde issue-element als optioneel
+focusdoel. De renderworker zoekt dit doel na het laden in de actuele DOM, accepteert alleen een
+unieke match en scrolt het element naar het midden van de vaste viewport voordat geometrie en
+screenshot worden vastgelegd. De bestaande overlay kan het probleem daardoor ook aanwijzen wanneer
+het buiten de oorspronkelijke eerste viewport stond.
+
+De focusopdracht bevat alleen een begrensde ID-, CSS- of unieke tekstlocator uit opgeslagen
+crawlbewijs. Een ontbrekend element, onbetrouwbare XPath of niet-unieke actuele match leidt nooit
+tot geforceerd scrollen. De live controle blijft dan als gewone viewportwaarneming bruikbaar.
+
+## Acceptatie fase 6
+
+- Alleen een opgeslagen betrouwbare locator kan als focusdoel naar de renderworker gaan.
+- De actuele DOM moet exact één match bevatten voordat de pagina scrolt.
+- Elementgeometrie en screenshot worden pas na een geslaagde focuspoging vastgelegd.
+- Een ongeldig, verdwenen of dubbel element breekt de render niet en levert geen kunstmatige focus.
+- Reguliere renderwaarnemingen zonder issuefocus behouden hun bestaande gedrag.

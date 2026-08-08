@@ -54,6 +54,35 @@ def test_renderer_enforces_request_limit(monkeypatch) -> None:  # type: ignore[n
     assert playwright.routes == ["continue", "continue", "abort"]
 
 
+def test_renderer_focuses_reliable_issue_target_before_screenshot(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setattr(browser_renderer, "validate_public_http_url", lambda _url: None)
+    playwright = _PlaywrightFactory([])
+
+    result = browser_renderer.render_page_html(
+        "https://example.com/",
+        focus_target={"strategy": "id", "value": "cta"},
+        playwright_factory=playwright,
+    )
+
+    assert result.focus_applied is True
+    assert playwright.focus_targets == [{"strategy": "id", "value": "cta"}]
+    assert playwright.capture_events == ["focus", "geometry", "screenshot"]
+
+
+def test_renderer_ignores_invalid_focus_without_failing(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setattr(browser_renderer, "validate_public_http_url", lambda _url: None)
+    playwright = _PlaywrightFactory([])
+
+    result = browser_renderer.render_page_html(
+        "https://example.com/",
+        focus_target={"strategy": "xpath", "value": "/html/body/a"},
+        playwright_factory=playwright,
+    )
+
+    assert result.focus_applied is False
+    assert playwright.focus_targets == []
+
+
 @dataclass
 class _Request:
     url: str
@@ -98,14 +127,24 @@ class _Page:
         return "<html><body><main>Rendered</main></body></html>"
 
     def screenshot(self, **_kwargs) -> bytes:  # type: ignore[no-untyped-def]
+        self.owner.capture_events.append("screenshot")
         return b"png"
 
+    def evaluate(self, _script: str, target: dict[str, object]) -> bool:
+        self.owner.capture_events.append("focus")
+        self.owner.focus_targets.append(target)
+        return target == {"strategy": "id", "value": "cta"}
+
     def locator(self, _selector: str):  # type: ignore[no-untyped-def]
-        return _Locator()
+        return _Locator(self.owner)
 
 
 class _Locator:
+    def __init__(self, owner) -> None:  # type: ignore[no-untyped-def]
+        self.owner = owner
+
     def evaluate_all(self, _script: str) -> list[dict[str, object]]:
+        self.owner.capture_events.append("geometry")
         return [
             {
                 "element_type": "a",
@@ -176,6 +215,8 @@ class _PlaywrightFactory:
         self.requests = requests
         self.routes: list[str] = []
         self.context_options: dict[str, object] = {}
+        self.focus_targets: list[dict[str, object]] = []
+        self.capture_events: list[str] = []
 
     def __call__(self):  # type: ignore[no-untyped-def]
         return _PlaywrightContext(self, self.requests)

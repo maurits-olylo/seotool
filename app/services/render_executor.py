@@ -38,7 +38,12 @@ def execute_render_observation(observation_id: str) -> None:
             observation.error_message = None
             db.commit()
 
-            result = render_page_html(url.normalized_url)
+            focus_target = observation.comparison.get("inspection_focus")
+            result = (
+                render_page_html(url.normalized_url, focus_target=focus_target)
+                if isinstance(focus_target, dict)
+                else render_page_html(url.normalized_url)
+            )
             rendered = extract_page(result.html, url.normalized_url)
             static_links = set(
                 db.scalars(
@@ -88,6 +93,8 @@ def execute_render_observation(observation_id: str) -> None:
                     "width": result.screenshot_width,
                     "height": result.screenshot_height,
                 },
+                "inspection_focus": focus_target if isinstance(focus_target, dict) else None,
+                "inspection_focus_applied": result.focus_applied,
             }
             db.commit()
             logger.info(

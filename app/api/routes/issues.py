@@ -906,6 +906,7 @@ def start_issue_inspection_recheck(
         source_snapshot_id=snapshot.id,
         status="pending",
         trigger_reasons=["live_issue_inspection", f"issue:{issue.id}"],
+        comparison=_inspection_focus(selected_page),
     )
     db.add(observation)
     db.flush()
@@ -929,6 +930,28 @@ def start_issue_inspection_recheck(
         db.commit()
         raise HTTPException(status_code=503, detail="Live inspection queue is unavailable")
     return IssueInspectionRecheckRead(observation_id=observation.id, status="pending")
+
+
+def _inspection_focus(page: dict[str, object]) -> dict[str, object]:
+    targets = page.get("targets")
+    if not isinstance(targets, list):
+        return {}
+    for target in targets:
+        if not isinstance(target, dict) or target.get("kind") != "located":
+            continue
+        locator = target.get("locator")
+        if not isinstance(locator, dict) or locator.get("reliable") is not True:
+            continue
+        strategy = locator.get("strategy")
+        value = locator.get("value")
+        if strategy in {"id", "css", "text"} and isinstance(value, str) and value:
+            return {
+                "inspection_focus": {
+                    "strategy": strategy,
+                    "value": value[:1_000],
+                }
+            }
+    return {}
 
 
 @router.get("/issues/{issue_id}/inspection/screenshots/{snapshot_id}")

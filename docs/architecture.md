@@ -344,6 +344,10 @@ Een ingeschakelde renderworker bewaart maximaal één PNG van de vaste viewport 
 afzonderlijk volume. De database bevat alleen sleutel, hash, grootte, afmetingen en vervaldatum; de
 API krijgt read-only volumetoegang en publiceert de interne sleutel niet. De standaardretentie is
 90 dagen en opruiming is per opslagactie begrensd.
+Bij een expliciete live issuehercontrole mag de observatie daarnaast één betrouwbare, begrensde
+locator uit het historische elementbewijs bevatten. De browser scrolt alleen bij exact één actuele
+DOM-match en legt daarna viewport en elementgeometrie vast. Ontbrekende, onbetrouwbare of ambigue
+doelen vallen terug op een gewone viewportopname; zij krijgen geen verzonnen visuele locatie.
 Afbeeldingen en documenten krijgen een lichte HEAD-controle. Grote afbeeldingen (meer dan 2 MB) en
 documenten (meer dan 5 MB) leveren afzonderlijke issues op zonder de volledige bestanden te downloaden.
 

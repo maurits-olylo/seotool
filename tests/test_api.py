@@ -1557,6 +1557,12 @@ def test_issue_detail_returns_live_element_location(
     assert recheck.json()["status"] == "pending"
     assert repeated.json() == recheck.json()
     assert enqueued == [recheck.json()["observation_id"]]
+    with SessionLocal() as db:
+        queued = db.get(RenderObservation, UUID(recheck.json()["observation_id"]))
+        assert queued is not None
+        assert queued.comparison == {
+            "inspection_focus": {"strategy": "id", "value": "oude-link"}
+        }
     refreshed = client.get(f"/api/v1/issues/{issue_id}/inspection").json()
     assert refreshed["live_recheck_available"] is True
     assert refreshed["pages"][0]["render_status"] == "pending"

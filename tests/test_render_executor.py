@@ -71,6 +71,36 @@ def test_executor_persists_failure_for_retry(monkeypatch) -> None:  # type: igno
         assert stored.error_message == "RuntimeError: browser stopped"
 
 
+def test_executor_passes_inspection_focus_to_renderer(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    with SessionLocal() as db:
+        observation = _observation(db)
+        observation.comparison = {
+            "inspection_focus": {"strategy": "id", "value": "cta"}
+        }
+        observation_id = str(observation.id)
+        db.commit()
+
+    received: list[dict[str, object]] = []
+
+    def render(_url: str, **kwargs: object) -> BrowserRenderResult:
+        received.append(kwargs)
+        return BrowserRenderResult(
+            html="<html><body><button id='cta'>Actie</button></body></html>",
+            browser_name="chromium",
+            request_count=1,
+            focus_applied=True,
+        )
+
+    monkeypatch.setattr("app.services.render_executor.render_page_html", render)
+    execute_render_observation(observation_id)
+
+    with SessionLocal() as db:
+        stored = db.get(RenderObservation, observation.id)
+        assert received == [{"focus_target": {"strategy": "id", "value": "cta"}}]
+        assert stored is not None
+        assert stored.comparison["inspection_focus_applied"] is True
+
+
 def _observation(db) -> RenderObservation:  # type: ignore[no-untyped-def]
     website = Website(
         client=Client(name="Render client"),
