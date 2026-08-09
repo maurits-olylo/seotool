@@ -152,8 +152,10 @@ Stagingacceptatie:
 
 De eerste visuele controle bevestigde de kaarten en prioriteit, maar vond in de uitgeklapte uitleg
 nog interne waarden voor uitvoerbaarheid, urgentie en businesscontext. De interface vertaalt deze
-waarden voortaan naar begrijpelijke Nederlandse tekst en toont geen ruwe JSON. Definitieve visuele
-acceptatie volgt na herbouw van de staging-API.
+waarden voortaan naar begrijpelijke Nederlandse tekst en toont geen ruwe JSON. De herbouwde
+staginginterface is daarna opnieuw gecontroleerd: beide kansen werden correct getoond, de
+cross-domainuitleg bevatte uitsluitend begrijpelijke Nederlandse waarden en de browser rapporteerde
+geen fouten of waarschuwingen. Daarmee is fase D definitief visueel geaccepteerd.
 
 ## Volgende fase
 
