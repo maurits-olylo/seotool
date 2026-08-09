@@ -885,12 +885,27 @@ function evidenceMarkup(evidence = {}) {
 const opportunityPatternLabels = {ctr: "CTR-kans", page_two: "Pagina-twee-kans", internal_link: "Interne-linkkans", important_accessibility: "Belangrijke toegankelijkheidskans"};
 const opportunityPriorityLabels = {high_opportunity: "Hoge kans", opportunity: "Kans", monitor: "Volgen", insufficient_evidence: "Onvoldoende bewijs"};
 const opportunityCoverageLabels = {gsc: "Zoekprestatie", crawler_issues: "Paginacontrole", analytics: "Gebruiksdata"};
+const opportunityFeasibilityLabels = {direct: "Direct uitvoerbaar", needs_content_input: "Inhoudelijke afstemming nodig", needs_technical_research: "Technische controle nodig"};
+const opportunityUrgencyLabels = {low: "Laag", medium: "Middel", high: "Hoog", critical: "Kritiek"};
+
+function opportunityFactorValue(entry) {
+  if (entry.signal === "feasibility") return opportunityFeasibilityLabels[entry.value] || "Nadere controle nodig";
+  if (entry.signal === "strongest_issue_severity") return opportunityUrgencyLabels[entry.value] || "Nog te bepalen";
+  if (entry.signal === "affected_pages") return `${entry.value} ${Number(entry.value) === 1 ? "pagina" : "pagina’s"}`;
+  if (entry.signal === "important_page_context") {
+    const demand = Number(entry.value?.observed_demand || 0);
+    if (entry.value?.important_url && demand > 0) return `Belangrijke pagina met ${demand} waargenomen vertoningen`;
+    if (entry.value?.important_url) return "Belangrijke pagina";
+    return demand > 0 ? `${demand} waargenomen vertoningen` : "Geen extra businesscontext";
+  }
+  return Array.isArray(entry.value) ? entry.value.join(", ") : String(entry.value ?? "onbekend");
+}
 
 function scoredOpportunityMarkup(item) {
   const pattern = item.source_coverage?.pattern || "unknown";
   const coverage = Object.entries(item.source_coverage || {}).filter(([key]) => key !== "pattern").map(([key, available]) => `<span class="coverage-pill ${available ? "" : "coverage-missing"}">${escapeHtml(opportunityCoverageLabels[key] || "Aanvullend signaal")}: ${available ? "aanwezig" : "onbekend"}</span>`).join("");
   const prioritySummary = (item.contributors || []).find((entry) => entry.signal === "priority_summary")?.value || "De beschikbare factoren bepalen de volgorde.";
-  const contributors = (item.contributors || []).filter((entry) => entry.signal !== "priority_summary" && entry.label).map((entry) => `<span class="evidence-chip">${escapeHtml(String(entry.label))}: ${escapeHtml(Array.isArray(entry.value) ? entry.value.join(", ") : typeof entry.value === "object" ? JSON.stringify(entry.value) : String(entry.value ?? "onbekend"))}</span>`).join("");
+  const contributors = (item.contributors || []).filter((entry) => entry.signal !== "priority_summary" && entry.label).map((entry) => `<span class="evidence-chip">${escapeHtml(String(entry.label))}: ${escapeHtml(opportunityFactorValue(entry))}</span>`).join("");
   const comparison = item.previous_total_score == null ? "Eerste meting" : `${item.total_score_change >= 0 ? "+" : ""}${item.total_score_change} sinds vorige meting`;
   const disabled = item.priority_class === "insufficient_evidence" ? " disabled" : "";
   return `<article class="opportunity-row scored-opportunity"><div class="opportunity-head"><div><span class="eyebrow">${escapeHtml(opportunityPatternLabels[pattern] || pattern)}</span><h3>${item.primary_url ? `<a href="${escapeHtml(item.primary_url)}" target="_blank" rel="noopener">${escapeHtml(item.primary_url)}</a>` : escapeHtml(item.scope_key)}</h3></div><strong>${escapeHtml(opportunityPriorityLabels[item.priority_class] || item.priority_class)}</strong></div><p>${escapeHtml(String(prioritySummary))}</p><p>${escapeHtml(comparison)} · ${escapeHtml(item.period_start)} t/m ${escapeHtml(item.period_end)}</p><div class="coverage-pills">${coverage}</div><details><summary>Waarom deze prioriteit?</summary><div class="opportunity-evidence">${contributors}</div></details><button type="button" class="detail-button opportunity-action" data-opportunity-evaluation="${escapeHtml(item.id)}"${disabled}>Maak taak</button></article>`;

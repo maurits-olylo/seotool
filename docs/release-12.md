@@ -150,6 +150,11 @@ Stagingacceptatie:
   `/100`-score;
 - gereedsignaal: `release-12-phase-d-staging-ok`.
 
+De eerste visuele controle bevestigde de kaarten en prioriteit, maar vond in de uitgeklapte uitleg
+nog interne waarden voor uitvoerbaarheid, urgentie en businesscontext. De interface vertaalt deze
+waarden voortaan naar begrijpelijke Nederlandse tekst en toont geen ruwe JSON. Definitieve visuele
+acceptatie volgt na herbouw van de staging-API.
+
 ## Volgende fase
 
 Na afzonderlijke bevestiging kan de volgende Release 12-fase starten. Productie volgt pas nadat de

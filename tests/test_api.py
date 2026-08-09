@@ -229,6 +229,10 @@ def test_operations_status_ignores_stale_website_responses(client: TestClient) -
     assert "Waarom deze prioriteit?" in script.text
     assert "opportunityScoreMarkup" not in script.text
     assert "${total}/100" not in script.text
+    assert 'needs_technical_research: "Technische controle nodig"' in script.text
+    assert 'high: "Hoog"' in script.text
+    assert 'return "Belangrijke pagina"' in script.text
+    assert "JSON.stringify(entry.value)" not in script.text
     assert "function renderTaskNotifications" in script.text
     assert "function taskAssigneeOptions" in script.text
     assert 'id="recommendation-task-owner"' in script.text
