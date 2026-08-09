@@ -208,7 +208,7 @@ afgerond.
 
 ## Fase F — informatiearchitectuur en beschrijvend leren
 
-Status: lokaal geïmplementeerd en getest; stagingacceptatie volgt.
+Status: lokaal en op staging geïmplementeerd en geaccepteerd.
 
 - Inzichten, Kansen en Acties zijn primaire navigatiebestemmingen;
 - technische signalen, URL's, wijzigingen, contentmetingen en vacatures blijven beschikbaar onder
@@ -228,7 +228,19 @@ Lokale acceptatie:
 - stagingfixture controleert primaire navigatie, routecompatibiliteit, minimumvolume en het verbod
   op causaliteitsclaims.
 
+Stagingacceptatie:
+
+- API, PostgreSQL en Redis waren gezond;
+- de fixture bevestigde Inzichten, Kansen en Acties, legacyroutes, minimumvolume drie en het
+  ontbreken van een causaliteitsclaim;
+- healthcheck en gereedsignaal `release-12-phase-f-staging-ok`: geslaagd;
+- de visuele controle bevestigde de primaire navigatie en routes `#inzichten`, `#kansen` en
+  `#acties`;
+- Kansen opent direct de opportunityweergave, Acties de menselijke werkvoorraad en Metingen bevat
+  de technische detailpagina's;
+- de Effect-weergave meldde bij nul vergelijkbare metingen begrijpelijk dat nog geen historisch
+  patroon beschikbaar is (`0/3`).
+
 ## Volgende fase
 
-Na technische en visuele stagingacceptatie is Release 12 inhoudelijk gereed voor het afzonderlijke
-productiebesluit.
+Release 12 is inhoudelijk en op staging gereed voor het afzonderlijke productiebesluit.
