@@ -240,6 +240,16 @@ def test_release_12_phase_d_fixture_is_synthetic_and_source_neutral() -> None:
     assert 'crawler_issues: "Paginacontrole"' in fixture
 
 
+def test_release_12_phase_e_fixture_is_synthetic_and_restores_source() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    fixture = (project_root / "scripts/accept-release-12-phase-e-staging.py").read_text()
+
+    assert "release-12-testability.invalid" in fixture
+    assert 'Website.name.like("[STAGING]%")' in fixture
+    assert "false_device_candidate" in fixture
+    assert "settings.primary_analytics_source = original_source" in fixture
+
+
 def test_render_artifact_volume_is_initialized_before_worker() -> None:
     project_root = Path(__file__).resolve().parents[1]
     for filename, volume_name in (
