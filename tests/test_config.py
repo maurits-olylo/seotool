@@ -229,6 +229,17 @@ def test_release_12_staging_cleanup_does_not_distinct_json_task_rows() -> None:
     assert ".distinct()" not in fixture
 
 
+def test_release_12_phase_d_fixture_is_synthetic_and_source_neutral() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    fixture = (project_root / "scripts/accept-release-12-phase-d-staging.py").read_text()
+
+    assert "release-12-priority.invalid" in fixture
+    assert 'Website.name.like("[STAGING]%")' in fixture
+    assert "searchless_candidate" in fixture
+    assert 'gsc: "Zoekprestatie"' in fixture
+    assert 'crawler_issues: "Paginacontrole"' in fixture
+
+
 def test_render_artifact_volume_is_initialized_before_worker() -> None:
     project_root = Path(__file__).resolve().parents[1]
     for filename, volume_name in (
