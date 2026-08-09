@@ -882,15 +882,17 @@ function evidenceMarkup(evidence = {}) {
   return Object.entries(evidence).slice(0, 5).map(([key, value]) => `<span class="evidence-chip">${escapeHtml(key.replaceAll("_", " "))}: ${escapeHtml(Array.isArray(value) ? value.join(", ") : String(value))}</span>`).join("");
 }
 
-const opportunityPatternLabels = {ctr: "CTR-kans", page_two: "Pagina-twee-kans", internal_link: "Interne-linkkans", important_accessibility: "Belangrijke toegankelijkheidskans"};
+const opportunityPatternLabels = {ctr: "CTR-kans", page_two: "Pagina-twee-kans", internal_link: "Interne-linkkans", important_accessibility: "Belangrijke toegankelijkheidskans", journey_friction: "Mogelijke doorstroomkans", underperforming_winner: "Kansrijke pagina met lage uitkomst", intent_mismatch: "Mogelijke mismatch tussen vraag en pagina", device_friction: "Mogelijke mobiele frictie"};
 const opportunityPriorityLabels = {high_opportunity: "Hoge kans", opportunity: "Kans", monitor: "Volgen", insufficient_evidence: "Onvoldoende bewijs"};
-const opportunityCoverageLabels = {gsc: "Zoekprestatie", crawler_issues: "Paginacontrole", analytics: "Gebruiksdata"};
-const opportunityFeasibilityLabels = {direct: "Direct uitvoerbaar", needs_content_input: "Inhoudelijke afstemming nodig", needs_technical_research: "Technische controle nodig"};
+const opportunityCoverageLabels = {gsc: "Zoekprestatie", search_performance: "Zoekprestatie", crawler_issues: "Paginacontrole", analytics: "Gebruiksdata", journey_behavior: "Bezoekersgedrag"};
+const opportunityFeasibilityLabels = {direct: "Direct uitvoerbaar", needs_content_input: "Inhoudelijke afstemming nodig", needs_technical_research: "Technische controle nodig", needs_hypothesis_review: "Hypothese beoordelen"};
 const opportunityUrgencyLabels = {low: "Laag", medium: "Middel", high: "Hoog", critical: "Kritiek"};
+const opportunityTestabilityLabels = {testable: "Test overwegen", longer_observation_needed: "Langer observeren", effect_measurement_preferred: "Effectmeting heeft voorkeur"};
 
 function opportunityFactorValue(entry) {
   if (entry.signal === "feasibility") return opportunityFeasibilityLabels[entry.value] || "Nadere controle nodig";
   if (entry.signal === "strongest_issue_severity") return opportunityUrgencyLabels[entry.value] || "Nog te bepalen";
+  if (entry.signal === "testability_band") return opportunityTestabilityLabels[entry.value] || "Eerst meetplan bepalen";
   if (entry.signal === "affected_pages") return `${entry.value} ${Number(entry.value) === 1 ? "pagina" : "pagina’s"}`;
   if (entry.signal === "important_page_context") {
     const demand = Number(entry.value?.observed_demand || 0);

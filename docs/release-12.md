@@ -159,5 +159,37 @@ geen fouten of waarschuwingen. Daarmee is fase D definitief visueel geaccepteerd
 
 ## Volgende fase
 
-Na afzonderlijke bevestiging kan de volgende Release 12-fase starten. Productie volgt pas nadat de
-volledige pilot en gebruikersacceptatie zijn afgerond.
+## Fase E — opportunities en testability
+
+Status: lokaal geïmplementeerd; stagingacceptatie volgt na de lokale eindcontrole.
+
+- statistisch begrensde journey-frictie uit Matomo wordt een opportunity en nooit een bewezen
+  probleem;
+- sterke zoekprestatie plus commerciële paginarol en een materieel lage uitkomst kan als
+  `underperforming_winner` worden voorgesteld;
+- commerciële vraagintentie op een informatief geclassificeerde pagina kan als toetsbare
+  intentmismatch worden voorgesteld;
+- iedere testkandidaat krijgt één van de voorlopige meetadviezen `testable`,
+  `longer_observation_needed` of `effect_measurement_preferred`;
+- de pilotdrempels zijn een ruisfilter, geen universele significantiegrens en geen causaliteitsclaim;
+- mobiele frictie vereist expliciet device-gesegmenteerd volume plus een materieel verschil tussen
+  mobiele en desktopperformance. Het huidige datamodel levert dat volume niet betrouwbaar, zodat
+  deze kandidaat terecht niet automatisch wordt aangemaakt;
+- taakteksten spreken over hypothese, waarnemingen en effectmeting en tonen geen interne kansscore.
+
+Acceptatie vereist minimaal een journey-kandidaat, een afgewezen kandidaat bij onvoldoende
+context, een correct meetadvies, begrijpelijke UI-labels en bewijs dat ontbrekend mobiel volume geen
+valse devicekans oplevert.
+
+Lokale acceptatie:
+
+- journey-frictie wordt historisch en idempotent als opportunity opgeslagen;
+- underperforming-winner-, intentmismatch- en devicebewijsgrenzen zijn afzonderlijk getest;
+- testadviezen en hypotheseteksten zijn in API, taak en interface regressiegedekt;
+- volledige regressiesuite: 565 geslaagd, alleen de bestaande Starlette/httpx-waarschuwing;
+- Ruff, JavaScript-syntax en diffcontrole: geslaagd.
+
+## Volgende fase
+
+Na lokale eindcontrole volgt de stagingacceptatie van fase E. Productie volgt pas nadat de volledige
+pilot en gebruikersacceptatie zijn afgerond.

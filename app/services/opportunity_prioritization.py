@@ -23,6 +23,7 @@ def priority_factors(
     feasibility: str,
     has_search_evidence: bool,
     impressions: int,
+    additional_domains: set[str] | None = None,
 ) -> list[dict[str, object]]:
     domains = sorted(
         {
@@ -30,6 +31,7 @@ def priority_factors(
             for issue in issues
         }
         | {"SEO"}
+        | (additional_domains or set())
     )
     strongest = max(
         (issue.severity for issue in issues),

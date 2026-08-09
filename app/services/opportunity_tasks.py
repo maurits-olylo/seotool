@@ -19,6 +19,9 @@ PATTERN_LABELS = {
     "ctr": "Verbeter zoekresultaat voor een kansrijke pagina",
     "page_two": "Versterk een pagina op de tweede zoekresultatenpagina",
     "internal_link": "Versterk interne links naar een belangrijke pagina",
+    "important_accessibility": "Herstel een belangrijk toegankelijkheidsknelpunt",
+    "journey_friction": "Onderzoek en verbeter de logische vervolgstap",
+    "underperforming_winner": "Onderzoek een kansrijke pagina met lage uitkomst",
 }
 PRIORITIES = {"high_opportunity": "high", "opportunity": "normal", "monitor": "low"}
 
@@ -59,22 +62,19 @@ def create_task_from_opportunity(
         primary_role="seo_specialist",
         supporting_roles=["content_editor"],
         priority=PRIORITIES.get(evaluation.priority_class, "low"),
-        priority_reason=(
-            f"Kansscore {evaluation.total_score:.1f}/100; klasse "
-            f"{evaluation.priority_class.replace('_', ' ')}."
-        ),
+        priority_reason="Prioriteit volgt uit de vastgelegde impact-, bewijs- en meetfactoren.",
         effort_min_minutes=30,
         effort_max_minutes=120,
         effort_confidence="low",
         feasibility="manual_review",
         action=title,
         rationale=(
-            "Deze taak is gebaseerd op een transparante kansscore en moet vóór uitvoering "
-            "inhoudelijk worden beoordeeld."
+            "Dit is een onderbouwde kans of testkandidaat, geen bewezen oorzaak. Beoordeel eerst "
+            "de hypothese en kies een passende effectmeting."
         ),
         steps=[
-            "Controleer de brondata en bijdragers bij de kansscore.",
-            "Bepaal de kleinste passende wijziging en leg de nulmeting vast.",
+            "Controleer de waarnemingen en prioriteitsfactoren.",
+            "Formuleer de kleinste toetsbare wijziging en leg de nulmeting vast.",
             "Voer de wijziging uit en beoordeel het resultaat in een volgende meetperiode.",
         ],
         required_input=[

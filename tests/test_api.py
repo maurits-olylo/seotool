@@ -233,6 +233,10 @@ def test_operations_status_ignores_stale_website_responses(client: TestClient) -
     assert 'high: "Hoog"' in script.text
     assert 'return "Belangrijke pagina"' in script.text
     assert "JSON.stringify(entry.value)" not in script.text
+    assert 'journey_friction: "Mogelijke doorstroomkans"' in script.text
+    assert 'testable: "Test overwegen"' in script.text
+    assert 'journey_behavior: "Bezoekersgedrag"' in script.text
+    assert 'needs_hypothesis_review: "Hypothese beoordelen"' in script.text
     assert "function renderTaskNotifications" in script.text
     assert "function taskAssigneeOptions" in script.text
     assert 'id="recommendation-task-owner"' in script.text

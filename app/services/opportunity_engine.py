@@ -13,12 +13,21 @@ from app.models.integrations import SearchConsoleMetric
 from app.models.issues import Issue
 from app.models.opportunities import OpportunityEvaluation
 from app.services.accessibility.rule_catalog import ACCESSIBILITY_ISSUE_TYPES
+from app.services.analytics_journey import build_analytics_journey
+from app.services.content_intent_insights import build_content_intent_insights
 from app.services.discovery_pages import is_discovery_only_page
 from app.services.opportunity_prioritization import priority_factors
 from app.services.opportunity_scoring import (
     OpportunityScores,
     calculate_opportunity_scores,
     store_opportunity_evaluation,
+)
+from app.services.opportunity_testability import (
+    PILOT_METHOD_VERSION,
+    detect_underperforming_winners,
+    intent_mismatch_candidates,
+    journey_friction_candidates,
+    testability_band,
 )
 
 ACTIVE_ISSUE_STATUSES = {
@@ -229,6 +238,77 @@ def _store_pattern(
     )
 
 
+def _store_testing_candidate(
+    db: Session,
+    *,
+    website_id: UUID,
+    url: Url,
+    period_start: date,
+    period_end: date,
+    pattern: str,
+    volume: int,
+    outcome_events: float,
+    evidence: dict[str, object],
+    issues: list[Issue],
+    domains: set[str],
+) -> tuple[OpportunityEvaluation, bool]:
+    band = testability_band(
+        volume=volume,
+        outcome_events=outcome_events,
+        outcome_available=True,
+    )
+    evidence_strength = 75 if band == "testable" else 60
+    scores = calculate_opportunity_scores(
+        potential=min(100, 55 + volume / 20),
+        friction=75,
+        evidence=evidence_strength,
+        feasibility=60,
+    )
+    factors = priority_factors(
+        url=url,
+        issues=issues,
+        reach=1,
+        feasibility="needs_hypothesis_review",
+        has_search_evidence=True,
+        impressions=volume,
+        additional_domains=domains,
+    )
+    factors.append(
+        {
+            "dimension": "testability",
+            "signal": "testability_band",
+            "label": "Meetadvies",
+            "value": band,
+            "direction": "context",
+        }
+    )
+    return store_opportunity_evaluation(
+        db,
+        website_id=website_id,
+        primary_url_id=url.id,
+        scope_type="page",
+        scope_key=f"{pattern}:{url.id}",
+        period_start=period_start,
+        period_end=period_end,
+        scores=scores,
+        source_coverage={
+            "search_performance": pattern != "journey_friction",
+            "journey_behavior": True,
+            "pattern": pattern,
+        },
+        contributors=[
+            {
+                "dimension": "evidence",
+                "signal": "pilot_method",
+                "value": PILOT_METHOD_VERSION,
+                "direction": "context",
+            },
+            *factors,
+        ],
+        evidence=[{"source": "combined_observation", **evidence}],
+    )
+
+
 def evaluate_website_opportunities(
     db: Session, website_id: UUID, period_start: date, period_end: date
 ) -> dict[str, int]:
@@ -371,5 +451,62 @@ def evaluate_website_opportunities(
             )
             created += int(was_created)
             existing += int(not was_created)
+
+    journey = build_analytics_journey(db, website_id, period_start, period_end)
+    behavioral_candidates = journey_friction_candidates(
+        list(journey.get("dead_end_opportunities", []))
+    )
+    behavioral_candidates.extend(
+        detect_underperforming_winners(
+            list(journey.get("pages", [])),
+            {str(url_id): metrics.impressions for url_id, metrics in metrics_by_url.items()},
+        )
+    )
+    url_id_by_value = {url.normalized_url: str(url.id) for url in db.scalars(
+        select(Url).where(Url.website_id == website_id)
+    )}
+    intent_insights = build_content_intent_insights(
+        db, website_id, period_start, period_end
+    )
+    for insight in intent_insights:
+        insight["url_id"] = url_id_by_value.get(str(insight.get("url") or ""), "")
+    behavioral_candidates.extend(
+        intent_mismatch_candidates(
+            intent_insights,
+            {
+                str(url_id): classification.search_intent
+                for url_id, classification in classifications.items()
+            },
+        )
+    )
+    for candidate in behavioral_candidates:
+        try:
+            url_id = UUID(candidate.url_id)
+        except ValueError:
+            skipped += 1
+            continue
+        url = urls.get(url_id) or db.get(Url, url_id)
+        if not url or url.website_id != website_id or not url.is_active:
+            skipped += 1
+            continue
+        _evaluation, was_created = _store_testing_candidate(
+            db,
+            website_id=website_id,
+            url=url,
+            period_start=period_start,
+            period_end=period_end,
+            pattern=candidate.pattern,
+            volume=candidate.volume,
+            outcome_events=candidate.outcome_events,
+            evidence=candidate.evidence,
+            issues=issues_by_url.get(url.id, []),
+            domains=(
+                {"content", "conversie"}
+                if candidate.pattern == "intent_mismatch"
+                else {"UX", "conversie"}
+            ),
+        )
+        created += int(was_created)
+        existing += int(not was_created)
     db.commit()
     return {"created": created, "existing": existing, "skipped": skipped}

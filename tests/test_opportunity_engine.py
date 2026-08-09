@@ -7,10 +7,10 @@ from app.db.session import SessionLocal
 from app.models.client import Client
 from app.models.content_analysis import UrlContentClassification
 from app.models.discovery import Url
-from app.models.integrations import SearchConsoleMetric
+from app.models.integrations import MatomoPageMetric, SearchConsoleMetric
 from app.models.issues import Issue
 from app.models.opportunities import OpportunityEvaluation
-from app.models.website import Website
+from app.models.website import Website, WebsiteSettings
 from app.services.opportunity_engine import evaluate_website_opportunities
 
 
@@ -230,3 +230,77 @@ def test_engine_rejects_false_opportunities_and_short_periods() -> None:
         assert db.scalar(select(OpportunityEvaluation.id)) is None
         with pytest.raises(ValueError, match="at least 28 days"):
             evaluate_website_opportunities(db, website.id, start, start + timedelta(days=6))
+
+
+def test_engine_stores_journey_friction_as_test_candidate() -> None:
+    with SessionLocal() as db:
+        customer = Client(name="Journey opportunity")
+        website = Website(
+            client=customer,
+            name="Journey opportunity site",
+            base_url="https://journey-opportunity.example.com",
+        )
+        website.settings = WebsiteSettings(primary_analytics_source="matomo")
+        db.add(website)
+        db.flush()
+        pages = []
+        for index in range(6):
+            url = Url(
+                website_id=website.id,
+                normalized_url=f"https://journey-opportunity.example.com/page-{index}",
+                current_status_code=200,
+                is_active=True,
+                is_indexable=True,
+            )
+            db.add(url)
+            db.flush()
+            pages.append(url)
+            db.add(
+                UrlContentClassification(
+                    website_id=website.id,
+                    url_id=url.id,
+                    period_start=date(2026, 7, 1),
+                    period_end=date(2026, 7, 28),
+                    input_hash=f"{index:064d}",
+                    classification_version="test-v1",
+                    search_intent="informational",
+                    journey_stage="understand",
+                    content_role="attract",
+                    confidence=0.9,
+                    probabilities={"informational": 1.0},
+                    source_coverage={"crawler": True},
+                    evidence=[],
+                )
+            )
+            db.add(
+                MatomoPageMetric(
+                    website_id=website.id,
+                    url_id=url.id,
+                    date=date(2026, 7, 15),
+                    page_url=url.normalized_url,
+                    visits=40 if index else 25,
+                    pageviews=40 if index else 25,
+                    unique_pageviews=40 if index else 25,
+                    entry_visits=40 if index else 25,
+                    bounces=32 if index else 25,
+                    exits=32 if index else 25,
+                    conversions=0,
+                )
+            )
+        db.commit()
+
+        result = evaluate_website_opportunities(
+            db, website.id, date(2026, 7, 1), date(2026, 7, 28)
+        )
+        evaluation = db.scalar(
+            select(OpportunityEvaluation).where(
+                OpportunityEvaluation.scope_key == f"journey_friction:{pages[0].id}"
+            )
+        )
+
+        assert result["created"] == 1
+        assert evaluation is not None
+        assert evaluation.source_coverage["pattern"] == "journey_friction"
+        factors = {item["signal"]: item for item in evaluation.contributors}
+        assert factors["testability_band"]["value"] == "effect_measurement_preferred"
+        assert factors["impact_domains"]["value"] == ["SEO", "UX", "conversie"]
