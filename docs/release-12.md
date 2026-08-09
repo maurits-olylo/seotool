@@ -1,7 +1,6 @@
 # Release 12 — Continuous Website Improvement-pilot
 
-Status: fase C lokaal en op staging geaccepteerd; fase D lokaal in uitvoering; nog niet naar
-productie gedeployed.
+Status: fase D lokaal en op staging geaccepteerd; nog niet naar productie gedeployed.
 
 ## Doel en afbakening
 
@@ -115,7 +114,7 @@ Definitieve stagingacceptatie:
 
 ## Fase D — uitlegbare cross-domainprioritering
 
-Status: lokaal geïmplementeerd en getest; stagingacceptatie volgt.
+Status: lokaal en op staging geïmplementeerd en geaccepteerd.
 
 - de bestaande kansberekening blijft intern beschikbaar voor reproduceerbare sortering, maar de
   interface toont geen universele `/100`-score meer;
@@ -139,6 +138,19 @@ Lokale acceptatie:
 - volledige regressiesuite: 558 geslaagd, alleen de bestaande Starlette/httpx-waarschuwing;
 - Ruff, JavaScript-syntax en diffcontrole: geslaagd.
 
+Stagingacceptatie:
+
+- de API, PostgreSQL en Redis waren gezond en migratie `0060` stond op head;
+- een belangrijke synthetische pagina leverde zonder zoekprestatiegegevens een cross-domainkans
+  met SEO- en accessibilityimpact op;
+- een bestaande synthetische SEO-kans gebruikte dezelfde factorgerichte uitlegstructuur;
+- ontbrekend zoekbewijs bleef zichtbaar als onzekerheidsfactor en blokkeerde de aantoonbare kans
+  niet;
+- de interfacecontrole bevestigde functionele bronlabels en de afwezigheid van een algemene
+  `/100`-score;
+- gereedsignaal: `release-12-phase-d-staging-ok`.
+
 ## Volgende fase
 
-Na lokale eindcontrole volgt de stagingacceptatie van fase D.
+Na afzonderlijke bevestiging kan de volgende Release 12-fase starten. Productie volgt pas nadat de
+volledige pilot en gebruikersacceptatie zijn afgerond.
