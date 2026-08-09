@@ -1,6 +1,6 @@
 # Release 12 — Continuous Website Improvement-pilot
 
-Status: fase D lokaal en op staging geaccepteerd; nog niet naar productie gedeployed.
+Status: fase E lokaal en op staging geaccepteerd; nog niet naar productie gedeployed.
 
 ## Doel en afbakening
 
@@ -161,7 +161,7 @@ geen fouten of waarschuwingen. Daarmee is fase D definitief visueel geaccepteerd
 
 ## Fase E — opportunities en testability
 
-Status: lokaal geïmplementeerd; stagingacceptatie volgt na de lokale eindcontrole.
+Status: lokaal en op staging geïmplementeerd en geaccepteerd.
 
 - statistisch begrensde journey-frictie uit Matomo wordt een opportunity en nooit een bewezen
   probleem;
@@ -189,7 +189,19 @@ Lokale acceptatie:
 - volledige regressiesuite: 565 geslaagd, alleen de bestaande Starlette/httpx-waarschuwing;
 - Ruff, JavaScript-syntax en diffcontrole: geslaagd.
 
+Stagingacceptatie:
+
+- API, PostgreSQL en Redis waren gezond;
+- de herbruikbare fixture bevestigde de journey-opportunity, het meetadvies
+  `effect_measurement_preferred`, het afwijzen van de valse devicekandidaat en herstel van de
+  oorspronkelijke brondata;
+- healthcheck en gereedsignaal `release-12-phase-e-ui-staging-ok`: geslaagd;
+- de visuele controle bevestigde het label `Mogelijke doorstroomkans`, begrijpelijke datadekking
+  (`Zoekprestatie: onbekend` en `Bezoekersgedrag: aanwezig`) en een uitklapbare onderbouwing met
+  impactdomeinen, hypothesebeoordeling en het meetadvies `Effectmeting heeft voorkeur`;
+- de interface toont geen interne bronnaam, ruwe score of onbewezen causaliteitsclaim.
+
 ## Volgende fase
 
-Na lokale eindcontrole volgt de stagingacceptatie van fase E. Productie volgt pas nadat de volledige
-pilot en gebruikersacceptatie zijn afgerond.
+Fase E is gereed. Productie volgt pas nadat de volledige pilot en gebruikersacceptatie zijn
+afgerond.
