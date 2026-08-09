@@ -250,6 +250,16 @@ def test_release_12_phase_e_fixture_is_synthetic_and_restores_source() -> None:
     assert "settings.primary_analytics_source = original_source" in fixture
 
 
+def test_release_12_phase_f_fixture_checks_navigation_and_learning_safeguards() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    fixture = (project_root / "scripts/accept-release-12-phase-f-staging.py").read_text()
+
+    assert '"primary_navigation": ["Inzichten", "Kansen", "Acties"]' in fixture
+    assert '"legacy_routes": True' in fixture
+    assert '"learning_minimum": 3' in fixture
+    assert '"causal_claim": False' in fixture
+
+
 def test_render_artifact_volume_is_initialized_before_worker() -> None:
     project_root = Path(__file__).resolve().parents[1]
     for filename, volume_name in (

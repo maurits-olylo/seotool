@@ -25,9 +25,9 @@ const labels = {
   cancel_requested: "Stop wordt voorbereid", connected: "Gekoppeld", error: "Fout",
 };
 const state = { currentUser: null, currentView: "dashboard", clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], changesRequestId: 0, jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, contentAnalysis: null, contentAnalysisDays: 28, contentAnalysisTab: "overview", contentAnalysisPage: 1, questionScopes: null, externalEvidenceRequests: new Map(), effectEvaluations: [], crawlRuns: [], showCrawlArchive: false, activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, operationsRequestId: 0, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], urlCoverage: null, filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, selectedInspectionSnapshotId: null, selectedRecommendationTask: null, recommendationFeedback: [], recommendationDefinitions: null, recommendationTasks: [], taskNotifications: [], taskMembers: [], googleConnectionId: null, bingConnectionId: null, matomoConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
-const VIEW_HASHES = {dashboard: "overzicht", tasks: "taken", actions: "analyse/acties", urls: "analyse/urls", changes: "analyse/wijzigingen", insights: "analyse/inzichten", contentAnalysis: "analyse/content", vacancies: "analyse/vacatures", reports: "rapportages", operations: "crawls-exports", clients: "instellingen/klanten-websites", team: "instellingen/team-toegang", integrations: "instellingen/integraties"};
-const LEGACY_HASHES = {rapportage: "reports", urls: "urls", wijzigingen: "changes", inzichten: "insights", vacatures: "vacancies", beheer: "operations", organisatie: "clients", integraties: "integrations", acties: "actions"};
-const ANALYSIS_VIEWS = new Set(["actions", "urls", "changes", "insights", "contentAnalysis", "vacancies"]);
+const VIEW_HASHES = {dashboard: "overzicht", insights: "inzichten", opportunities: "kansen", tasks: "acties", actions: "metingen/signalen", urls: "metingen/urls", changes: "metingen/wijzigingen", contentAnalysis: "metingen/content", vacancies: "metingen/vacatures", reports: "rapportages", operations: "crawls-exports", clients: "instellingen/klanten-websites", team: "instellingen/team-toegang", integrations: "instellingen/integraties"};
+const LEGACY_HASHES = {rapportage: "reports", urls: "urls", wijzigingen: "changes", inzichten: "insights", vacatures: "vacancies", beheer: "operations", organisatie: "clients", integraties: "integrations", acties: "actions", taken: "tasks", "analyse/acties": "actions", "analyse/urls": "urls", "analyse/wijzigingen": "changes", "analyse/inzichten": "insights", "analyse/content": "contentAnalysis", "analyse/vacatures": "vacancies"};
+const ANALYSIS_VIEWS = new Set(["actions", "urls", "changes", "contentAnalysis", "vacancies"]);
 const SETTINGS_VIEWS = new Set(["clients", "team", "integrations"]);
 const CLIENT_STORAGE_KEY = "seo-monitor-client-id";
 const WEBSITE_STORAGE_KEY = "seo-monitor-website-id";
@@ -949,6 +949,13 @@ function effectEvaluationMarkup(item) {
 }
 
 function renderEffectEvaluations() {
+  const comparable = state.effectEvaluations.filter((item) => item.status === "development_visible" && item.metrics?.gsc?.changes?.clicks?.relative_percent != null);
+  if (comparable.length < 3) {
+    $("#content-effect-learning").textContent = `Nog onvoldoende vergelijkbare metingen voor een historisch patroon (${comparable.length}/3).`;
+  } else {
+    const positive = comparable.filter((item) => item.metrics.gsc.changes.clicks.relative_percent > 0).length;
+    $("#content-effect-learning").textContent = `Binnen deze website ontwikkelden organische klikken zich positief bij ${positive} van ${comparable.length} vergelijkbare metingen. Dit is beschrijvende historie; causaliteit is niet bewezen.`;
+  }
   $("#content-effect-list").innerHTML = state.effectEvaluations.map(effectEvaluationMarkup).join("") || `<p class="content-loading">Nog geen effectevaluaties. Alleen uitgevoerde taken met een concrete URL-scope worden meegenomen.</p>`;
 }
 
@@ -1210,7 +1217,7 @@ async function pollIntegrationHistory(websiteId) {
 function showView(view, updateHash = true) {
   if (state.currentUser?.role === "client") view = "reports";
   state.currentView = view;
-  const visibleView = view === "reports" ? "actions" : ["clients", "team"].includes(view) ? "organization" : view === "contentAnalysis" ? "content-analysis" : view;
+  const visibleView = view === "reports" ? "actions" : ["clients", "team"].includes(view) ? "organization" : ["contentAnalysis", "opportunities"].includes(view) ? "content-analysis" : view;
   for (const name of ["dashboard", "tasks", "actions", "insights", "content-analysis", "urls", "changes", "vacancies", "operations", "organization", "integrations"]) {
     $(`#${name}-view`).classList.toggle("hidden", name !== visibleView);
   }
@@ -1229,7 +1236,11 @@ function showView(view, updateHash = true) {
       $(selector).innerHTML = `<p class="insight-empty">Inzichten konden niet worden geladen. Probeer het later opnieuw.</p>`;
     }
   });
-  if (view === "contentAnalysis") loadContentAnalysis();
+  if (["contentAnalysis", "opportunities"].includes(view)) {
+    applyContentAnalysisPresentation(view);
+    showContentAnalysisTab(view === "opportunities" ? "opportunities" : state.contentAnalysisTab);
+    loadContentAnalysis();
+  }
   if (["clients", "team"].includes(view)) { applyOrganizationPresentation(view); loadOrganization(); }
   if (view === "urls") renderUrls();
   if (view === "changes") loadChanges().catch(() => renderTableState("#change-rows", 5, "Wijzigingen konden niet worden geladen. Probeer het later opnieuw.", true));
@@ -1248,7 +1259,7 @@ function viewFromHash() {
 function updateNavigation(view) {
   const analysisActive = ANALYSIS_VIEWS.has(view);
   const settingsActive = SETTINGS_VIEWS.has(view);
-  for (const name of ["dashboard", "tasks", "reports", "operations"]) $(`#${name}-nav`).classList.toggle("nav-active", name === view);
+  for (const name of ["dashboard", "insights", "opportunities", "tasks", "reports", "operations"]) $(`#${name}-nav`).classList.toggle("nav-active", name === view);
   $("#analysis-nav").classList.toggle("nav-active", analysisActive);
   $("#settings-nav").classList.toggle("nav-active", settingsActive);
   for (const group of ["analysis", "settings"]) {
@@ -1262,6 +1273,15 @@ function updateNavigation(view) {
   }
   $("#app").classList.remove("mobile-nav-open");
   $("#mobile-nav-toggle").setAttribute("aria-expanded", "false");
+}
+
+function applyContentAnalysisPresentation(view) {
+  const opportunityMode = view === "opportunities";
+  $("#content-analysis-eyebrow").textContent = opportunityMode ? "KANSEN" : "METINGEN";
+  $("#content-analysis-title").textContent = opportunityMode ? "Kansen" : "Content";
+  $("#content-analysis-intro").textContent = opportunityMode
+    ? "Onderbouwde verbeteropties en toetsbare hypotheses, met zichtbare datadekking."
+    : "Zoekintentie, contentrollen en klantreis met zichtbaar bewijs en expliciete datadekking.";
 }
 
 function applyOrganizationPresentation(view) {
@@ -2942,7 +2962,7 @@ $("#confirm-mfa").addEventListener("click", async () => {
 $("#profile-toggle").addEventListener("click", () => { const open = $("#profile-popover").classList.toggle("hidden") === false; $("#profile-toggle").setAttribute("aria-expanded", String(open)); });
 $("#mobile-nav-toggle").addEventListener("click", () => { const open = $("#app").classList.toggle("mobile-nav-open"); $("#mobile-nav-toggle").setAttribute("aria-expanded", String(open)); });
 $("#client-select").addEventListener("change", async () => { localStorage.setItem(CLIENT_STORAGE_KEY, $("#client-select").value); localStorage.removeItem(WEBSITE_STORAGE_KEY); state.crawlRuns = []; state.changesRequestId += 1; state.changes = []; state.changeGroups = []; await loadWebsites(); if (state.currentView === "integrations") await loadIntegrations(); if (state.currentView === "dashboard") await loadDashboard(); });
-$("#website-select").addEventListener("change", async () => { localStorage.setItem(WEBSITE_STORAGE_KEY, $("#website-select").value); state.selectedReportSnapshotId = null; state.consultantInsights = null; state.contentAnalysis = null; state.questionScopes = null; state.externalEvidenceRequests.clear(); state.contentAnalysisPage = 1; state.operationsRequestId += 1; state.changesRequestId += 1; state.operationsLoading = false; state.crawlRuns = []; state.showCrawlArchive = false; state.activeCrawlJob = null; state.exports = []; state.changes = []; state.changeGroups = []; if (state.currentView === "changes") renderTableState("#change-rows", 5, "Wijzigingen worden geladen…"); if (state.currentView === "operations") renderOperations(); if (state.currentView === "changes") await loadChanges(); await loadIssues(); if (state.currentView === "integrations") await loadIntegrations(); if (state.currentView === "insights") await loadConsultantInsights(); if (state.currentView === "contentAnalysis") await loadContentAnalysis(); if (state.currentView === "urls") renderUrls(); if (state.currentView === "vacancies") await loadJobListings(); if (state.currentView === "operations") await loadOperations(); if (state.currentView === "dashboard") await loadDashboard(); });
+$("#website-select").addEventListener("change", async () => { localStorage.setItem(WEBSITE_STORAGE_KEY, $("#website-select").value); state.selectedReportSnapshotId = null; state.consultantInsights = null; state.contentAnalysis = null; state.questionScopes = null; state.externalEvidenceRequests.clear(); state.contentAnalysisPage = 1; state.operationsRequestId += 1; state.changesRequestId += 1; state.operationsLoading = false; state.crawlRuns = []; state.showCrawlArchive = false; state.activeCrawlJob = null; state.exports = []; state.changes = []; state.changeGroups = []; if (state.currentView === "changes") renderTableState("#change-rows", 5, "Wijzigingen worden geladen…"); if (state.currentView === "operations") renderOperations(); if (state.currentView === "changes") await loadChanges(); await loadIssues(); if (state.currentView === "integrations") await loadIntegrations(); if (state.currentView === "insights") await loadConsultantInsights(); if (["contentAnalysis", "opportunities"].includes(state.currentView)) await loadContentAnalysis(); if (state.currentView === "urls") renderUrls(); if (state.currentView === "vacancies") await loadJobListings(); if (state.currentView === "operations") await loadOperations(); if (state.currentView === "dashboard") await loadDashboard(); });
 for (const selector of ["#severity-filter", "#scope-filter", "#nature-filter", "#type-filter", "#impact-filter"]) $(selector).addEventListener("change", () => { state.page = 1; render(); });
 $("#status-filter").addEventListener("change", loadIssues);
 $("#search-filter").addEventListener("input", () => { state.page = 1; render(); });
@@ -3018,6 +3038,7 @@ $("#tasks-nav").addEventListener("click", () => showView("tasks"));
 $("#actions-nav").addEventListener("click", () => showView("actions"));
 $("#reports-nav").addEventListener("click", () => showView("reports"));
 $("#insights-nav").addEventListener("click", () => showView("insights"));
+$("#opportunities-nav").addEventListener("click", () => showView("opportunities"));
 $("#content-analysis-nav").addEventListener("click", () => showView("contentAnalysis"));
 $("#urls-nav").addEventListener("click", () => showView("urls"));
 $("#changes-nav").addEventListener("click", () => showView("changes"));
@@ -3054,7 +3075,7 @@ $("#integration-warning-action").addEventListener("click", () => showView("integ
 $("#insight-period").addEventListener("change", async (event) => { state.insightDays = Number(event.target.value); await loadConsultantInsights(); });
 $("#performance-context-question-form").addEventListener("submit", submitPerformanceContextQuestion);
 $("#content-analysis-period").addEventListener("change", async (event) => { state.contentAnalysisDays = Number(event.target.value); state.contentAnalysisPage = 1; await loadContentAnalysis(); });
-$("#content-analysis-tabs").addEventListener("click", (event) => { const button = event.target.closest("[data-content-tab]"); if (button) showContentAnalysisTab(button.dataset.contentTab); });
+$("#content-analysis-tabs").addEventListener("click", (event) => { const button = event.target.closest("[data-content-tab]"); if (!button) return; if (state.currentView === "opportunities" && button.dataset.contentTab !== "opportunities") showView("contentAnalysis"); showContentAnalysisTab(button.dataset.contentTab); });
 $("#content-question-list").addEventListener("click", (event) => { const taskButton = event.target.closest("[data-question-gap-task]"); if (taskButton) { const row = taskButton.closest(".question-scope-row"); const viewButton = row?.querySelector("[data-view-question-evidence]"); if (viewButton) createQuestionGapTask(viewButton.dataset.viewQuestionEvidence, taskButton.dataset.questionGapTask); return; } const viewButton = event.target.closest("[data-view-question-evidence]"); if (viewButton) { viewQuestionEvidence(viewButton.dataset.viewQuestionEvidence); return; } const button = event.target.closest("[data-question-evidence]"); if (button) requestQuestionEvidence(button.dataset.questionEvidence); });
 $("#content-page-previous").addEventListener("click", () => { state.contentAnalysisPage -= 1; renderContentAnalysis(); });
 $("#content-page-next").addEventListener("click", () => { state.contentAnalysisPage += 1; renderContentAnalysis(); });

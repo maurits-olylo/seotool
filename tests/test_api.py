@@ -96,6 +96,9 @@ def test_information_architecture_and_legacy_routes_are_served(client: TestClien
     assert page.status_code == 200
     for element_id in [
         "dashboard-nav",
+        "insights-nav",
+        "opportunities-nav",
+        "tasks-nav",
         "analysis-nav",
         "reports-nav",
         "operations-nav",
@@ -109,7 +112,16 @@ def test_information_architecture_and_legacy_routes_are_served(client: TestClien
 
     script = client.get("/ui/assets/app.js")
     assert script.status_code == 200
-    assert 'actions: "analyse/acties"' in script.text
+    assert 'insights: "inzichten"' in script.text
+    assert 'opportunities: "kansen"' in script.text
+    assert 'tasks: "acties"' in script.text
+    assert 'actions: "metingen/signalen"' in script.text
+    assert '"analyse/acties": "actions"' in script.text
+    assert 'applyContentAnalysisPresentation(view)' in script.text
+    assert 'view === "opportunities" ? "opportunities"' in script.text
+    assert 'id="content-effect-learning"' in page.text
+    assert "Dit is beschrijvende historie; causaliteit is niet bewezen." in script.text
+    assert 'app.js?v=20260809-2' in page.text
     assert 'reports: "rapportages"' in script.text
     assert 'operations: "crawls-exports"' in script.text
     assert 'organisatie: "clients"' in script.text
@@ -120,7 +132,8 @@ def test_analysis_pages_share_consistent_states_and_labels(client: TestClient) -
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
     assert 'href="/ui/assets/analysis-consistency.css' in page.text
-    assert page.text.count('<span class="eyebrow">ANALYSE</span><h1>') == 5
+    assert page.text.count('<span class="eyebrow">ANALYSE</span><h1>') == 4
+    assert 'id="content-analysis-eyebrow" class="eyebrow">METINGEN</span>' in page.text
     assert 'class="issue-table"' in page.text
     for element_id in ["url-empty", "change-empty", "vacancy-empty"]:
         assert f'id="{element_id}" class="empty hidden" role="status"' in page.text
@@ -192,7 +205,7 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
 def test_operations_status_ignores_stale_website_responses(client: TestClient) -> None:
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
-    assert 'src="/ui/assets/app.js?v=20260809-1"' in page.text
+    assert 'src="/ui/assets/app.js?v=20260809-2"' in page.text
     assert 'href="/ui/assets/issue-inspection.css?v=20260808-5"' in page.text
     script = client.get("/ui/assets/app.js").text
     assert "issue-inspection-page-select" in script
@@ -278,7 +291,8 @@ def test_content_analysis_interface_exposes_evidence_and_coverage(client: TestCl
         assert f'data-content-tab="{tab}"' in page.text
         assert f'id="content-tab-{tab}"' in page.text
     assert script.status_code == 200
-    assert 'contentAnalysis: "analyse/content"' in script.text
+    assert 'contentAnalysis: "metingen/content"' in script.text
+    assert '"analyse/content": "contentAnalysis"' in script.text
     assert "Promise.all([" in script.text
     assert "function renderContentAnalysis" in script.text
     assert "function loadContentAnalysis" in script.text

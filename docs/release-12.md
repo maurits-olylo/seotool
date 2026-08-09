@@ -205,3 +205,30 @@ Stagingacceptatie:
 
 Fase E is gereed. Productie volgt pas nadat de volledige pilot en gebruikersacceptatie zijn
 afgerond.
+
+## Fase F — informatiearchitectuur en beschrijvend leren
+
+Status: lokaal geïmplementeerd en getest; stagingacceptatie volgt.
+
+- Inzichten, Kansen en Acties zijn primaire navigatiebestemmingen;
+- technische signalen, URL's, wijzigingen, contentmetingen en vacatures blijven beschikbaar onder
+  Metingen en worden niet als afzonderlijke productdisciplines gepresenteerd;
+- Kansen opent rechtstreeks de bestaande, onderbouwde opportunityweergave;
+- Acties opent de menselijke taakworkflow; bestaande issues heten in de navigatie Signalen;
+- oude hashes blijven ondersteund en worden naar de nieuwe routes vertaald;
+- sitegebonden effecthistorie toont pas vanaf drie vergelijkbare metingen een beschrijvend patroon;
+- de leerlaag doet geen voorspelling, deelt geen klantdata tussen websites en presenteert geen
+  causaliteitsclaim.
+
+Lokale acceptatie:
+
+- nieuwe en oude routes zijn regressiegedekt;
+- JavaScript-syntax, Ruff en diffcontrole: geslaagd;
+- volledige regressiesuite: geslaagd, alleen de bestaande Starlette/httpx-waarschuwing;
+- stagingfixture controleert primaire navigatie, routecompatibiliteit, minimumvolume en het verbod
+  op causaliteitsclaims.
+
+## Volgende fase
+
+Na technische en visuele stagingacceptatie is Release 12 inhoudelijk gereed voor het afzonderlijke
+productiebesluit.
