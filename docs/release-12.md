@@ -1,6 +1,6 @@
 # Release 12 — Continuous Website Improvement-pilot
 
-Status: fase E lokaal en op staging geaccepteerd; nog niet naar productie gedeployed.
+Status: volledig lokaal, op staging en in productie geaccepteerd.
 
 ## Doel en afbakening
 
@@ -243,4 +243,19 @@ Stagingacceptatie:
 
 ## Volgende fase
 
-Release 12 is inhoudelijk en op staging gereed voor het afzonderlijke productiebesluit.
+Het afzonderlijke productiebesluit was GO; onderstaande productieacceptatie rondt de release af.
+
+## Productieacceptatie
+
+- API, PostgreSQL, Redis en renderworker waren gezond;
+- migratie `0060` stond op head, rendering was actief en de accessibility-engine was beschikbaar;
+- de statische fase-F-controle, healthcheck en deployment-drain slaagden; één gepauzeerde crawl is
+  hervat;
+- gereedsignaal `release-12-production-ok`: geslaagd;
+- de visuele controle bevestigde de primaire navigatie Inzichten, Kansen en Acties;
+- `#inzichten` opende de inzichtweergave, `#kansen` de onderbouwde opportunityweergave en `#acties`
+  de menselijke werkvoorraad;
+- de Effect-weergave toonde bij onvoldoende vergelijkbare productiehistorie correct de ondergrens
+  `0/3` en deed geen causaliteitsclaim.
+
+Release 12 is daarmee volledig geaccepteerd in productie.
