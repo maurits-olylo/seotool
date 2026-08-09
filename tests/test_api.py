@@ -192,7 +192,7 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
 def test_operations_status_ignores_stale_website_responses(client: TestClient) -> None:
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
-    assert 'src="/ui/assets/app.js?v=20260808-12"' in page.text
+    assert 'src="/ui/assets/app.js?v=20260809-1"' in page.text
     assert 'href="/ui/assets/issue-inspection.css?v=20260808-5"' in page.text
     script = client.get("/ui/assets/app.js").text
     assert "issue-inspection-page-select" in script
