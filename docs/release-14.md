@@ -1,6 +1,6 @@
 # Release 14 — Invitation-only onboarding
 
-Status: fase A lokaal in uitvoering; nog niet op staging of productie gedeployed.
+Status: fase A lokaal en op staging geaccepteerd; nog niet op productie gedeployed.
 
 ## Doel
 
@@ -27,11 +27,22 @@ een afzonderlijk live-activeringsbesluit zijn afgerond.
 Lokale acceptatie:
 
 - 17 gerichte onboarding-, security- en migratietests geslaagd;
-- volledige regressiesuite: 596 geslaagd met alleen de bestaande dependencywaarschuwing;
+- volledige regressiesuite: 597 geslaagd met alleen de bestaande dependencywaarschuwing;
 - Alembic heeft één lineaire head `0062`;
 - gewijzigde Pythonbestanden zijn lintvrij en correct geformatteerd;
 - privacyverwijdering wist onboarding- en verificatierecords expliciet vóór websiteverwijdering.
 
-Vervolgfasen voegen tokenvernieuwing/download, de begeleide interface, idempotent starten van de
-eerste crawl, begrijpelijke voortgang, analytics/Sensor-meetvalidatie en end-to-end gebruikersproeven
-toe.
+Stagingacceptatie:
+
+- Alembic staat op één head `0062`;
+- herhaald starten is idempotent en maakt geen dubbele website aan;
+- alleen de SHA-256-hash van het verificatietoken wordt opgeslagen;
+- vóór succesvolle verificatie worden nul crawljobs aangemaakt;
+- de drie beveiligde onboardingroutes zijn beschikbaar;
+- de acceptatiefixture is volledig opgeruimd;
+- API en database zijn gezond;
+- definitief gereedsignaal: `release-14-phase-a-staging-ok`.
+
+Fase B voegt tokenvernieuwing/download en de begeleide verificatie-interface toe. Latere fasen
+voegen idempotent starten van de eerste crawl, begrijpelijke voortgang,
+analytics/Sensor-meetvalidatie en end-to-end gebruikersproeven toe.
