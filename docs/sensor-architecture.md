@@ -756,7 +756,9 @@ Release 13 bestaat uit afzonderlijke gates:
 - E — Thactual daily aggregates, quality state en intelligencekoppeling; lokaal en op staging
   geaccepteerd;
 - F — stagingacceptatie, performance/deletion/abusetests; lokaal en op staging geaccepteerd;
-- G — expliciet F&F-pilotbesluit.
+- G — expliciet pilotbesluit; Sensor technisch goedgekeurd, friends-and-family `NO-GO` totdat de
+  bestaande harde releasegates zijn afgerond. `thact.nl` is de beoogde eerste interne live
+  testwebsite tijdens onboardingontwikkeling.
 
 De bestaande volledige-roadmap- en F&F-gates blijven leidend. Sensor verbreedt niet stilzwijgend de
 al geplande onboarding-, privacy- en securityscope.

@@ -1021,3 +1021,20 @@ afwijking bevat. Geef het label `betrouwbaar` pas na twee schone controles.
 Gevolg: opportunity- en assistentuitkomsten blijven herleidbaar, tenantgebonden en read-only.
 Meetproblemen worden normale gededupliceerde issues met bewijs en verificatiehistorie, zonder GA4
 en Matomo te combineren of een algemene SEO-score te introduceren.
+
+## 2026-08-10 — Sensor is technisch goedgekeurd, maar friends-and-family blijft geblokkeerd
+
+Context: de synthetische Sensor-proef voldoet aan het clientbudget, batching, manifestcontract,
+meetkwaliteit, intelligencekoppeling, privacyverwijdering en de gesloten misbruikgrens. De bredere
+friends-and-family-gates voor onboarding, privacy/security, back-up, productie-infrastructuur,
+gebruikersproeven en homepage zijn nog niet afgerond.
+
+Besluit: behoud optie A met een begrensde Matomo-client achter een verplichte same-origin Gateway.
+Start geen publieke Sensorroute of friends-and-family-deployment. Gebruik `thact.nl` in principe
+als eerste interne live testwebsite tijdens onboardingontwikkeling, met meting standaard uit en
+afzonderlijke activeringsgoedkeuring na eigendomsverificatie en privacy-/consentconfiguratie.
+
+Gevolg: optie C wordt niet gebouwd zolang performance, semantiek en installatiecontract blijven
+voldoen. De interne pilot begint met één pagina, interactie en proces, gebruikt geen persistent
+visitor-ID, heeft korte retentie en moet installatie, kill switch en verwijdering bewijzen voordat
+minimaal twee weken beperkte veldmeting start. Dit besluit is geen live-deploymenttoestemming.

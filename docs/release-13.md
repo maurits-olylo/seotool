@@ -264,3 +264,35 @@ Definitieve stagingacceptatie:
 
 Fase F is hiermee afgerond. Fase G is uitsluitend het expliciete pilotbesluit. Zij opent niet
 automatisch een publieke route of friends-and-family-deployment.
+
+## Fase G — expliciet pilotbesluit
+
+Status: besluit genomen; Sensor technisch goedgekeurd, friends-and-family voorlopig `NO-GO`.
+
+Besluit:
+
+- optie A blijft de pilotarchitectuur; de performance-, batching- en semantiekmetingen geven geen
+  aanleiding om optie C nu te bouwen;
+- verdere voorbereiding van onboarding, same-origin Gateway en een begrensde interne live pilot
+  mag doorgaan;
+- een publieke Sensorroute of friends-and-family-deployment blijft geblokkeerd totdat onboarding,
+  privacy/security, onafhankelijke back-up, productie-infrastructuur, gebruikersproeven en de
+  afzonderlijke homepagegoedkeuring zijn afgerond;
+- `thact.nl` is in principe gekozen als eerste verse live testwebsite tijdens de ontwikkeling van
+  onboarding. Dit is een interne productproef en geen friends-and-family-vrijgave.
+
+Voorwaarden voor de proef op `thact.nl`:
+
+1. website-eigendom wordt via de nieuwe onboardingflow geverifieerd;
+2. de Gateway wordt same-origin en standaard inactief geïnstalleerd;
+3. activering volgt pas na een expliciet privacy-/consentprofiel, zonder persistent visitor-ID en
+   met korte vastgelegde retentie;
+4. begin met één pagina, één primaire interactie en één proces/outcome;
+5. valideer eerst installatie en deletion op een afgeschermde testpagina en meet daarna minimaal
+   twee weken beperkte live velddata;
+6. opportunities en effectevidence blijven voorlopig totdat measurement state betrouwbaar is;
+7. kill switch en volledige verwijdering worden vóór activering nogmaals getest.
+
+Deze keuze is toestemming om de onboarding- en pilotimplementatie te ontwerpen en bouwen, niet om
+de meting al op de live website te activeren. Iedere live activering blijft een afzonderlijk
+deploymentbesluit.
