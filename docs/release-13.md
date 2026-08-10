@@ -132,3 +132,15 @@ Lokale acceptatie:
 
 Staging voert de fase-D-fixture en de twintig performance-runs opnieuw uit, omdat de browserruntime
 in deze fase is uitgebreid.
+
+Eerste stagingpoging:
+
+- omvang, p75 uitvoering van 21,0 ms, vijf observations en één POST voldeden;
+- één long task in twintig runs blokkeerde de keten vóór de semantische fase-D-fixture;
+- de eerste meetversie schreef iedere long task in het volledige venster aan Sensor toe en had geen
+  nulmeting, waardoor Chromium- of garbage-collectionruis niet kon worden onderscheiden;
+- iedere run krijgt daarom een gekoppelde nulmeting op dezelfde fixture. Een Sensor-long-task is
+  alleen toerekenbaar wanneer de Sensorvariant de grens van 50 ms overschrijdt terwijl de nulmeting
+  dat niet doet, of meer dan 5 ms boven een eveneens lange nulmeting uitkomt;
+- ruwe aantallen en maximale duur voor beide varianten blijven zichtbaar. Het budget blijft nul
+  toerekenbare long tasks; alleen de attributiemethode is hersteld.

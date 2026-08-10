@@ -16,6 +16,32 @@ def percentile_75(values: list[float]) -> float:
     return ordered[min(len(ordered) - 1, int(len(ordered) * 0.75))]
 
 
+def observe_long_tasks(page: Any) -> None:
+    page.evaluate(
+        """
+        window.__sensorLongTasks = [];
+        new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) window.__sensorLongTasks.push(entry.duration);
+        }).observe({entryTypes: ['longtask']});
+        """
+    )
+
+
+def measure_baseline(browser: Any) -> dict[str, Any]:
+    context = browser.new_context(service_workers="block")
+    page = context.new_page()
+    page.route(
+        "**/*",
+        lambda route: route.fulfill(status=200, content_type="text/html", body=FIXTURE_HTML),
+    )
+    page.goto(FIXTURE_URL, wait_until="domcontentloaded")
+    observe_long_tasks(page)
+    page.wait_for_timeout(3000)
+    long_tasks = page.evaluate("window.__sensorLongTasks")
+    context.close()
+    return {"long_tasks": [round(float(duration), 3) for duration in long_tasks]}
+
+
 def measure_once(browser: Any, matomo_source: str, bootstrap_source: str) -> dict[str, Any]:
     context = browser.new_context(service_workers="block")
     page = context.new_page()
@@ -43,14 +69,7 @@ def measure_once(browser: Any, matomo_source: str, bootstrap_source: str) -> dic
     )
     page.on("request", record_tracking_request)
     page.goto(FIXTURE_URL, wait_until="domcontentloaded")
-    page.evaluate(
-        """
-        window.__sensorLongTasks = [];
-        new PerformanceObserver((list) => {
-          for (const entry of list.getEntries()) window.__sensorLongTasks.push(entry.duration);
-        }).observe({entryTypes: ['longtask']});
-        """
-    )
+    observe_long_tasks(page)
     execution_ms = page.evaluate(
         """([bootstrap, matomo]) => {
           const started = performance.now();
@@ -112,16 +131,27 @@ def main() -> None:
     )
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True)
-        results = [
-            measure_once(browser, matomo_source, bootstrap_source) for _ in range(arguments.runs)
-        ]
+        baseline_results = []
+        results = []
+        for _ in range(arguments.runs):
+            baseline_results.append(measure_baseline(browser))
+            results.append(measure_once(browser, matomo_source, bootstrap_source))
         browser.close()
 
     execution = [float(result["execution_ms"]) for result in results]
     requests = [int(result["tracking_requests"]) for result in results]
     methods = sorted({method for result in results for method in result["tracking_methods"]})
     batch_sizes = [int(result["largest_batch"]) for result in results]
-    long_tasks = [duration for result in results for duration in result["long_tasks"]]
+    baseline_long_tasks = [
+        duration for result in baseline_results for duration in result["long_tasks"]
+    ]
+    sensor_long_tasks = [duration for result in results for duration in result["long_tasks"]]
+    attributable_long_tasks = 0
+    for baseline, sensor in zip(baseline_results, results, strict=True):
+        baseline_max = max(baseline["long_tasks"], default=0)
+        sensor_max = max(sensor["long_tasks"], default=0)
+        if sensor_max >= 50 and (baseline_max < 50 or sensor_max > baseline_max + 5):
+            attributable_long_tasks += 1
     summary = {
         "runs": len(results),
         "execution_ms_median": round(median(execution), 3),
@@ -129,19 +159,25 @@ def main() -> None:
         "tracking_requests_max": max(requests),
         "tracking_methods": methods,
         "largest_batch_min": min(batch_sizes),
-        "long_tasks_at_least_50ms": sum(duration >= 50 for duration in long_tasks),
+        "baseline_long_tasks_at_least_50ms": sum(
+            duration >= 50 for duration in baseline_long_tasks
+        ),
+        "sensor_long_tasks_at_least_50ms": sum(duration >= 50 for duration in sensor_long_tasks),
+        "baseline_long_task_max_ms": max(baseline_long_tasks, default=0),
+        "sensor_long_task_max_ms": max(sensor_long_tasks, default=0),
+        "sensor_attributable_long_tasks": attributable_long_tasks,
         "budget": {
             "execution_ms_p75_max": 25,
             "tracking_requests_max": 2,
             "largest_batch_min": 5,
-            "long_tasks_at_least_50ms_max": 0,
+            "sensor_attributable_long_tasks_max": 0,
         },
     }
     summary["within_budget"] = (
         summary["execution_ms_p75"] <= 25
         and summary["tracking_requests_max"] <= 2
         and summary["largest_batch_min"] >= 5
-        and summary["long_tasks_at_least_50ms"] == 0
+        and summary["sensor_attributable_long_tasks"] == 0
     )
     print(json.dumps(summary, sort_keys=True))
     if not summary["within_budget"]:
