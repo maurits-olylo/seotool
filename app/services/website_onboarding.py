@@ -19,6 +19,7 @@ from app.schemas.onboarding import (
     WebsiteOnboardingRead,
     WebsiteOnboardingStart,
 )
+from app.services.analytics_quality import analytics_quality_status
 from app.services.crawl_deployment import (
     crawl_deployment_is_active,
     pause_job_if_deployment_active,
@@ -114,6 +115,7 @@ def get_website_onboarding(db: Session, onboarding_id: UUID) -> WebsiteOnboardin
         _verification(db, onboarding.id),
         first_crawl_job=first_crawl_job,
         first_crawl_run=first_crawl_run,
+        analytics_quality=analytics_quality_status(db, onboarding.website_id),
     )
 
 
@@ -400,7 +402,10 @@ def _read(
     token: str | None = None,
     first_crawl_job: CrawlJob | None = None,
     first_crawl_run: CrawlRun | None = None,
+    analytics_quality: dict[str, object] | None = None,
 ) -> WebsiteOnboardingRead:
+    quality = analytics_quality or {"status": "not_configured"}
+    quality_status = str(quality.get("status", "not_configured"))
     return WebsiteOnboardingRead(
         id=onboarding.id,
         client_id=onboarding.client_id,
@@ -421,6 +426,13 @@ def _read(
         first_crawl_crawled_urls=first_crawl_run.crawled_urls if first_crawl_run else 0,
         first_crawl_failed_urls=first_crawl_run.failed_urls if first_crawl_run else 0,
         first_crawl_error=first_crawl_job.error_message if first_crawl_job else None,
+        analytics_quality_status=quality_status,
+        analytics_quality_source=(str(quality["source"]) if quality.get("source") else None),
+        analytics_quality_source_label=(
+            str(quality["source_label"]) if quality.get("source_label") else None
+        ),
+        analytics_quality_last_checked_at=quality.get("last_checked_at"),
+        conversion_insights_reliable=quality_status == "reliable",
     )
 
 

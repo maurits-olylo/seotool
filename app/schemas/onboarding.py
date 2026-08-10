@@ -50,6 +50,11 @@ class WebsiteOnboardingRead(BaseModel):
     first_crawl_crawled_urls: int = 0
     first_crawl_failed_urls: int = 0
     first_crawl_error: str | None = None
+    analytics_quality_status: str = "not_configured"
+    analytics_quality_source: str | None = None
+    analytics_quality_source_label: str | None = None
+    analytics_quality_last_checked_at: datetime | None = None
+    conversion_insights_reliable: bool = False
 
 
 class WebsiteVerificationCheckRead(BaseModel):

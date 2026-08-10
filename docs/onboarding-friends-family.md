@@ -1,10 +1,9 @@
 # Onboarding voor friends-and-family
 
-Status: de persistente website-onboarding en HTTPS-eigendomsverificatiefundering zijn lokaal en op
-staging geaccepteerd in Release 14 fase A. De begeleide verificatie-interface en veilige
-tokenvernieuwing zijn lokaal en op staging geaccepteerd in fase B. De veilige, idempotente eerste
-crawl is lokaal en op staging geaccepteerd in fase C. Begrijpelijke voortgang en end-to-end
-gebruikersacceptatie volgen in afzonderlijke fasen.
+Status: websiteverificatie, begeleide verificatie, de veilige eerste crawl en begrijpelijke
+voortgang zijn lokaal en op staging geaccepteerd in Release 14 fase A tot en met D. Fase E koppelt
+de bestaande analytics-meetkwaliteit optioneel aan het onboardingresultaat. End-to-end
+gebruikersacceptatie volgt daarna afzonderlijk.
 
 ## Doel
 

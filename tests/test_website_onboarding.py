@@ -405,6 +405,8 @@ def test_onboarding_exposes_progress_and_advances_to_results() -> None:
         assert resumed.first_crawl_discovered_urls == 15
         assert resumed.first_crawl_crawled_urls == 12
         assert resumed.first_crawl_failed_urls == 1
+        assert resumed.analytics_quality_status == "not_configured"
+        assert resumed.conversion_insights_reliable is False
 
 
 def test_failed_first_crawl_retries_with_same_job_id() -> None:
@@ -436,3 +438,30 @@ def test_failed_first_crawl_retries_with_same_job_id() -> None:
         assert retried_job.status == "pending"
         assert retried_onboarding.status == "crawl_queued"
         assert db.scalar(select(func.count()).select_from(CrawlJob)) == 1
+
+
+def test_onboarding_only_marks_conversion_insights_reliable_after_quality_check(
+    monkeypatch,
+) -> None:  # type: ignore[no-untyped-def]
+    with SessionLocal() as db:
+        client = _client(db)
+        started = start_website_onboarding(
+            db, client_id=client.id, actor_user_id=None, payload=_payload()
+        )
+        monkeypatch.setattr(
+            "app.services.website_onboarding.analytics_quality_status",
+            lambda _db, _website_id: {
+                "status": "reliable",
+                "source": "matomo",
+                "source_label": "Matomo",
+                "last_checked_at": datetime.now(UTC),
+            },
+        )
+
+        resumed = get_website_onboarding(db, started.id)
+
+        assert resumed.analytics_quality_status == "reliable"
+        assert resumed.analytics_quality_source == "matomo"
+        assert resumed.analytics_quality_source_label == "Matomo"
+        assert resumed.analytics_quality_last_checked_at is not None
+        assert resumed.conversion_insights_reliable is True

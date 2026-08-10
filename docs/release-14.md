@@ -137,3 +137,25 @@ Stagingacceptatie:
 - de synthetische website, onboarding, verificatie, job en crawlrun zijn volledig opgeruimd;
 - API en database bleven gezond op Alembic-head `0063`;
 - definitief gereedsignaal: `release-14-phase-d-staging-ok`.
+
+## Fase E — optionele meetkwaliteit
+
+- technische onboarding en crawling blijven volledig bruikbaar zonder analyticskoppeling;
+- het onboardingresultaat hergebruikt de bestaande GA4/Matomo-meetkwaliteitsstatus;
+- conversie-inzichten krijgen alleen bij status `reliable` het label betrouwbaar;
+- `not_configured`, `insufficient_data`, `attention_needed` en `provisional` krijgen een eerlijke,
+  begrijpelijke toelichting zonder technische details;
+- de gebruiker kan vanuit het resultaat rechtstreeks naar Integraties om bron en leadevents in te
+  stellen;
+- er ontstaat geen tweede kwaliteitsengine of afwijkende bronlogica.
+
+Lokale acceptatie:
+
+- onboarding zonder analytics blijft voltooid en zet `conversion_insights_reliable` op `false`;
+- een bestaande betrouwbare Matomo-controle wordt correct als `reliable` doorgegeven;
+- alle vijf kwaliteitsstatussen hebben een afzonderlijke, begrijpelijke gebruikersmelding;
+- de configuratieactie opent Integraties met dezelfde klant en website geselecteerd;
+- gerichte onboarding-, analytics-, API- en interfacetests zijn geslaagd;
+- de volledige regressiesuite is geslaagd met alleen de bestaande dependencywaarschuwing;
+- Python-linting en JavaScript-syntaxcontrole zijn geslaagd;
+- geen migration nodig: fase E gebruikt de bestaande analyticsrecords en Alembic-head `0063`.

@@ -397,6 +397,7 @@ function renderFirstCrawlProgress(onboarding) {
   $("#first-crawl-progress-bar").style.width = `${percentage}%`;
   $("#retry-first-crawl").classList.toggle("hidden", !failed);
   $("#view-first-results").classList.toggle("hidden", !finished);
+  renderOnboardingMeasurement(onboarding, finished);
   if (finished) {
     $("#first-crawl-progress-title").textContent = "Je eerste inzichten staan klaar";
     $("#first-crawl-progress-message").textContent = status === "partially_succeeded"
@@ -415,6 +416,28 @@ function renderFirstCrawlProgress(onboarding) {
       : "De controle start automatisch. Je hoeft niets meer te doen.";
   }
   $("#first-crawl-progress-metrics").textContent = `${onboarding.first_crawl_discovered_urls || 0} gevonden · ${onboarding.first_crawl_crawled_urls || 0} gecontroleerd · ${onboarding.first_crawl_failed_urls || 0} niet gelukt`;
+}
+
+function renderOnboardingMeasurement(onboarding, visible) {
+  const panel = $("#onboarding-measurement-quality");
+  const configure = $("#configure-onboarding-measurement");
+  panel.classList.toggle("hidden", !visible);
+  configure.classList.toggle("hidden", !visible || onboarding.conversion_insights_reliable);
+  if (!visible) return;
+  const status = onboarding.analytics_quality_status || "not_configured";
+  const labels = {
+    not_configured: ["Technische monitoring is actief", "Analytics is optioneel. Conversie-inzichten worden pas als betrouwbaar getoond nadat je een bron en leadevents hebt ingesteld."],
+    insufficient_data: ["Metingen nog niet gevalideerd", "De analyticsbron is gekoppeld, maar er is nog onvoldoende gecontroleerde historie voor betrouwbare conversie-inzichten."],
+    attention_needed: ["Meetkwaliteit vraagt aandacht", "De meting bevat een sterke afwijking. Technische inzichten blijven beschikbaar; conversieconclusies worden begrensd."],
+    provisional: ["Metingen voorlopig hersteld", "Eén schone controle is voltooid. Nog één schone controle is nodig voor het label betrouwbaar."],
+    reliable: ["Metingen betrouwbaar", "De gekoppelde analyticsbron ondersteunt betrouwbare conversie-inzichten."],
+  };
+  const [title, message] = labels[status] || labels.insufficient_data;
+  $("#onboarding-measurement-title").textContent = onboarding.analytics_quality_source_label ? `${onboarding.analytics_quality_source_label}: ${title}` : title;
+  $("#onboarding-measurement-message").textContent = message;
+  $("#onboarding-measurement-evidence").textContent = onboarding.analytics_quality_last_checked_at
+    ? `Laatst gecontroleerd op ${new Date(onboarding.analytics_quality_last_checked_at).toLocaleString("nl-NL")}.`
+    : "Deze stap blokkeert de eerste crawl niet.";
 }
 
 function scheduleOnboardingPoll() {
@@ -624,6 +647,13 @@ async function viewFirstOnboardingResults() {
   localStorage.setItem(WEBSITE_STORAGE_KEY, state.websiteOnboarding.website_id);
   await loadClients(state.websiteOnboarding.client_id, state.websiteOnboarding.website_id);
   showView("insights");
+}
+
+async function configureOnboardingMeasurement() {
+  localStorage.setItem(CLIENT_STORAGE_KEY, state.websiteOnboarding.client_id);
+  localStorage.setItem(WEBSITE_STORAGE_KEY, state.websiteOnboarding.website_id);
+  await loadClients(state.websiteOnboarding.client_id, state.websiteOnboarding.website_id);
+  showView("integrations");
 }
 
 async function createWebsite(event) {
@@ -3362,6 +3392,7 @@ $("#first-crawl-preferences").addEventListener("submit", startFirstOnboardingCra
 $("#restart-website-onboarding").addEventListener("click", restartWebsiteOnboarding);
 $("#retry-first-crawl").addEventListener("click", retryFirstOnboardingCrawl);
 $("#view-first-results").addEventListener("click", viewFirstOnboardingResults);
+$("#configure-onboarding-measurement").addEventListener("click", configureOnboardingMeasurement);
 $("#website-form").addEventListener("submit", createWebsite);
 $("#invitation-form").addEventListener("submit", createInvitation);
 $("#invitation-client").addEventListener("change", loadMembers);
