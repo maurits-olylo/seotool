@@ -104,7 +104,7 @@ geen publieke klantingestion.
 
 ## Fase D — observation manifest en exposure-/procesfixture
 
-Status: lokaal geïmplementeerd en getest; stagingacceptatie staat open.
+Status: lokaal geïmplementeerd en op staging geaccepteerd.
 
 - meting start alleen bij expliciete `measurementAllowed: true`;
 - manifestversie, exact paginapad en vervaldatum worden vóór koppeling gevalideerd;
@@ -144,3 +144,18 @@ Eerste stagingpoging:
   dat niet doet, of meer dan 5 ms boven een eveneens lange nulmeting uitkomt;
 - ruwe aantallen en maximale duur voor beide varianten blijven zichtbaar. Het budget blijft nul
   toerekenbare long tasks; alleen de attributiemethode is hersteld.
+
+Definitieve stagingacceptatie:
+
+- twintig gekoppelde nul- en Sensormetingen zijn voltooid;
+- p75 Sensoruitvoering 14,6 ms bij een budget van 25 ms;
+- nul long tasks in zowel nulmeting als Sensorvariant en dus nul toerekenbare long tasks;
+- vijf observations zaten geordend in één same-origin POST;
+- de volgorde was `page_view`, `element_exposure`, `element_interaction`, `process_start` en
+  `process_success`;
+- er zijn geen cookies geplaatst en een dubbele successmelding is geweigerd;
+- API en database bleven gezond;
+- gereedsignaal: `release-13-phase-d-staging-ok`.
+
+Fase D is hiermee afgerond. De fixture bewijst het manifestcontract en de beperkte browserruntime,
+niet een publieke klantinstallatie of productie-ingestion.
