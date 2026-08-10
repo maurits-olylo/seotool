@@ -159,3 +159,16 @@ Lokale acceptatie:
 - de volledige regressiesuite is geslaagd met alleen de bestaande dependencywaarschuwing;
 - Python-linting en JavaScript-syntaxcontrole zijn geslaagd;
 - geen migration nodig: fase E gebruikt de bestaande analyticsrecords en Alembic-head `0063`.
+
+Stagingacceptatie:
+
+- zonder analytics bleef de technische onboarding voltooid en werd betrouwbaarheid niet geclaimd;
+- de toelichting maakte expliciet dat analytics optioneel is en de eerste crawl niet blokkeert;
+- `Meetkwaliteit instellen` opende Integraties met dezelfde website geselecteerd;
+- twee synthetische schone Matomo-controles leverden de bestaande status `reliable` op;
+- `Matomo: Metingen betrouwbaar`, toelichting en laatste controlemoment werden correct getoond;
+- bij betrouwbare metingen verdween de configuratieknop;
+- er werd geen externe analyticsverbinding gemaakt en geen echte website gecrawld;
+- website, onboarding, verificatie, crawldata, meetdata en synthetische verbinding zijn opgeruimd;
+- API en database bleven gezond op Alembic-head `0063`;
+- definitief gereedsignaal: `release-14-phase-e-staging-ok`.
