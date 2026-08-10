@@ -188,7 +188,9 @@ website → Thactual bootstrap → matomo.js → Matomo Tracking API
 ```
 
 De bootstrap laadt siteconfiguratie, consentstatus en manifest en vertaalt alleen toegestane
-observaties naar Matomo pageviews, events, content impressions en goals.
+observaties naar gebatchte Matomo-events. De eerste stagingmeting wees pageviews en directe events
+af omdat zij de requestqueue omzeilden; de adapter gebruikt daarom Matomo's publieke
+`queueRequest`-interface en laat Matomo bezoek- en URL-context toevoegen.
 
 Voordelen:
 
@@ -259,7 +261,7 @@ Optie C is een zinvolle doelarchitectuur, maar niet de kleinste betrouwbare eers
 | EU-beheerbaarheid | goed bij eigen EU-host | volledig eigen | goed, meer componenten |
 | Event flexibility | goed | maximaal | zeer goed |
 | Outcome measurement | goed; trusted pad apart | volledig eigen | zeer goed |
-| Element exposure | content tracking/custom event | volledig eigen | volledig eigen |
+| Element exposure | gebatcht canonical event | volledig eigen | volledig eigen |
 | Form/process tracking | goed met allowlist | volledig eigen | zeer goed |
 | SPA support | volwassen | zelf bouwen | zelf bouwen |
 | First-party support | proxy/config nodig | native | native |
@@ -813,7 +815,7 @@ Kafka, Kubernetes of eigen distributed eventplatform.
 3. Is tijdelijke sessieopslag juridisch en methodologisch toegestaan of blijft de pilot volledig
    sessionless/cookieless?
 4. Welke raw-retentie is minimaal nodig voor Matomo-archivering en debugging?
-5. Kan Matomo content tracking het manifest-exposurecontract voldoende zuiver dragen?
+5. Blijft de gebatchte canonical eventmapping ook bij langere sessies volledig en geordend?
 6. Welke harde performance-uitkomst dwingt overgang van A naar C af?
 7. Welke ondersteunde stack krijgt als eerste de automatische Gateway-installatie?
 8. Welke serverintegratie kan als eerste trusted outcome leveren?

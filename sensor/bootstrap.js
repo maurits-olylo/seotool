@@ -27,25 +27,21 @@
       : null;
     const value = observation.value || {};
 
-    if (observation.name === "page_view") return ["trackPageView"];
-    if (observation.name === "element_exposure") {
-      return ["trackContentImpression", subject, manifestVersion, global.location.pathname];
-    }
-    if (observation.name === "element_interaction") {
-      return [
-        "trackContentInteraction",
-        requireToken(value.interaction_type, "interaction type"),
-        subject,
-        manifestVersion,
-        global.location.pathname,
-      ];
-    }
-    return [
-      "trackEvent",
-      "thactual_sensor",
-      observation.name,
-      subject || requireToken(value.duration_bucket || value.status, "event value"),
-    ];
+    const detail =
+      subject ||
+      (observation.name === "page_view"
+        ? "page"
+        : requireToken(
+            value.duration_bucket || value.status || value.interaction_type,
+            "event value",
+          ));
+    const eventName = `${manifestVersion}:${detail}`;
+    const parameters = new URLSearchParams({
+      e_c: "thactual_sensor",
+      e_a: observation.name,
+      e_n: eventName,
+    });
+    return ["queueRequest", parameters.toString()];
   }
 
   function initialize(config) {

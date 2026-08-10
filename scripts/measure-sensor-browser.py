@@ -19,7 +19,20 @@ def percentile_75(values: list[float]) -> float:
 def measure_once(browser: Any, matomo_source: str, bootstrap_source: str) -> dict[str, Any]:
     context = browser.new_context(service_workers="block")
     page = context.new_page()
-    requests: list[str] = []
+    requests: list[dict[str, int | str]] = []
+
+    def record_tracking_request(request: Any) -> None:
+        if "/thactual/observe" not in request.url:
+            return
+        batch_size = 1
+        try:
+            payload = request.post_data_json
+            if isinstance(payload, dict) and isinstance(payload.get("requests"), list):
+                batch_size = len(payload["requests"])
+        except Exception:  # noqa: BLE001 - diagnostics must not inspect or expose invalid payloads
+            pass
+        requests.append({"method": request.method, "batch_size": batch_size})
+
     page.route(
         "**/*",
         lambda route: route.fulfill(
@@ -28,12 +41,7 @@ def measure_once(browser: Any, matomo_source: str, bootstrap_source: str) -> dic
             body=FIXTURE_HTML if route.request.url == FIXTURE_URL else "ok",
         ),
     )
-    page.on(
-        "request",
-        lambda request: (
-            requests.append(request.url) if "/thactual/observe" in request.url else None
-        ),
-    )
+    page.on("request", record_tracking_request)
     page.goto(FIXTURE_URL, wait_until="domcontentloaded")
     page.evaluate(
         """
@@ -83,6 +91,8 @@ def measure_once(browser: Any, matomo_source: str, bootstrap_source: str) -> dic
         "execution_ms": round(float(execution_ms), 3),
         "long_tasks": [round(float(duration), 3) for duration in long_tasks],
         "tracking_requests": len(requests),
+        "tracking_methods": sorted({str(request["method"]) for request in requests}),
+        "largest_batch": max((int(request["batch_size"]) for request in requests), default=0),
     }
 
 
@@ -109,12 +119,16 @@ def main() -> None:
 
     execution = [float(result["execution_ms"]) for result in results]
     requests = [int(result["tracking_requests"]) for result in results]
+    methods = sorted({method for result in results for method in result["tracking_methods"]})
+    batch_sizes = [int(result["largest_batch"]) for result in results]
     long_tasks = [duration for result in results for duration in result["long_tasks"]]
     summary = {
         "runs": len(results),
         "execution_ms_median": round(median(execution), 3),
         "execution_ms_p75": round(percentile_75(execution), 3),
         "tracking_requests_max": max(requests),
+        "tracking_methods": methods,
+        "largest_batch_min": min(batch_sizes),
         "long_tasks_at_least_50ms": sum(duration >= 50 for duration in long_tasks),
         "budget": {
             "execution_ms_p75_max": 25,

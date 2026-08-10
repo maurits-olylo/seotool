@@ -29,12 +29,16 @@ def test_adapter_maps_canonical_observations_at_provider_edge() -> None:
     )
     success = observation_to_matomo_command(_observation())
 
-    assert page.name == "trackPageView"
-    assert page.arguments == ()
-    assert exposure.name == "trackContentImpression"
-    assert exposure.arguments[:2] == ("primary_cta", "2026-08-10.1")
-    assert success.name == "trackEvent"
-    assert success.arguments == ("thactual_sensor", "process_success", "quote_form")
+    assert page.name == "queueRequest"
+    assert page.arguments == ("e_c=thactual_sensor&e_a=page_view&e_n=2026-08-10.1%3Apage",)
+    assert exposure.name == "queueRequest"
+    assert exposure.arguments == (
+        "e_c=thactual_sensor&e_a=element_exposure&e_n=2026-08-10.1%3Aprimary_cta",
+    )
+    assert success.name == "queueRequest"
+    assert success.arguments == (
+        "e_c=thactual_sensor&e_a=process_success&e_n=2026-08-10.1%3Aquote_form",
+    )
 
 
 def test_bootstrap_uses_same_origin_cookieless_bounded_configuration() -> None:
@@ -53,7 +57,7 @@ def test_bootstrap_maps_only_allowlisted_events_in_node() -> None:
     runner = """
 const fs = require('fs');
 const vm = require('vm');
-const context = {window: {location: {pathname: '/offerte'}}};
+const context = {window: {location: {pathname: '/offerte'}}, URLSearchParams};
 vm.createContext(context);
 vm.runInContext(fs.readFileSync('sensor/bootstrap.js', 'utf8'), context);
 const sensor = context.window.ThactualSensorBootstrap.initialize({
@@ -80,8 +84,14 @@ process.stdout.write(JSON.stringify({queue: context.window._paq, rejected}));
 
     assert result["rejected"] is True
     assert ["setTrackerUrl", "/thactual/observe"] in result["queue"]
-    assert ["trackContentImpression", "primary_cta", "v1", "/offerte"] in result["queue"]
-    assert ["trackEvent", "thactual_sensor", "process_start", "quote_form"] in result["queue"]
+    assert [
+        "queueRequest",
+        "e_c=thactual_sensor&e_a=element_exposure&e_n=v1%3Aprimary_cta",
+    ] in result["queue"]
+    assert [
+        "queueRequest",
+        "e_c=thactual_sensor&e_a=process_start&e_n=v1%3Aquote_form",
+    ] in result["queue"]
 
 
 def test_pinned_client_measurement_is_reproducible(tmp_path: Path) -> None:

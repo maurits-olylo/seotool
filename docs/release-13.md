@@ -44,8 +44,9 @@ nog open.
 - Matomo JavaScript tracker `5.10.0` is als externe proefartifact gepind op versie en SHA-256;
 - de externe client wordt nog niet in de repository of productie-image opgenomen;
 - de 67.976-byte client is reproduceerbaar gemeten op 22.078 bytes met deterministische gzip;
-- de Thactual-bootstrap is 2.351 bytes onbewerkt en 882 bytes gecomprimeerd;
-- het gecombineerde resultaat is 22.960 bytes en blijft binnen het budget van 50.000 bytes;
+- de Thactual-bootstrap is na transportoptimalisatie 2.173 bytes onbewerkt en 872 bytes
+  gecomprimeerd;
+- het gecombineerde resultaat is 22.950 bytes en blijft binnen het budget van 50.000 bytes;
 - de bootstrap gebruikt uitsluitend `/thactual/observe`, schakelt cookies en Matomo-
   performancetracking uit en activeert geen generieke content-, link- of DOM-tracking;
 - canonical observations worden alleen aan de adapterrand naar Matomo-events of contentacties
@@ -66,3 +67,14 @@ Lokale acceptatie:
 Fase C is pas afgerond nadat dezelfde gepinde externe client in de staging-renderworker twintig
 keer binnen het browserbudget is gemeten. Een succesvolle spike is geen besluit om Matomo al te
 deployen of publieke Gatewayroutes te openen.
+
+Eerste stagingmeting:
+
+- twintig runs, p75 uitvoering 22,5 ms en geen long tasks: geslaagd;
+- maximaal vier trackingrequests bij een budget van twee: afgewezen;
+- oorzaak in de gepinde Matomo-client: pageviews en gewone events omzeilen de interne bulkqueue;
+  contentobservaties gebruiken die queue wel;
+- correctie: alle canonical Sensor-observaties lopen via Matomo's publieke `queueRequest`-methode
+  als gesloten Sensor-events. Hierdoor blijven bezoek- en URL-context door Matomo verrijkt, terwijl
+  de vijf proefobservaties als één bulk-POST kunnen worden verzonden;
+- de herhaalmeting rapporteert alleen methode, requestaantal en batchgrootte en logt geen payload.
