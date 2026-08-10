@@ -1,7 +1,7 @@
 # Release 13 — Thactual Sensor
 
-Status: fasen A tot en met D lokaal en op staging geaccepteerd; fase E lokaal geïmplementeerd en
-klaar voor stagingacceptatie. Er is nog geen publieke Gateway- of Matomo-productiedeployment.
+Status: fasen A tot en met E lokaal en op staging geaccepteerd. Er is nog geen publieke Gateway-
+of Matomo-productiedeployment.
 
 ## Fase A — architecture discovery
 
@@ -162,7 +162,7 @@ niet een publieke klantinstallatie of productie-ingestion.
 
 ## Fase E — dagelijkse aggregaten, meetkwaliteit en intelligence
 
-Status: lokaal geïmplementeerd en getest; stagingacceptatie staat open.
+Status: lokaal geïmplementeerd en op staging geaccepteerd.
 
 - vier additive tabellen leggen manifestversies, outcome-definities, dagelijkse URL-aggregaten en
   periodieke measurement state vast;
@@ -189,3 +189,16 @@ Lokale acceptatie:
 
 De stagingfixture maakt een synthetische website met 28 meetdagen, bewijst reliable quality,
 opportunityverrijking en niet-causale effectevidence, en verwijdert alle synthetische data daarna.
+
+Definitieve stagingacceptatie:
+
+- database is lineair gemigreerd naar `0061`;
+- measurement state werd `reliable` met één verwachte en één waargenomen pagina;
+- bestaande opportunity-intelligence is met gedragsbewijs verrijkt;
+- effectevidence bleef expliciet niet-causaal;
+- de fixture heeft alle synthetische gegevens aantoonbaar verwijderd;
+- API en database bleven gezond;
+- gereedsignaal: `release-13-phase-e-staging-ok`.
+
+Fase E is hiermee afgerond. Fase F toetst de operationele staginggrenzen voor performance,
+verwijdering en misbruik; zij opent nog geen friends-and-family-deployment.
