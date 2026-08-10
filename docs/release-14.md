@@ -1,7 +1,6 @@
 # Release 14 — Invitation-only onboarding
 
-Status: fase A lokaal en op staging geaccepteerd; fase B lokaal geaccepteerd en nog niet op staging
-of productie gedeployed.
+Status: fase A en B lokaal en op staging geaccepteerd; nog niet op productie gedeployed.
 
 ## Doel
 
@@ -64,3 +63,13 @@ Lokale acceptatie:
 - volledige regressiesuite geslaagd met alleen de bestaande dependencywaarschuwing;
 - Python-linting, formattingcontrole en JavaScript-syntaxcontrole geslaagd;
 - geen migration nodig: fase B gebruikt de persistente modellen uit `0062`.
+
+Stagingacceptatie:
+
+- tokenvernieuwing vervangt aantoonbaar de oude hash en reset de pogingsteller;
+- uitsluitend de hash blijft opgeslagen en het token komt niet in blijvende browseropslag;
+- vóór verificatie worden nul crawljobs aangemaakt;
+- de begeleide interface en hervatten na refresh zijn aanwezig;
+- de synthetische fixture is volledig opgeruimd;
+- API en database zijn gezond en Alembic staat op `0062`;
+- definitief gereedsignaal: `release-14-phase-b-staging-ok`.
