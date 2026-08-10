@@ -70,6 +70,7 @@ Stagingacceptatie:
 - uitsluitend de hash blijft opgeslagen en het token komt niet in blijvende browseropslag;
 - vóór verificatie worden nul crawljobs aangemaakt;
 - de begeleide interface en hervatten na refresh zijn aanwezig;
+- desktop- en mobiele browserweergave zijn helder, toegankelijk en vrij van consolefouten;
 - de synthetische fixture is volledig opgeruimd;
 - API en database zijn gezond en Alembic staat op `0062`;
 - definitief gereedsignaal: `release-14-phase-b-staging-ok`.
