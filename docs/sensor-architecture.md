@@ -496,16 +496,41 @@ Businesslogica leest capabilities en coverage, nooit Matomo event category/actio
 
 ## 25. First-party architecture
 
-Een first-party klantendpoint is nuttig tegen blokkering en voor duidelijke datastroom, maar niet
-gratis. GTM installeert code; het maakt geen reverse proxy.
+Een **Thactual Gateway** op dezelfde origin als de gemeten website is een harde voorwaarde voor de
+Sensor-pilot. Een CNAME of analytics-subdomein is first-party in sommige cookiedefinities, maar is
+niet same-origin en kan nog steeds als bekende trackingroute worden behandeld. De browser mag
+daarom uitsluitend lokale paden zien, bijvoorbeeld:
 
-Pilotvolgorde:
+```text
+https://www.example.com/thactual/sensor.js
+https://www.example.com/thactual/observe
+```
 
-1. direct EU Sensor/Matomo-endpoint met correcte CORS en consent;
-2. optionele WordPress- of reverse-proxyroute bij één gecontroleerde klant;
-3. pas standaardiseren na gemeten verschil in dekking, beheerlast en performance.
+De Gateway levert het gepinde script en stuurt toegestane observations server-side door naar de
+EU Sensor/Matomo-backend. Matomo-hostnamen, eventnamen en credentials worden nooit onderdeel van
+de publieke installatie. Een eventuele cookie wordt uitsluitend host-only op de website-origin
+gezet; de standaard blijft cookieless zonder persistent visitor-ID.
 
-Een first-party route verandert browsertrust niet in servertrust.
+Het installatiecontract is voor iedere ondersteunde stack gelijk:
+
+1. installeer één Thactual-plugin, app of beheerde reverse-proxymodule;
+2. koppel de website met een eenmalige sitegebonden autorisatie;
+3. laat Thactual scriptpad, observationpad, forwarding, caching en consentconfiguratie aanmaken;
+4. rond af met één automatische live verificatie.
+
+De installatietest slaagt alleen wanneer script en observations exact via de website-origin lopen,
+geen third-party browserrequest ontstaat, forwarding werkt en caching, batching en deduplicatie
+correct zijn. Handmatige Matomo-eventconfiguratie per pagina is niet toegestaan.
+
+Dit contract schermt de meetengine af: een latere overgang van optie A naar C verandert de
+klantinstallatie niet. Per stack mag de implementatie verschillen, maar maatwerk per klant is geen
+acceptabele standaardroute. Begin met één volledig ondersteunde stack; voeg een volgende stack pas
+toe met dezelfde automatische installatie- en verificatietest.
+
+De garantie geldt voor browserclassificatie volgens het same-originmodel. Geen product kan
+garanderen dat iedere extensie, filterlijst of beveiligingsoplossing een first-party pad nooit
+blokkeert. Een first-party route verandert browsertrust bovendien niet in servertrust; forwarding
+blijft onder het anti-abusecontract vallen.
 
 ## 26. Anti-abuse and trust
 
@@ -558,14 +583,23 @@ een annotatie bij dalingen en effectvensters.
 
 Pilotgate per representatieve mobiele pagina:
 
-- exacte compressed en uncompressed scriptbytes rapporteren; geen vooraf verzonnen limiet;
-- maximaal één initiële trackingrequest plus gebatchte noodzakelijke observations;
+- bootstrap plus gepinde Matomo-client maximaal 50 KB gecomprimeerd op eerste bezoek;
+- Sensor-uitvoering maximaal 25 ms totale main-threadtijd;
+- maximaal één initiële trackingrequest plus één gebatchte vervolgrequest in de normale flow;
+- maximaal 10 KB observationpayload per normale sessie;
 - geen permanente polling of generieke MutationObserver;
 - maximaal één IntersectionObserver per pagina;
 - geen long task van 50 ms of meer toe te schrijven aan Sensor;
-- p75 INP/LCP/CLS met en zonder Sensor vergelijken;
+- p75 INP-verslechtering maximaal 10 ms en maximaal 5 procent;
+- p75 LCP-verslechtering maximaal 50 ms en CLS-delta maximaal 0,001;
 - main-threadtijd, geheugen, requestcount en bytes als releasebewijs bewaren;
-- bij meetbare relevante verslechtering: pilot niet uitbreiden.
+- minimaal 99 procent aflevering van verplichte observations in de gecontroleerde proef;
+- minder dan 0,5 procent duplicaten en minimaal 98 procent succesvolle manifest-/elementkoppeling.
+
+Beoordeel deze grenzen met reproduceerbare vergelijkingen op representatieve pagina's en apparaten,
+niet met één Lighthouse-run. Gebruik voor de pilot minimaal twintig vergelijkende labruns en daarna
+twee weken veldmetingen; de p75 is leidend. Een herhaalde harde overschrijding na normale
+optimalisatie blokkeert uitbreiding van de pilot.
 
 Een eigen client mag pas als “lichter” worden aangemerkt na dezelfde reproduceerbare meting tegen
 de gekozen Matomo-configuratie.
@@ -670,12 +704,17 @@ C is strategisch beter wanneer minstens één van deze punten empirisch geldt:
 - meerdere backendengines moeten op korte termijn worden ondersteund;
 - direct Matomo-ingestion is operationeel of juridisch niet beheersbaar.
 
+Daarnaast vervalt optie A wanneer zij niet achter de gestandaardiseerde same-origin Thactual
+Gateway kan draaien of per klant handmatige Matomo-inrichting vereist. Eenvoudige installatie en
+same-origin levering zijn dus even harde gates als performance en meetbetrouwbaarheid.
+
 Zonder dat bewijs is C meer structurele complexiteit dan productwaarde.
 
 ## 37. Recommended architecture
 
 De aanbeveling is **A voor de pilot, ontworpen met een C-compatibele grens**:
 
+- verplichte same-origin Thactual Gateway als stabiel klantcontract;
 - eigen observation vocabulary en manifest;
 - kleine Thactual-bootstrap rond een gepinde Matomo-client;
 - Matomo als raw/processing/archive engine;
@@ -776,7 +815,7 @@ Kafka, Kubernetes of eigen distributed eventplatform.
 4. Welke raw-retentie is minimaal nodig voor Matomo-archivering en debugging?
 5. Kan Matomo content tracking het manifest-exposurecontract voldoende zuiver dragen?
 6. Welke harde performance-uitkomst dwingt overgang van A naar C af?
-7. Is een first-party proxy voor de eerste klant operationeel haalbaar zonder maatwerk per stack?
+7. Welke ondersteunde stack krijgt als eerste de automatische Gateway-installatie?
 8. Welke serverintegratie kan als eerste trusted outcome leveren?
 
 ## 44. Decision
@@ -784,8 +823,10 @@ Kafka, Kubernetes of eigen distributed eventplatform.
 De kernvraag wordt voor de pilot als volgt beantwoord:
 
 > De kleinste betrouwbare observatielaag is voorlopig een streng begrensde Matomo-client en
-> EU-Matomo-backend achter een eigen Thactual vocabulary, manifest en aggregate adapter. Bouw de
-> eigen ingestion/client van optie C pas nadat meetbewijs aantoont dat deze extra complexiteit een
-> concreet probleem oplost.
+> EU-Matomo-backend achter een verplichte same-origin Thactual Gateway, eigen vocabulary, manifest
+> en aggregate adapter. Optie A blijft alleen geldig wanneer installatie via één ondersteunde
+> module automatisch en zonder klantspecifieke Matomo-configuratie verloopt. Bouw de eigen
+> ingestion/client van optie C zodra performance, meetbetrouwbaarheid of dit installatiecontract
+> aantoonbaar niet wordt gehaald.
 
 Leidend principe: **collect less, observe better, interpret in Thactual**.
