@@ -1,7 +1,6 @@
 # Release 14 — Invitation-only onboarding
 
-Status: fase A, B en C lokaal en op staging geaccepteerd; fase D lokaal gereed; nog niet op
-productie gedeployed.
+Status: fase A tot en met D lokaal en op staging geaccepteerd; nog niet op productie gedeployed.
 
 ## Doel
 
@@ -126,6 +125,15 @@ Lokale acceptatie:
 - voortgang, eindstatus, foutstatus en hergebruik van hetzelfde job-ID zijn afgedekt;
 - geen migration nodig: fase D gebruikt de bestaande modellen en Alembic-head `0063`.
 
-Stagingacceptatie moet nog aantonen dat een echte eerste crawl zichtbaar van wachtrij via uitvoering
-naar eerste inzichten gaat, na refresh verder loopt en na een gecontroleerde fout met hetzelfde
-job-ID kan worden hervat.
+Stagingacceptatie:
+
+- dezelfde synthetische crawljob werd zichtbaar hervat na een volledige paginaverversing;
+- de fase `sitemap_import` verscheen begrijpelijk als `Sitemap wordt gelezen`;
+- gevonden, gecontroleerde en mislukte aantallen werden correct bijgewerkt;
+- gedeeltelijk succes opende `Bekijk eerste inzichten` en selecteerde de juiste website;
+- een gecontroleerde fout gaf een begrijpelijke herstelmelding en alleen `Opnieuw proberen`;
+- veilig opnieuw proberen hergebruikte aantoonbaar hetzelfde job-ID en maakte nul duplicaten;
+- er werd geen echte website gecrawld en niets naar Redis gestuurd tijdens de fixtureproef;
+- de synthetische website, onboarding, verificatie, job en crawlrun zijn volledig opgeruimd;
+- API en database bleven gezond op Alembic-head `0063`;
+- definitief gereedsignaal: `release-14-phase-d-staging-ok`.
