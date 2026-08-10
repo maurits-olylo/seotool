@@ -1,6 +1,7 @@
 # Release 13 — Thactual Sensor
 
-Status: fasen A en B lokaal afgerond; nog niet op staging of productie gedeployed.
+Status: fasen A en B lokaal afgerond; fase C lokaal en op staging geaccepteerd. Er is nog geen
+publieke Gateway- of Matomo-productiedeployment.
 
 ## Fase A — architecture discovery
 
@@ -38,8 +39,7 @@ Lokale acceptatie:
 
 ## Fase C — synthetische Matomo-backed measurement spike
 
-Status: lokaal geïmplementeerd en getest; browsermeting in de bestaande staging-renderworker staat
-nog open.
+Status: lokaal geïmplementeerd en op staging geaccepteerd.
 
 - Matomo JavaScript tracker `5.10.0` is als externe proefartifact gepind op versie en SHA-256;
 - de externe client wordt nog niet in de repository of productie-image opgenomen;
@@ -86,3 +86,18 @@ Tweede stagingmeting:
   Matomo-client een JSON-bulkbody verstuurt;
 - de acceptatie leest de POST-body nu expliciet als JSON, bewaart alleen het aantal `requests` en
   vereist minimaal vijf items. Een parsefout levert nul op en kan dus niet meer onterecht slagen.
+
+Definitieve stagingacceptatie:
+
+- Matomo-client `5.10.0` en SHA-256 zijn opnieuw geverifieerd;
+- twintig Chromium-runs zijn uitgevoerd in de bestaande staging-renderworker;
+- p75 uitvoering 16,9 ms bij een budget van 25 ms;
+- vijf observations zaten in iedere gemeten bulkbatch;
+- maximaal één trackingrequest, uitsluitend via POST;
+- geen Sensor-long-task van minimaal 50 ms;
+- API en database bleven gezond;
+- gereedsignaal: `release-13-phase-c-batch-ok`.
+
+Daarmee is optie A voor deze synthetische scope niet door performance of batching afgewezen. De
+volgende fase toetst het observation manifest en één echte exposure-/procesfixture; zij opent nog
+geen publieke klantingestion.

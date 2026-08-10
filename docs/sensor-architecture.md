@@ -750,7 +750,7 @@ Release 13 bestaat uit afzonderlijke gates:
 
 - A — dit architectuurdocument; lokaal afgerond;
 - B — capabilitycontract, schema en privacy/threat model; lokaal afgerond;
-- C — synthetische Matomo-backed measurement spike; lokaal gebouwd, stagingmeting open;
+- C — synthetische Matomo-backed measurement spike; lokaal en op staging geaccepteerd;
 - D — observation manifest en één exposure/processfixture;
 - E — Thactual daily aggregates, quality state en intelligencekoppeling;
 - F — stagingacceptatie, performance/deletion/abusetests;
