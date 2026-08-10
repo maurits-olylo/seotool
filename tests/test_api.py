@@ -1,7 +1,7 @@
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -1316,6 +1316,78 @@ def test_superuser_invites_user_for_client(client: TestClient) -> None:
             select(ClientMembership).where(ClientMembership.user_id == member.id)
         )
         assert membership and str(membership.client_id) == customer["id"]
+
+
+def test_invited_admin_can_only_start_onboarding_for_own_client(client: TestClient) -> None:
+    from app.main import app
+
+    own_client = client.post("/api/v1/clients", json={"name": "Invited admin owner"}).json()
+    other_client = client.post("/api/v1/clients", json={"name": "Other invitation tenant"}).json()
+    with SessionLocal() as db:
+        db.add(
+            User(
+                email="onboarding-owner@example.com",
+                role="superuser",
+                password_hash=hash_password("Owner-secure-password-1!"),
+            )
+        )
+        db.commit()
+
+    owner = TestClient(app)
+    assert owner.post(
+        "/ui/login",
+        json={
+            "email": "onboarding-owner@example.com",
+            "password": "Owner-secure-password-1!",
+        },
+    ).status_code == 204
+    invitation = owner.post(
+        "/api/v1/invitations",
+        json={
+            "email": "invited-onboarding-admin@example.com",
+            "client_id": own_client["id"],
+            "role": "admin",
+        },
+    )
+    assert invitation.status_code == 201
+    token = invitation.json()["accept_path"].split("token=", maxsplit=1)[1]
+    invited = TestClient(app)
+    assert invited.post(
+        f"/api/v1/invitations/{token}/accept",
+        json={"password": "Invited-admin-password-1!"},
+    ).status_code == 204
+
+    own_onboarding = invited.post(
+        f"/api/v1/website-onboarding/clients/{own_client['id']}",
+        json={
+            "request_id": str(uuid4()),
+            "website_name": "Invited admin website",
+            "base_url": "https://invited-admin.example.test/",
+        },
+    )
+    forbidden = invited.post(
+        f"/api/v1/website-onboarding/clients/{other_client['id']}",
+        json={
+            "request_id": str(uuid4()),
+            "website_name": "Forbidden tenant website",
+            "base_url": "https://forbidden-tenant.example.test/",
+        },
+    )
+
+    assert own_onboarding.status_code == 201
+    assert forbidden.status_code == 403
+    resumed = invited.get(f"/api/v1/website-onboarding/{own_onboarding.json()['id']}")
+    assert resumed.status_code == 200
+
+
+def test_admin_invitation_opens_guided_onboarding() -> None:
+    root = Path(__file__).resolve().parents[1]
+    page = (root / "app/ui/invitation.html").read_text()
+    script = (root / "app/ui/invitation.js").read_text()
+
+    assert "invitation.js?v=20260810-1" in page
+    assert 'invitationRole === "admin"' in script
+    assert '"/app#instellingen/klanten-websites"' in script
 
 
 def test_issue_detail_exposes_evidence_and_updates_status(client: TestClient) -> None:

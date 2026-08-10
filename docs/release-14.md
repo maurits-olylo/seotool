@@ -172,3 +172,26 @@ Stagingacceptatie:
 - website, onboarding, verificatie, crawldata, meetdata en synthetische verbinding zijn opgeruimd;
 - API en database bleven gezond op Alembic-head `0063`;
 - definitief gereedsignaal: `release-14-phase-e-staging-ok`.
+
+## Fase F — invitation-only end-to-end toegang
+
+- een door de superuser uitgenodigde organisatiebeheerder landt na accountactivatie direct in de
+  begeleide websitewizard;
+- gewone gebruikers en rapportageklanten behouden hun bestaande landingspagina en bevoegdheden;
+- server-side tenantautorisatie blijft bepalend: een beheerder kan alleen binnen de toegewezen
+  organisatie een onboarding starten of hervatten;
+- de eenmalige uitnodigingslink, wachtwoordregels, sessiecookie en MFA-verplichting blijven
+  ongewijzigd;
+- de flow vraagt geen terminal- of databasehandeling van de uitgenodigde gebruiker.
+
+Lokale acceptatie:
+
+- een superuser kan een organisatiebeheerder uitnodigen en de uitnodiging blijft eenmalig;
+- na activatie verwijst de interface een beheerder rechtstreeks naar de begeleide websitewizard;
+- de uitgenodigde beheerder kan binnen de eigen organisatie een onboarding starten en hervatten;
+- dezelfde beheerder krijgt `403` bij een onboardingpoging voor een andere organisatie;
+- bestaande bestemmingen en rechten voor `user` en `client` blijven ongewijzigd;
+- gerichte uitnodigings-, sessie-, onboarding- en tenanttests zijn geslaagd;
+- de volledige regressiesuite is geslaagd met alleen de bestaande dependencywaarschuwing;
+- Python-linting en JavaScript-syntaxcontrole zijn geslaagd;
+- geen migration nodig: fase F gebruikt de bestaande uitnodigings- en lidmaatschapsmodellen.

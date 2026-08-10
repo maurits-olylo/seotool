@@ -2,8 +2,9 @@
 
 Status: websiteverificatie, begeleide verificatie, de veilige eerste crawl en begrijpelijke
 voortgang zijn lokaal en op staging geaccepteerd in Release 14 fase A tot en met D. Fase E koppelt
-de bestaande analytics-meetkwaliteit optioneel aan het onboardingresultaat. End-to-end
-gebruikersacceptatie volgt daarna afzonderlijk.
+de bestaande analytics-meetkwaliteit optioneel aan het onboardingresultaat en is lokaal en op
+staging geaccepteerd. Fase F verbindt de uitnodiging direct met de wizard en bereidt de afzonderlijke
+end-to-end gebruikersacceptatie voor.
 
 ## Doel
 

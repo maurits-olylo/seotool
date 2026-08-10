@@ -1,5 +1,6 @@
 const token = new URLSearchParams(window.location.search).get("token");
 const message = document.querySelector("#invitation-message");
+let invitationRole = null;
 
 async function loadInvitation() {
   if (!token) { message.textContent = "Deze uitnodigingslink is ongeldig."; return; }
@@ -9,6 +10,7 @@ async function loadInvitation() {
     return;
   }
   const invitation = await response.json();
+  invitationRole = invitation.role;
   document.querySelector("#invitation-email").textContent = invitation.email;
 }
 
@@ -27,7 +29,8 @@ document.querySelector("#invitation-form").addEventListener("submit", async (eve
   if (response.ok) {
     message.className = "success";
     message.textContent = "Account is geactiveerd. Je wordt nu ingelogd…";
-    window.setTimeout(() => window.location.assign("/app"), 900);
+    const destination = invitationRole === "admin" ? "/app#instellingen/klanten-websites" : "/app";
+    window.setTimeout(() => window.location.assign(destination), 900);
     return;
   }
   const payload = await response.json().catch(() => ({}));
