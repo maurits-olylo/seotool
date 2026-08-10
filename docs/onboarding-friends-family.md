@@ -2,8 +2,9 @@
 
 Status: de persistente website-onboarding en HTTPS-eigendomsverificatiefundering zijn lokaal en op
 staging geaccepteerd in Release 14 fase A. De begeleide verificatie-interface en veilige
-tokenvernieuwing zijn lokaal en op staging geaccepteerd in fase B. Eerste crawl en end-to-end
-gebruikersacceptatie volgen in afzonderlijke fasen.
+tokenvernieuwing zijn lokaal en op staging geaccepteerd in fase B. De veilige, idempotente eerste
+crawl is lokaal geaccepteerd in fase C en wacht nog op stagingacceptatie. Begrijpelijke voortgang
+en end-to-end gebruikersacceptatie volgen in afzonderlijke fasen.
 
 ## Doel
 

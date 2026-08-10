@@ -8,6 +8,8 @@ from app.core.security import Principal, require_api_key
 from app.db.session import get_db
 from app.models.onboarding import WebsiteOnboarding
 from app.schemas.onboarding import (
+    WebsiteOnboardingCrawlPreferences,
+    WebsiteOnboardingFirstCrawlRead,
     WebsiteOnboardingRead,
     WebsiteOnboardingStart,
     WebsiteVerificationCheckRead,
@@ -17,6 +19,7 @@ from app.services.website_onboarding import (
     check_website_ownership,
     get_website_onboarding,
     renew_website_verification_file,
+    start_first_onboarding_crawl,
     start_website_onboarding,
 )
 
@@ -105,6 +108,41 @@ def download_new_verification_file(
             "Cache-Control": "no-store",
             "Content-Disposition": 'attachment; filename="thactual-verification.txt"',
         },
+    )
+
+
+@router.post(
+    "/{onboarding_id}/first-crawl",
+    response_model=WebsiteOnboardingFirstCrawlRead,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def start_first_crawl(
+    onboarding_id: UUID,
+    payload: WebsiteOnboardingCrawlPreferences,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> WebsiteOnboardingFirstCrawlRead:
+    onboarding = _authorized_onboarding(db, principal, onboarding_id, admin=True)
+    try:
+        onboarding, job = start_first_onboarding_crawl(
+            db,
+            onboarding.id,
+            actor_user_id=principal.user_id,
+            preferences=payload,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return WebsiteOnboardingFirstCrawlRead(
+        onboarding_id=onboarding.id,
+        website_id=onboarding.website_id,
+        crawl_job_id=job.id,
+        status=onboarding.status,
+        current_step=onboarding.current_step,
+        queue_status=job.status,
     )
 
 

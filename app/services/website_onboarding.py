@@ -8,9 +8,20 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
+from app.core.queue import crawl_queue_name, enqueue_crawl_job
+from app.models.discovery import CrawlJob
 from app.models.onboarding import WebsiteOnboarding, WebsiteOwnershipVerification
 from app.models.website import Website, WebsiteSettings
-from app.schemas.onboarding import WebsiteOnboardingRead, WebsiteOnboardingStart
+from app.schemas.onboarding import (
+    WebsiteOnboardingCrawlPreferences,
+    WebsiteOnboardingRead,
+    WebsiteOnboardingStart,
+)
+from app.services.crawl_deployment import (
+    crawl_deployment_is_active,
+    pause_job_if_deployment_active,
+)
 from app.services.http_crawler import CrawlError, fetch_url
 from app.services.security_audit import record_security_event
 
@@ -88,7 +99,10 @@ def get_website_onboarding(db: Session, onboarding_id: UUID) -> WebsiteOnboardin
     onboarding = db.get(WebsiteOnboarding, onboarding_id)
     if onboarding is None:
         raise LookupError("Website onboarding not found")
-    return _read(onboarding, _verification(db, onboarding.id))
+    first_crawl_job = (
+        db.get(CrawlJob, onboarding.first_crawl_job_id) if onboarding.first_crawl_job_id else None
+    )
+    return _read(onboarding, _verification(db, onboarding.id), first_crawl_job=first_crawl_job)
 
 
 def renew_website_verification_file(
@@ -128,6 +142,82 @@ def renew_website_verification_file(
     )
     db.commit()
     return f"{VERIFICATION_PREFIX}{token}"
+
+
+def start_first_onboarding_crawl(
+    db: Session,
+    onboarding_id: UUID,
+    *,
+    actor_user_id: UUID | None,
+    preferences: WebsiteOnboardingCrawlPreferences,
+) -> tuple[WebsiteOnboarding, CrawlJob]:
+    onboarding = db.scalar(
+        select(WebsiteOnboarding).where(WebsiteOnboarding.id == onboarding_id).with_for_update()
+    )
+    if onboarding is None:
+        raise LookupError("Website onboarding not found")
+    if onboarding.first_crawl_job_id is not None:
+        existing_job = db.get(CrawlJob, onboarding.first_crawl_job_id)
+        if existing_job is None:
+            raise LookupError("First onboarding crawl not found")
+        return onboarding, existing_job
+    verification = _verification(db, onboarding.id, lock=True)
+    if verification.status != "verified":
+        raise ValueError("Verifieer eerst het website-eigendom")
+    if crawl_deployment_is_active(db):
+        raise RuntimeError("Crawls zijn tijdelijk gepauzeerd voor deployment")
+
+    website = db.get(Website, onboarding.website_id)
+    if website is None:
+        raise LookupError("Onboarding website not found")
+    website_settings = website.settings or WebsiteSettings(website_id=website.id)
+    for key, value in preferences.model_dump(exclude_none=True).items():
+        setattr(website_settings, key, value)
+    db.add(website_settings)
+    settings_snapshot = {
+        "max_urls": preferences.max_urls,
+        "request_delay_ms": preferences.request_delay_ms,
+        "concurrency": preferences.concurrency,
+        "request_timeout_seconds": website_settings.request_timeout_seconds,
+        "max_response_size": website_settings.max_response_size,
+        "respect_robots_txt": preferences.respect_robots_txt,
+    }
+    job = CrawlJob(
+        website_id=website.id,
+        job_type="full_site_crawl",
+        settings_snapshot=settings_snapshot,
+        queue_name=crawl_queue_name("full_site_crawl"),
+        queue_priority=website_settings.queue_priority,
+    )
+    db.add(job)
+    db.flush()
+    onboarding.first_crawl_job_id = job.id
+    onboarding.status = "crawl_queued"
+    onboarding.current_step = "first_crawl"
+    onboarding.last_error_code = None
+    record_security_event(
+        db,
+        event_type="website_onboarding.first_crawl_created",
+        result="success",
+        summary="Eerste websitecrawl exact eenmaal aangemaakt",
+        actor_user_id=actor_user_id,
+        client_id=onboarding.client_id,
+        target_type="crawl_job",
+        target_id=job.id,
+        details={"job_type": "full_site_crawl"},
+    )
+    db.commit()
+    if get_settings().app_env != "test" and not pause_job_if_deployment_active(db, job):
+        queued = enqueue_crawl_job(
+            str(job.id),
+            job_type=job.job_type,
+            priority=job.queue_priority,
+            website_id=str(job.website_id),
+        )
+        if queued is False:
+            job.status = "waiting_for_capacity"
+            db.commit()
+    return onboarding, job
 
 
 def check_website_ownership(
@@ -220,6 +310,7 @@ def _read(
     verification: WebsiteOwnershipVerification,
     *,
     token: str | None = None,
+    first_crawl_job: CrawlJob | None = None,
 ) -> WebsiteOnboardingRead:
     return WebsiteOnboardingRead(
         id=onboarding.id,
@@ -232,6 +323,8 @@ def _read(
         verification_path=VERIFICATION_PATH,
         verification_expires_at=verification.expires_at,
         verification_file_content=f"{VERIFICATION_PREFIX}{token}" if token else None,
+        first_crawl_job_id=onboarding.first_crawl_job_id,
+        first_crawl_status=first_crawl_job.status if first_crawl_job else None,
     )
 
 

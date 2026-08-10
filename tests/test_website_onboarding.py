@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from pydantic import ValidationError
@@ -10,12 +10,13 @@ from app.models.client import Client
 from app.models.discovery import CrawlJob
 from app.models.onboarding import WebsiteOnboarding, WebsiteOwnershipVerification
 from app.models.website import Website
-from app.schemas.onboarding import WebsiteOnboardingStart
+from app.schemas.onboarding import WebsiteOnboardingCrawlPreferences, WebsiteOnboardingStart
 from app.services.http_crawler import FetchResult
 from app.services.website_onboarding import (
     VERIFICATION_PATH,
     check_website_ownership,
     renew_website_verification_file,
+    start_first_onboarding_crawl,
     start_website_onboarding,
     token_hash,
 )
@@ -252,3 +253,109 @@ def test_verification_file_download_is_not_cached_and_rotates_token(client) -> N
         ]
         is None
     )
+
+
+def test_first_crawl_requires_verification_and_is_created_exactly_once() -> None:
+    with SessionLocal() as db:
+        client = _client(db)
+        started = start_website_onboarding(
+            db, client_id=client.id, actor_user_id=None, payload=_payload()
+        )
+        preferences = WebsiteOnboardingCrawlPreferences(
+            max_urls=2_500,
+            request_delay_ms=400,
+            concurrency=2,
+        )
+        with pytest.raises(ValueError, match="Verifieer eerst"):
+            start_first_onboarding_crawl(
+                db,
+                started.id,
+                actor_user_id=None,
+                preferences=preferences,
+            )
+
+        verification = db.scalar(select(WebsiteOwnershipVerification))
+        assert verification is not None
+        verification.status = "verified"
+        db.commit()
+        first_onboarding, first_job = start_first_onboarding_crawl(
+            db,
+            started.id,
+            actor_user_id=None,
+            preferences=preferences,
+        )
+        repeated_onboarding, repeated_job = start_first_onboarding_crawl(
+            db,
+            started.id,
+            actor_user_id=None,
+            preferences=WebsiteOnboardingCrawlPreferences(max_urls=99_999),
+        )
+
+        assert first_job.id == repeated_job.id
+        assert first_onboarding.first_crawl_job_id == first_job.id
+        assert repeated_onboarding.current_step == "first_crawl"
+        assert db.scalar(select(func.count()).select_from(CrawlJob)) == 1
+        website = db.get(Website, started.website_id)
+        assert website is not None
+        assert website.settings.max_urls == 2_500
+        assert website.settings.request_delay_ms == 400
+        assert website.settings.concurrency == 2
+        assert website.settings.respect_robots_txt is True
+        assert website.settings.sitemap_urls == ["https://fresh.example.test/sitemap.xml"]
+
+
+def test_first_crawl_preferences_always_require_robots_txt() -> None:
+    with pytest.raises(ValidationError, match="Robots.txt respecteren is verplicht"):
+        WebsiteOnboardingCrawlPreferences(respect_robots_txt=False)
+
+
+def test_first_crawl_api_is_idempotent_and_resumable(client) -> None:  # type: ignore[no-untyped-def]
+    customer = client.post("/api/v1/clients", json={"name": "First crawl API client"}).json()
+    started = client.post(
+        f"/api/v1/website-onboarding/clients/{customer['id']}",
+        json={
+            "request_id": str(uuid4()),
+            "website_name": "First crawl API website",
+            "base_url": "https://first-crawl.example.test/",
+        },
+    ).json()
+    with SessionLocal() as db:
+        verification = db.scalar(
+            select(WebsiteOwnershipVerification).where(
+                WebsiteOwnershipVerification.onboarding_id == UUID(started["id"])
+            )
+        )
+        assert verification is not None
+        verification.status = "verified"
+        db.commit()
+
+    payload = {
+        "max_urls": 1_500,
+        "request_delay_ms": 350,
+        "concurrency": 3,
+        "respect_robots_txt": True,
+    }
+    first = client.post(
+        f"/api/v1/website-onboarding/{started['id']}/first-crawl",
+        json=payload,
+    )
+    repeated = client.post(
+        f"/api/v1/website-onboarding/{started['id']}/first-crawl",
+        json=payload,
+    )
+    resumed = client.get(f"/api/v1/website-onboarding/{started['id']}")
+
+    assert first.status_code == 202
+    assert repeated.status_code == 202
+    assert repeated.json()["crawl_job_id"] == first.json()["crawl_job_id"]
+    assert resumed.json()["first_crawl_job_id"] == first.json()["crawl_job_id"]
+    assert resumed.json()["first_crawl_status"] == "pending"
+    with SessionLocal() as db:
+        assert (
+            db.scalar(
+                select(func.count())
+                .select_from(CrawlJob)
+                .where(CrawlJob.website_id == UUID(started["website_id"]))
+            )
+            == 1
+        )

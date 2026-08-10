@@ -13,6 +13,7 @@ class WebsiteOnboarding(UUIDTimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint("client_id", "request_id", name="uq_website_onboarding_request"),
         UniqueConstraint("website_id", name="uq_website_onboarding_website"),
+        UniqueConstraint("first_crawl_job_id", name="uq_website_onboarding_first_crawl_job"),
         CheckConstraint(
             "status IN ('verification_pending', 'verified', 'crawl_queued', 'completed', 'failed')",
             name="ck_website_onboardings_status",
@@ -33,6 +34,9 @@ class WebsiteOnboarding(UUIDTimestampMixin, Base):
         ForeignKey("users.id", ondelete="SET NULL"), index=True
     )
     request_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    first_crawl_job_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("crawl_jobs.id", ondelete="SET NULL"), index=True
+    )
     status: Mapped[str] = mapped_column(String(30), default="verification_pending", index=True)
     current_step: Mapped[str] = mapped_column(String(30), default="verification", index=True)
     last_error_code: Mapped[str | None] = mapped_column(String(50))

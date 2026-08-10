@@ -1,6 +1,7 @@
 # Release 14 — Invitation-only onboarding
 
-Status: fase A en B lokaal en op staging geaccepteerd; nog niet op productie gedeployed.
+Status: fase A en B lokaal en op staging geaccepteerd; fase C lokaal geaccepteerd en nog niet op
+staging of productie gedeployed.
 
 ## Doel
 
@@ -74,3 +75,22 @@ Stagingacceptatie:
 - de synthetische fixture is volledig opgeruimd;
 - API en database zijn gezond en Alembic staat op `0062`;
 - definitief gereedsignaal: `release-14-phase-b-staging-ok`.
+
+## Fase C — veilige eerste crawl
+
+- na eigendomsverificatie bevestigt de gebruiker voorzichtige crawlvoorkeuren;
+- robots.txt respecteren is tijdens onboarding verplicht;
+- standaard wordt maximaal 1.000 pagina's gecontroleerd met 300 ms vertraging en drie
+  gelijktijdige verzoeken;
+- één persistente `first_crawl_job_id` maakt dubbel klikken, refresh en herhaalde API-verzoeken
+  idempotent;
+- de eerste crawl wordt pas na verificatie en buiten een deployment-drain aangemaakt;
+- de interface hervat na refresh met dezelfde crawljob en toont de actuele wachtrijstatus;
+- Alembic heeft één lineaire head `0063`.
+
+Lokale acceptatie:
+
+- 71 gerichte onboarding-, migratie-, API- en interfacetests geslaagd;
+- volledige regressiesuite geslaagd met alleen de bestaande dependencywaarschuwing;
+- Python-linting, formattingcontrole en JavaScript-syntaxcontrole geslaagd;
+- dubbel starten levert dezelfde crawljob op en bewaart de oorspronkelijk bevestigde instellingen.

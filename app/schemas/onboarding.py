@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import AnyHttpUrl, BaseModel, Field, field_validator
+from pydantic import AnyHttpUrl, BaseModel, Field, field_validator, model_validator
 
 from app.schemas.website import WebsiteSettingsData
 
@@ -41,6 +41,8 @@ class WebsiteOnboardingRead(BaseModel):
     verification_path: str
     verification_expires_at: datetime
     verification_file_content: str | None = None
+    first_crawl_job_id: UUID | None = None
+    first_crawl_status: str | None = None
 
 
 class WebsiteVerificationCheckRead(BaseModel):
@@ -50,3 +52,26 @@ class WebsiteVerificationCheckRead(BaseModel):
     verification_status: str
     attempt_count: int
     last_error_code: str | None
+
+
+class WebsiteOnboardingCrawlPreferences(BaseModel):
+    sitemap_urls: list[str] | None = Field(default=None, max_length=20)
+    max_urls: int = Field(default=1_000, ge=1, le=100_000)
+    request_delay_ms: int = Field(default=300, ge=100, le=5_000)
+    concurrency: int = Field(default=3, ge=1, le=10)
+    respect_robots_txt: bool = True
+
+    @model_validator(mode="after")
+    def require_safe_robots_setting(self) -> "WebsiteOnboardingCrawlPreferences":
+        if not self.respect_robots_txt:
+            raise ValueError("Robots.txt respecteren is verplicht tijdens onboarding")
+        return self
+
+
+class WebsiteOnboardingFirstCrawlRead(BaseModel):
+    onboarding_id: UUID
+    website_id: UUID
+    crawl_job_id: UUID
+    status: str
+    current_step: str
+    queue_status: str

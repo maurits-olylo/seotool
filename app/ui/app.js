@@ -376,14 +376,23 @@ function renderWebsiteOnboarding() {
   const active = Boolean(onboarding);
   $("#website-onboarding-form").classList.toggle("hidden", active);
   $("#website-verification-step").classList.toggle("hidden", !active);
-  $("#verification-step-label").textContent = active ? "Stap 2 van 2" : "Stap 1 van 2";
+  $("#verification-step-label").textContent = !active
+    ? "Stap 1 van 3"
+    : onboarding?.first_crawl_job_id
+      ? "Stap 3 van 3"
+      : onboarding?.verification_status === "verified"
+        ? "Stap 3 van 3"
+        : "Stap 2 van 3";
   if (!onboarding) return;
   const verified = onboarding.verification_status === "verified";
-  $("#download-verification-file").classList.toggle("hidden", verified);
-  $("#check-website-verification").classList.toggle("hidden", verified);
+  const crawlStarted = Boolean(onboarding.first_crawl_job_id);
+  $("#verification-instructions").classList.toggle("hidden", verified);
+  $("#first-crawl-preferences").classList.toggle("hidden", !verified || crawlStarted);
   $("#website-verification-message").classList.toggle("error", Boolean(onboarding.last_error_code));
-  $("#website-verification-message").textContent = verified
-    ? "Website geverifieerd. Je kunt verder met de crawlvoorkeuren."
+  $("#website-verification-message").textContent = crawlStarted
+    ? `De eerste crawl is aangemaakt en staat ${onboarding.first_crawl_status === "running" ? "in uitvoering" : "in de wachtrij"}.`
+    : verified
+      ? "Website geverifieerd. Bevestig de veilige crawlvoorkeuren."
     : onboarding.last_error_code
       ? websiteVerificationMessage(onboarding.last_error_code)
       : "Download het bestand en plaats het op je website.";
@@ -468,6 +477,40 @@ async function checkWebsiteVerification() {
   try {
     const result = await api(`/api/v1/website-onboarding/${state.websiteOnboarding.id}/verification/check`, {method: "POST"});
     state.websiteOnboarding = {...state.websiteOnboarding, ...result};
+    renderWebsiteOnboarding();
+  } catch (error) {
+    message.classList.add("error");
+    message.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function startFirstOnboardingCrawl(event) {
+  event.preventDefault();
+  const button = event.currentTarget.querySelector('button[type="submit"]');
+  const message = $("#website-verification-message");
+  button.disabled = true;
+  message.classList.remove("error");
+  message.textContent = "Eerste crawl wordt veilig klaargezet…";
+  try {
+    const result = await api(`/api/v1/website-onboarding/${state.websiteOnboarding.id}/first-crawl`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        max_urls: Number($("#first-crawl-max-urls").value),
+        request_delay_ms: Number($("#first-crawl-delay").value),
+        concurrency: Number($("#first-crawl-concurrency").value),
+        respect_robots_txt: true,
+      }),
+    });
+    state.websiteOnboarding = {
+      ...state.websiteOnboarding,
+      status: result.status,
+      current_step: result.current_step,
+      first_crawl_job_id: result.crawl_job_id,
+      first_crawl_status: result.queue_status,
+    };
     renderWebsiteOnboarding();
   } catch (error) {
     message.classList.add("error");
@@ -3228,6 +3271,7 @@ $("#onboarding-form").addEventListener("submit", onboardClient);
 $("#website-onboarding-form").addEventListener("submit", startWebsiteOnboarding);
 $("#download-verification-file").addEventListener("click", downloadWebsiteVerificationFile);
 $("#check-website-verification").addEventListener("click", checkWebsiteVerification);
+$("#first-crawl-preferences").addEventListener("submit", startFirstOnboardingCrawl);
 $("#restart-website-onboarding").addEventListener("click", restartWebsiteOnboarding);
 $("#website-form").addEventListener("submit", createWebsite);
 $("#invitation-form").addEventListener("submit", createInvitation);
