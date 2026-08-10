@@ -101,3 +101,34 @@ Definitieve stagingacceptatie:
 Daarmee is optie A voor deze synthetische scope niet door performance of batching afgewezen. De
 volgende fase toetst het observation manifest en één echte exposure-/procesfixture; zij opent nog
 geen publieke klantingestion.
+
+## Fase D — observation manifest en exposure-/procesfixture
+
+Status: lokaal geïmplementeerd en getest; stagingacceptatie staat open.
+
+- meting start alleen bij expliciete `measurementAllowed: true`;
+- manifestversie, exact paginapad en vervaldatum worden vóór koppeling gevalideerd;
+- maximaal twintig unieke, allowlisted manifestobservaties zijn toegestaan;
+- selectors zijn uitsluitend vaste `data-thactual`-identifiers en nooit vrije CSS-paden;
+- ontbrekende of dubbel voorkomende locators worden niet gevolgd;
+- maximaal één `IntersectionObserver` meet een exposure pas na minimaal één seconde voor minstens
+  de helft in beeld;
+- clicks op een expliciet exposure-/interactionelement leveren één interaction;
+- een expliciet formulierelement levert `process_start`; alleen een allowlisted proces kan via de
+  applicatie-API `process_success` melden;
+- herhaald succes, servertrust en vrije evidencewaarden worden niet door de browserruntime
+  geaccepteerd;
+- `destroy()` ruimt observer, timers en listeners op;
+- de fixture verwacht exact de volgorde pageview, exposure, interactie, processtart en processucces
+  in één same-origin bulk-POST zonder cookie.
+
+Lokale acceptatie:
+
+- gerichte Sensor-, manifest-, Matomo- en fixturetests: 12 geslaagd;
+- volledige regressiesuite: 579 geslaagd;
+- actuele bootstrap plus Matomo-client: 24.286 bytes gecomprimeerd van maximaal 50.000 bytes;
+- Ruff, formattering, JavaScript-syntax en diffcontrole: geslaagd;
+- geen publieke route, secret, databaseopslag of migration toegevoegd.
+
+Staging voert de fase-D-fixture en de twintig performance-runs opnieuw uit, omdat de browserruntime
+in deze fase is uitgebreid.

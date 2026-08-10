@@ -61,7 +61,7 @@ const context = {window: {location: {pathname: '/offerte'}}, URLSearchParams};
 vm.createContext(context);
 vm.runInContext(fs.readFileSync('sensor/bootstrap.js', 'utf8'), context);
 const sensor = context.window.ThactualSensorBootstrap.initialize({
-  schemaVersion: '1', manifestVersion: 'v1', siteId: '7'
+  schemaVersion: '1', manifestVersion: 'v1', siteId: '7', measurementAllowed: true
 });
 sensor.observe({
   name: 'element_exposure',
@@ -92,6 +92,32 @@ process.stdout.write(JSON.stringify({queue: context.window._paq, rejected}));
         "queueRequest",
         "e_c=thactual_sensor&e_a=process_start&e_n=v1%3Aquote_form",
     ] in result["queue"]
+
+
+def test_bootstrap_requires_explicit_measurement_permission() -> None:
+    runner = """
+const fs = require('fs');
+const vm = require('vm');
+const context = {window: {location: {pathname: '/offerte'}}, URLSearchParams};
+vm.createContext(context);
+vm.runInContext(fs.readFileSync('sensor/bootstrap.js', 'utf8'), context);
+let rejected = false;
+try {
+  context.window.ThactualSensorBootstrap.initialize({
+    schemaVersion: '1', manifestVersion: '2026-08-10.1', siteId: '7',
+    measurementAllowed: false
+  });
+} catch (_) {
+  rejected = true;
+}
+process.stdout.write(JSON.stringify({rejected, queue: context.window._paq || []}));
+"""
+    completed = subprocess.run(
+        ["node", "-e", runner], cwd=ROOT, check=True, capture_output=True, text=True
+    )
+    result = json.loads(completed.stdout)
+
+    assert result == {"rejected": True, "queue": []}
 
 
 def test_pinned_client_measurement_is_reproducible(tmp_path: Path) -> None:

@@ -61,7 +61,7 @@ def measure_once(browser: Any, matomo_source: str, bootstrap_source: str) -> dic
           };
           add(bootstrap);
           window.ThactualSensorBootstrap.initialize({
-            schemaVersion: '1', manifestVersion: 'v1', siteId: '1'
+            schemaVersion: '1', manifestVersion: 'v1', siteId: '1', measurementAllowed: true
           });
           window.ThactualSensor.observe({name: 'page_view', value: {}});
           window.ThactualSensor.observe({

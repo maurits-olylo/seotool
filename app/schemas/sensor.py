@@ -64,7 +64,7 @@ class SensorManifest(BaseModel):
     site_key: str = Field(min_length=16, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
     profile: Literal["lead_generation", "content", "recruitment", "commerce"]
     page_match: str = Field(min_length=1, max_length=512)
-    observations: list[SensorManifestObservation] = Field(max_length=20)
+    observations: list[SensorManifestObservation] = Field(min_length=1, max_length=20)
     expires_at: datetime
 
     @field_validator("observations")
