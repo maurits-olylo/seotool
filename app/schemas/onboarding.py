@@ -41,6 +41,9 @@ class WebsiteOnboardingRead(BaseModel):
     verification_path: str
     verification_expires_at: datetime
     verification_file_content: str | None = None
+    detected_platform: str | None = None
+    platform_confidence: str | None = None
+    confirmed_platform: str | None = None
     first_crawl_job_id: UUID | None = None
     first_crawl_status: str | None = None
     first_crawl_phase: str | None = None
@@ -55,6 +58,21 @@ class WebsiteOnboardingRead(BaseModel):
     analytics_quality_source_label: str | None = None
     analytics_quality_last_checked_at: datetime | None = None
     conversion_insights_reliable: bool = False
+
+
+class WebsitePlatformRead(BaseModel):
+    detected_platform: str | None
+    platform_confidence: str | None
+    confirmed_platform: str | None
+
+
+class WebsitePlatformConfirm(BaseModel):
+    platform: str = Field(min_length=1, max_length=40)
+
+    @field_validator("platform")
+    @classmethod
+    def normalize_platform(cls, value: str) -> str:
+        return value.strip().lower()
 
 
 class WebsiteVerificationCheckRead(BaseModel):

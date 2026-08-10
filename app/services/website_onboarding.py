@@ -25,6 +25,7 @@ from app.services.crawl_deployment import (
     pause_job_if_deployment_active,
 )
 from app.services.http_crawler import CrawlError, fetch_url
+from app.services.platform_detection import detect_platform
 from app.services.security_audit import record_security_event
 
 VERIFICATION_PATH = "/.well-known/thactual-verification.txt"
@@ -117,6 +118,39 @@ def get_website_onboarding(db: Session, onboarding_id: UUID) -> WebsiteOnboardin
         first_crawl_run=first_crawl_run,
         analytics_quality=analytics_quality_status(db, onboarding.website_id),
     )
+
+
+def detect_website_platform(db: Session, onboarding_id: UUID) -> WebsiteOnboarding:
+    onboarding = db.get(WebsiteOnboarding, onboarding_id)
+    if onboarding is None:
+        raise LookupError("Website onboarding not found")
+    website = db.get(Website, onboarding.website_id)
+    if website is None:
+        raise LookupError("Website not found")
+    try:
+        result = fetch_url(website.base_url, timeout_seconds=10, max_response_size=1_000_000)
+        detection = detect_platform(result)
+    except CrawlError:
+        detection = None
+    if detection is None:
+        onboarding.detected_platform = None
+        onboarding.platform_confidence = None
+    else:
+        onboarding.detected_platform = detection.platform
+        onboarding.platform_confidence = detection.confidence
+    db.commit()
+    return onboarding
+
+
+def confirm_website_platform(
+    db: Session, onboarding_id: UUID, platform: str
+) -> WebsiteOnboarding:
+    onboarding = db.get(WebsiteOnboarding, onboarding_id)
+    if onboarding is None:
+        raise LookupError("Website onboarding not found")
+    onboarding.confirmed_platform = platform
+    db.commit()
+    return onboarding
 
 
 def renew_website_verification_file(
@@ -417,6 +451,9 @@ def _read(
         verification_path=VERIFICATION_PATH,
         verification_expires_at=verification.expires_at,
         verification_file_content=f"{VERIFICATION_PREFIX}{token}" if token else None,
+        detected_platform=onboarding.detected_platform,
+        platform_confidence=onboarding.platform_confidence,
+        confirmed_platform=onboarding.confirmed_platform,
         first_crawl_job_id=onboarding.first_crawl_job_id,
         first_crawl_status=first_crawl_job.status if first_crawl_job else None,
         first_crawl_phase=first_crawl_run.phase if first_crawl_run else None,

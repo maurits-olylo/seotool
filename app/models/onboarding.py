@@ -40,6 +40,9 @@ class WebsiteOnboarding(UUIDTimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(30), default="verification_pending", index=True)
     current_step: Mapped[str] = mapped_column(String(30), default="verification", index=True)
     last_error_code: Mapped[str | None] = mapped_column(String(50))
+    detected_platform: Mapped[str | None] = mapped_column(String(40))
+    platform_confidence: Mapped[str | None] = mapped_column(String(20))
+    confirmed_platform: Mapped[str | None] = mapped_column(String(40))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 

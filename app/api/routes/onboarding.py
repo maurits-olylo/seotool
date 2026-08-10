@@ -12,11 +12,15 @@ from app.schemas.onboarding import (
     WebsiteOnboardingFirstCrawlRead,
     WebsiteOnboardingRead,
     WebsiteOnboardingStart,
+    WebsitePlatformConfirm,
+    WebsitePlatformRead,
     WebsiteVerificationCheckRead,
 )
 from app.services.authorization import require_client_access
 from app.services.website_onboarding import (
     check_website_ownership,
+    confirm_website_platform,
+    detect_website_platform,
     get_website_onboarding,
     renew_website_verification_file,
     retry_first_onboarding_crawl,
@@ -25,6 +29,14 @@ from app.services.website_onboarding import (
 )
 
 router = APIRouter(prefix="/website-onboarding", tags=["website-onboarding"])
+
+
+def _platform_read(onboarding: WebsiteOnboarding) -> WebsitePlatformRead:
+    return WebsitePlatformRead(
+        detected_platform=onboarding.detected_platform,
+        platform_confidence=onboarding.platform_confidence,
+        confirmed_platform=onboarding.confirmed_platform,
+    )
 
 
 @router.post(
@@ -62,6 +74,27 @@ def onboarding_status(
         return get_website_onboarding(db, onboarding.id)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/{onboarding_id}/platform/detect", response_model=WebsitePlatformRead)
+def detect_platform(
+    onboarding_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> WebsitePlatformRead:
+    onboarding = _authorized_onboarding(db, principal, onboarding_id, admin=True)
+    return _platform_read(detect_website_platform(db, onboarding.id))
+
+
+@router.post("/{onboarding_id}/platform/confirm", response_model=WebsitePlatformRead)
+def confirm_platform(
+    onboarding_id: UUID,
+    payload: WebsitePlatformConfirm,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> WebsitePlatformRead:
+    onboarding = _authorized_onboarding(db, principal, onboarding_id, admin=True)
+    return _platform_read(confirm_website_platform(db, onboarding.id, payload.platform))
 
 
 @router.post("/{onboarding_id}/verification/check", response_model=WebsiteVerificationCheckRead)

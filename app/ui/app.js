@@ -459,6 +459,7 @@ async function loadOnboardingProgress() {
 }
 
 function renderWebsiteOnboarding() {
+  ensurePlatformGuidance();
   const onboarding = state.websiteOnboarding;
   const active = Boolean(onboarding);
   $("#website-onboarding-form").classList.toggle("hidden", active);
@@ -471,6 +472,7 @@ function renderWebsiteOnboarding() {
         ? "Stap 3 van 3"
         : "Stap 2 van 3";
   if (!onboarding) return;
+  renderPlatformGuidance(onboarding);
   const verified = onboarding.verification_status === "verified";
   const crawlStarted = Boolean(onboarding.first_crawl_job_id);
   $("#verification-instructions").classList.toggle("hidden", verified);
@@ -487,6 +489,72 @@ function renderWebsiteOnboarding() {
   scheduleOnboardingPoll();
 }
 
+const platformLabels = {wordpress:"WordPress",shopify:"Shopify",webflow:"Webflow",wix:"Wix",squarespace:"Squarespace",custom:"maatwerk of een ander platform"};
+const platformHelp = {
+  wordpress:"Laat je beheerder dit via hosting of SFTP in de publieke map .well-known plaatsen. De mediabibliotheek is niet geschikt.",
+  shopify:"Laat je Shopify-developer dit via de storefront of een proxyroute publiceren; de gewone bestandsupload maakt dit adres niet aan.",
+  webflow:"Laat je Webflow-developer dit exacte pad via hosting of een proxy publiceren; de Assets-bibliotheek is niet voldoende.",
+  wix:"Laat je Wix-developer een openbare route met dit exacte pad en deze inhoud maken; Media Manager is niet voldoende.",
+  squarespace:"Laat je Squarespace-beheerder of developer dit exacte openbare pad publiceren; een gewone bestandslink krijgt een ander adres.",
+  custom:"Plaats het bestand in de publieke webroot onder .well-known, of stuur deze opdracht naar je websitebeheerder.",
+};
+
+function ensurePlatformGuidance() {
+  const container = $("#verification-instructions");
+  if ($("#platform-confirmation")) return;
+  container.innerHTML = `<section id="platform-confirmation" class="platform-confirmation"><span class="eyebrow">PLATFORMHERKENNING</span><h3 id="platform-confirmation-title">Websiteplatform herkennen…</h3><p id="platform-confirmation-message"></p><div id="platform-confirmation-actions" class="verification-actions hidden"><button id="confirm-detected-platform" class="primary-button" type="button">Ja, dat klopt</button><button id="change-detected-platform" class="secondary-button" type="button">Nee, ander platform</button></div><div id="platform-selection" class="platform-selection hidden"><label>Welk platform gebruik je?<select id="website-platform"><option value="wordpress">WordPress</option><option value="shopify">Shopify</option><option value="webflow">Webflow</option><option value="wix">Wix</option><option value="squarespace">Squarespace</option><option value="custom">Maatwerk of anders</option></select></label><button id="confirm-selected-platform" class="primary-button" type="button">Gebruik deze instructies</button></div></section><ol id="verification-instruction-list" class="hidden"><li><strong>Download het verificatiebestand.</strong><span>Dit bestand hoort alleen bij deze website.</span></li><li><strong>Publiceer het op het juiste adres.</strong><span id="platform-upload-help"></span><span>Het moet bereikbaar zijn op <code id="verification-public-url"></code>.</span></li><li><strong>Laat Thactual controleren.</strong><span>Open eerst het adres hierboven. Zie je de bestandsinhoud, klik dan op ‘Controleer plaatsing’.</span></li></ol><div id="verification-actions" class="verification-actions hidden"><button id="download-verification-file" class="primary-button" type="button">Download verificatiebestand</button><button id="check-website-verification" class="secondary-button" type="button">Controleer plaatsing</button><button id="restart-website-onboarding" class="detail-button" type="button">Andere website</button></div>`;
+  $("#confirm-detected-platform").addEventListener("click", () => confirmWebsitePlatform(state.websiteOnboarding.detected_platform));
+  $("#change-detected-platform").addEventListener("click", () => $("#platform-selection").classList.remove("hidden"));
+  $("#confirm-selected-platform").addEventListener("click", () => confirmWebsitePlatform($("#website-platform").value));
+  $("#download-verification-file").addEventListener("click", downloadWebsiteVerificationFile);
+  $("#check-website-verification").addEventListener("click", checkWebsiteVerification);
+  $("#restart-website-onboarding").addEventListener("click", restartWebsiteOnboarding);
+}
+
+function renderPlatformGuidance(onboarding) {
+  const detected = onboarding.detected_platform;
+  const confirmed = onboarding.confirmed_platform;
+  $("#platform-confirmation-actions").classList.toggle("hidden", !detected || Boolean(confirmed));
+  $("#platform-selection").classList.toggle("hidden", Boolean(confirmed) || Boolean(detected));
+  if (confirmed) {
+    $("#platform-confirmation-title").textContent = `${platformLabels[confirmed] || confirmed} bevestigd`;
+    $("#platform-confirmation-message").textContent = "Hieronder staan de passende uitvoeringsstappen.";
+  } else if (detected) {
+    const qualifier = onboarding.platform_confidence === "high" ? "We herkennen" : "Dit lijkt op";
+    $("#platform-confirmation-title").textContent = `${qualifier} ${platformLabels[detected] || detected}. Klopt dat?`;
+    $("#platform-confirmation-message").textContent = "Bevestig dit zodat Thactual de juiste instructies toont.";
+  } else {
+    $("#platform-confirmation-title").textContent = "We herkennen het websiteplatform niet";
+    $("#platform-confirmation-message").textContent = "Geef aan welk platform je gebruikt; technische kennis is niet nodig.";
+    $("#platform-selection").classList.remove("hidden");
+  }
+  $("#verification-instruction-list").classList.toggle("hidden", !confirmed);
+  $("#verification-actions").classList.toggle("hidden", !confirmed);
+  if (confirmed) {
+    $("#platform-upload-help").textContent = platformHelp[confirmed] || platformHelp.custom;
+    const knownWebsite = state.organizationWebsites.find(item => item.id === onboarding.website_id);
+    const origin = new URL(onboarding.base_url || knownWebsite?.base_url || location.origin).origin;
+    $("#verification-public-url").textContent = `${origin}${onboarding.verification_path}`;
+  }
+}
+
+async function detectWebsitePlatform() {
+  try {
+    const result = await api(`/api/v1/website-onboarding/${state.websiteOnboarding.id}/platform/detect`, {method:"POST"});
+    state.websiteOnboarding = {...state.websiteOnboarding, ...result};
+  } catch (_error) {
+    state.websiteOnboarding = {...state.websiteOnboarding, detected_platform:null, platform_confidence:null};
+  }
+  renderWebsiteOnboarding();
+}
+
+async function confirmWebsitePlatform(platform) {
+  if (!platform) return;
+  const result = await api(`/api/v1/website-onboarding/${state.websiteOnboarding.id}/platform/confirm`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({platform})});
+  state.websiteOnboarding = {...state.websiteOnboarding, ...result};
+  renderWebsiteOnboarding();
+}
+
 async function startWebsiteOnboarding(event) {
   event.preventDefault();
   const button = event.currentTarget.querySelector('button[type="submit"]');
@@ -496,20 +564,23 @@ async function startWebsiteOnboarding(event) {
   message.textContent = "Website wordt klaargezet…";
   try {
     const sitemap = $("#website-onboarding-sitemap").value.trim();
+    const baseUrl = $("#website-onboarding-url").value.trim();
     state.websiteOnboarding = await api(`/api/v1/website-onboarding/clients/${$("#website-onboarding-client").value}`, {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({
         request_id: crypto.randomUUID(),
         website_name: $("#website-onboarding-name").value.trim(),
-        base_url: $("#website-onboarding-url").value.trim(),
+        base_url: baseUrl,
         settings: {sitemap_urls: sitemap ? [sitemap] : []},
       }),
     });
+    state.websiteOnboarding.base_url = baseUrl;
     state.verificationFileContent = state.websiteOnboarding.verification_file_content;
     localStorage.setItem(ONBOARDING_STORAGE_KEY, state.websiteOnboarding.id);
     message.textContent = "";
     renderWebsiteOnboarding();
+    await detectWebsitePlatform();
   } catch (error) {
     message.classList.add("error");
     message.textContent = error.message;

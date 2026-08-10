@@ -22,3 +22,13 @@ def test_first_crawl_migration_follows_onboarding_foundation() -> None:
     assert '"first_crawl_job_id"' in migration
     assert 'ondelete="SET NULL"' in migration
     assert "op.alter_column" not in migration
+
+
+def test_platform_detection_migration_follows_first_crawl() -> None:
+    root = Path(__file__).resolve().parents[1]
+    migration = (root / "alembic/versions/0064_onboarding_platform_detection.py").read_text()
+
+    assert 'revision: str = "0064"' in migration
+    assert 'down_revision: str | None = "0063"' in migration
+    assert '"detected_platform"' in migration
+    assert '"confirmed_platform"' in migration
