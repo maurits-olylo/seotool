@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,7 @@ from app.services.authorization import require_client_access
 from app.services.website_onboarding import (
     check_website_ownership,
     get_website_onboarding,
+    renew_website_verification_file,
     start_website_onboarding,
 )
 
@@ -77,6 +78,33 @@ def check_verification(
         verification_status=verification.status,
         attempt_count=verification.attempt_count,
         last_error_code=onboarding.last_error_code,
+    )
+
+
+@router.post("/{onboarding_id}/verification/file", response_class=Response)
+def download_new_verification_file(
+    onboarding_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> Response:
+    onboarding = _authorized_onboarding(db, principal, onboarding_id, admin=True)
+    try:
+        content = renew_website_verification_file(
+            db,
+            onboarding.id,
+            actor_user_id=principal.user_id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return Response(
+        content=content,
+        media_type="text/plain; charset=utf-8",
+        headers={
+            "Cache-Control": "no-store",
+            "Content-Disposition": 'attachment; filename="thactual-verification.txt"',
+        },
     )
 
 

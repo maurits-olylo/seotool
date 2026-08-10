@@ -1,0 +1,79 @@
+.verification-wizard {
+  margin: 30px 0;
+  overflow: visible;
+}
+
+.verification-wizard .panel-head {
+  align-items: flex-start;
+}
+
+.verification-wizard select {
+  width: 100%;
+  min-width: 0;
+}
+
+.verification-form-actions {
+  grid-column: 1 / -1;
+  padding: 4px 0 24px;
+}
+
+.verification-step {
+  padding: 0 24px 24px;
+}
+
+.verification-step ol {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+  counter-reset: verification-step;
+}
+
+.verification-step li {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  padding: 14px 16px 14px 52px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fafcfb;
+  counter-increment: verification-step;
+}
+
+.verification-step li::before {
+  position: absolute;
+  top: 13px;
+  left: 14px;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--green);
+  color: #fff;
+  font-weight: 800;
+  content: counter(verification-step);
+}
+
+.verification-step li span {
+  color: var(--muted);
+}
+
+.verification-step code {
+  overflow-wrap: anywhere;
+}
+
+.verification-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.verification-actions button {
+  margin: 0;
+}
+
+.verification-step .operation-message {
+  margin-bottom: 0 !important;
+}

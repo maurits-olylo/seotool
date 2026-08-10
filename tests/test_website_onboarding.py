@@ -15,6 +15,7 @@ from app.services.http_crawler import FetchResult
 from app.services.website_onboarding import (
     VERIFICATION_PATH,
     check_website_ownership,
+    renew_website_verification_file,
     start_website_onboarding,
     token_hash,
 )
@@ -198,3 +199,56 @@ def test_onboarding_api_starts_and_resumes_without_exposing_token_again(client) 
     assert resumed.status_code == 200
     assert resumed.json()["status"] == "verification_pending"
     assert resumed.json()["verification_file_content"] is None
+
+
+def test_renewed_verification_file_replaces_hash_and_resets_attempts() -> None:
+    with SessionLocal() as db:
+        client = _client(db)
+        started = start_website_onboarding(
+            db, client_id=client.id, actor_user_id=None, payload=_payload()
+        )
+        verification = db.scalar(
+            select(WebsiteOwnershipVerification).where(
+                WebsiteOwnershipVerification.onboarding_id == started.id
+            )
+        )
+        assert verification is not None
+        previous_hash = verification.token_hash
+        verification.status = "expired"
+        verification.attempt_count = 4
+        db.commit()
+
+        content = renew_website_verification_file(db, started.id, actor_user_id=None)
+
+        db.refresh(verification)
+        assert content.startswith("thactual-site-verification=")
+        renewed_token = content.removeprefix("thactual-site-verification=")
+        assert token_hash(renewed_token) == verification.token_hash
+        assert verification.token_hash != previous_hash
+        assert verification.status == "pending"
+        assert verification.attempt_count == 0
+
+
+def test_verification_file_download_is_not_cached_and_rotates_token(client) -> None:  # type: ignore[no-untyped-def]
+    customer = client.post("/api/v1/clients", json={"name": "Download onboarding client"}).json()
+    started = client.post(
+        f"/api/v1/website-onboarding/clients/{customer['id']}",
+        json={
+            "request_id": str(uuid4()),
+            "website_name": "Download website",
+            "base_url": "https://download.example.test/",
+        },
+    ).json()
+
+    response = client.post(f"/api/v1/website-onboarding/{started['id']}/verification/file")
+
+    assert response.status_code == 200
+    assert response.text.startswith("thactual-site-verification=")
+    assert response.headers["cache-control"] == "no-store"
+    assert 'filename="thactual-verification.txt"' in response.headers["content-disposition"]
+    assert (
+        client.get(f"/api/v1/website-onboarding/{started['id']}").json()[
+            "verification_file_content"
+        ]
+        is None
+    )

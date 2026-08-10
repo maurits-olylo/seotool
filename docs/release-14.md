@@ -1,6 +1,7 @@
 # Release 14 — Invitation-only onboarding
 
-Status: fase A lokaal en op staging geaccepteerd; nog niet op productie gedeployed.
+Status: fase A lokaal en op staging geaccepteerd; fase B lokaal geaccepteerd en nog niet op staging
+of productie gedeployed.
 
 ## Doel
 
@@ -46,3 +47,20 @@ Stagingacceptatie:
 Fase B voegt tokenvernieuwing/download en de begeleide verificatie-interface toe. Latere fasen
 voegen idempotent starten van de eerste crawl, begrijpelijke voortgang,
 analytics/Sensor-meetvalidatie en end-to-end gebruikersproeven toe.
+
+## Fase B — begeleide verificatie
+
+- een hervatbare tweestapsinterface maakt de website aan en begeleidt de bestandsplaatsing;
+- het verificatiebestand wordt rechtstreeks gedownload zonder tokenweergave in de interface;
+- opnieuw downloaden vernieuwt het token, de vervaldatum en de opgeslagen hash atomair;
+- oude bestanden worden daarmee direct ongeldig en tokens komen niet in logs of blijvende
+  browseropslag;
+- begrijpelijke meldingen vervangen technische foutcodes;
+- succesvolle controle brengt de gebruiker naar de crawlvoorkeuren zonder al een crawl te starten.
+
+Lokale acceptatie:
+
+- 66 gerichte API-, onboarding- en interfacetests geslaagd;
+- volledige regressiesuite geslaagd met alleen de bestaande dependencywaarschuwing;
+- Python-linting, formattingcontrole en JavaScript-syntaxcontrole geslaagd;
+- geen migration nodig: fase B gebruikt de persistente modellen uit `0062`.

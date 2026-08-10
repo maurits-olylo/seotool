@@ -121,11 +121,33 @@ def test_information_architecture_and_legacy_routes_are_served(client: TestClien
     assert 'view === "opportunities" ? "opportunities"' in script.text
     assert 'id="content-effect-learning"' in page.text
     assert "Dit is beschrijvende historie; causaliteit is niet bewezen." in script.text
-    assert 'app.js?v=20260809-2' in page.text
+    assert 'app.js?v=20260810-1' in page.text
     assert 'reports: "rapportages"' in script.text
     assert 'operations: "crawls-exports"' in script.text
     assert 'organisatie: "clients"' in script.text
     assert 'rapportage: "reports"' in script.text
+
+
+def test_guided_website_verification_interface_is_served(client: TestClient) -> None:
+    page = client.get("/ui/assets/index.html")
+    assert page.status_code == 200
+    for element_id in [
+        "website-onboarding-form",
+        "website-verification-step",
+        "download-verification-file",
+        "check-website-verification",
+    ]:
+        assert f'id="{element_id}"' in page.text
+    assert "/.well-known/thactual-verification.txt" in page.text
+    assert "app.js?v=20260810-1" in page.text
+    assert "onboarding.css?v=20260810-1" in page.text
+
+    script = client.get("/ui/assets/app.js")
+    assert script.status_code == 200
+    assert "startWebsiteOnboarding" in script.text
+    assert "downloadWebsiteVerificationFile" in script.text
+    assert "resumeWebsiteOnboarding" in script.text
+    assert 'credentials: "same-origin"' in script.text
 
 
 def test_analysis_pages_share_consistent_states_and_labels(client: TestClient) -> None:
@@ -205,7 +227,7 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
 def test_operations_status_ignores_stale_website_responses(client: TestClient) -> None:
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
-    assert 'src="/ui/assets/app.js?v=20260809-2"' in page.text
+    assert 'src="/ui/assets/app.js?v=20260810-1"' in page.text
     assert 'href="/ui/assets/issue-inspection.css?v=20260808-5"' in page.text
     script = client.get("/ui/assets/app.js").text
     assert "issue-inspection-page-select" in script

@@ -91,6 +91,45 @@ def get_website_onboarding(db: Session, onboarding_id: UUID) -> WebsiteOnboardin
     return _read(onboarding, _verification(db, onboarding.id))
 
 
+def renew_website_verification_file(
+    db: Session,
+    onboarding_id: UUID,
+    *,
+    actor_user_id: UUID | None,
+) -> str:
+    onboarding = db.scalar(
+        select(WebsiteOnboarding).where(WebsiteOnboarding.id == onboarding_id).with_for_update()
+    )
+    if onboarding is None:
+        raise LookupError("Website onboarding not found")
+    verification = _verification(db, onboarding.id, lock=True)
+    if verification.status == "verified":
+        raise ValueError("Website is al geverifieerd")
+
+    token = secrets.token_urlsafe(32)
+    verification.token_hash = token_hash(token)
+    verification.status = "pending"
+    verification.attempt_count = 0
+    verification.expires_at = datetime.now(UTC) + timedelta(days=VERIFICATION_TTL_DAYS)
+    verification.last_checked_at = None
+    onboarding.status = "verification_pending"
+    onboarding.current_step = "verification"
+    onboarding.last_error_code = None
+    record_security_event(
+        db,
+        event_type="website_onboarding.verification_file_renewed",
+        result="success",
+        summary="Website-verificatiebestand vernieuwd",
+        actor_user_id=actor_user_id,
+        client_id=onboarding.client_id,
+        target_type="website_onboarding",
+        target_id=onboarding.id,
+        details={"method": "https_file"},
+    )
+    db.commit()
+    return f"{VERIFICATION_PREFIX}{token}"
+
+
 def check_website_ownership(
     db: Session,
     onboarding_id: UUID,

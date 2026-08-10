@@ -24,13 +24,14 @@ const labels = {
   pause_requested: "Pauze wordt voorbereid", paused: "Gepauzeerd",
   cancel_requested: "Stop wordt voorbereid", connected: "Gekoppeld", error: "Fout",
 };
-const state = { currentUser: null, currentView: "dashboard", clients: [], websites: [], organizationWebsites: [], issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], changesRequestId: 0, jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, contentAnalysis: null, contentAnalysisDays: 28, contentAnalysisTab: "overview", contentAnalysisPage: 1, questionScopes: null, externalEvidenceRequests: new Map(), effectEvaluations: [], crawlRuns: [], showCrawlArchive: false, activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, operationsRequestId: 0, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], urlCoverage: null, filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, selectedInspectionSnapshotId: null, selectedRecommendationTask: null, recommendationFeedback: [], recommendationDefinitions: null, recommendationTasks: [], taskNotifications: [], taskMembers: [], googleConnectionId: null, bingConnectionId: null, matomoConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
+const state = { currentUser: null, currentView: "dashboard", clients: [], websites: [], organizationWebsites: [], websiteOnboarding: null, verificationFileContent: null, issues: [], suppressions: [], selectedIssueIds: new Set(), selectedSuppressionIds: new Set(), changes: [], changeGroups: [], changesRequestId: 0, jobListings: [], jobSummary: {}, consultantInsights: null, insightDays: 28, contentAnalysis: null, contentAnalysisDays: 28, contentAnalysisTab: "overview", contentAnalysisPage: 1, questionScopes: null, externalEvidenceRequests: new Map(), effectEvaluations: [], crawlRuns: [], showCrawlArchive: false, activeCrawlJob: null, exports: [], systemStatus: null, operationsLoading: false, operationsRequestId: 0, integrationHealth: {connections: [], mappings: []}, urls: new Map(), urlRecords: [], urlCoverage: null, filtered: [], urlFiltered: [], changeFiltered: [], vacancyFiltered: [], page: 1, urlPage: 1, changePage: 1, selectedIssueId: null, selectedInspectionSnapshotId: null, selectedRecommendationTask: null, recommendationFeedback: [], recommendationDefinitions: null, recommendationTasks: [], taskNotifications: [], taskMembers: [], googleConnectionId: null, bingConnectionId: null, matomoConnectionId: null, clientReport: null, reportPeriod: "month", reportSnapshots: [], selectedReportSnapshotId: null };
 const VIEW_HASHES = {dashboard: "overzicht", insights: "inzichten", opportunities: "kansen", tasks: "acties", actions: "metingen/signalen", urls: "metingen/urls", changes: "metingen/wijzigingen", contentAnalysis: "metingen/content", vacancies: "metingen/vacatures", reports: "rapportages", operations: "crawls-exports", clients: "instellingen/klanten-websites", team: "instellingen/team-toegang", integrations: "instellingen/integraties"};
 const LEGACY_HASHES = {rapportage: "reports", urls: "urls", wijzigingen: "changes", inzichten: "insights", vacatures: "vacancies", beheer: "operations", organisatie: "clients", integraties: "integrations", acties: "actions", taken: "tasks", "analyse/acties": "actions", "analyse/urls": "urls", "analyse/wijzigingen": "changes", "analyse/inzichten": "insights", "analyse/content": "contentAnalysis", "analyse/vacatures": "vacancies"};
 const ANALYSIS_VIEWS = new Set(["actions", "urls", "changes", "contentAnalysis", "vacancies"]);
 const SETTINGS_VIEWS = new Set(["clients", "team", "integrations"]);
 const CLIENT_STORAGE_KEY = "seo-monitor-client-id";
 const WEBSITE_STORAGE_KEY = "seo-monitor-website-id";
+const ONBOARDING_STORAGE_KEY = "seo-monitor-website-onboarding-id";
 let operationsPollTimer = null;
 
 async function api(path, options = {}) {
@@ -264,14 +265,17 @@ function updateReportSelectors() {
 async function loadOrganization() {
   const options = state.clients.map(option).join("");
   $("#new-website-client").innerHTML = options;
+  $("#website-onboarding-client").innerHTML = options;
   $("#invitation-client").innerHTML = options;
   if ($("#client-select").value) {
     $("#new-website-client").value = $("#client-select").value;
+    $("#website-onboarding-client").value = $("#client-select").value;
     $("#invitation-client").value = $("#client-select").value;
   }
   state.organizationWebsites = await api("/api/v1/websites");
   renderClientDirectory();
   await loadMembers();
+  await resumeWebsiteOnboarding();
 }
 
 function renderClientDirectory() {
@@ -354,6 +358,142 @@ async function onboardClient(event) {
     message.textContent = `Klant en website zijn aangemaakt. De eerste volledige crawl staat klaar (${result.crawl_job.status}).`;
   } catch (error) { message.classList.add("error"); message.textContent = error.message; }
   finally { button.disabled = false; }
+}
+
+function websiteVerificationMessage(errorCode) {
+  return ({
+    verification_expired: "Het bestand is verlopen. Download een nieuw verificatiebestand.",
+    verification_file_unavailable: "Het bestand is nog niet bereikbaar op de aangegeven locatie.",
+    verification_redirect_outside_scope: "De bestandslocatie verwijst door naar een ander domein.",
+    verification_token_mismatch: "Het gevonden bestand is niet het laatst gedownloade bestand.",
+    verification_timeout: "De website reageerde niet op tijd. Probeer het over enkele minuten opnieuw.",
+    verification_ssrf_blocked: "Deze website kan om veiligheidsredenen niet worden gecontroleerd.",
+  })[errorCode] || "De plaatsing kon nog niet worden bevestigd. Controleer het bestand en probeer opnieuw.";
+}
+
+function renderWebsiteOnboarding() {
+  const onboarding = state.websiteOnboarding;
+  const active = Boolean(onboarding);
+  $("#website-onboarding-form").classList.toggle("hidden", active);
+  $("#website-verification-step").classList.toggle("hidden", !active);
+  $("#verification-step-label").textContent = active ? "Stap 2 van 2" : "Stap 1 van 2";
+  if (!onboarding) return;
+  const verified = onboarding.verification_status === "verified";
+  $("#download-verification-file").classList.toggle("hidden", verified);
+  $("#check-website-verification").classList.toggle("hidden", verified);
+  $("#website-verification-message").classList.toggle("error", Boolean(onboarding.last_error_code));
+  $("#website-verification-message").textContent = verified
+    ? "Website geverifieerd. Je kunt verder met de crawlvoorkeuren."
+    : onboarding.last_error_code
+      ? websiteVerificationMessage(onboarding.last_error_code)
+      : "Download het bestand en plaats het op je website.";
+}
+
+async function startWebsiteOnboarding(event) {
+  event.preventDefault();
+  const button = event.currentTarget.querySelector('button[type="submit"]');
+  const message = $("#website-onboarding-message");
+  button.disabled = true;
+  message.classList.remove("error");
+  message.textContent = "Website wordt klaargezet…";
+  try {
+    const sitemap = $("#website-onboarding-sitemap").value.trim();
+    state.websiteOnboarding = await api(`/api/v1/website-onboarding/clients/${$("#website-onboarding-client").value}`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        request_id: crypto.randomUUID(),
+        website_name: $("#website-onboarding-name").value.trim(),
+        base_url: $("#website-onboarding-url").value.trim(),
+        settings: {sitemap_urls: sitemap ? [sitemap] : []},
+      }),
+    });
+    state.verificationFileContent = state.websiteOnboarding.verification_file_content;
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, state.websiteOnboarding.id);
+    message.textContent = "";
+    renderWebsiteOnboarding();
+  } catch (error) {
+    message.classList.add("error");
+    message.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function saveVerificationFile(content) {
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([content], {type: "text/plain;charset=utf-8"}));
+  link.download = "thactual-verification.txt";
+  document.body.appendChild(link);
+  link.click();
+  URL.revokeObjectURL(link.href);
+  link.remove();
+}
+
+async function downloadWebsiteVerificationFile() {
+  const button = $("#download-verification-file");
+  const message = $("#website-verification-message");
+  button.disabled = true;
+  try {
+    let content = state.verificationFileContent;
+    if (!content) {
+      const response = await fetch(`/api/v1/website-onboarding/${state.websiteOnboarding.id}/verification/file`, {method: "POST", credentials: "same-origin"});
+      if (response.status === 401) { showLogin(); throw new Error("Niet aangemeld"); }
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.detail || "Het verificatiebestand kon niet worden vernieuwd.");
+      }
+      content = await response.text();
+      state.websiteOnboarding.last_error_code = null;
+    }
+    saveVerificationFile(content);
+    state.verificationFileContent = null;
+    button.textContent = "Nieuw bestand downloaden";
+    message.classList.remove("error");
+    message.textContent = "Bestand gedownload. Plaats het nu op de aangegeven locatie.";
+  } catch (error) {
+    message.classList.add("error");
+    message.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function checkWebsiteVerification() {
+  const button = $("#check-website-verification");
+  const message = $("#website-verification-message");
+  button.disabled = true;
+  message.classList.remove("error");
+  message.textContent = "Plaatsing wordt gecontroleerd…";
+  try {
+    const result = await api(`/api/v1/website-onboarding/${state.websiteOnboarding.id}/verification/check`, {method: "POST"});
+    state.websiteOnboarding = {...state.websiteOnboarding, ...result};
+    renderWebsiteOnboarding();
+  } catch (error) {
+    message.classList.add("error");
+    message.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function resumeWebsiteOnboarding() {
+  const onboardingId = localStorage.getItem(ONBOARDING_STORAGE_KEY);
+  if (!onboardingId || state.websiteOnboarding) return;
+  try {
+    state.websiteOnboarding = await api(`/api/v1/website-onboarding/${onboardingId}`);
+    renderWebsiteOnboarding();
+  } catch (_error) {
+    localStorage.removeItem(ONBOARDING_STORAGE_KEY);
+  }
+}
+
+function restartWebsiteOnboarding() {
+  state.websiteOnboarding = null;
+  state.verificationFileContent = null;
+  localStorage.removeItem(ONBOARDING_STORAGE_KEY);
+  $("#website-onboarding-form").reset();
+  renderWebsiteOnboarding();
 }
 
 async function createWebsite(event) {
@@ -1288,7 +1428,7 @@ function applyOrganizationPresentation(view) {
   const teamMode = view === "team";
   $("#organization-title").textContent = teamMode ? "Team & toegang" : "Klanten & websites";
   $("#organization-intro").textContent = teamMode ? "Nodig gebruikers uit en beheer hun toegang per klant." : "Beheer klanten, websites en de eerste crawlconfiguratie.";
-  for (const selector of ["#onboarding-form", ".client-directory", "#website-form"]) $(selector).classList.toggle("hidden", teamMode);
+  for (const selector of ["#website-onboarding-wizard", "#onboarding-form", ".client-directory", "#website-form"]) $(selector).classList.toggle("hidden", teamMode);
   for (const selector of ["#invitation-form", ".organization-members"]) $(selector).classList.toggle("hidden", !teamMode);
 }
 
@@ -3085,6 +3225,10 @@ $("#evaluate-opportunities").addEventListener("click", evaluateScoredOpportuniti
 $("#issue-context-question-form").addEventListener("submit", (event) => { event.preventDefault(); if (state.selectedIssueId) submitContextQuestion(event.currentTarget, "issue", state.selectedIssueId); });
 $("#content-settings-form").addEventListener("submit", saveContentSettings);
 $("#onboarding-form").addEventListener("submit", onboardClient);
+$("#website-onboarding-form").addEventListener("submit", startWebsiteOnboarding);
+$("#download-verification-file").addEventListener("click", downloadWebsiteVerificationFile);
+$("#check-website-verification").addEventListener("click", checkWebsiteVerification);
+$("#restart-website-onboarding").addEventListener("click", restartWebsiteOnboarding);
 $("#website-form").addEventListener("submit", createWebsite);
 $("#invitation-form").addEventListener("submit", createInvitation);
 $("#invitation-client").addEventListener("change", loadMembers);
