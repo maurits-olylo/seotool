@@ -101,5 +101,8 @@ Stagingacceptatie:
 - de veilige instellingen en verplichte robots.txt-keuze zijn opgeslagen;
 - de fixture maakte één databasejob en stuurde nul jobs naar Redis of een echte website;
 - hervatten na refresh is aanwezig;
+- de driestapsflow en veilige standaardwaarden zijn op desktop en mobiel helder weergegeven;
+- robots.txt is in de interface zichtbaar verplicht en niet uitschakelbaar;
+- de browserconsole bevat geen fouten of waarschuwingen;
 - de synthetische fixture is volledig opgeruimd en API en database zijn gezond;
 - definitief gereedsignaal: `release-14-phase-c-staging-ok`.
