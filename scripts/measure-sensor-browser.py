@@ -133,9 +133,18 @@ def main() -> None:
         browser = playwright.chromium.launch(headless=True)
         baseline_results = []
         results = []
-        for _ in range(arguments.runs):
-            baseline_results.append(measure_baseline(browser))
-            results.append(measure_once(browser, matomo_source, bootstrap_source))
+        pair_orders = []
+        for run_index in range(arguments.runs):
+            if run_index % 2 == 0:
+                baseline = measure_baseline(browser)
+                sensor = measure_once(browser, matomo_source, bootstrap_source)
+                pair_orders.append("baseline_first")
+            else:
+                sensor = measure_once(browser, matomo_source, bootstrap_source)
+                baseline = measure_baseline(browser)
+                pair_orders.append("sensor_first")
+            baseline_results.append(baseline)
+            results.append(sensor)
         browser.close()
 
     execution = [float(result["execution_ms"]) for result in results]
@@ -146,12 +155,24 @@ def main() -> None:
         duration for result in baseline_results for duration in result["long_tasks"]
     ]
     sensor_long_tasks = [duration for result in results for duration in result["long_tasks"]]
-    attributable_long_tasks = 0
-    for baseline, sensor in zip(baseline_results, results, strict=True):
+    long_task_pairs = []
+    for run_index, (baseline, sensor, order) in enumerate(
+        zip(baseline_results, results, pair_orders, strict=True), start=1
+    ):
         baseline_max = max(baseline["long_tasks"], default=0)
         sensor_max = max(sensor["long_tasks"], default=0)
-        if sensor_max >= 50 and (baseline_max < 50 or sensor_max > baseline_max + 5):
-            attributable_long_tasks += 1
+        attributable = sensor_max >= 50 and (baseline_max < 50 or sensor_max > baseline_max + 5)
+        if baseline_max >= 50 or sensor_max >= 50:
+            long_task_pairs.append(
+                {
+                    "run": run_index,
+                    "order": order,
+                    "baseline_max_ms": baseline_max,
+                    "sensor_max_ms": sensor_max,
+                    "attributable": attributable,
+                }
+            )
+    attributable_long_tasks = sum(bool(pair["attributable"]) for pair in long_task_pairs)
     summary = {
         "runs": len(results),
         "execution_ms_median": round(median(execution), 3),
@@ -166,6 +187,8 @@ def main() -> None:
         "baseline_long_task_max_ms": max(baseline_long_tasks, default=0),
         "sensor_long_task_max_ms": max(sensor_long_tasks, default=0),
         "sensor_attributable_long_tasks": attributable_long_tasks,
+        "pair_order": "alternating_ab_ba",
+        "long_task_pairs": long_task_pairs,
         "budget": {
             "execution_ms_p75_max": 25,
             "tracking_requests_max": 2,

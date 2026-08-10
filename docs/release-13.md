@@ -235,3 +235,15 @@ De browseracceptatie downloadt de externe Matomo-client uitsluitend vanuit de ge
 een harde limiet van 100.000 bytes en verifieert zowel exacte omvang als SHA-256 vóór uitvoering.
 De client wordt alleen in een tijdelijk bestand gebruikt en niet in de repository of image
 opgenomen.
+
+Eerste stagingpoging:
+
+- omvang, p75-uitvoering van 16,0 ms, vijf observations en één POST voldeden;
+- één Sensor-run bevatte een long task van 55 ms tegenover nul in de gekoppelde nulmeting en
+  blokkeerde de acceptatie terecht;
+- de meetvolgorde bleek iedere nulmeting vóór de Sensorvariant uit te voeren. Daardoor kon
+  volgordegebonden browser- of garbage-collectionopbouw systematisch aan Sensor worden
+  toegeschreven;
+- de paren wisselen daarom deterministisch tussen A/B en B/A. Het rapport toont voor ieder paar
+  met een long task het runnummer, de volgorde en beide maximale duren;
+- het budget blijft ongewijzigd op nul toerekenbare Sensor-long-tasks.

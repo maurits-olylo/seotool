@@ -19,4 +19,8 @@ def test_browser_measurement_is_bounded_and_synthetic() -> None:
     assert '"sensor_long_tasks_at_least_50ms"' in source
     assert '"largest_batch_min"' in source
     assert '"tracking_methods"' in source
+    assert 'pair_orders.append("baseline_first")' in source
+    assert 'pair_orders.append("sensor_first")' in source
+    assert '"pair_order": "alternating_ab_ba"' in source
+    assert '"long_task_pairs"' in source
     assert "example.com" not in source
