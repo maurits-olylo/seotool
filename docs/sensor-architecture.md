@@ -746,8 +746,8 @@ pilotrelease.
 
 Release 13 bestaat uit afzonderlijke gates:
 
-- A — dit architectuurdocument;
-- B — capabilitycontract, schema en privacy/threat model;
+- A — dit architectuurdocument; lokaal afgerond;
+- B — capabilitycontract, schema en privacy/threat model; lokaal afgerond;
 - C — synthetische Matomo-backed measurement spike;
 - D — observation manifest en één exposure/processfixture;
 - E — Thactual daily aggregates, quality state en intelligencekoppeling;
