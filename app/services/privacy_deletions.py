@@ -6,12 +6,25 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.models.client import Client
+from app.models.sensor import (
+    SensorDailyPageMetric,
+    SensorManifest,
+    SensorMeasurementState,
+    SensorOutcomeDefinition,
+)
 from app.models.website import Website
 
 SUPPORTED_ENTITY_TYPES = {"client", "website"}
+SENSOR_WEBSITE_MODELS = (
+    SensorDailyPageMetric,
+    SensorMeasurementState,
+    SensorOutcomeDefinition,
+    SensorManifest,
+)
 
 
 def privacy_deletion_ledger_path() -> Path:
@@ -69,12 +82,24 @@ def apply_privacy_deletions(db: Session, path: Path | None = None) -> dict[str, 
         seen.add((entity_type, entity_id))
 
     result["records"] = len(seen)
-    for entity_type, entity_id in seen:
+    for entity_type, entity_id in sorted(
+        seen, key=lambda item: (item[0] != "website", str(item[1]))
+    ):
         model = Client if entity_type == "client" else Website
         entity = db.get(model, entity_id)
         if entity is None:
             continue
+        website_ids = (
+            list(db.scalars(select(Website.id).where(Website.client_id == entity_id)))
+            if entity_type == "client"
+            else [entity_id]
+        )
+        for sensor_model in SENSOR_WEBSITE_MODELS:
+            db.execute(delete(sensor_model).where(sensor_model.website_id.in_(website_ids)))
+        if entity_type == "client":
+            db.expire(entity, ["websites"])
         db.delete(entity)
+        db.flush()
         result[f"{entity_type}s_deleted"] += 1
     db.commit()
     return result

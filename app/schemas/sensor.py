@@ -133,3 +133,13 @@ class SensorObservationBatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     observations: Annotated[list[SensorObservation], Field(min_length=1, max_length=25)]
+
+    @field_validator("observations")
+    @classmethod
+    def observations_have_unique_event_ids(
+        cls, value: list[SensorObservation]
+    ) -> list[SensorObservation]:
+        event_ids = [observation.event_id for observation in value]
+        if len(event_ids) != len(set(event_ids)):
+            raise ValueError("observation event IDs must be unique within a batch")
+        return value

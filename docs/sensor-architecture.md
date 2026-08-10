@@ -755,7 +755,8 @@ Release 13 bestaat uit afzonderlijke gates:
 - D — observation manifest en één exposure/processfixture; lokaal en op staging geaccepteerd;
 - E — Thactual daily aggregates, quality state en intelligencekoppeling; lokaal en op staging
   geaccepteerd;
-- F — stagingacceptatie, performance/deletion/abusetests;
+- F — stagingacceptatie, performance/deletion/abusetests; lokaal geïmplementeerd,
+  stagingacceptatie open;
 - G — expliciet F&F-pilotbesluit.
 
 De bestaande volledige-roadmap- en F&F-gates blijven leidend. Sensor verbreedt niet stilzwijgend de

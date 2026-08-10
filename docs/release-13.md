@@ -202,3 +202,36 @@ Definitieve stagingacceptatie:
 
 Fase E is hiermee afgerond. Fase F toetst de operationele staginggrenzen voor performance,
 verwijdering en misbruik; zij opent nog geen friends-and-family-deployment.
+
+## Fase F — performance, privacyverwijdering en gesloten misbruikgrens
+
+Status: lokaal geïmplementeerd en getest; stagingacceptatie staat open.
+
+- de bestaande twintig gekoppelde browserruns en het gecomprimeerde clientbudget worden opnieuw
+  uitgevoerd tegen exact dezelfde gepinde Matomo-client;
+- een batch weigert voortaan ook dubbele event-ID's en begrenst daarmee replay binnen één request;
+- persoonsgegevens, onbekende waarden, browsertrust-escalatie en meer dan 25 observations blijven
+  contractueel afgewezen;
+- website- en klantverwijdering wissen Sensor-aggregaten, manifests, measurement states en
+  outcome-definities expliciet voordat de bestaande entiteiten worden verwijderd;
+- de deletion ledger bevat alleen type, UUID en tijdstip en blijft idempotent bij herstelherhaling;
+- de stagingfixture bewijst dat alle vier Sensor-tabellen leeg zijn en ruimt de synthetische klant
+  ook bij een mislukte acceptatie op;
+- OpenAPI moet nul publieke Sensor- of observationroutes bevatten.
+
+Deze abuseacceptatie geldt uitsluitend voor de gesloten huidige grens. Rate limits, site/domain-
+binding, dagquota, timestampwindow en cross-request replaybescherming blijven harde voorwaarden
+voordat in een latere release een publieke Gatewayroute mag worden geopend.
+
+Lokale acceptatie:
+
+- 19 gerichte contract-, privacy-, fixture- en back-up/restoretests geslaagd;
+- volledige regressiesuite: 589 geslaagd met alleen de bestaande dependencywaarschuwing;
+- alle gewijzigde Pythonbestanden zijn lintvrij en correct geformatteerd;
+- Alembic blijft ongewijzigd op één lineaire head `0061`;
+- geen migration of extra releaseback-up nodig.
+
+De browseracceptatie downloadt de externe Matomo-client uitsluitend vanuit de gepinde bron, stelt
+een harde limiet van 100.000 bytes en verifieert zowel exacte omvang als SHA-256 vóór uitvoering.
+De client wordt alleen in een tijdelijk bestand gebruikt en niet in de repository of image
+opgenomen.

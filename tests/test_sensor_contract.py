@@ -99,3 +99,10 @@ def test_observation_batch_is_bounded() -> None:
 
     with pytest.raises(ValidationError):
         SensorObservationBatch(observations=[_observation() for _ in range(26)])
+
+
+def test_observation_batch_rejects_replayed_event_id() -> None:
+    observation = _observation()
+
+    with pytest.raises(ValidationError, match="event IDs must be unique"):
+        SensorObservationBatch(observations=[observation, observation])
