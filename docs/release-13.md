@@ -1,6 +1,6 @@
 # Release 13 — Thactual Sensor
 
-Status: fasen A tot en met E lokaal en op staging geaccepteerd. Er is nog geen publieke Gateway-
+Status: fasen A tot en met F lokaal en op staging geaccepteerd. Er is nog geen publieke Gateway-
 of Matomo-productiedeployment.
 
 ## Fase A — architecture discovery
@@ -205,7 +205,7 @@ verwijdering en misbruik; zij opent nog geen friends-and-family-deployment.
 
 ## Fase F — performance, privacyverwijdering en gesloten misbruikgrens
 
-Status: lokaal geïmplementeerd en getest; stagingacceptatie staat open.
+Status: lokaal geïmplementeerd en op staging geaccepteerd.
 
 - de bestaande twintig gekoppelde browserruns en het gecomprimeerde clientbudget worden opnieuw
   uitgevoerd tegen exact dezelfde gepinde Matomo-client;
@@ -247,3 +247,20 @@ Eerste stagingpoging:
 - de paren wisselen daarom deterministisch tussen A/B en B/A. Het rapport toont voor ieder paar
   met een long task het runnummer, de volgorde en beide maximale duren;
 - het budget blijft ongewijzigd op nul toerekenbare Sensor-long-tasks.
+
+Definitieve stagingacceptatie:
+
+- de gepinde Matomo-client en totale gecomprimeerde omvang van 24.286 bytes zijn geverifieerd;
+- twintig afwisselende A/B–B/A-paren gaven p75 18,4 ms bij een budget van 25 ms;
+- er waren nul long tasks in zowel nulmeting als Sensorvariant en dus nul toerekenbare long tasks;
+- alle vijf observations werden geordend in één same-origin POST zonder cookies;
+- persoonsgegevens, browsertrust-escalatie, een te grote batch en een herhaald event-ID zijn
+  afgewezen;
+- OpenAPI bevat nul publieke Sensor- of observationroutes;
+- manifests, definitions, dagelijkse metrics en measurement states zijn via de deletion ledger
+  verwijderd en dezelfde ledgerherhaling was idempotent;
+- alle synthetische gegevens zijn verwijderd en API/database bleven gezond;
+- gereedsignalen: `release-13-phase-f-browser-ok` en `release-13-phase-f-staging-ok`.
+
+Fase F is hiermee afgerond. Fase G is uitsluitend het expliciete pilotbesluit. Zij opent niet
+automatisch een publieke route of friends-and-family-deployment.

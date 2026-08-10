@@ -1,6 +1,6 @@
 # Release 13 — Thactual Sensor architecture discovery
 
-Status: fasen A tot en met E lokaal en op staging geaccepteerd. Er is geen publieke ingestion of
+Status: fasen A tot en met F lokaal en op staging geaccepteerd. Er is geen publieke ingestion of
 Matomo-productiedeployment.
 
 ## 1. Executive summary
@@ -755,8 +755,7 @@ Release 13 bestaat uit afzonderlijke gates:
 - D — observation manifest en één exposure/processfixture; lokaal en op staging geaccepteerd;
 - E — Thactual daily aggregates, quality state en intelligencekoppeling; lokaal en op staging
   geaccepteerd;
-- F — stagingacceptatie, performance/deletion/abusetests; lokaal geïmplementeerd,
-  stagingacceptatie open;
+- F — stagingacceptatie, performance/deletion/abusetests; lokaal en op staging geaccepteerd;
 - G — expliciet F&F-pilotbesluit.
 
 De bestaande volledige-roadmap- en F&F-gates blijven leidend. Sensor verbreedt niet stilzwijgend de
