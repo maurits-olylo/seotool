@@ -32,6 +32,7 @@ const SETTINGS_VIEWS = new Set(["clients", "team", "integrations"]);
 const CLIENT_STORAGE_KEY = "seo-monitor-client-id";
 const WEBSITE_STORAGE_KEY = "seo-monitor-website-id";
 const ONBOARDING_STORAGE_KEY = "seo-monitor-website-onboarding-id";
+let onboardingPollTimer = null;
 let operationsPollTimer = null;
 
 async function api(path, options = {}) {
@@ -371,6 +372,69 @@ function websiteVerificationMessage(errorCode) {
   })[errorCode] || "De plaatsing kon nog niet worden bevestigd. Controleer het bestand en probeer opnieuw.";
 }
 
+function onboardingPhaseLabel(phase) {
+  return ({
+    sitemap_import: "Sitemap wordt gelezen",
+    url_check: "Pagina's worden gecontroleerd",
+    crawl: "Website wordt verkend",
+    "404_analysis": "Foutpagina's worden beoordeeld",
+    internal_link_analysis: "Interne links worden geanalyseerd",
+    finalizing: "Eerste inzichten worden samengesteld",
+  })[phase] || "Website wordt gecontroleerd";
+}
+
+function renderFirstCrawlProgress(onboarding) {
+  const panel = $("#first-crawl-progress");
+  const status = onboarding.first_crawl_status;
+  const finished = ["succeeded", "partially_succeeded"].includes(status);
+  const failed = ["failed", "cancelled"].includes(status);
+  const current = Number(onboarding.first_crawl_current || 0);
+  const total = Number(onboarding.first_crawl_total || 0);
+  const percentage = finished ? 100 : total > 0 ? Math.min(95, Math.round((current / total) * 100)) : 8;
+  panel.classList.toggle("hidden", !onboarding.first_crawl_job_id);
+  if (!onboarding.first_crawl_job_id) return;
+  $("#website-onboarding-wizard").appendChild(panel);
+  $("#first-crawl-progress-bar").style.width = `${percentage}%`;
+  $("#retry-first-crawl").classList.toggle("hidden", !failed);
+  $("#view-first-results").classList.toggle("hidden", !finished);
+  if (finished) {
+    $("#first-crawl-progress-title").textContent = "Je eerste inzichten staan klaar";
+    $("#first-crawl-progress-message").textContent = status === "partially_succeeded"
+      ? "De bruikbare resultaten zijn beschikbaar. Enkele pagina's konden nog niet worden gecontroleerd."
+      : "De eerste controle is afgerond. Bekijk waar de meeste verbetering mogelijk is.";
+  } else if (failed) {
+    $("#first-crawl-progress-title").textContent = "De controle kon niet worden afgerond";
+    $("#first-crawl-progress-message").textContent = "Je instellingen zijn bewaard. Probeer de controle opnieuw; er wordt geen dubbele crawl aangemaakt.";
+  } else if (status === "running") {
+    $("#first-crawl-progress-title").textContent = onboardingPhaseLabel(onboarding.first_crawl_phase);
+    $("#first-crawl-progress-message").textContent = "Je kunt dit scherm sluiten. De controle gaat op de achtergrond verder.";
+  } else {
+    $("#first-crawl-progress-title").textContent = "De eerste controle staat klaar";
+    $("#first-crawl-progress-message").textContent = status === "waiting_for_capacity"
+      ? "De controle start automatisch zodra er capaciteit beschikbaar is."
+      : "De controle start automatisch. Je hoeft niets meer te doen.";
+  }
+  $("#first-crawl-progress-metrics").textContent = `${onboarding.first_crawl_discovered_urls || 0} gevonden · ${onboarding.first_crawl_crawled_urls || 0} gecontroleerd · ${onboarding.first_crawl_failed_urls || 0} niet gelukt`;
+}
+
+function scheduleOnboardingPoll() {
+  clearTimeout(onboardingPollTimer);
+  const status = state.websiteOnboarding?.first_crawl_status;
+  if (state.websiteOnboarding?.first_crawl_job_id && !["succeeded", "partially_succeeded", "failed", "cancelled"].includes(status)) {
+    onboardingPollTimer = setTimeout(loadOnboardingProgress, 4000);
+  }
+}
+
+async function loadOnboardingProgress() {
+  if (!state.websiteOnboarding?.id) return;
+  try {
+    state.websiteOnboarding = await api(`/api/v1/website-onboarding/${state.websiteOnboarding.id}`);
+    renderWebsiteOnboarding();
+  } catch (_error) {
+    scheduleOnboardingPoll();
+  }
+}
+
 function renderWebsiteOnboarding() {
   const onboarding = state.websiteOnboarding;
   const active = Boolean(onboarding);
@@ -388,14 +452,16 @@ function renderWebsiteOnboarding() {
   const crawlStarted = Boolean(onboarding.first_crawl_job_id);
   $("#verification-instructions").classList.toggle("hidden", verified);
   $("#first-crawl-preferences").classList.toggle("hidden", !verified || crawlStarted);
-  $("#website-verification-message").classList.toggle("error", Boolean(onboarding.last_error_code));
+  renderFirstCrawlProgress(onboarding);
+  $("#website-verification-message").classList.toggle("error", Boolean(onboarding.last_error_code) && !crawlStarted);
   $("#website-verification-message").textContent = crawlStarted
-    ? `De eerste crawl is aangemaakt en staat ${onboarding.first_crawl_status === "running" ? "in uitvoering" : "in de wachtrij"}.`
+    ? ""
     : verified
       ? "Website geverifieerd. Bevestig de veilige crawlvoorkeuren."
     : onboarding.last_error_code
       ? websiteVerificationMessage(onboarding.last_error_code)
       : "Download het bestand en plaats het op je website.";
+  scheduleOnboardingPoll();
 }
 
 async function startWebsiteOnboarding(event) {
@@ -532,11 +598,32 @@ async function resumeWebsiteOnboarding() {
 }
 
 function restartWebsiteOnboarding() {
+  clearTimeout(onboardingPollTimer);
   state.websiteOnboarding = null;
   state.verificationFileContent = null;
   localStorage.removeItem(ONBOARDING_STORAGE_KEY);
   $("#website-onboarding-form").reset();
   renderWebsiteOnboarding();
+}
+
+async function retryFirstOnboardingCrawl() {
+  const button = $("#retry-first-crawl");
+  button.disabled = true;
+  try {
+    await api(`/api/v1/website-onboarding/${state.websiteOnboarding.id}/first-crawl/retry`, {method: "POST"});
+    await loadOnboardingProgress();
+  } catch (error) {
+    $("#first-crawl-progress-message").textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function viewFirstOnboardingResults() {
+  localStorage.setItem(CLIENT_STORAGE_KEY, state.websiteOnboarding.client_id);
+  localStorage.setItem(WEBSITE_STORAGE_KEY, state.websiteOnboarding.website_id);
+  await loadClients(state.websiteOnboarding.client_id, state.websiteOnboarding.website_id);
+  showView("insights");
 }
 
 async function createWebsite(event) {
@@ -3273,6 +3360,8 @@ $("#download-verification-file").addEventListener("click", downloadWebsiteVerifi
 $("#check-website-verification").addEventListener("click", checkWebsiteVerification);
 $("#first-crawl-preferences").addEventListener("submit", startFirstOnboardingCrawl);
 $("#restart-website-onboarding").addEventListener("click", restartWebsiteOnboarding);
+$("#retry-first-crawl").addEventListener("click", retryFirstOnboardingCrawl);
+$("#view-first-results").addEventListener("click", viewFirstOnboardingResults);
 $("#website-form").addEventListener("submit", createWebsite);
 $("#invitation-form").addEventListener("submit", createInvitation);
 $("#invitation-client").addEventListener("change", loadMembers);

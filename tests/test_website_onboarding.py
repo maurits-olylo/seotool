@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 
 from app.db.session import SessionLocal
 from app.models.client import Client
+from app.models.crawl import CrawlRun
 from app.models.discovery import CrawlJob
 from app.models.onboarding import WebsiteOnboarding, WebsiteOwnershipVerification
 from app.models.website import Website
@@ -15,7 +16,9 @@ from app.services.http_crawler import FetchResult
 from app.services.website_onboarding import (
     VERIFICATION_PATH,
     check_website_ownership,
+    get_website_onboarding,
     renew_website_verification_file,
+    retry_first_onboarding_crawl,
     start_first_onboarding_crawl,
     start_website_onboarding,
     token_hash,
@@ -359,3 +362,77 @@ def test_first_crawl_api_is_idempotent_and_resumable(client) -> None:  # type: i
             )
             == 1
         )
+
+
+def test_onboarding_exposes_progress_and_advances_to_results() -> None:
+    with SessionLocal() as db:
+        client = _client(db)
+        started = start_website_onboarding(
+            db, client_id=client.id, actor_user_id=None, payload=_payload()
+        )
+        verification = db.scalar(select(WebsiteOwnershipVerification))
+        assert verification is not None
+        verification.status = "verified"
+        db.commit()
+        onboarding, job = start_first_onboarding_crawl(
+            db,
+            started.id,
+            actor_user_id=None,
+            preferences=WebsiteOnboardingCrawlPreferences(),
+        )
+        run = CrawlRun(
+            crawl_job_id=job.id,
+            website_id=job.website_id,
+            crawl_type=job.job_type,
+            status="succeeded",
+            phase="finalizing",
+            phase_current=12,
+            phase_total=12,
+            discovered_urls=15,
+            crawled_urls=12,
+            failed_urls=1,
+        )
+        job.status = "partially_succeeded"
+        db.add(run)
+        db.commit()
+
+        resumed = get_website_onboarding(db, onboarding.id)
+
+        assert resumed.status == "completed"
+        assert resumed.current_step == "results"
+        assert resumed.first_crawl_status == "partially_succeeded"
+        assert resumed.first_crawl_phase == "finalizing"
+        assert resumed.first_crawl_discovered_urls == 15
+        assert resumed.first_crawl_crawled_urls == 12
+        assert resumed.first_crawl_failed_urls == 1
+
+
+def test_failed_first_crawl_retries_with_same_job_id() -> None:
+    with SessionLocal() as db:
+        client = _client(db)
+        started = start_website_onboarding(
+            db, client_id=client.id, actor_user_id=None, payload=_payload()
+        )
+        verification = db.scalar(select(WebsiteOwnershipVerification))
+        assert verification is not None
+        verification.status = "verified"
+        db.commit()
+        onboarding, job = start_first_onboarding_crawl(
+            db,
+            started.id,
+            actor_user_id=None,
+            preferences=WebsiteOnboardingCrawlPreferences(),
+        )
+        job.status = "failed"
+        job.error_message = "Tijdelijke crawlerfout"
+        db.commit()
+        failed = get_website_onboarding(db, onboarding.id)
+
+        retried_onboarding, retried_job = retry_first_onboarding_crawl(db, onboarding.id)
+
+        assert failed.status == "failed"
+        assert failed.first_crawl_error == "Tijdelijke crawlerfout"
+        assert retried_job.id == job.id
+        assert retried_job.status == "pending"
+        assert retried_onboarding.status == "crawl_queued"
+        assert db.scalar(select(func.count()).select_from(CrawlJob)) == 1

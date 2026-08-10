@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.queue import crawl_queue_name, enqueue_crawl_job
+from app.models.crawl import CrawlRun
 from app.models.discovery import CrawlJob
 from app.models.onboarding import WebsiteOnboarding, WebsiteOwnershipVerification
 from app.models.website import Website, WebsiteSettings
@@ -102,7 +103,18 @@ def get_website_onboarding(db: Session, onboarding_id: UUID) -> WebsiteOnboardin
     first_crawl_job = (
         db.get(CrawlJob, onboarding.first_crawl_job_id) if onboarding.first_crawl_job_id else None
     )
-    return _read(onboarding, _verification(db, onboarding.id), first_crawl_job=first_crawl_job)
+    first_crawl_run = None
+    if first_crawl_job is not None:
+        reconcile_onboarding_crawl_status(db, first_crawl_job)
+        first_crawl_run = db.scalar(
+            select(CrawlRun).where(CrawlRun.crawl_job_id == first_crawl_job.id)
+        )
+    return _read(
+        onboarding,
+        _verification(db, onboarding.id),
+        first_crawl_job=first_crawl_job,
+        first_crawl_run=first_crawl_run,
+    )
 
 
 def renew_website_verification_file(
@@ -220,6 +232,82 @@ def start_first_onboarding_crawl(
     return onboarding, job
 
 
+def retry_first_onboarding_crawl(
+    db: Session,
+    onboarding_id: UUID,
+) -> tuple[WebsiteOnboarding, CrawlJob]:
+    onboarding = db.scalar(
+        select(WebsiteOnboarding).where(WebsiteOnboarding.id == onboarding_id).with_for_update()
+    )
+    if onboarding is None or onboarding.first_crawl_job_id is None:
+        raise LookupError("First onboarding crawl not found")
+    job = db.get(CrawlJob, onboarding.first_crawl_job_id)
+    if job is None:
+        raise LookupError("First onboarding crawl not found")
+    if job.status in {"waiting_for_capacity", "pending", "running"}:
+        return onboarding, job
+    if job.status not in {"failed", "cancelled"}:
+        raise ValueError("Deze eerste crawl kan niet opnieuw worden gestart")
+    if crawl_deployment_is_active(db):
+        raise RuntimeError("Crawls zijn tijdelijk gepauzeerd voor deployment")
+    job.status = "pending"
+    job.finished_at = None
+    job.error_message = None
+    onboarding.status = "crawl_queued"
+    onboarding.current_step = "first_crawl"
+    onboarding.last_error_code = None
+    db.commit()
+    if get_settings().app_env != "test" and not pause_job_if_deployment_active(db, job):
+        queued = enqueue_crawl_job(
+            str(job.id),
+            job_type=job.job_type,
+            attempt=job.attempt_count + 1,
+            priority=job.queue_priority,
+            website_id=str(job.website_id),
+        )
+        if queued is False:
+            job.status = "waiting_for_capacity"
+            db.commit()
+    return onboarding, job
+
+
+def reconcile_onboarding_crawl_status(db: Session, job: CrawlJob) -> None:
+    onboarding = db.scalar(
+        select(WebsiteOnboarding).where(WebsiteOnboarding.first_crawl_job_id == job.id)
+    )
+    if onboarding is None:
+        return
+    status = onboarding.status
+    current_step = onboarding.current_step
+    error_code = onboarding.last_error_code
+    if job.status in {"succeeded", "partially_succeeded"}:
+        status = "completed"
+        current_step = "results"
+        error_code = None
+        onboarding.completed_at = onboarding.completed_at or datetime.now(UTC)
+    elif job.status == "failed":
+        status = "failed"
+        current_step = "first_crawl"
+        error_code = "first_crawl_failed"
+    elif job.status == "cancelled":
+        status = "failed"
+        current_step = "first_crawl"
+        error_code = "first_crawl_cancelled"
+    else:
+        status = "crawl_queued"
+        current_step = "first_crawl"
+        error_code = None
+    if (onboarding.status, onboarding.current_step, onboarding.last_error_code) != (
+        status,
+        current_step,
+        error_code,
+    ):
+        onboarding.status = status
+        onboarding.current_step = current_step
+        onboarding.last_error_code = error_code
+        db.commit()
+
+
 def check_website_ownership(
     db: Session,
     onboarding_id: UUID,
@@ -311,6 +399,7 @@ def _read(
     *,
     token: str | None = None,
     first_crawl_job: CrawlJob | None = None,
+    first_crawl_run: CrawlRun | None = None,
 ) -> WebsiteOnboardingRead:
     return WebsiteOnboardingRead(
         id=onboarding.id,
@@ -325,6 +414,13 @@ def _read(
         verification_file_content=f"{VERIFICATION_PREFIX}{token}" if token else None,
         first_crawl_job_id=onboarding.first_crawl_job_id,
         first_crawl_status=first_crawl_job.status if first_crawl_job else None,
+        first_crawl_phase=first_crawl_run.phase if first_crawl_run else None,
+        first_crawl_current=first_crawl_run.phase_current if first_crawl_run else 0,
+        first_crawl_total=first_crawl_run.phase_total if first_crawl_run else 0,
+        first_crawl_discovered_urls=first_crawl_run.discovered_urls if first_crawl_run else 0,
+        first_crawl_crawled_urls=first_crawl_run.crawled_urls if first_crawl_run else 0,
+        first_crawl_failed_urls=first_crawl_run.failed_urls if first_crawl_run else 0,
+        first_crawl_error=first_crawl_job.error_message if first_crawl_job else None,
     )
 
 

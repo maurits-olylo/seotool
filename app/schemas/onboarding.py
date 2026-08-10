@@ -43,6 +43,13 @@ class WebsiteOnboardingRead(BaseModel):
     verification_file_content: str | None = None
     first_crawl_job_id: UUID | None = None
     first_crawl_status: str | None = None
+    first_crawl_phase: str | None = None
+    first_crawl_current: int = 0
+    first_crawl_total: int = 0
+    first_crawl_discovered_urls: int = 0
+    first_crawl_crawled_urls: int = 0
+    first_crawl_failed_urls: int = 0
+    first_crawl_error: str | None = None
 
 
 class WebsiteVerificationCheckRead(BaseModel):

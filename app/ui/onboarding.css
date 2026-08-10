@@ -104,6 +104,22 @@
   font-weight: 800;
 }
 
+.onboarding-progress {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.onboarding-progress h3,
+.onboarding-progress p {
+  margin: 0;
+}
+
+.onboarding-progress-metrics {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
 @media (max-width: 720px) {
   .crawl-preference-fields {
     grid-template-columns: 1fr;

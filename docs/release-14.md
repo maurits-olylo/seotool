@@ -1,6 +1,7 @@
 # Release 14 — Invitation-only onboarding
 
-Status: fase A, B en C lokaal en op staging geaccepteerd; nog niet op productie gedeployed.
+Status: fase A, B en C lokaal en op staging geaccepteerd; fase D lokaal gereed; nog niet op
+productie gedeployed.
 
 ## Doel
 
@@ -106,3 +107,25 @@ Stagingacceptatie:
 - de browserconsole bevat geen fouten of waarschuwingen;
 - de synthetische fixture is volledig opgeruimd en API en database zijn gezond;
 - definitief gereedsignaal: `release-14-phase-c-staging-ok`.
+
+## Fase D — begrijpelijke voortgang en herstel
+
+- onboarding volgt de bestaande eerste crawljob en maakt geen tweede voortgangsmodel;
+- wachtrij, uitvoering, crawlstadium en aantallen worden automatisch iedere vier seconden ververst;
+- technische crawlstadia worden vertaald naar begrijpelijke gebruikersmeldingen;
+- de flow blijft na refresh hervatbaar met hetzelfde onboarding- en crawljob-ID;
+- succes en gedeeltelijk succes openen rechtstreeks de eerste inzichten;
+- een mislukte of geannuleerde crawl geeft een herstelactie zonder instellingen te verliezen;
+- opnieuw proberen zet dezelfde crawljob terug in de wachtrij en maakt geen duplicaat.
+
+Lokale acceptatie:
+
+- 71 gerichte onboarding-, API- en interfacetests geslaagd;
+- volledige regressiesuite geslaagd met alleen de bestaande dependencywaarschuwing;
+- Python-linting en JavaScript-syntaxcontrole geslaagd;
+- voortgang, eindstatus, foutstatus en hergebruik van hetzelfde job-ID zijn afgedekt;
+- geen migration nodig: fase D gebruikt de bestaande modellen en Alembic-head `0063`.
+
+Stagingacceptatie moet nog aantonen dat een echte eerste crawl zichtbaar van wachtrij via uitvoering
+naar eerste inzichten gaat, na refresh verder loopt en na een gecontroleerde fout met hetzelfde
+job-ID kan worden hervat.
