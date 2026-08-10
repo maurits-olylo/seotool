@@ -24,9 +24,9 @@ def measure_once(browser: Any, matomo_source: str, bootstrap_source: str) -> dic
     def record_tracking_request(request: Any) -> None:
         if "/thactual/observe" not in request.url:
             return
-        batch_size = 1
+        batch_size = 0
         try:
-            payload = request.post_data_json
+            payload = json.loads(request.post_data or "")
             if isinstance(payload, dict) and isinstance(payload.get("requests"), list):
                 batch_size = len(payload["requests"])
         except Exception:  # noqa: BLE001 - diagnostics must not inspect or expose invalid payloads
@@ -133,12 +133,14 @@ def main() -> None:
         "budget": {
             "execution_ms_p75_max": 25,
             "tracking_requests_max": 2,
+            "largest_batch_min": 5,
             "long_tasks_at_least_50ms_max": 0,
         },
     }
     summary["within_budget"] = (
         summary["execution_ms_p75"] <= 25
         and summary["tracking_requests_max"] <= 2
+        and summary["largest_batch_min"] >= 5
         and summary["long_tasks_at_least_50ms"] == 0
     )
     print(json.dumps(summary, sort_keys=True))

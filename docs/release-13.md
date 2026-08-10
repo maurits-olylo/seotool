@@ -78,3 +78,11 @@ Eerste stagingmeting:
   als gesloten Sensor-events. Hierdoor blijven bezoek- en URL-context door Matomo verrijkt, terwijl
   de vijf proefobservaties als één bulk-POST kunnen worden verzonden;
 - de herhaalmeting rapporteert alleen methode, requestaantal en batchgrootte en logt geen payload.
+
+Tweede stagingmeting:
+
+- omvang 22.950 bytes, p75 uitvoering 24,5 ms, geen long tasks en maximaal één POST: geslaagd;
+- de batchteller rapporteerde door een te defensieve Playwright-uitlezing één item, terwijl de
+  Matomo-client een JSON-bulkbody verstuurt;
+- de acceptatie leest de POST-body nu expliciet als JSON, bewaart alleen het aantal `requests` en
+  vereist minimaal vijf items. Een parsefout levert nul op en kan dus niet meer onterecht slagen.
