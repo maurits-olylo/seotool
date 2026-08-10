@@ -1,0 +1,37 @@
+# Release 14 — Invitation-only onboarding
+
+Status: fase A lokaal in uitvoering; nog niet op staging of productie gedeployed.
+
+## Doel
+
+Een uitgenodigde gebruiker kan zonder terminal- of databasehandeling een website toevoegen,
+eigendom bewijzen, veilige crawlvoorkeuren bevestigen en daarna exact één eerste crawl starten. De
+flow is hervatbaar en tenantgebonden. Sensor blijft uit totdat websiteverificatie, privacyprofiel en
+een afzonderlijk live-activeringsbesluit zijn afgerond.
+
+## Fase A — persistente onboarding en eigendomsverificatie
+
+- aparte friends-and-family-route naast de bestaande beheerdersaanmaak;
+- idempotente start via een clientrequest-ID;
+- website en instellingen worden atomair met een persistente onboardingstatus aangemaakt;
+- de website blijft `verification_pending` en er wordt nog geen crawljob gemaakt;
+- één HTTPS-bestand onder `/.well-known/thactual-verification.txt` is de eerste verificatiemethode;
+- alleen SHA-256 van het willekeurige token wordt opgeslagen; de inhoud wordt alleen bij eerste
+  aanmaak teruggegeven;
+- controle hergebruikt timeout-, responsegrootte-, redirect- en SSRF-beveiliging;
+- redirects buiten de exacte website-origin, verkeerde inhoud en verlopen tokens zijn
+  herstelbare statussen;
+- succes activeert de website en brengt de flow naar crawlvoorkeuren, maar start nog geen crawl;
+- start en verificatiecontrole krijgen security-auditbewijs zonder token of responsecontent.
+
+Lokale acceptatie:
+
+- 17 gerichte onboarding-, security- en migratietests geslaagd;
+- volledige regressiesuite: 596 geslaagd met alleen de bestaande dependencywaarschuwing;
+- Alembic heeft één lineaire head `0062`;
+- gewijzigde Pythonbestanden zijn lintvrij en correct geformatteerd;
+- privacyverwijdering wist onboarding- en verificatierecords expliciet vóór websiteverwijdering.
+
+Vervolgfasen voegen tokenvernieuwing/download, de begeleide interface, idempotent starten van de
+eerste crawl, begrijpelijke voortgang, analytics/Sensor-meetvalidatie en end-to-end gebruikersproeven
+toe.

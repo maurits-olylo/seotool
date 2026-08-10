@@ -16,6 +16,7 @@ class CrawlError(RuntimeError):
 
 BODY_CONTENT_TYPES = {
     "text/html",
+    "text/plain",
     "application/xhtml+xml",
     "application/xml",
     "text/xml",

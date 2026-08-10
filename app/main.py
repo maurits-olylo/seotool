@@ -20,6 +20,7 @@ from app.api.routes import (
     integrations,
     issues,
     jobs,
+    onboarding,
     opportunities,
     public_estimates,
     recommendations,
@@ -95,6 +96,7 @@ async def redirect_proxied_http_to_https(
 
 
 app.include_router(clients.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
+app.include_router(onboarding.router, prefix="/api/v1", dependencies=[Depends(require_api_key)])
 app.include_router(
     content_analysis.router, prefix="/api/v1", dependencies=[Depends(require_api_key)]
 )

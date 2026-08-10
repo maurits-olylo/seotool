@@ -10,6 +10,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.models.client import Client
+from app.models.onboarding import WebsiteOnboarding, WebsiteOwnershipVerification
 from app.models.sensor import (
     SensorDailyPageMetric,
     SensorManifest,
@@ -19,11 +20,13 @@ from app.models.sensor import (
 from app.models.website import Website
 
 SUPPORTED_ENTITY_TYPES = {"client", "website"}
-SENSOR_WEBSITE_MODELS = (
+WEBSITE_PRIVACY_MODELS = (
     SensorDailyPageMetric,
     SensorMeasurementState,
     SensorOutcomeDefinition,
     SensorManifest,
+    WebsiteOwnershipVerification,
+    WebsiteOnboarding,
 )
 
 
@@ -94,8 +97,8 @@ def apply_privacy_deletions(db: Session, path: Path | None = None) -> dict[str, 
             if entity_type == "client"
             else [entity_id]
         )
-        for sensor_model in SENSOR_WEBSITE_MODELS:
-            db.execute(delete(sensor_model).where(sensor_model.website_id.in_(website_ids)))
+        for website_model in WEBSITE_PRIVACY_MODELS:
+            db.execute(delete(website_model).where(website_model.website_id.in_(website_ids)))
         if entity_type == "client":
             db.expire(entity, ["websites"])
         db.delete(entity)

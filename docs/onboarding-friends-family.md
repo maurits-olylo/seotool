@@ -1,5 +1,9 @@
 # Onboarding voor friends-and-family
 
+Status: de persistente website-onboarding en HTTPS-eigendomsverificatiefundering zijn lokaal
+geïmplementeerd in Release 14 fase A. Interface, tokenvernieuwing, eerste crawl en end-to-end
+gebruikersacceptatie volgen in afzonderlijke fasen.
+
 ## Doel
 
 Een uitgenodigde niet-technische gebruiker moet zonder terminal-, database- of handmatige

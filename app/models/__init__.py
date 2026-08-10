@@ -42,6 +42,7 @@ from app.models.issues import (
     IssueSuppression,
 )
 from app.models.jobs import JobListing
+from app.models.onboarding import WebsiteOnboarding, WebsiteOwnershipVerification
 from app.models.opportunities import OpportunityEvaluation
 from app.models.performance import PerformanceObservation
 from app.models.recommendations import (
@@ -101,6 +102,8 @@ __all__ = [
     "JobListing",
     "MonthlyReportSnapshot",
     "OpportunityEvaluation",
+    "WebsiteOnboarding",
+    "WebsiteOwnershipVerification",
     "PerformanceObservation",
     "RecommendationFeedback",
     "RecommendationTask",
