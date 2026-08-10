@@ -56,6 +56,12 @@ from app.models.recommendations import (
 )
 from app.models.rendering import RenderObservation
 from app.models.reporting import MonthlyReportSnapshot
+from app.models.sensor import (
+    SensorDailyPageMetric,
+    SensorManifest,
+    SensorMeasurementState,
+    SensorOutcomeDefinition,
+)
 from app.models.system import CrawlDeploymentControl, QueueDeadLetter, RetentionOperation
 from app.models.user import (
     ClientMembership,
@@ -105,6 +111,10 @@ __all__ = [
     "TaskNotification",
     "TaskNotificationReceipt",
     "RenderObservation",
+    "SensorDailyPageMetric",
+    "SensorManifest",
+    "SensorMeasurementState",
+    "SensorOutcomeDefinition",
     "IntegrationConnection",
     "MatomoAggregateMetric",
     "MatomoPageMetric",

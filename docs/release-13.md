@@ -1,7 +1,7 @@
 # Release 13 — Thactual Sensor
 
-Status: fasen A en B lokaal afgerond; fase C lokaal en op staging geaccepteerd. Er is nog geen
-publieke Gateway- of Matomo-productiedeployment.
+Status: fasen A tot en met D lokaal en op staging geaccepteerd; fase E lokaal geïmplementeerd en
+klaar voor stagingacceptatie. Er is nog geen publieke Gateway- of Matomo-productiedeployment.
 
 ## Fase A — architecture discovery
 
@@ -159,3 +159,33 @@ Definitieve stagingacceptatie:
 
 Fase D is hiermee afgerond. De fixture bewijst het manifestcontract en de beperkte browserruntime,
 niet een publieke klantinstallatie of productie-ingestion.
+
+## Fase E — dagelijkse aggregaten, meetkwaliteit en intelligence
+
+Status: lokaal geïmplementeerd en getest; stagingacceptatie staat open.
+
+- vier additive tabellen leggen manifestversies, outcome-definities, dagelijkse URL-aggregaten en
+  periodieke measurement state vast;
+- Thactual bewaart uitsluitend dagelijkse URL-aggregaten en geen raw events of visitorprofielen;
+- een provider-onafhankelijk contract levert sessies, exposure, interactie, processtart en
+  observed/trusted outcomes;
+- measurement state wordt alleen `reliable` bij een geldig actief manifest, minimaal zeven
+  meetdagen, minimaal 90% paginadekking, maximaal twee dagen freshness-lag, geen rejects en een
+  mogelijke outcome/startverhouding;
+- een nieuwere slechte quality state blokkeert oudere betrouwbare evidence;
+- betrouwbare Sensor-data verrijkt bestaande opportunities als ondersteunend gedragsbewijs, maar
+  maakt zelfstandig geen issue of opportunity;
+- effectevaluaties nemen Sensor-totalen en coverage mee als `behavior_observation` en blijven
+  expliciet `observed_correlation`, nooit een causale claim;
+- database-rollen krijgen alleen de benodigde toegang tot de nieuwe tabellen.
+
+Lokale acceptatie:
+
+- gerichte aggregate-, intelligence-, migratie- en fixturetests: 5 geslaagd;
+- volledige regressiesuite: 584 geslaagd met één bestaande dependencywaarschuwing;
+- Alembic heeft één lineaire head `0061`;
+- Ruff, formattering van de gewijzigde Pythonbestanden en diffcontrole: geslaagd;
+- geen publieke ingestionroute, site key, Matomo-backend of klantdeployment toegevoegd.
+
+De stagingfixture maakt een synthetische website met 28 meetdagen, bewijst reliable quality,
+opportunityverrijking en niet-causale effectevidence, en verwijdert alle synthetische data daarna.

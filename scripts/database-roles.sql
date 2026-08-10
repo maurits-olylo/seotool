@@ -37,7 +37,8 @@ GRANT SELECT ON TABLE clients, crawl_deployment_control, issue_suppressions, web
 TO seo_crawler;
 GRANT SELECT ON TABLE google_analytics_metrics, search_console_metrics TO seo_crawler;
 GRANT SELECT ON TABLE matomo_page_metrics, search_console_query_metrics,
-  url_content_classifications, url_content_overrides TO seo_crawler;
+  sensor_daily_page_metrics, sensor_manifests, sensor_measurement_states,
+  sensor_outcome_definitions, url_content_classifications, url_content_overrides TO seo_crawler;
 GRANT SELECT, INSERT ON TABLE effect_interventions, effect_evaluations TO seo_crawler;
 GRANT UPDATE (id) ON TABLE crawl_deployment_control TO seo_crawler;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO seo_crawler;
@@ -50,6 +51,8 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
   integration_connections, matomo_aggregate_metrics, matomo_page_metrics,
   external_intelligence_requests, external_observations, external_usage_records,
   performance_observations, search_console_metrics, search_console_query_metrics,
+  sensor_daily_page_metrics, sensor_manifests, sensor_measurement_states,
+  sensor_outcome_definitions,
   url_inspection_results, website_integrations
 TO seo_integration;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO seo_integration;

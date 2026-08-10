@@ -29,6 +29,7 @@ from app.services.opportunity_testability import (
     journey_friction_candidates,
     testability_band,
 )
+from app.services.sensor_aggregates import reliable_sensor_evidence_by_url
 
 ACTIVE_ISSUE_STATUSES = {
     "new",
@@ -149,6 +150,7 @@ def _contributors(
     *,
     url: Url,
     feasibility: str,
+    sensor_evidence: dict[str, object] | None = None,
 ) -> list[dict[str, object]]:
     return [
         {
@@ -175,6 +177,18 @@ def _contributors(
             "value": f"{PATTERN_VERSION}:{pattern}",
             "direction": "context",
         },
+        *(
+            [
+                {
+                    "dimension": "evidence",
+                    "signal": "observed_behavior",
+                    "value": sensor_evidence,
+                    "direction": "context",
+                }
+            ]
+            if sensor_evidence
+            else []
+        ),
         *priority_factors(
             url=url,
             issues=issues,
@@ -198,7 +212,16 @@ def _store_pattern(
     matching_issues: list[Issue],
     scores: OpportunityScores,
     feasibility: str,
+    sensor_evidence: dict[str, object] | None = None,
 ) -> tuple[OpportunityEvaluation, bool]:
+    source_coverage: dict[str, object] = {
+        "gsc": metrics.impressions > 0,
+        "crawler_issues": True,
+        "analytics": False,
+        "pattern": pattern,
+    }
+    if sensor_evidence:
+        source_coverage["behavior_observation"] = True
     return store_opportunity_evaluation(
         db,
         website_id=website_id,
@@ -208,18 +231,14 @@ def _store_pattern(
         period_start=period_start,
         period_end=period_end,
         scores=scores,
-        source_coverage={
-            "gsc": metrics.impressions > 0,
-            "crawler_issues": True,
-            "analytics": False,
-            "pattern": pattern,
-        },
+        source_coverage=source_coverage,
         contributors=_contributors(
             pattern,
             metrics,
             matching_issues,
             url=url,
             feasibility=feasibility,
+            sensor_evidence=sensor_evidence,
         ),
         evidence=[
             {
@@ -234,6 +253,7 @@ def _store_pattern(
                 "issue_ids": [str(issue.id) for issue in matching_issues],
                 "issue_types": sorted(issue.issue_type for issue in matching_issues),
             },
+            *([{"source": "behavior_observation", **sensor_evidence}] if sensor_evidence else []),
         ],
     )
 
@@ -337,6 +357,9 @@ def evaluate_website_opportunities(
     }
     canonicals = _latest_canonicals(db, set(urls))
     classifications = _latest_classifications(db, website_id)
+    sensor_evidence_by_url = reliable_sensor_evidence_by_url(
+        db, website_id, period_start, period_end
+    )
     created = 0
     existing = 0
     skipped = len(candidate_url_ids) - len(urls)
@@ -417,9 +440,7 @@ def evaluate_website_opportunities(
         ]
         if url.is_important and accessibility_issues:
             confidence = (
-                75
-                if all(issue.confidence == "high" for issue in accessibility_issues)
-                else 55
+                75 if all(issue.confidence == "high" for issue in accessibility_issues) else 55
             )
             candidates.append(
                 (
@@ -448,6 +469,7 @@ def evaluate_website_opportunities(
                 matching_issues=relevant,
                 scores=scores,
                 feasibility=feasibility,
+                sensor_evidence=sensor_evidence_by_url.get(url.id),
             )
             created += int(was_created)
             existing += int(not was_created)
@@ -462,12 +484,11 @@ def evaluate_website_opportunities(
             {str(url_id): metrics.impressions for url_id, metrics in metrics_by_url.items()},
         )
     )
-    url_id_by_value = {url.normalized_url: str(url.id) for url in db.scalars(
-        select(Url).where(Url.website_id == website_id)
-    )}
-    intent_insights = build_content_intent_insights(
-        db, website_id, period_start, period_end
-    )
+    url_id_by_value = {
+        url.normalized_url: str(url.id)
+        for url in db.scalars(select(Url).where(Url.website_id == website_id))
+    }
+    intent_insights = build_content_intent_insights(db, website_id, period_start, period_end)
     for insight in intent_insights:
         insight["url_id"] = url_id_by_value.get(str(insight.get("url") or ""), "")
     behavioral_candidates.extend(

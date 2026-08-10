@@ -16,8 +16,9 @@ from app.models.integrations import (
 )
 from app.services.analytics_provider import primary_analytics_source
 from app.services.content_analysis import normalize_query
+from app.services.sensor_aggregates import sensor_totals
 
-METHOD_VERSION = "2"
+METHOD_VERSION = "3"
 PERIOD_DAYS = 28
 MINIMUM_MATURITY_DAYS = 42
 MINIMUM_COVERAGE_DAYS = 14
@@ -91,10 +92,13 @@ def evaluate_effect_cohort(
     analytics_after = _analytics_totals(
         db, website_id, url_ids, observation_start, observation_end, analytics_source
     )
+    sensor_before = sensor_totals(db, website_id, url_ids, baseline_start, baseline_end)
+    sensor_after = sensor_totals(db, website_id, url_ids, observation_start, observation_end)
     metrics = {
         "gsc": _comparison(gsc_before, gsc_after),
         "question_gsc": _comparison(question_gsc_before, question_gsc_after),
         "analytics": _comparison(analytics_before, analytics_after),
+        "behavior_observation": _comparison(sensor_before, sensor_after),
     }
     if not interventions:
         status = "insufficient_data"
@@ -123,6 +127,11 @@ def evaluate_effect_cohort(
             "observation_days": analytics_after["days"],
             "expected_days": PERIOD_DAYS,
         },
+        "behavior_observation": {
+            "baseline_days": sensor_before["days"],
+            "observation_days": sensor_after["days"],
+            "expected_days": PERIOD_DAYS,
+        },
     }
     confidence = {
         "mature": bool(interventions) and latest + timedelta(days=MINIMUM_MATURITY_DAYS) <= as_of,
@@ -131,6 +140,7 @@ def evaluate_effect_cohort(
             and gsc_after["days"] >= MINIMUM_COVERAGE_DAYS
         ),
         "analytics_comparable": bool(analytics_before["days"] and analytics_after["days"]),
+        "behavior_observation_comparable": bool(sensor_before["days"] and sensor_after["days"]),
         "overlapping_urls": sum(1 for count in url_counts.values() if count > 1),
     }
     payload = {
@@ -220,9 +230,7 @@ def refresh_due_effect_evaluations(db: Session, *, as_of: date | None = None) ->
     return refreshed
 
 
-def _effect_recheck_due(
-    latest: EffectEvaluation | None, change_date: date, as_of: date
-) -> bool:
+def _effect_recheck_due(latest: EffectEvaluation | None, change_date: date, as_of: date) -> bool:
     if latest is None:
         return True
     created_date = latest.created_at.date()
