@@ -1,7 +1,6 @@
 # Release 14 — Invitation-only onboarding
 
-Status: fase A en B lokaal en op staging geaccepteerd; fase C lokaal geaccepteerd en nog niet op
-staging of productie gedeployed.
+Status: fase A, B en C lokaal en op staging geaccepteerd; nog niet op productie gedeployed.
 
 ## Doel
 
@@ -94,3 +93,13 @@ Lokale acceptatie:
 - volledige regressiesuite geslaagd met alleen de bestaande dependencywaarschuwing;
 - Python-linting, formattingcontrole en JavaScript-syntaxcontrole geslaagd;
 - dubbel starten levert dezelfde crawljob op en bewaart de oorspronkelijk bevestigde instellingen.
+
+Stagingacceptatie:
+
+- Alembic staat op één head `0063`;
+- herhaald starten levert exact dezelfde eerste crawljob op;
+- de veilige instellingen en verplichte robots.txt-keuze zijn opgeslagen;
+- de fixture maakte één databasejob en stuurde nul jobs naar Redis of een echte website;
+- hervatten na refresh is aanwezig;
+- de synthetische fixture is volledig opgeruimd en API en database zijn gezond;
+- definitief gereedsignaal: `release-14-phase-c-staging-ok`.
