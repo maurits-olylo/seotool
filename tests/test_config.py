@@ -114,6 +114,22 @@ def test_application_image_runs_as_non_root_user() -> None:
     assert "USER app" in dockerfile
 
 
+def test_application_images_install_only_hashed_locked_dependencies() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    dockerfile = (project_root / "Dockerfile").read_text()
+    render_dockerfile = (project_root / "Dockerfile.render").read_text()
+    runtime_lock = (project_root / "requirements.lock").read_text()
+    render_lock = (project_root / "requirements-render.lock").read_text()
+
+    assert "--require-hashes -r requirements.lock" in dockerfile
+    assert "--require-hashes" in render_dockerfile
+    assert "-r requirements.lock -r requirements-render.lock" in render_dockerfile
+    assert "pip install --no-cache-dir ." not in dockerfile
+    assert 'pip install --no-cache-dir ".[render]"' not in render_dockerfile
+    assert "--hash=sha256:" in runtime_lock
+    assert "--hash=sha256:" in render_lock
+
+
 def test_production_rejects_insecure_defaults() -> None:
     with pytest.raises(ValidationError, match="Default database credentials"):
         Settings(

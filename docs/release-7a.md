@@ -287,3 +287,18 @@ Deze fase kiest en configureert pas dan een betaalde tweede EU-opslaglocatie, Ob
 gelijkwaardige verwijderbescherming, automatische lifecycle en herstel vanaf uitsluitend de
 onafhankelijke kopie. SEC-13 blijft tot die acceptatie gedeeltelijk open en kan vóór Friends &
 Family niet als volledig opgelost worden aangemerkt.
+
+### Fase 7A — Gehashte productiedependencies
+
+Status: lokaal geïmplementeerd; staging- en productiebuildvalidatie blijven open.
+
+- `requirements.lock` bevat de volledige runtimegraaf met exacte versies en packagehashes;
+- de renderimage gebruikt dezelfde runtime-lock en een kleine gehashte Playwright-overlay;
+- beide applicatie-images installeren met `--require-hashes` en lossen tijdens de build geen brede
+  versieranges uit `pyproject.toml` meer op;
+- de applicatiecode draait rechtstreeks vanuit `/app`, waardoor geen tweede onbeheerde
+  build-isolationstap nodig is;
+- regressietests bewaken dat Dockerfiles niet terugvallen op een ongehashte projectinstallatie.
+
+Deze fase sluit SEC-15 nog niet. Een gecontroleerde Python 3.12-build, ontwikkel-/testlock, CI,
+SBOM en dependency-, secret-, SAST- en imagescans volgen in fase 7B.

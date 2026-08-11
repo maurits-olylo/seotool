@@ -11,8 +11,9 @@ FROM mcr.microsoft.com/playwright/python:v1.61.0-noble
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
 
-COPY pyproject.toml ./
-RUN pip install --no-cache-dir ".[render]"
+COPY requirements.lock requirements-render.lock ./
+RUN pip install --no-cache-dir --require-hashes \
+    -r requirements.lock -r requirements-render.lock
 COPY --from=axe-core /opt/axe/axe.min.js /opt/axe/axe.min.js
 COPY --from=axe-core /opt/axe/LICENSE /opt/axe/LICENSE
 COPY --chown=pwuser:pwuser . .
