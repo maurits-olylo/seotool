@@ -15,8 +15,9 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
   sitemap-/robotskwaliteit, taken en notificaties, Matomo/GA4, zoekintentie, contentanalyse,
   opportunities, effectmeting, externe vraag- en citation-evidence en gerichte live hercontrole.
 - Release 7a is technisch grotendeels afgerond. De onafhankelijke immutable EU-back-up, de
-  juridische/privacygelijkstelling en een afsluitende privacy- en securityaudit blijven harde gates
-  voor friends-and-family.
+  reproduceerbare supply chain, auditdetectie, juridische/privacygelijkstelling en een afsluitende
+  onafhankelijke privacy- en securityaudit blijven harde gates voor friends-and-family. De actuele
+  bevindingenmatrix staat in `docs/security-remediation-status-2026-08-11.md`.
 - De afzonderlijke Linux-worker is geen onderdeel van deze roadmap en wordt niet als beschikbare
   productiecapaciteit beschouwd.
 

@@ -59,7 +59,8 @@ wachtende taken opgeheven.
 
 ## Release 7a-B — Platform en privacy
 
-Status: in uitvoering; fase 1 is lokaal afgerond en nog niet gedeployed.
+Status: technisch grotendeels afgerond en gedeployed. De actuele herstelmatrix en resterende
+securitygates staan in `docs/security-remediation-status-2026-08-11.md`.
 
 Deze deelrelease behandelt de resterende platformhardening, SSRF-/netwerkisolatie, secretscheiding,
 containerbeleid, back-upbewijs, supply-chaincontroles en de functionele privacygate.
