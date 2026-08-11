@@ -256,6 +256,18 @@ Stagingacceptatie:
 - de crawl-drain is afgesloten met `active=false` en `resumed=0`;
 - definitief gereedsignaal: `release-13-14-production-ok`.
 
+## Live onboardingacceptatie — Thact
+
+- een nieuwe WordPress-website is volledig via de productie-interface onboard;
+- de website is als afzonderlijke website onder de bedoelde hoofdklant aangemaakt;
+- platformherkenning en de WordPress-route zijn gebruikt;
+- de gegenereerde verificatieplugin is gedownload, geïnstalleerd en succesvol gebruikt voor
+  eigendomsverificatie;
+- de download herstelt na een verlopen sessie via de normale loginroute en toont niet langer de
+  technische melding `Invalid API key`;
+- deze gecontroleerde acceptatie bewijst de live technische route, maar telt niet als een van de
+  twee vereiste proeven met niet-technische gebruikers.
+
 De publieke Sensor is hierbij niet geactiveerd. De technische productieacceptatie is afgerond; de
 twee geplande friends-and-family-gebruikersproeven blijven de laatste onboardingvalidatie.
 

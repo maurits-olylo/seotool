@@ -6,24 +6,25 @@ nadat de code is getest, gedeployed en het productieresultaat is gecontroleerd.
 
 ## Huidige status
 
-- Ontwikkeling is na afronding van Release 4 tijdelijk gepauzeerd voor de afzonderlijke inrichting
-  van de gaming-pc als Linux-worker. Release 5 start pas na een expliciet hervattingsbesluit.
-  Publieke website-inschatting en friends-and-family volgen in Release 13.
-- Productie en de geïsoleerde NAS-stagingomgeving zijn gezond en staan op migratie `0040`.
-- De elementlocatie-cleanup is op 1 augustus 2026 afgerond en operationeel gecontroleerd.
-- Automatische elementlocatieretentie is op 1 augustus 2026 in productie gevalideerd: vijf
-  persistente operaties zijn geslaagd en één operatie hervatte zichzelf begrensd via scheduler en
-  maintenancequeue.
-- Laatste volledige lokale kwaliteitscontrole: volledige testsuite en Ruff zonder bevindingen.
-- Multi-client domeinisolatie is op 2026-07-19 in productie bevestigd: `jobsatpearle.be` komt niet
-  meer als actieve URL van `werkenbijgrandvision.nl` voor.
+- Releases 1 tot en met 14 zijn technisch afgerond en op productie geaccepteerd. Release 14 is op
+  11 augustus 2026 aanvullend met een echte WordPress-onboarding van Thact gevalideerd.
+- Productie en de geïsoleerde NAS-stagingomgeving staan op migratie `0064`. API, database en de
+  geraakte workers zijn gezond; begrensde JavaScript-rendering, visuele issue-inspectie, Sensor en
+  invitation-only onboarding zijn operationeel.
+- De productkern ondersteunt inmiddels technische SEO, PageSpeed/CrUX, structured data,
+  sitemap-/robotskwaliteit, taken en notificaties, Matomo/GA4, zoekintentie, contentanalyse,
+  opportunities, effectmeting, externe vraag- en citation-evidence en gerichte live hercontrole.
+- Release 7a is technisch grotendeels afgerond. De onafhankelijke immutable EU-back-up, de
+  juridische/privacygelijkstelling en een afsluitende privacy- en securityaudit blijven harde gates
+  voor friends-and-family.
+- De afzonderlijke Linux-worker is geen onderdeel van deze roadmap en wordt niet als beschikbare
+  productiecapaciteit beschouwd.
 
-## Gebundelde uitvoeringsplanning vanaf 2 augustus 2026
+## Leidende releaseplanning
 
-De resterende roadmap wordt voortaan in grotere, samenhangende releases uitgevoerd. De bestaande
-secties hieronder blijven de inhoudelijke specificatie en behouden hun gerealiseerde status. Deze
-releasevolgorde is leidend voor planning en deployment. Interne mijlpalen worden niet afzonderlijk
-gedeployed; per release volgt één integrale kwaliteitscontrole, stagingproef en productiedeployment.
+De status in deze lijst is leidend. Oudere inhoudelijke secties lager in dit document blijven als
+specificatie en historische onderbouwing behouden, maar mogen niet worden gebruikt om de actuele
+releasestatus af te leiden.
 
 1. **Retentie en productie-integriteit** — versieerbaar beleid, volledige audit, veilige
    multi-datasetretentie en bewijsbehoud. Status: afgerond en op 2 augustus 2026 met migratie
@@ -84,21 +85,231 @@ gedeployed; per release volgt één integrale kwaliteitscontrole, stagingproef e
    Status: afgerond en op 2 augustus 2026 met exact releasecommit `99f242c` op staging en productie
    gevalideerd. Staging bevestigde de Chromium-runtime; productie bevestigde migratie `0040`,
    queuebeleid v2, alle geraakte workers, API- en databasehealth en een correct opgeheven
-   crawl-drain. Rendering blijft met `RENDERING_ENABLED=false` bewust inactief totdat de nieuwe
-   Linux-worker afzonderlijk is ingericht en de productkoppeling expliciet wordt goedgekeurd.
-5. **Lighthouse/CrUX, contextuele structured data en sitemap-/robotskwaliteit.**
+   crawl-drain. Rendering bleef binnen Release 4 bewust inactief; zij is in Release 11 begrensd op
+   de NAS geactiveerd en operationeel geaccepteerd. De Linux-worker blijft een afzonderlijk project.
+5. **Lighthouse/CrUX, contextuele structured data en sitemap-/robotskwaliteit.** Status: afgerond
+   en op 4 augustus 2026 op staging en productie gevalideerd met migratie `0041`.
 6. **Begrijpelijk actieplatform** — diagnoses, taken, URL-overzicht, crawldiepte, exports,
-   notificaties en UX/UI-polish.
-7. **Matomo en analytics-meetkwaliteit.**
+   notificaties en UX/UI-polish. Status: afgerond en op 4 augustus 2026 op staging en productie
+   gevalideerd met migratie `0042`.
+7. **Matomo en analytics-meetkwaliteit.** Status: afgerond en op 5 augustus 2026 op staging en
+   productie gevalideerd.
+7a. **Privacy by design en frictieloze klantinstructies** — verplichte privacyfundering nadat
+    Matomo is gedeployed en in productie is gevalideerd, en vóór de verdere datarijke releases en
+    friends-and-family-onboarding. Status: deels afgerond. Identiteit, toegang, containerhardening,
+    secretscheiding, minimale databaserollen, crawlerisolatie en lokaal herstelbare versleutelde
+    back-ups zijn operationeel. De resterende gates staan hieronder.
 8. **Zoekintentie en contentanalyse** — kwaliteit, veroudering, overlap en interne-linkkansen.
-9. **Opportunity-engine en contextuele data-assistent.**
-10. **Genormaliseerde externe links en eerste betaalde dataprovider.**
-11. **SERP-, zichtbaarheid- en concurrentieanalyse.**
-12. **Effectmeting en klant-/managementrapportage.**
+   Status: afgerond en op 7 augustus 2026 op staging en productie gevalideerd met migratie `0054`.
+9. **Opportunity-engine en contextuele data-assistent.** Status: afgerond en op 7 augustus 2026 op
+   staging en productie gevalideerd met migratie `0055`.
+10. **Meetbare SEO-effectontwikkeling** — interventies, automatische taakverificatie,
+    effectevaluaties en historische vergelijking. Status: afgerond en op 7 augustus 2026 op staging
+    en productie gevalideerd met migratie `0057`.
+11. **Externe vraagintelligence en visuele issue-inspectie** — schaalbare vraag-/paginakoppeling,
+    ontbrekende antwoorden en citations, herbruikbaar extern bewijs, screenshots, elementmarkering
+    en gerichte live hercontrole. Status: afgerond en op 8 augustus 2026 op staging en productie
+    gevalideerd met migratie `0060`.
+12. **Continuous Website Improvement-pilot** — accessibility als eerste extra kwaliteitsbron,
+    betrouwbare axe-core-normalisatie, componentgroepering, meerdere issues naar een taak en
+    gerichte verificatie. Status: afgerond en op staging en productie gevalideerd. Zie
+    `docs/continuous-website-improvement-design.md` en `docs/release-12.md`.
 13. **Publieke ervaring en onboarding** — website-inschatting, publieke vraagassistent,
     vergelijkingen, invitation-only onboarding, websiteverificatie en meetvalidatie.
+    Status: Sensor en invitation-only onboarding zijn technisch afgerond en op productie
+    gevalideerd. De publieke homepageonderdelen, twee niet-technische onboardingproeven en de
+    resterende privacy- en securitygates blijven open.
 14. **Begrensde generatieve AI** — providerabstractie, gebruiksregistratie, budgetten,
-    prijsbevestiging, audit, veiligheidsregels en alleen goedgekeurde kleine functies.
+    prijsbevestiging, audit, veiligheidsregels en alleen goedgekeurde kleine functies. Status:
+    gepland; geen voorwaarde voor de eerste continuous-improvement-pilot.
+
+### Gebundelde interfaceperformance en begrijpelijkheid
+
+Status: deels gerealiseerd in Releases 8 tot en met 11. De resterende meetbare
+interfaceperformance en Matomo-polish worden gebundeld met een volgende substantiële
+interface-release; niet als losse cosmetische hotfix uitbrengen.
+
+- Toon de applicatieschil en gekozen klant-/websitecontext direct; blokkeer het eerste beeld niet op
+  volledige issue-, rapportage-, crawl- of integratiedata.
+- Laad dashboardonderdelen onafhankelijk en parallel met herkenbare skeletons, laadstatussen en
+  herstelbare foutmeldingen. Eén traag endpoint mag de overige interface niet verbergen.
+- Verminder de seriële opstartketen voor gebruiker, klanten, websites en issues. Haal alleen de
+  noodzakelijke samenvatting op vóór de eerste bruikbare weergave en pagineer grote detailsets.
+- Meet server-side responstijden per endpoint en leg trage databasequeries, aantallen en relevante
+  context vast zonder secrets of klantinhoud te loggen.
+- Verwerk de reeds uitgestelde Matomo-polish: leg de URL-koppelingsratio in gewone taal uit, toon
+  unieke URL-aantallen en bied een bruikbare doorklik naar ongekoppelde URL-varianten.
+- Gebruik voor dashboardhiërarchie een compacte stand van zaken, ontwikkeling, eerstvolgende
+  acties, recent opgeloste problemen en crawlactualiteit. Introduceer geen algemene SEO-score.
+
+Acceptatie:
+
+- De eerste bruikbare applicatieweergave verschijnt onder normale productiebelasting binnen één
+  seconde; hoofdgegevens zijn binnen twee seconden zichtbaar of tonen een lokale laadstatus.
+- Een vertraagde detailaanvraag houdt navigatie, contextselectie en reeds beschikbare kaarten niet
+  tegen.
+- Een refresh toont onmiddellijk visuele voortgang en nooit meerdere seconden een leeg scherm.
+- Desktop en 390 px mobiel blijven zonder horizontale overflow bruikbaar.
+- Gemeten endpoint- en renderdoorlooptijden zijn vóór en na de wijziging vastgelegd.
+
+### Harde privacygate na Matomo en vóór friends-and-family
+
+Deze mijlpaal start nadat Matomo als bron is gedeployed en in productie is gevalideerd. De
+friends-and-family-release mag niet starten voordat de privacygate volledig is uitgevoerd, getest
+en gedocumenteerd.
+
+#### Verantwoordelijkheidsmodel en eigen zorgplicht
+
+Leg in algemene voorwaarden, gebruiksvoorwaarden en verwerkersovereenkomst vast dat de klant
+instaat voor zijn bevoegdheid, rechtmatige doelen en instructies, gekozen websites en bronnen,
+gebruikers die hij toegang geeft, noodzakelijkheid van afwijkende bewaartermijnen en het verdere
+gebruik van correct gedownloade exports.
+
+SEO Monitor blijft zelf verantwoordelijk voor een veilige, minimale en correcte uitvoering. Het
+platform moet zich aantoonbaar inspannen om privacy-inbreuken te voorkomen en mag de
+klantverantwoordelijkheid niet gebruiken om eigen verplichtingen weg te schrijven. Dit omvat
+minimaal tenantisolatie, least privilege, veilige authenticatie en OAuth, gegevensminimalisatie,
+doelbinding, logging zonder onnodige persoonsgegevens, retentie en verwijdering, veilige back-ups,
+SSRF-bescherming, subverwerkersbeheer, incidentafhandeling en geen eigen secundair gebruik van
+klantdata zonder afzonderlijk goedgekeurde grondslag en transparantie. Een kennelijk onrechtmatige
+of onveilige instructie moet kunnen worden gewaarschuwd, geweigerd of opgeschort.
+
+#### Frictieloze onboarding en klantinstructies
+
+Vraag alleen naar keuzes die de verwerking werkelijk veranderen. Geef herkenbare suggesties,
+gebruik `Anders` alleen voor uitzonderingen en plaats bij iedere betekenisvolle privacyvraag een
+toegankelijke `[?]`-uitleg waarom de vraag wordt gesteld en wat het antwoord verandert.
+
+De onboarding legt minimaal vast:
+
+- relatie tot de website: eigen organisatie, klant, adviseur, concurrentieonderzoek, eenmalige
+  audit of anders;
+- gebruiksdoel met passende suggesties en alleen bij `Anders` een korte toelichting;
+- type website en alleen waar relevant een vervolgvraag over structureel gevoelige inhoud;
+- bewaartermijn: 90 dagen, 1 jaar als aanbevolen standaard of 3 jaar met waarschuwing en actieve
+  keuze;
+- privacycontact, standaard ingevuld met de accountbeheerder en eenvoudig wijzigbaar.
+
+Vraag geen afzonderlijke juridische bevestiging wanneer het doel al vastligt in de productfunctie,
+de gebruikershandeling zelf een duidelijke instructie vormt en het antwoord niets aan de
+verwerking verandert. Een geslaagde OAuth-koppeling en propertyselectie gelden bijvoorbeeld als
+gedocumenteerde instructie; integraties tonen doel, gegevenscategorieën en rechten, maar vragen
+geen overbodige doel- of bevoegdheidsvragen. Bij gebruikersuitnodigingen kiest de beheerder alleen
+de noodzakelijke functionele rol; de algemene klantgarantie wordt niet bij iedere uitnodiging
+herhaald.
+
+Vraag pas contextueel aanvullende bevestiging bij een wezenlijke risicoverandering, zoals een
+langere bewaartermijn, gevoelige websitecategorie, uitbreiding buiten de bestaande websitescope,
+authenticated crawling, AI-verwerking of afwijkend gebruik buiten de vastgelegde productdoelen.
+
+#### Privacyvriendelijke Matomo-implementatie
+
+Neem Matomo volledig op in het gegevensregister, retentiebeleid, privacystatement,
+verwerkersovereenkomst en subverwerkersbeoordeling. Gebruik veilige defaults:
+
+- alleen de expliciet gekoppelde Matomo-site en noodzakelijke, bij voorkeur geaggregeerde
+  rapportagedata importeren;
+- API-token met uitsluitend noodzakelijke leestoegang, versleutelde opslag en nooit tokens in URL's
+  of logs;
+- geen bezoeker-IP's, raw visit logs, user-ID's, volledige URL-querystrings of andere directere
+  identifiers importeren wanneer geaggregeerde statistieken voor het productdoel volstaan;
+- interne zoekopdrachten, individuele bezoekersprofielen en andere gevoeliger datasets alleen
+  ondersteunen na een afzonderlijk doel- en privacybesluit en standaard uit laten;
+- brondata, herkomst, gekozen site, meetdefinities, bewaartermijn en ontkoppeling auditbaar maken;
+- Matomo- en GA4-data gescheiden houden en nooit stilzwijgend samenvoegen;
+- bij eventueel eigen gebruik van Matomo voor SEO Monitor zelf kiezen voor een EU-gehoste of
+  zelfbeheerde inrichting, minimale events, passende IP-anonimisering, korte retentie, respect voor
+  toepasselijke browser-/privacykeuzes en waar haalbaar een cookieloze configuratie; de definitieve
+  cookiebanner- en toestemmingskeuze juridisch laten beoordelen op basis van de feitelijke
+  configuratie.
+
+#### Privacystatement en contracten
+
+Werk het privacystatement, de algemene voorwaarden, gebruiksvoorwaarden en verwerkersovereenkomst
+gezamenlijk bij zodat zij overeenkomen met de werkelijke productwerking. Leg minimaal vast:
+
+- rollen van SEO Monitor, klant en eventuele bureau-/subverwerkerketen;
+- doelen, gegevenscategorieën, bronnen, bewaartermijnen en verwijdering;
+- crawling van eigen sites, klantsites, publieke concurrentiesites en eenmalige analyses;
+- OAuth-, Matomo-, GA4-, GSC- en Bing-verwerking;
+- rechten en instructies van klanten, betrokkenenverzoeken, incidenten en audits;
+- actuele subverwerkers, EU-datalocaties en wijzigingsprocedure;
+- welke verantwoordelijkheid de klant draagt en welke verplichtingen SEO Monitor zelf behoudt;
+- dat productclaims over gegevensminimalisatie en privacy by design alleen worden gebruikt wanneer
+  zij technisch en operationeel aantoonbaar waar zijn.
+
+#### E-mail, notificaties en opt-ins
+
+Maak een versieerbaar communicatie- en toestemmingsmodel met een centraal voorkeurencentrum.
+Onderscheid minimaal:
+
+- noodzakelijke service- en beveiligingsberichten die onderdeel zijn van de dienstverlening, zoals
+  accountbeveiliging, belangrijke storingen, contractwijzigingen en kritieke incidentmeldingen;
+- functionele productnotificaties die de gebruiker per categorie en kanaal kan aan- of uitzetten,
+  zoals crawlresultaten, taakupdates, rapportages en integratiefouten;
+- marketing, commerciële updates, nieuwsbrieven en productpromotie, die nooit worden gebundeld met
+  noodzakelijke dienstverlening en alleen na een afzonderlijke geldige opt-in worden verzonden.
+
+Gebruik geen vooraf aangevinkte marketingkeuzes. Maak opt-ins specifiek, begrijpelijk, aantoonbaar
+en even eenvoudig intrekbaar als verstrekbaar. Bewaar per keuze gebruiker, doel/categorie, kanaal,
+datum en tijd, bron, oude en nieuwe waarde en de versie van de getoonde tekst. Iedere optionele
+e-mail bevat een werkende afmeldroute; het voorkeurencentrum laat keuzes per categorie beheren.
+Hertoets de precieze grondslag en vereiste opt-in per berichttype vóór implementatie en laat de
+definitieve teksten juridisch controleren.
+
+#### Bewijs en acceptatie
+
+Bewaar per relevante klantinstructie organisatie, website, handelende gebruiker en rol, gekozen
+instelling, datum en tijd, oude en nieuwe waarde, toepasselijke contract-/beleidsversie,
+verificatiemethode en de automatisch toegepaste technische gevolgen. Bewaar niet alleen het
+antwoord, maar ook bewijs dat retentie, toegangsbeperking, opt-out en verwijdering werkelijk zijn
+uitgevoerd.
+
+Acceptatie vóór friends-and-family:
+
+- Matomo voldoet aan bovenstaande privacydefaults en is opgenomen in alle relevante registers en
+  documenten;
+- onboarding bevat alleen betekenisvolle privacykeuzes en gebruikt veilige defaults;
+- privacy-instructies, communicatievoorkeuren en wijzigingen zijn versieerbaar en auditbaar;
+- e-mail- en notificatievoorkeuren zijn per doel en kanaal getest, inclusief afmelding;
+- privacystatement, voorwaarden, verwerkersovereenkomst en productgedrag zijn gelijkgetrokken;
+- bewaartermijnen en verwijdering werken over database, exports, tijdelijke opslag en herstelproces;
+- de eigen niet-overdraagbare privacy- en securityverplichtingen van SEO Monitor zijn aantoonbaar
+  uitgevoerd;
+- een nieuwe privacy- en securityaudit is succesvol afgerond zonder openstaande kritieke of hoge
+  bevindingen.
+
+De F&F-release krijgt alleen `GO` wanneer deze privacygate én de onderstaande securitygate zijn
+afgerond en het bewijs daarvan is vastgelegd.
+
+### Harde securitygate vóór friends-and-family-release
+
+De friends-and-family-release in Release 13 mag niet worden gestart zolang de security-audit van
+3 augustus 2026 niet volledig en aantoonbaar naar tevredenheid is afgehandeld. Het auditrapport is
+opgeslagen als `docs/security-audit-2026-08-03.md`.
+
+Minimaal vereist vóór vrijgave:
+
+- alle bevindingen met prioriteit P0 en P1 zijn opgelost, getest en gereviewd;
+- de uitnodigingsflow kan geen bestaand account of wachtwoord overnemen;
+- iedere lees- en schrijfactie wordt afgedwongen op gebruiker, tenant, tenantrol, object en actie;
+- crawler en renderer zijn aantoonbaar beschermd tegen SSRF, redirects, DNS-rebinding en toegang
+  tot interne netwerken;
+- productie-API, databases, queues en beheerinterfaces zijn niet rechtstreeks publiek bereikbaar;
+- MFA voor beheerders, login-rate-limiting en intrekbare sessies zijn operationeel;
+- API- en workeridentiteiten hebben afzonderlijke, minimale en roteerbare rechten;
+- secrets zijn per service begrensd en containers zijn volgens het vastgestelde beleid gehard;
+- security-auditlogging, detectie en incidentrespons zijn operationeel getest;
+- een versleutelde en tegen verwijdering beschermde onafhankelijke EU-back-up is succesvol hersteld;
+- builds zijn reproduceerbaar en CI controleert tests, secrets, dependencies, code en containerimages;
+- alle vereiste regressie-, tenantisolatie- en securitytests slagen in de gecontroleerde pipeline;
+- de toepasselijke OWASP ASVS niveau 2-eisen zijn voorzien van bewijs en zonder onbehandelde
+  kritieke of hoge afwijkingen beoordeeld.
+
+Na implementatie moet een volledige nieuwe security-audit worden uitgevoerd. De F&F-release krijgt
+alleen `GO` wanneer die heraudit succesvol is, geen openstaande kritieke of hoge bevindingen bevat
+en het resultaat inclusief bewijs en eventuele expliciete risicoacceptaties is vastgelegd. Een
+code-review, checklist of geslaagde standaardtestset vervangt deze heraudit niet.
 
 Grote releases betekenen niet dat onverenigbare risico's ongescheiden worden uitgevoerd. Iedere
 migratie blijft herhaalbaar en controleerbaar. Destructieve dataverwerking, providerkosten en
@@ -1510,13 +1721,17 @@ Acceptatie:
 
 ## Invitation-only onboardingworkflow
 
-Status: gepland; nog niet in uitvoering. Dit is een verplichte, releaseblokkerende fase vóór de
-friends-and-family-release. De functionele scope, beveiligingskeuze, testmatrix en raming staan in
-`docs/onboarding-friends-family.md`.
+Status: technisch afgerond en op 11 augustus 2026 op productie geaccepteerd. De begeleide
+websiteflow, eigendomsverificatie, veilige eerste crawl, meetkwaliteitsstatus,
+platformherkenning en WordPress-verificatieplugin zijn beschikbaar. Twee volledige proeven met
+niet-technische gebruikers blijven open. De functionele scope, beveiligingskeuze, testmatrix en
+het proefprotocol staan in `docs/onboarding-friends-family.md`.
 
 - Bouw voort op de bestaande accounts, uitnodigingen, rollen en atomaire klant-/websitecreatie.
 - Voeg een begeleide en hervatbare flow toe van uitnodiging tot eerste crawlresultaten.
-- Voeg één veilige methode voor website-eigendomsverificatie toe.
+- Bied eenvoudige verificatieplugins voor WordPress en later de ondersteunde andere platforms.
+  Houd deze eerste plugins klein: zij publiceren alleen de verificatieroute en krijgen minimale
+  rechten. Handmatige bestandsplaatsing blijft een alternatief.
 - Maak analytics-meetkwaliteit onderdeel van onboarding zodra een analyticsbron wordt gekoppeld:
   valideer koppeling en scope, leg gekwalificeerde leadevents en hun ingangsdatum vast, voer een
   historische nulmeting uit en toon een blijvende betrouwbaarheidsstatus.
@@ -1529,7 +1744,42 @@ friends-and-family-release. De functionele scope, beveiligingskeuze, testmatrix 
   het product.
 - Voorkom dubbele websites en initiële crawls bij refresh, dubbel klikken of opnieuw proberen.
 - Valideer de volledige flow met minimaal twee niet-technische proefgebruikers.
-- Start deze implementatie pas als een afzonderlijke ontwikkelfase expliciet wordt gekozen.
+- Werk iedere resterende onboardinguitbreiding uit als een afzonderlijk gekozen ontwikkelfase.
+
+### Latere CMS-plugins voor inzicht en begrensde uitvoering
+
+Status: toekomstig; geen voorwaarde voor afronding van de huidige onboardingrelease. Bouw dit pas
+uit nadat de eenvoudige verificatieplugins stabiel werken en de plugin-API afzonderlijk is
+ontworpen en beveiligd.
+
+- Ondersteun uiteindelijk WordPress, Shopify, Wix, Webflow, Squarespace en maatwerk via
+  platform-specifieke adapters.
+- Toon in het CMS-dashboard een actueel actieoverzicht uit Thactual, met een directe link naar de
+  betreffende publieke pagina en waar het platform dit betrouwbaar ondersteunt naar het juiste
+  bewerkscherm.
+- Laat taken en uitvoeringsstatus synchroniseren zonder de crawler-, issue- of taakengine naar de
+  plugin te verplaatsen. Thactual blijft beslissen en controleren; de plugin toont en voert uit.
+- Bouw een beperkte, versieerbare actiebibliotheek. Begin met laag-risicoacties zoals een pagina uit
+  een CMS-sitemap uitsluiten, redirects beheren, metadata of indexatie-instellingen aanpassen en
+  bekende interne links naar een expliciet gekozen vervangende pagina wijzigen.
+- Vereis bij iedere mutatie een preview, expliciete toestemming, idempotente uitvoering,
+  auditlogging, minimale CMS-rechten en waar mogelijk een herstelpunt of rollback.
+- Voer middelgrote en hoge risicoacties, waaronder content verwijderen, slugs wijzigen,
+  templatecode aanpassen en grote contentherschrijvingen, nooit stilzwijgend autonoom uit.
+- Start na uitvoering automatisch een gerichte Thactual-controle. Sluit de taak alleen wanneer het
+  resultaat aantoonbaar is hersteld; geef de taak anders met bewijs terug voor vervolgwerk.
+- Behandel een symptoom niet automatisch als oplossing. Bij een 404 in een sitemap bepaalt
+  Thactual eerst of herstellen, redirecten of uitsluiten passend is; de plugin voert uitsluitend de
+  expliciet gekozen actie uit.
+
+Acceptatie voor deze latere uitbreiding:
+
+- een plugin kan alleen acties uitvoeren waarvoor de gebruiker en het CMS aantoonbaar bevoegd zijn;
+- iedere mutatie is vooraf uitlegbaar, achteraf auditbaar en veilig opnieuw uitvoerbaar;
+- tenant-, website- en taakscope kunnen niet worden verwisseld;
+- een mislukte of gedeeltelijke uitvoering leidt niet tot een onterecht gesloten taak;
+- verwijderen of andere moeilijk herstelbare acties vereisen een afzonderlijke risicobeoordeling
+  en expliciete bevestiging.
 
 ## Pakketdefinitie, prijzen en gratis gebruikstermijn
 

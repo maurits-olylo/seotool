@@ -5,11 +5,15 @@ De flow omvat uitnodiging, hervatbare websitewizard, eigendomsverificatie, veili
 begrijpelijke voortgang, optionele meetkwaliteit en platformgestuurde verificatie. Alleen twee
 volledige niet-technische gebruikersproeven staan nog open.
 
+De live WordPress-onboarding en verificatieplugin zijn op 11 augustus 2026 met Thact succesvol
+gecontroleerd. Deze technische acceptatie telt niet als een van de twee niet-technische proeven.
+
 ## Productiestatus
 
-De wizard en beveiligde onboardingroutes zijn op 11 augustus 2026 op productie gecontroleerd
-zonder een echte website, verificatie of crawl aan te maken. De publieke Sensor blijft uit. De
-volgende acceptatiestap is de volledige flow laten uitvoeren door twee niet-technische gebruikers.
+De wizard en beveiligde onboardingroutes zijn op 11 augustus 2026 op productie gecontroleerd. Een
+echte WordPress-website van Thact is daarna via de wizard toegevoegd en met de gegenereerde plugin
+geverifieerd. De volgende acceptatiestap is de volledige flow laten uitvoeren door twee
+niet-technische gebruikers.
 
 ## Doel
 
@@ -139,6 +143,37 @@ dan één initiële crawl voor dezelfde voltooide onboarding.
   eerste crawl te blokkeren.
 - Minimaal twee niet-technische proefgebruikers voltooien de flow zonder mondelinge technische
   instructies.
+
+## Protocol voor de twee gebruikersproeven
+
+Voer iedere proef uit met een verse website en een gebruiker die de flow niet eerder heeft gezien.
+De begeleider observeert zonder vooraf uitleg te geven en grijpt alleen in wanneer veiligheid,
+privacy of ongewenste productiebelasting dat vereist.
+
+Per proef doorloopt de gebruiker zelfstandig:
+
+1. uitnodiging openen, account activeren, inloggen en zo nodig MFA instellen;
+2. organisatie en website controleren, platformherkenning beoordelen en eigendom verifiëren;
+3. crawlvoorkeuren bevestigen, de eerste crawl starten en na refresh of nieuwe login hervatten;
+4. voortgang, eerste resultaten en de aanbevolen vervolgstap vinden en in eigen woorden uitleggen.
+
+Leg per stap alleen vast:
+
+- gelukt zonder hulp, gelukt na herstel of niet gelukt;
+- waar de gebruiker aarzelde, terugging of een verkeerde keuze maakte;
+- welke tekst of actie onduidelijk was;
+- technische foutcode of incidentreferentie wanneer werkelijk iets misging;
+- totale doorlooptijd en of de gebruiker achteraf wist wat de volgende stap was.
+
+Een proef geldt als geslaagd wanneer de gebruiker zonder terminal-, database- of mondelinge
+technische instructie een geverifieerde website en exact één eerste crawl bereikt, een onderbreking
+kan hervatten en de uitkomst begrijpt. Een productfout, vastloper, dubbele website/crawl,
+tenantlek of noodzakelijke beheerdercorrectie maakt de proef niet geslaagd en vereist eerst een
+correctie en een nieuwe volledige proef.
+
+Na twee geslaagde proeven worden de bevindingen samengevat in dit document. Niet-blokkerende
+begrijpelijkheidsverbeteringen gaan naar de roadmap; beveiligings-, privacy-, tenant- en
+databetrouwbaarheidsproblemen blokkeren verdere releasevoorbereiding.
 
 ## Afbakening na deze release
 
