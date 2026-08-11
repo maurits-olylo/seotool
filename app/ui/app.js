@@ -33,6 +33,8 @@ const CLIENT_STORAGE_KEY = "seo-monitor-client-id";
 const WEBSITE_STORAGE_KEY = "seo-monitor-website-id";
 const ONBOARDING_STORAGE_KEY = "seo-monitor-website-onboarding-id";
 let onboardingPollTimer = null;
+let platformDetectionLoading = false;
+let onboardingEditingDetails = false;
 let operationsPollTimer = null;
 
 async function api(path, options = {}) {
@@ -462,8 +464,8 @@ function renderWebsiteOnboarding() {
   ensurePlatformGuidance();
   const onboarding = state.websiteOnboarding;
   const active = Boolean(onboarding);
-  $("#website-onboarding-form").classList.toggle("hidden", active);
-  $("#website-verification-step").classList.toggle("hidden", !active);
+  $("#website-onboarding-form").classList.toggle("hidden", active && !onboardingEditingDetails);
+  $("#website-verification-step").classList.toggle("hidden", !active || onboardingEditingDetails);
   $("#verification-step-label").textContent = !active
     ? "Stap 1 van 3"
     : onboarding?.first_crawl_job_id
@@ -489,7 +491,7 @@ function renderWebsiteOnboarding() {
   scheduleOnboardingPoll();
 }
 
-const platformLabels = {wordpress:"WordPress",shopify:"Shopify",webflow:"Webflow",wix:"Wix",squarespace:"Squarespace",custom:"maatwerk of een ander platform"};
+const platformLabels = {wordpress:"WordPress",shopify:"Shopify",webflow:"Webflow",wix:"Wix",squarespace:"Squarespace",custom:"maatwerk of een ander platform",unknown:"onbekend platform"};
 const platformHelp = {
   wordpress:"Laat je beheerder dit via hosting of SFTP in de publieke map .well-known plaatsen. De mediabibliotheek is niet geschikt.",
   shopify:"Laat je Shopify-developer dit via de storefront of een proxyroute publiceren; de gewone bestandsupload maakt dit adres niet aan.",
@@ -497,23 +499,32 @@ const platformHelp = {
   wix:"Laat je Wix-developer een openbare route met dit exacte pad en deze inhoud maken; Media Manager is niet voldoende.",
   squarespace:"Laat je Squarespace-beheerder of developer dit exacte openbare pad publiceren; een gewone bestandslink krijgt een ander adres.",
   custom:"Plaats het bestand in de publieke webroot onder .well-known, of stuur deze opdracht naar je websitebeheerder.",
+  unknown:"Stuur de getoonde URL en het verificatiebestand naar degene die je website beheert. Diegene kan het bestand op het juiste adres publiceren.",
 };
 
 function ensurePlatformGuidance() {
   const container = $("#verification-instructions");
   if ($("#platform-confirmation")) return;
-  container.innerHTML = `<section id="platform-confirmation" class="platform-confirmation"><span class="eyebrow">PLATFORMHERKENNING</span><h3 id="platform-confirmation-title">Websiteplatform herkennen…</h3><p id="platform-confirmation-message"></p><div id="platform-confirmation-actions" class="verification-actions hidden"><button id="confirm-detected-platform" class="primary-button" type="button">Ja, dat klopt</button><button id="change-detected-platform" class="secondary-button" type="button">Nee, ander platform</button></div><div id="platform-selection" class="platform-selection hidden"><label>Welk platform gebruik je?<select id="website-platform"><option value="wordpress">WordPress</option><option value="shopify">Shopify</option><option value="webflow">Webflow</option><option value="wix">Wix</option><option value="squarespace">Squarespace</option><option value="custom">Maatwerk of anders</option></select></label><button id="confirm-selected-platform" class="primary-button" type="button">Gebruik deze instructies</button></div></section><ol id="verification-instruction-list" class="hidden"><li><strong>Download het verificatiebestand.</strong><span>Dit bestand hoort alleen bij deze website.</span></li><li><strong>Publiceer het op het juiste adres.</strong><span id="platform-upload-help"></span><span>Het moet bereikbaar zijn op <code id="verification-public-url"></code>.</span></li><li><strong>Laat Thactual controleren.</strong><span>Open eerst het adres hierboven. Zie je de bestandsinhoud, klik dan op ‘Controleer plaatsing’.</span></li></ol><div id="verification-actions" class="verification-actions hidden"><button id="download-verification-file" class="primary-button" type="button">Download verificatiebestand</button><button id="check-website-verification" class="secondary-button" type="button">Controleer plaatsing</button><button id="restart-website-onboarding" class="detail-button" type="button">Andere website</button></div>`;
+  container.innerHTML = `<div class="verification-back"><button id="edit-onboarding-details" class="detail-button" type="button">← Terug naar websitegegevens</button></div><section id="platform-confirmation" class="platform-confirmation"><span class="eyebrow">PLATFORMHERKENNING</span><div id="platform-detection-loader" class="platform-loader hidden"><span class="loading-spinner" aria-hidden="true"></span><div><h3>Websiteplatform herkennen…</h3><p>Thactual bekijkt de openbare website. Dit duurt meestal enkele seconden.</p></div></div><div id="platform-detection-result"><h3 id="platform-confirmation-title"></h3><p id="platform-confirmation-message"></p><div id="platform-confirmation-actions" class="verification-actions hidden"><button id="confirm-detected-platform" class="primary-button" type="button">Ja, dat klopt</button><button id="change-detected-platform" class="secondary-button" type="button">Nee, ander platform</button></div><div id="platform-selection" class="platform-selection hidden"><label>Welk platform gebruik je?<select id="website-platform"><option value="wordpress">WordPress</option><option value="shopify">Shopify</option><option value="webflow">Webflow</option><option value="wix">Wix</option><option value="squarespace">Squarespace</option><option value="custom">Maatwerk of anders</option><option value="unknown">Weet ik niet</option></select></label><button id="confirm-selected-platform" class="primary-button" type="button">Ga verder</button></div></div></section><section id="verification-methods" class="verification-methods hidden"></section><ol id="verification-instruction-list" class="hidden"><li><strong>Download het verificatiebestand.</strong><span>Dit bestand hoort alleen bij deze website.</span></li><li><strong>Publiceer het op het juiste adres.</strong><span id="platform-upload-help"></span><span>Het moet bereikbaar zijn op <code id="verification-public-url"></code>.</span></li><li><strong>Laat Thactual controleren.</strong><span>Open eerst het adres hierboven. Zie je de bestandsinhoud, klik dan op ‘Controleer plaatsing’.</span></li></ol><div id="verification-actions" class="verification-actions hidden"><button id="download-verification-file" class="primary-button" type="button">Download verificatiebestand</button><button id="check-website-verification" class="secondary-button" type="button">Controleer plaatsing</button></div>`;
   $("#confirm-detected-platform").addEventListener("click", () => confirmWebsitePlatform(state.websiteOnboarding.detected_platform));
   $("#change-detected-platform").addEventListener("click", () => $("#platform-selection").classList.remove("hidden"));
   $("#confirm-selected-platform").addEventListener("click", () => confirmWebsitePlatform($("#website-platform").value));
   $("#download-verification-file").addEventListener("click", downloadWebsiteVerificationFile);
   $("#check-website-verification").addEventListener("click", checkWebsiteVerification);
-  $("#restart-website-onboarding").addEventListener("click", restartWebsiteOnboarding);
+  $("#edit-onboarding-details").addEventListener("click", editWebsiteOnboardingDetails);
 }
 
 function renderPlatformGuidance(onboarding) {
   const detected = onboarding.detected_platform;
   const confirmed = onboarding.confirmed_platform;
+  $("#platform-detection-loader").classList.toggle("hidden", !platformDetectionLoading);
+  $("#platform-detection-result").classList.toggle("hidden", platformDetectionLoading);
+  if (platformDetectionLoading) {
+    $("#verification-instruction-list").classList.add("hidden");
+    $("#verification-actions").classList.add("hidden");
+    $("#verification-methods").classList.add("hidden");
+    return;
+  }
   $("#platform-confirmation-actions").classList.toggle("hidden", !detected || Boolean(confirmed));
   $("#platform-selection").classList.toggle("hidden", Boolean(confirmed) || Boolean(detected));
   if (confirmed) {
@@ -535,16 +546,49 @@ function renderPlatformGuidance(onboarding) {
     const knownWebsite = state.organizationWebsites.find(item => item.id === onboarding.website_id);
     const origin = new URL(onboarding.base_url || knownWebsite?.base_url || location.origin).origin;
     $("#verification-public-url").textContent = `${origin}${onboarding.verification_path}`;
+    renderVerificationMethods(confirmed);
+  }
+}
+
+function renderVerificationMethods(platform) {
+  const methods = $("#verification-methods");
+  methods.classList.remove("hidden");
+  if (platform === "wordpress") {
+    methods.innerHTML = `<h3>Kies hoe je WordPress koppelt</h3><div class="verification-method-grid"><article class="verification-method recommended"><span>Aanbevolen</span><h4>WordPress-plugin</h4><p>Installeer en activeer de plugin. De verificatieroute wordt automatisch gepubliceerd.</p><button id="download-wordpress-plugin" class="primary-button" type="button">Download WordPress-plugin</button></article><article class="verification-method"><h4>Handmatig plaatsen</h4><p>Gebruik hosting of SFTP als je liever geen plugin installeert.</p><button id="show-manual-verification" class="secondary-button" type="button">Toon handmatige stappen</button></article></div>`;
+    $("#verification-instruction-list").classList.add("hidden");
+    $("#download-verification-file").classList.add("hidden");
+    $("#download-wordpress-plugin").addEventListener("click", downloadWordPressPlugin);
+    $("#show-manual-verification").addEventListener("click", () => {
+      $("#verification-instruction-list").classList.remove("hidden");
+      $("#download-verification-file").classList.remove("hidden");
+    });
+  } else {
+    methods.innerHTML = `<h3>Instructies voor ${platformLabels[platform] || platform}</h3><p>${platformHelp[platform] || platformHelp.custom}</p>`;
+    $("#download-verification-file").classList.remove("hidden");
   }
 }
 
 async function detectWebsitePlatform() {
+  platformDetectionLoading = true;
+  renderWebsiteOnboarding();
   try {
     const result = await api(`/api/v1/website-onboarding/${state.websiteOnboarding.id}/platform/detect`, {method:"POST"});
     state.websiteOnboarding = {...state.websiteOnboarding, ...result};
   } catch (_error) {
     state.websiteOnboarding = {...state.websiteOnboarding, detected_platform:null, platform_confidence:null};
   }
+  platformDetectionLoading = false;
+  renderWebsiteOnboarding();
+}
+
+function editWebsiteOnboardingDetails() {
+  const onboarding = state.websiteOnboarding;
+  onboardingEditingDetails = true;
+  $("#website-onboarding-client").value = onboarding.client_id;
+  $("#website-onboarding-name").value = onboarding.website_name;
+  $("#website-onboarding-url").value = onboarding.base_url;
+  $("#website-onboarding-sitemap").value = onboarding.sitemap_urls?.[0] || "";
+  $("#website-onboarding-form button[type='submit']").textContent = "Wijzigingen opslaan";
   renderWebsiteOnboarding();
 }
 
@@ -565,19 +609,22 @@ async function startWebsiteOnboarding(event) {
   try {
     const sitemap = $("#website-onboarding-sitemap").value.trim();
     const baseUrl = $("#website-onboarding-url").value.trim();
-    state.websiteOnboarding = await api(`/api/v1/website-onboarding/clients/${$("#website-onboarding-client").value}`, {
-      method: "POST",
+    const editing = onboardingEditingDetails && state.websiteOnboarding;
+    state.websiteOnboarding = await api(editing ? `/api/v1/website-onboarding/${state.websiteOnboarding.id}/details` : `/api/v1/website-onboarding/clients/${$("#website-onboarding-client").value}`, {
+      method: editing ? "PATCH" : "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({
-        request_id: crypto.randomUUID(),
+        ...(editing ? {} : {request_id: crypto.randomUUID()}),
         website_name: $("#website-onboarding-name").value.trim(),
         base_url: baseUrl,
-        settings: {sitemap_urls: sitemap ? [sitemap] : []},
+        ...(editing ? {sitemap_url: sitemap || null} : {settings: {sitemap_urls: sitemap ? [sitemap] : []}}),
       }),
     });
     state.websiteOnboarding.base_url = baseUrl;
     state.verificationFileContent = state.websiteOnboarding.verification_file_content;
     localStorage.setItem(ONBOARDING_STORAGE_KEY, state.websiteOnboarding.id);
+    onboardingEditingDetails = false;
+    $("#website-onboarding-form button[type='submit']").textContent = "Website toevoegen";
     message.textContent = "";
     renderWebsiteOnboarding();
     await detectWebsitePlatform();
@@ -587,6 +634,23 @@ async function startWebsiteOnboarding(event) {
   } finally {
     button.disabled = false;
   }
+}
+
+async function downloadWordPressPlugin() {
+  const button = $("#download-wordpress-plugin");
+  button.disabled = true;
+  try {
+    const response = await fetch(`/api/v1/website-onboarding/${state.websiteOnboarding.id}/verification/wordpress-plugin`, {method:"POST", credentials:"same-origin"});
+    if (!response.ok) throw new Error((await response.json().catch(() => ({}))).detail || "De plugin kon niet worden gemaakt.");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(await response.blob());
+    link.download = "thactual-verification.zip";
+    document.body.appendChild(link); link.click(); URL.revokeObjectURL(link.href); link.remove();
+    $("#website-verification-message").textContent = "Plugin gedownload. Ga in WordPress naar Plugins → Nieuwe plugin → Plugin uploaden, installeer en activeer hem.";
+  } catch (error) {
+    $("#website-verification-message").classList.add("error");
+    $("#website-verification-message").textContent = error.message;
+  } finally { button.disabled = false; }
 }
 
 function saveVerificationFile(content) {

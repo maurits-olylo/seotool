@@ -9,6 +9,7 @@ from app.db.session import get_db
 from app.models.onboarding import WebsiteOnboarding
 from app.schemas.onboarding import (
     WebsiteOnboardingCrawlPreferences,
+    WebsiteOnboardingDetailsUpdate,
     WebsiteOnboardingFirstCrawlRead,
     WebsiteOnboardingRead,
     WebsiteOnboardingStart,
@@ -20,12 +21,14 @@ from app.services.authorization import require_client_access
 from app.services.website_onboarding import (
     check_website_ownership,
     confirm_website_platform,
+    create_wordpress_verification_plugin,
     detect_website_platform,
     get_website_onboarding,
     renew_website_verification_file,
     retry_first_onboarding_crawl,
     start_first_onboarding_crawl,
     start_website_onboarding,
+    update_website_onboarding_details,
 )
 
 router = APIRouter(prefix="/website-onboarding", tags=["website-onboarding"])
@@ -74,6 +77,23 @@ def onboarding_status(
         return get_website_onboarding(db, onboarding.id)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.patch("/{onboarding_id}/details", response_model=WebsiteOnboardingRead)
+def update_onboarding_details(
+    onboarding_id: UUID,
+    payload: WebsiteOnboardingDetailsUpdate,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> WebsiteOnboardingRead:
+    onboarding = _authorized_onboarding(db, principal, onboarding_id, admin=True)
+    try:
+        return update_website_onboarding_details(db, onboarding.id, payload)
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Deze website bestaat al") from exc
+    except (LookupError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.post("/{onboarding_id}/platform/detect", response_model=WebsitePlatformRead)
@@ -141,6 +161,31 @@ def download_new_verification_file(
         headers={
             "Cache-Control": "no-store",
             "Content-Disposition": 'attachment; filename="thactual-verification.txt"',
+        },
+    )
+
+
+@router.post("/{onboarding_id}/verification/wordpress-plugin", response_class=Response)
+def download_wordpress_plugin(
+    onboarding_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> Response:
+    onboarding = _authorized_onboarding(db, principal, onboarding_id, admin=True)
+    if onboarding.confirmed_platform != "wordpress":
+        raise HTTPException(status_code=409, detail="Bevestig eerst WordPress als platform")
+    try:
+        content = create_wordpress_verification_plugin(
+            db, onboarding.id, actor_user_id=principal.user_id
+        )
+    except (LookupError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return Response(
+        content=content,
+        media_type="application/zip",
+        headers={
+            "Cache-Control": "no-store",
+            "Content-Disposition": 'attachment; filename="thactual-verification.zip"',
         },
     )
 

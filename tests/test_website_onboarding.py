@@ -1,5 +1,7 @@
 from datetime import UTC, datetime
+from io import BytesIO
 from uuid import UUID, uuid4
+from zipfile import ZipFile
 
 import pytest
 from pydantic import ValidationError
@@ -256,6 +258,63 @@ def test_verification_file_download_is_not_cached_and_rotates_token(client) -> N
         ]
         is None
     )
+
+
+def test_onboarding_details_can_be_corrected_before_verification(client) -> None:  # type: ignore[no-untyped-def]
+    customer = client.post("/api/v1/clients", json={"name": "Correction client"}).json()
+    started = client.post(
+        f"/api/v1/website-onboarding/clients/{customer['id']}",
+        json={
+            "request_id": str(uuid4()),
+            "website_name": "Wrong website",
+            "base_url": "https://wrong.example.test/",
+        },
+    ).json()
+
+    response = client.patch(
+        f"/api/v1/website-onboarding/{started['id']}/details",
+        json={
+            "website_name": "Correct website",
+            "base_url": "https://correct.example.test/",
+            "sitemap_url": "https://correct.example.test/sitemap.xml",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["website_name"] == "Correct website"
+    assert response.json()["base_url"] == "https://correct.example.test/"
+    assert response.json()["sitemap_urls"] == ["https://correct.example.test/sitemap.xml"]
+
+
+def test_wordpress_plugin_contains_private_verification_route(client) -> None:  # type: ignore[no-untyped-def]
+    customer = client.post("/api/v1/clients", json={"name": "Plugin client"}).json()
+    started = client.post(
+        f"/api/v1/website-onboarding/clients/{customer['id']}",
+        json={
+            "request_id": str(uuid4()),
+            "website_name": "WordPress website",
+            "base_url": "https://wordpress.example.test/",
+        },
+    ).json()
+    assert (
+        client.post(
+            f"/api/v1/website-onboarding/{started['id']}/platform/confirm",
+            json={"platform": "wordpress"},
+        ).status_code
+        == 200
+    )
+
+    response = client.post(
+        f"/api/v1/website-onboarding/{started['id']}/verification/wordpress-plugin"
+    )
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    with ZipFile(BytesIO(response.content)) as bundle:
+        plugin = bundle.read("thactual-verification/thactual-verification.php").decode()
+    assert "Plugin Name: Thactual Website Verification" in plugin
+    assert VERIFICATION_PATH in plugin
+    assert "thactual-site-verification=" in plugin
 
 
 def test_first_crawl_requires_verification_and_is_created_exactly_once() -> None:

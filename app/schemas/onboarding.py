@@ -34,6 +34,9 @@ class WebsiteOnboardingRead(BaseModel):
     id: UUID
     client_id: UUID
     website_id: UUID
+    website_name: str
+    base_url: str
+    sitemap_urls: list[str] = Field(default_factory=list)
     status: str
     current_step: str
     last_error_code: str | None
@@ -72,7 +75,32 @@ class WebsitePlatformConfirm(BaseModel):
     @field_validator("platform")
     @classmethod
     def normalize_platform(cls, value: str) -> str:
-        return value.strip().lower()
+        normalized = value.strip().lower()
+        allowed = {"wordpress", "shopify", "webflow", "wix", "squarespace", "custom", "unknown"}
+        if normalized not in allowed:
+            raise ValueError("Onbekend websiteplatform")
+        return normalized
+
+
+class WebsiteOnboardingDetailsUpdate(BaseModel):
+    website_name: str = Field(min_length=1, max_length=255)
+    base_url: AnyHttpUrl
+    sitemap_url: AnyHttpUrl | None = None
+
+    @field_validator("website_name")
+    @classmethod
+    def normalize_website_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Websitenaam is verplicht")
+        return value
+
+    @field_validator("base_url")
+    @classmethod
+    def require_https(cls, value: AnyHttpUrl) -> AnyHttpUrl:
+        if value.scheme != "https":
+            raise ValueError("Websiteverificatie vereist HTTPS")
+        return value
 
 
 class WebsiteVerificationCheckRead(BaseModel):

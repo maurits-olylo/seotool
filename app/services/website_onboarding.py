@@ -1,5 +1,7 @@
 import hashlib
+import io
 import secrets
+import zipfile
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlsplit, urlunsplit
 from uuid import UUID
@@ -16,6 +18,7 @@ from app.models.onboarding import WebsiteOnboarding, WebsiteOwnershipVerificatio
 from app.models.website import Website, WebsiteSettings
 from app.schemas.onboarding import (
     WebsiteOnboardingCrawlPreferences,
+    WebsiteOnboardingDetailsUpdate,
     WebsiteOnboardingRead,
     WebsiteOnboardingStart,
 )
@@ -52,7 +55,10 @@ def start_website_onboarding(
     )
     if existing is not None:
         verification = _verification(db, existing.id)
-        return _read(existing, verification)
+        website = db.get(Website, existing.website_id)
+        if website is None:
+            raise LookupError("Website not found")
+        return _read(existing, verification, website=website)
 
     token = secrets.token_urlsafe(32)
     website = Website(
@@ -95,7 +101,7 @@ def start_website_onboarding(
         details={"method": "https_file"},
     )
     db.commit()
-    return _read(onboarding, verification, token=token)
+    return _read(onboarding, verification, website=website, token=token)
 
 
 def get_website_onboarding(db: Session, onboarding_id: UUID) -> WebsiteOnboardingRead:
@@ -114,6 +120,7 @@ def get_website_onboarding(db: Session, onboarding_id: UUID) -> WebsiteOnboardin
     return _read(
         onboarding,
         _verification(db, onboarding.id),
+        website=db.get(Website, onboarding.website_id),
         first_crawl_job=first_crawl_job,
         first_crawl_run=first_crawl_run,
         analytics_quality=analytics_quality_status(db, onboarding.website_id),
@@ -142,15 +149,73 @@ def detect_website_platform(db: Session, onboarding_id: UUID) -> WebsiteOnboardi
     return onboarding
 
 
-def confirm_website_platform(
-    db: Session, onboarding_id: UUID, platform: str
-) -> WebsiteOnboarding:
+def confirm_website_platform(db: Session, onboarding_id: UUID, platform: str) -> WebsiteOnboarding:
     onboarding = db.get(WebsiteOnboarding, onboarding_id)
     if onboarding is None:
         raise LookupError("Website onboarding not found")
     onboarding.confirmed_platform = platform
     db.commit()
     return onboarding
+
+
+def update_website_onboarding_details(
+    db: Session,
+    onboarding_id: UUID,
+    payload: WebsiteOnboardingDetailsUpdate,
+) -> WebsiteOnboardingRead:
+    onboarding = db.scalar(
+        select(WebsiteOnboarding).where(WebsiteOnboarding.id == onboarding_id).with_for_update()
+    )
+    if onboarding is None:
+        raise LookupError("Website onboarding not found")
+    verification = _verification(db, onboarding.id, lock=True)
+    if verification.status == "verified" or onboarding.first_crawl_job_id is not None:
+        raise ValueError("Websitegegevens kunnen na verificatie niet meer worden gewijzigd")
+    website = db.get(Website, onboarding.website_id)
+    if website is None:
+        raise LookupError("Website not found")
+    website.name = payload.website_name
+    website.base_url = str(payload.base_url)
+    settings = website.settings or WebsiteSettings(website_id=website.id)
+    settings.sitemap_urls = [str(payload.sitemap_url)] if payload.sitemap_url else []
+    db.add(settings)
+    onboarding.detected_platform = None
+    onboarding.platform_confidence = None
+    onboarding.confirmed_platform = None
+    onboarding.last_error_code = None
+    db.commit()
+    return _read(onboarding, verification, website=website)
+
+
+def create_wordpress_verification_plugin(
+    db: Session,
+    onboarding_id: UUID,
+    *,
+    actor_user_id: UUID | None,
+) -> bytes:
+    content = renew_website_verification_file(db, onboarding_id, actor_user_id=actor_user_id)
+    php = f"""<?php
+/**
+ * Plugin Name: Thactual Website Verification
+ * Description: Verifies this WordPress website for Thactual.
+ * Version: 1.0.0
+ */
+add_action('parse_request', function ($wp) {{
+    $path = '/.well-known/thactual-verification.txt';
+    if (parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) !== $path) {{
+        return;
+    }}
+    status_header(200);
+    header('Content-Type: text/plain; charset=utf-8');
+    header('Cache-Control: no-store');
+    echo {content!r};
+    exit;
+}});
+"""
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as bundle:
+        bundle.writestr("thactual-verification/thactual-verification.php", php)
+    return archive.getvalue()
 
 
 def renew_website_verification_file(
@@ -433,17 +498,23 @@ def _read(
     onboarding: WebsiteOnboarding,
     verification: WebsiteOwnershipVerification,
     *,
+    website: Website | None,
     token: str | None = None,
     first_crawl_job: CrawlJob | None = None,
     first_crawl_run: CrawlRun | None = None,
     analytics_quality: dict[str, object] | None = None,
 ) -> WebsiteOnboardingRead:
+    if website is None:
+        raise LookupError("Website context missing")
     quality = analytics_quality or {"status": "not_configured"}
     quality_status = str(quality.get("status", "not_configured"))
     return WebsiteOnboardingRead(
         id=onboarding.id,
         client_id=onboarding.client_id,
         website_id=onboarding.website_id,
+        website_name=website.name,
+        base_url=website.base_url,
+        sitemap_urls=list(website.settings.sitemap_urls if website.settings else []),
         status=onboarding.status,
         current_step=onboarding.current_step,
         last_error_code=onboarding.last_error_code,
