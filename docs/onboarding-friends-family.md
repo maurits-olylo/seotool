@@ -1,10 +1,9 @@
 # Onboarding voor friends-and-family
 
-Status: websiteverificatie, begeleide verificatie, de veilige eerste crawl en begrijpelijke
-voortgang zijn lokaal en op staging geaccepteerd in Release 14 fase A tot en met D. Fase E koppelt
-de bestaande analytics-meetkwaliteit optioneel aan het onboardingresultaat en is lokaal en op
-staging geaccepteerd. Fase F verbindt de uitnodiging direct met de wizard en bereidt de afzonderlijke
-end-to-end gebruikersacceptatie voor.
+Status: Release 14 fase A tot en met G is lokaal en op staging geaccepteerd. De flow omvat
+uitnodiging, hervatbare websitewizard, eigendomsverificatie, veilige eerste crawl, begrijpelijke
+voortgang, optionele meetkwaliteit en platformgestuurde verificatie. Productiedeployment en twee
+volledige niet-technische gebruikersproeven staan nog open.
 
 ## Doel
 
@@ -33,7 +32,9 @@ vooral een beheerfunctie en heeft geen blijvende wizardstatus of eigendomsverifi
 1. Een beheerder maakt via de interface een organisatie en uitnodiging aan.
 2. De ontvanger opent de eenmalige link, kiest een wachtwoord en krijgt toegang tot die organisatie.
 3. Een begeleide wizard vraagt websitenaam, basis-URL, sitemap en veilige crawlvoorkeuren.
-4. De gebruiker bewijst website-eigendom via één ondersteunde verificatiemethode.
+4. Thactual probeert het websiteplatform te herkennen en laat de gebruiker dit bevestigen. De
+   gebruiker bewijst website-eigendom via een eenvoudige platformplugin of handmatige plaatsing
+   van het verificatiebestand.
 5. De gebruiker kan een analyticsbron koppelen en gekwalificeerde leadevents definiëren. Bij een
    koppeling voert het systeem een meetkwaliteitscontrole uit voordat conversie-inzichten als
    betrouwbaar worden aangemerkt.
@@ -80,8 +81,14 @@ Gebruik één willekeurig verificatietoken per website en ondersteun voor de eer
 bestand op een vaste HTTPS-locatie onder het geverifieerde domein. Sla alleen een hash van het token,
 status, pogingen en tijdstippen op. Pas bestaande SSRF-, redirect-, timeout- en responslimieten toe.
 
-Een DNS TXT-methode en HTML-metatag kunnen later als alternatieven worden toegevoegd. Bouw niet
-direct drie methoden: één duidelijke, geteste methode is voldoende voor de besloten release.
+Voor WordPress wordt hetzelfde bestand via een eenvoudige downloadbare plugin gepubliceerd. De
+plugin is aan het ingevoerde domein gebonden en wordt bij Multisite alleen op de bedoelde subsite
+geactiveerd; netwerkbrede activatie is geblokkeerd. Voor andere herkende platforms blijft de
+handmatige route voorlopig beschikbaar en volgen eenvoudige verificatieplugins later.
+
+Een DNS TXT-methode en HTML-metatag kunnen later als alternatieven worden toegevoegd. De eerste
+release houdt iedere plugin bewust beperkt tot verificatie. CMS-acties, taakoverzichten en
+schrijfrechten worden pas later via een afzonderlijk ontworpen en beveiligde plugin-API toegevoegd.
 
 ## Benodigde implementatie
 
@@ -107,6 +114,11 @@ dan één initiële crawl voor dezelfde voltooide onboarding.
 - Onboarding hervatten na refresh en nieuwe login.
 - Website en instellingen correct aanmaken binnen de eigen organisatie.
 - Correct verificatiebestand accepteren; verkeerd of ontbrekend token duidelijk afwijzen.
+- Platformdetectie toont tijdens de controle een laadstatus en daarna pas herkenning of de keuze
+  `Weet ik niet`.
+- Stap 2 kan vóór verificatie terug naar stap 1 zonder verlies van de ingevoerde websitegegevens.
+- De WordPress-plugin reageert alleen op het gekoppelde domein en weigert netwerkbrede activatie in
+  een Multisite-installatie.
 - Redirects en private of lokale doelen opnieuw op SSRF-risico controleren.
 - Dubbel klikken of opnieuw proberen maakt geen dubbele website of crawljob.
 - Deployment-drain bewaart de onboardingstatus en laat later veilig hervatten.

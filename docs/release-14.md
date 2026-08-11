@@ -1,6 +1,6 @@
 # Release 14 — Invitation-only onboarding
 
-Status: fase A tot en met D lokaal en op staging geaccepteerd; nog niet op productie gedeployed.
+Status: fase A tot en met G lokaal en op staging geaccepteerd; nog niet op productie gedeployed.
 
 ## Doel
 
@@ -195,3 +195,51 @@ Lokale acceptatie:
 - de volledige regressiesuite is geslaagd met alleen de bestaande dependencywaarschuwing;
 - Python-linting en JavaScript-syntaxcontrole zijn geslaagd;
 - geen migration nodig: fase F gebruikt de bestaande uitnodigings- en lidmaatschapsmodellen.
+
+Stagingacceptatie:
+
+- MFA voor de synthetische organisatiebeheerder is gecontroleerd zonder herstelcodes of secrets
+  vast te leggen;
+- de uitnodigingsflow landde na activatie rechtstreeks in de websitewizard;
+- de eigen organisatie kon onboarding starten en hervatten; tenantvreemde toegang bleef geweigerd;
+- API en database bleven gezond op Alembic-head `0063`;
+- definitief gereedsignaal: `release-14-phase-f-staging-ok`.
+
+## Fase G — platformgestuurde verificatie
+
+- na het invoeren van de website toont de interface eerst een echte detectiestatus en pas daarna
+  het resultaat; een tijdelijk onjuist label `onbekend` wordt niet meer getoond;
+- WordPress, Shopify, Webflow, Wix en Squarespace worden op basis van openbare signalen herkend;
+- de gebruiker bevestigt de herkenning of kiest een ander platform, `Maatwerk of anders` of
+  `Weet ik niet`;
+- teruggaan van stap 2 naar stap 1 bewaart naam, URL en sitemap en maakt correctie mogelijk zolang
+  verificatie en eerste crawl nog niet zijn afgerond;
+- ieder platform krijgt eigen uitvoeringscontext; handmatige bestandsplaatsing blijft de algemene
+  terugvalroute;
+- WordPress krijgt een downloadbare verificatieplugin als aanbevolen route;
+- de WordPress-plugin publiceert uitsluitend het verificatiebestand, is gebonden aan het
+  ingevoerde domein en blokkeert netwerkbrede activatie binnen Multisite;
+- bij WordPress Multisite wordt dezelfde plugin alleen op de bedoelde subsite geactiveerd;
+- uitgebreidere CMS-integraties, actieoverzichten en begrensde uitvoering vallen buiten deze
+  release en staan als latere uitbreiding op de roadmap.
+
+Lokale acceptatie:
+
+- platformdetectie, invoervalidatie, veilig wijzigen vóór verificatie en plugingeneratie zijn met
+  regressietests afgedekt;
+- de gegenereerde plugin bevat een eigen hostcontrole, Multisite-controle en blokkade voor
+  netwerkbrede activatie;
+- volledige regressiesuite, Ruff, formatting, JavaScript-syntax en diffcontrole zijn geslaagd;
+- migratie `0064` voegt alleen de platformdetectievelden toe en blijft één lineaire head.
+
+Stagingacceptatie:
+
+- Alembic staat op één head `0064` en API, database en Redis zijn gezond;
+- de wijzigingsroute en WordPress-pluginroute zijn via OpenAPI bevestigd;
+- de detectielaadstatus, platformbevestiging, `Weet ik niet`, terugnavigatie en vooraf ingevulde
+  websitegegevens zijn zichtbaar gecontroleerd;
+- WordPress toont de plugin als aanbevolen route en handmatige plaatsing als alternatief;
+- de Multisite-instructie is zichtbaar en de servercontrole bevestigt hostbegrenzing en blokkering
+  van netwerkactivatie;
+- definitieve gereedsignalen: `release-14f-onboarding-staging-ok`,
+  `release-14f-multisite-staging-ok` en browseracceptatie van de onboardingwizard.
