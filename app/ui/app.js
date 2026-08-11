@@ -37,7 +37,7 @@ let platformDetectionLoading = false;
 let onboardingEditingDetails = false;
 let operationsPollTimer = null;
 
-async function api(path, options = {}) {
+async function apiResponse(path, options = {}) {
   const response = await fetch(path, { credentials: "same-origin", ...options });
   if (response.status === 401) { showLogin(); throw new Error("Niet aangemeld"); }
   if (!response.ok) {
@@ -49,6 +49,11 @@ async function api(path, options = {}) {
         : payload.detail;
     throw new Error(detail || `API-fout ${response.status}`);
   }
+  return response;
+}
+
+async function api(path, options = {}) {
+  const response = await apiResponse(path, options);
   return response.status === 204 ? null : response.json();
 }
 
@@ -641,8 +646,7 @@ async function downloadWordPressPlugin() {
   const button = $("#download-wordpress-plugin");
   button.disabled = true;
   try {
-    const response = await fetch(`/api/v1/website-onboarding/${state.websiteOnboarding.id}/verification/wordpress-plugin`, {method:"POST", credentials:"same-origin"});
-    if (!response.ok) throw new Error((await response.json().catch(() => ({}))).detail || "De plugin kon niet worden gemaakt.");
+    const response = await apiResponse(`/api/v1/website-onboarding/${state.websiteOnboarding.id}/verification/wordpress-plugin`, {method:"POST"});
     const link = document.createElement("a");
     link.href = URL.createObjectURL(await response.blob());
     link.download = "thactual-verification.zip";
@@ -671,12 +675,7 @@ async function downloadWebsiteVerificationFile() {
   try {
     let content = state.verificationFileContent;
     if (!content) {
-      const response = await fetch(`/api/v1/website-onboarding/${state.websiteOnboarding.id}/verification/file`, {method: "POST", credentials: "same-origin"});
-      if (response.status === 401) { showLogin(); throw new Error("Niet aangemeld"); }
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.detail || "Het verificatiebestand kon niet worden vernieuwd.");
-      }
+      const response = await apiResponse(`/api/v1/website-onboarding/${state.websiteOnboarding.id}/verification/file`, {method: "POST"});
       content = await response.text();
       state.websiteOnboarding.last_error_code = null;
     }
