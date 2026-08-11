@@ -258,3 +258,20 @@ Stagingacceptatie:
 
 De publieke Sensor is hierbij niet geactiveerd. De technische productieacceptatie is afgerond; de
 twee geplande friends-and-family-gebruikersproeven blijven de laatste onboardingvalidatie.
+
+## Onboardingcorrectie — hoofdklant en afzonderlijke websites
+
+Status: op 11 augustus 2026 lokaal, op staging en op productie geaccepteerd.
+
+- een hoofdklant kan zonder eigen website, crawl of verplichte websitevelden worden aangemaakt;
+- agencies en webbouwers kunnen daarna optioneel websites onder die hoofdklant koppelen;
+- iedere website heeft een afzonderlijke verwijderactie die de hoofdklant behoudt;
+- de waarschuwing noemt expliciet dat alleen de gekozen website en haar gekoppelde data verdwijnen;
+- verwijderen ruimt een actieve websiteselectie en eventuele lokale onboardingstatus op;
+- de bestaande tenantgebonden `DELETE /api/v1/websites/{website_id}`-route blijft bepalend;
+- commits `36b677b` en `735d9ff` bevatten de correctie;
+- 652 regressietests, Ruff, JavaScript-syntax en diffcontrole zijn geslaagd;
+- staging is geaccepteerd met `main-client-staging-ok` en `website-delete-staging-ok`;
+- productie is gezond gebleven op Alembic-head `0064` en geaccepteerd met
+  `onboarding-correction-production-ok`;
+- bij de browseracceptatie zijn geen bestaande productiegegevens gewijzigd of verwijderd.
