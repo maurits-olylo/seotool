@@ -1,7 +1,16 @@
 # Release 13 — Thactual Sensor
 
-Status: fasen A tot en met F lokaal en op staging geaccepteerd. Er is nog geen publieke Gateway-
-of Matomo-productiedeployment.
+Status: fasen A tot en met F lokaal en op staging geaccepteerd. De backend- en schemafundering is
+op 11 augustus 2026 met Release 14 op productie gedeployed. De publieke Gateway, Sensor en
+Matomo-client zijn nog niet geactiveerd.
+
+## Productiestatus
+
+- migratie `0061` en de interne meetfundering staan op productie als onderdeel van Alembic-head
+  `0064`;
+- API, integration-worker, database en Redis zijn na deployment gezond bevonden;
+- er zijn geen publieke Sensorroutes, manifests of websites geactiveerd;
+- live-activering blijft een afzonderlijk besluit en wordt eerst met een verse website gevalideerd.
 
 ## Fase A — architecture discovery
 

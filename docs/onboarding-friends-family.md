@@ -1,9 +1,15 @@
 # Onboarding voor friends-and-family
 
-Status: Release 14 fase A tot en met G is lokaal en op staging geaccepteerd. De flow omvat
-uitnodiging, hervatbare websitewizard, eigendomsverificatie, veilige eerste crawl, begrijpelijke
-voortgang, optionele meetkwaliteit en platformgestuurde verificatie. Productiedeployment en twee
+Status: Release 14 fase A tot en met G is lokaal, op staging en technisch op productie geaccepteerd.
+De flow omvat uitnodiging, hervatbare websitewizard, eigendomsverificatie, veilige eerste crawl,
+begrijpelijke voortgang, optionele meetkwaliteit en platformgestuurde verificatie. Alleen twee
 volledige niet-technische gebruikersproeven staan nog open.
+
+## Productiestatus
+
+De wizard en beveiligde onboardingroutes zijn op 11 augustus 2026 op productie gecontroleerd
+zonder een echte website, verificatie of crawl aan te maken. De publieke Sensor blijft uit. De
+volgende acceptatiestap is de volledige flow laten uitvoeren door twee niet-technische gebruikers.
 
 ## Doel
 

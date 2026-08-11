@@ -1,6 +1,7 @@
 # Release 14 — Invitation-only onboarding
 
-Status: fase A tot en met G lokaal en op staging geaccepteerd; nog niet op productie gedeployed.
+Status: fase A tot en met G lokaal, op staging en technisch op productie geaccepteerd. Twee volledige
+niet-technische gebruikersproeven blijven open.
 
 ## Doel
 
@@ -243,3 +244,17 @@ Stagingacceptatie:
   van netwerkactivatie;
 - definitieve gereedsignalen: `release-14f-onboarding-staging-ok`,
   `release-14f-multisite-staging-ok` en browseracceptatie van de onboardingwizard.
+
+## Productieacceptatie — 11 augustus 2026
+
+- Releases 13 en 14 zijn gebundeld vanuit commit `c08b291` gedeployed;
+- Alembic staat op één head `0064` en API, integration-worker, database en Redis zijn gezond;
+- onboardingroutes en de WordPress Multisite-hostbegrenzing zijn server-side gecontroleerd;
+- de productie-interface toont de begeleide wizard onder `Instellingen > Klanten & websites`;
+- bestaande klanten en websites bleven zichtbaar en intact;
+- tijdens de acceptatie zijn geen website, plugin, verificatie of crawl aangemaakt;
+- de crawl-drain is afgesloten met `active=false` en `resumed=0`;
+- definitief gereedsignaal: `release-13-14-production-ok`.
+
+De publieke Sensor is hierbij niet geactiveerd. De technische productieacceptatie is afgerond; de
+twee geplande friends-and-family-gebruikersproeven blijven de laatste onboardingvalidatie.
