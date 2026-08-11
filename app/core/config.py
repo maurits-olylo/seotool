@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     service_role: str = "api"
     app_name: str = "SEO Monitor API"
     api_key: str = "change-me"
-    database_url: str = "postgresql+psycopg://seo:seo@postgres:5432/seo"
+    database_url: str = "postgresql+psycopg://seo:seo@postgres:5432/seo"  # pragma: allowlist secret
     redis_url: str = "redis://redis:6379/0"
     log_level: str = "INFO"
     user_agent: str = "SEO-Monitor-Bot/0.1"

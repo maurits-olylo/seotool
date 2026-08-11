@@ -1,0 +1,99 @@
+name: Security and quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+
+      - name: Install hashed CI dependencies
+        run: python -m pip install --require-hashes -r requirements-ci.lock
+
+      - name: Verify environment
+        run: python -m pip check
+
+      - name: Lint
+        run: ruff check app tests scripts
+
+      - name: Test
+        run: pytest
+
+      - name: Static security analysis
+        run: bandit -q -r app -ll
+
+      - name: Scan production sources for secrets
+        run: |
+          detect-secrets scan \
+            app scripts compose.yaml compose.prod.yaml compose.staging.yaml \
+            pyproject.toml Dockerfile Dockerfile.render \
+            > /tmp/seo-monitor-secrets.json
+          python -c "import json; data=json.load(open('/tmp/seo-monitor-secrets.json')); count=sum(len(items) for items in data.get('results', {}).values()); print({'secret_candidates': count}); raise SystemExit(bool(count))"
+
+      - name: Generate reproducible CycloneDX SBOM
+        run: |
+          mkdir -p outputs/ci
+          cyclonedx-py requirements requirements.lock \
+            --output-reproducible --output-format JSON \
+            --output-file outputs/ci/sbom.cdx.json
+
+      - name: Upload SBOM
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: seo-monitor-sbom
+          path: outputs/ci/sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Audit locked Python dependencies
+        run: pip-audit -r requirements.lock --strict
+
+  container-images:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build application image
+        run: docker build --pull --tag seo-monitor-ci:${{ github.sha }} .
+
+      - name: Scan application image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: seo-monitor-ci:${{ github.sha }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: false
+          severity: CRITICAL,HIGH
+
+      - name: Build renderer image
+        run: docker build --pull --file Dockerfile.render --tag seo-monitor-render-ci:${{ github.sha }} .
+
+      - name: Scan renderer image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: seo-monitor-render-ci:${{ github.sha }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: false
+          severity: CRITICAL,HIGH

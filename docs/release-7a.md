@@ -315,3 +315,25 @@ Stagingacceptatie op 11 augustus 2026:
 
 De waarschuwingen over niet-schrijfbare pip-cachemappen zijn verwacht bij de bewust niet-root en
 read-only draaiende containers en hebben geen functionele of beveiligingsimpact.
+
+### Fase 7B — CI, SBOM en geautomatiseerde scans
+
+Status: lokaal geïmplementeerd; eerste GitHub-run is nog niet geaccepteerd en de dependencygate
+blokkeert terecht op drie advisories waarvoor nog geen installeerbare fix bestaat.
+
+- Python 3.12 gebruikt één gehashte CI-lock voor tests, linting en securitytools;
+- de workflow heeft alleen leesrecht, gebruikt geen `pull_request_target` en pint alle externe
+  Actions op volledige commit-SHA;
+- iedere push en pull request draait Ruff, de volledige testsuite, Bandit, een productiegerichte
+  secretscan en `pip-audit` tegen de runtime-lock;
+- iedere run maakt een reproduceerbare CycloneDX-SBOM en bewaart die dertig dagen als artifact;
+- beide Dockerimages worden opnieuw gebouwd en met een vastgepinde Trivy-release op kritieke en
+  hoge kwetsbaarheden gecontroleerd;
+- de Trivy-pin gebruikt de geverifieerde immutable release `v0.36.0`; veranderlijke tags zijn niet
+  toegestaan.
+
+De lokale dependency-audit vond vier advisories in `cryptography 46.0.7`. De lock is verhoogd naar
+de hoogst leverbare versie `48.0.1`, waarmee één advisory is opgelost. Drie advisories noemen
+versie 49 of 50 als fix, maar die versies zijn nog niet beschikbaar voor de Python 3.12-resolver.
+Zij worden niet genegeerd: de CI blijft rood totdat een installeerbare veilige versie bestaat of
+een afzonderlijke expliciete en tijdgebonden risicoacceptatie is goedgekeurd.

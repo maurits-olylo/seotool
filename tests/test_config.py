@@ -130,6 +130,28 @@ def test_application_images_install_only_hashed_locked_dependencies() -> None:
     assert "--hash=sha256:" in render_lock
 
 
+def test_security_workflow_is_read_only_and_pins_third_party_actions() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    workflow = (project_root / ".github/workflows/security-quality.yml").read_text()
+
+    assert "permissions:\n  contents: read" in workflow
+    assert "pull_request_target:" not in workflow
+    assert "python-version: \"3.12\"" in workflow
+    assert "pip install --require-hashes -r requirements-ci.lock" in workflow
+    assert "pip-audit -r requirements.lock --strict" in workflow
+    assert "cyclonedx-py requirements requirements.lock" in workflow
+    assert "bandit -q -r app -ll" in workflow
+    assert "detect-secrets scan" in workflow
+    assert "severity: CRITICAL,HIGH" in workflow
+    for action_line in (
+        "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405",
+        "actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f",
+        "aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25",
+    ):
+        assert action_line in workflow
+
+
 def test_production_rejects_insecure_defaults() -> None:
     with pytest.raises(ValidationError, match="Default database credentials"):
         Settings(
