@@ -290,7 +290,7 @@ Family niet als volledig opgelost worden aangemerkt.
 
 ### Fase 7A — Gehashte productiedependencies
 
-Status: lokaal geïmplementeerd; staging- en productiebuildvalidatie blijven open.
+Status: lokaal en op staging geaccepteerd; productiebuildvalidatie blijft open.
 
 - `requirements.lock` bevat de volledige runtimegraaf met exacte versies en packagehashes;
 - de renderimage gebruikt dezelfde runtime-lock en een kleine gehashte Playwright-overlay;
@@ -302,3 +302,16 @@ Status: lokaal geïmplementeerd; staging- en productiebuildvalidatie blijven ope
 
 Deze fase sluit SEC-15 nog niet. Een gecontroleerde Python 3.12-build, ontwikkel-/testlock, CI,
 SBOM en dependency-, secret-, SAST- en imagescans volgen in fase 7B.
+
+Stagingacceptatie op 11 augustus 2026:
+
+- API, render-worker, PostgreSQL en Redis waren gezond na de gehashte rebuild;
+- Alembic bleef zonder schemawijziging op één head `0064`;
+- `pip check` meldde in beide applicatie-images geen gebroken requirements;
+- de API draaide met de vastgezette FastAPI- en SQLAlchemy-versies;
+- de render-worker importeerde Playwright en bleef als RQ-worker geregistreerd;
+- de API-healthcheck bleef `ok`;
+- definitief gereedsignaal: `supply-chain-7a-staging-ok`.
+
+De waarschuwingen over niet-schrijfbare pip-cachemappen zijn verwacht bij de bewust niet-root en
+read-only draaiende containers en hebben geen functionele of beveiligingsimpact.

@@ -29,7 +29,7 @@ of hoge bevindingen meer meldt.
 | SEC-12 rootcontainers | opgelost binnen NAS-beperkingen | applicaties draaien niet-root, read-only, zonder capabilities en met `no-new-privileges`; alleen de niet-ondersteunde PID-limiet resteert als platformbeperking |
 | SEC-13 back-upweerbaarheid | gedeeltelijk opgelost | versleutelde volledige herstelbundels, controles, privacy-ledger en periodieke taak werken; onafhankelijke immutable EU-kopie ontbreekt nog |
 | SEC-14 auditlogging/detectie | gedeeltelijk opgelost | duurzaam security-auditregister bestaat; externe bescherming, detectieregels en incidentproef zijn nog niet volledig geaccepteerd |
-| SEC-15 reproduceerbare supply chain | open | lockfile met hashes, CI, SBOM en geautomatiseerde dependency-, secret-, SAST- en imagescans ontbreken |
+| SEC-15 reproduceerbare supply chain | gedeeltelijk opgelost | gehashte runtime- en renderlocks zijn op Linux/Python 3.12 en staging bewezen; ontwikkellock, CI, SBOM en geautomatiseerde dependency-, secret-, SAST- en imagescans ontbreken nog |
 | SEC-16 betrouwbaar testbewijs | lokaal opgelost, CI open | volledige regressiesuites zijn herhaald lokaal geslaagd op de releaseflow; gecontroleerde CI-evidence ontbreekt nog |
 
 ## Resterende securitygates
