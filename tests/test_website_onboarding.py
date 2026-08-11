@@ -315,6 +315,11 @@ def test_wordpress_plugin_contains_private_verification_route(client) -> None:  
     assert "Plugin Name: Thactual Website Verification" in plugin
     assert VERIFICATION_PATH in plugin
     assert "thactual-site-verification=" in plugin
+    assert "Version: 1.0.1" in plugin
+    assert "$expected_host = 'wordpress.example.test'" in plugin
+    assert "$request_host !== $expected_host" in plugin
+    assert "is_multisite() && $network_wide" in plugin
+    assert "Activeer Thactual alleen op de bedoelde website" in plugin
 
 
 def test_first_crawl_requires_verification_and_is_created_exactly_once() -> None:

@@ -193,16 +193,40 @@ def create_wordpress_verification_plugin(
     *,
     actor_user_id: UUID | None,
 ) -> bytes:
+    onboarding = db.get(WebsiteOnboarding, onboarding_id)
+    if onboarding is None:
+        raise LookupError("Website onboarding not found")
+    website = db.get(Website, onboarding.website_id)
+    if website is None:
+        raise LookupError("Website not found")
+    expected_host = urlsplit(website.base_url).hostname
+    if not expected_host:
+        raise ValueError("Websiteadres bevat geen geldig domein")
     content = renew_website_verification_file(db, onboarding_id, actor_user_id=actor_user_id)
     php = f"""<?php
 /**
  * Plugin Name: Thactual Website Verification
  * Description: Verifies this WordPress website for Thactual.
- * Version: 1.0.0
+ * Version: 1.0.1
+ * Network: false
  */
+register_activation_hook(__FILE__, function ($network_wide) {{
+    if (is_multisite() && $network_wide) {{
+        deactivate_plugins(plugin_basename(__FILE__), true);
+        wp_die(
+            'Activeer Thactual alleen op de bedoelde website, niet voor het hele netwerk.',
+            'Thactual Multisite-beveiliging',
+            array('back_link' => true)
+        );
+    }}
+}});
+
 add_action('parse_request', function ($wp) {{
     $path = '/.well-known/thactual-verification.txt';
-    if (parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) !== $path) {{
+    $request_host = strtolower(preg_replace('/:\\d+$/', '', $_SERVER['HTTP_HOST'] ?? ''));
+    $expected_host = {expected_host.lower()!r};
+    $request_path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+    if ($request_host !== $expected_host || $request_path !== $path) {{
         return;
     }}
     status_header(200);

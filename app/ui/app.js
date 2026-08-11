@@ -554,7 +554,7 @@ function renderVerificationMethods(platform) {
   const methods = $("#verification-methods");
   methods.classList.remove("hidden");
   if (platform === "wordpress") {
-    methods.innerHTML = `<h3>Kies hoe je WordPress koppelt</h3><div class="verification-method-grid"><article class="verification-method recommended"><span>Aanbevolen</span><h4>WordPress-plugin</h4><p>Installeer en activeer de plugin. De verificatieroute wordt automatisch gepubliceerd.</p><button id="download-wordpress-plugin" class="primary-button" type="button">Download WordPress-plugin</button></article><article class="verification-method"><h4>Handmatig plaatsen</h4><p>Gebruik hosting of SFTP als je liever geen plugin installeert.</p><button id="show-manual-verification" class="secondary-button" type="button">Toon handmatige stappen</button></article></div>`;
+    methods.innerHTML = `<h3>Kies hoe je WordPress koppelt</h3><div class="verification-method-grid"><article class="verification-method recommended"><span>Aanbevolen</span><h4>WordPress-plugin</h4><p>Installeer en activeer de plugin. Gebruik je Multisite? Activeer hem dan alleen op deze website, niet voor het hele netwerk.</p><button id="download-wordpress-plugin" class="primary-button" type="button">Download WordPress-plugin</button></article><article class="verification-method"><h4>Handmatig plaatsen</h4><p>Gebruik hosting of SFTP als je liever geen plugin installeert.</p><button id="show-manual-verification" class="secondary-button" type="button">Toon handmatige stappen</button></article></div>`;
     $("#verification-instruction-list").classList.add("hidden");
     $("#download-verification-file").classList.add("hidden");
     $("#download-wordpress-plugin").addEventListener("click", downloadWordPressPlugin);
@@ -646,7 +646,7 @@ async function downloadWordPressPlugin() {
     link.href = URL.createObjectURL(await response.blob());
     link.download = "thactual-verification.zip";
     document.body.appendChild(link); link.click(); URL.revokeObjectURL(link.href); link.remove();
-    $("#website-verification-message").textContent = "Plugin gedownload. Ga in WordPress naar Plugins → Nieuwe plugin → Plugin uploaden, installeer en activeer hem.";
+    $("#website-verification-message").textContent = "Plugin gedownload. Ga in WordPress naar Plugins → Nieuwe plugin → Plugin uploaden, installeer en activeer hem. Bij Multisite activeer je hem alleen op deze website.";
   } catch (error) {
     $("#website-verification-message").classList.add("error");
     $("#website-verification-message").textContent = error.message;
