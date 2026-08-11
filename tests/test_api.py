@@ -121,7 +121,7 @@ def test_information_architecture_and_legacy_routes_are_served(client: TestClien
     assert 'view === "opportunities" ? "opportunities"' in script.text
     assert 'id="content-effect-learning"' in page.text
     assert "Dit is beschrijvende historie; causaliteit is niet bewezen." in script.text
-    assert 'app.js?v=20260811-2' in page.text
+    assert 'app.js?v=20260811-3' in page.text
     assert 'reports: "rapportages"' in script.text
     assert 'operations: "crawls-exports"' in script.text
     assert 'organisatie: "clients"' in script.text
@@ -141,7 +141,7 @@ def test_guided_website_verification_interface_is_served(client: TestClient) -> 
     ]:
         assert f'id="{element_id}"' in page.text
     assert "/.well-known/thactual-verification.txt" in page.text
-    assert "app.js?v=20260811-2" in page.text
+    assert "app.js?v=20260811-3" in page.text
     assert "onboarding.css?v=20260811-1" in page.text
     for element_id in [
         "first-crawl-progress",
@@ -175,6 +175,8 @@ def test_main_client_can_be_created_without_website_from_interface(client: TestC
     assert 'api("/api/v1/clients", {method:"POST"' in script.text
     assert 'api("/api/v1/clients/onboard"' not in script.text
     assert "Je kunt nu optioneel een website koppelen." in script.text
+    assert "website-delete" in script.text
+    assert "De hoofdklant blijft bestaan." in script.text
 
 
 def test_analysis_pages_share_consistent_states_and_labels(client: TestClient) -> None:
@@ -254,7 +256,7 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
 def test_operations_status_ignores_stale_website_responses(client: TestClient) -> None:
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
-    assert 'src="/ui/assets/app.js?v=20260811-2"' in page.text
+    assert 'src="/ui/assets/app.js?v=20260811-3"' in page.text
     assert 'href="/ui/assets/issue-inspection.css?v=20260808-5"' in page.text
     script = client.get("/ui/assets/app.js").text
     assert "issue-inspection-page-select" in script
@@ -431,7 +433,12 @@ def test_dashboard_and_reports_have_clear_drilldowns(client: TestClient) -> None
     assert 'setAttribute("aria-pressed"' in script.text
 
 
-def test_crud_client_and_website(client: TestClient) -> None:
+def test_crud_client_and_website(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    privacy_deletions: list[tuple[str, object]] = []
+    monkeypatch.setattr(
+        "app.api.routes.websites.record_privacy_deletion",
+        lambda entity_type, entity_id: privacy_deletions.append((entity_type, entity_id)),
+    )
     created = client.post("/api/v1/clients", json={"name": "Example"})
     assert created.status_code == 201
     client_id = created.json()["id"]
@@ -444,6 +451,13 @@ def test_crud_client_and_website(client: TestClient) -> None:
     website_id = website.json()["id"]
     settings = client.get(f"/api/v1/websites/{website_id}/settings")
     assert settings.json()["respect_robots_txt"] is True
+    deleted = client.delete(f"/api/v1/websites/{website_id}")
+    assert deleted.status_code == 204
+    assert client.get(f"/api/v1/websites/{website_id}").status_code == 404
+    assert client.get(f"/api/v1/clients/{client_id}").status_code == 200
+    assert [(entity_type, str(entity_id)) for entity_type, entity_id in privacy_deletions] == [
+        ("website", website_id)
+    ]
 
 
 def test_api_requires_key() -> None:

@@ -1,0 +1,16 @@
+.client-websites .client-website {
+  align-items: center;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.client-websites .website-delete {
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .client-websites .client-website {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+}

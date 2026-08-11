@@ -294,14 +294,14 @@ function renderClientDirectory() {
   $("#client-rows").innerHTML = clients.map((client) => {
     const websites = websitesByClient[client.id] || [];
     const websiteMarkup = websites.length
-      ? websites.map((website) => `<span><strong>${escapeHtml(website.name)}</strong><small>${escapeHtml(website.base_url)}</small></span>`).join("")
+      ? websites.map((website) => `<span class="client-website"><span><strong>${escapeHtml(website.name)}</strong><small>${escapeHtml(website.base_url)}</small></span><button type="button" class="detail-button danger website-delete" data-website-id="${website.id}" data-website-name="${escapeHtml(website.name)}" data-client-id="${client.id}">Verwijder website</button></span>`).join("")
       : `<span class="client-no-website">Nog geen website</span>`;
     return `<tr><td><input class="client-name-input" data-client-id="${client.id}" value="${escapeHtml(client.name)}" maxlength="255"></td><td><div class="client-websites">${websiteMarkup}</div></td><td>${escapeHtml(client.internal_reference || "—")}</td><td><div class="client-actions"><button type="button" class="detail-button client-open" data-client-id="${client.id}">Open</button><button type="button" class="detail-button client-save" data-client-id="${client.id}">Opslaan</button><button type="button" class="detail-button danger client-delete" data-client-id="${client.id}" data-client-name="${escapeHtml(client.name)}">Verwijder</button></div></td></tr>`;
   }).join("");
   $("#client-cards").innerHTML = clients.map((client) => {
     const websites = websitesByClient[client.id] || [];
     const websiteMarkup = websites.length
-      ? websites.map((website) => `<span><strong>${escapeHtml(website.name)}</strong><small>${escapeHtml(website.base_url)}</small></span>`).join("")
+      ? websites.map((website) => `<span class="client-website"><span><strong>${escapeHtml(website.name)}</strong><small>${escapeHtml(website.base_url)}</small></span><button type="button" class="detail-button danger website-delete" data-website-id="${website.id}" data-website-name="${escapeHtml(website.name)}" data-client-id="${client.id}">Verwijder website</button></span>`).join("")
       : `<span class="client-no-website">Nog geen website</span>`;
     return `<article class="client-card"><label>Klantnaam<input class="client-name-input" data-client-id="${client.id}" value="${escapeHtml(client.name)}" maxlength="255"></label><div class="client-card-reference"><span>Interne referentie</span><strong>${escapeHtml(client.internal_reference || "—")}</strong></div><div class="client-websites">${websiteMarkup}</div><div class="client-actions"><button type="button" class="detail-button client-open" data-client-id="${client.id}">Open</button><button type="button" class="detail-button client-save" data-client-id="${client.id}">Opslaan</button><button type="button" class="detail-button danger client-delete" data-client-id="${client.id}" data-client-name="${escapeHtml(client.name)}">Verwijder</button></div></article>`;
   }).join("");
@@ -857,6 +857,20 @@ async function deleteClient(clientId, clientName) {
     await api(`/api/v1/clients/${clientId}`, {method:"DELETE"});
     if (localStorage.getItem(CLIENT_STORAGE_KEY) === clientId) { localStorage.removeItem(CLIENT_STORAGE_KEY); localStorage.removeItem(WEBSITE_STORAGE_KEY); }
     message.classList.remove("error"); message.textContent = "Klant verwijderd."; await loadClients(); await loadOrganization();
+  } catch (error) { message.classList.add("error"); message.textContent = error.message; }
+}
+
+async function deleteWebsite(websiteId, websiteName, clientId) {
+  if (!window.confirm(`Website “${websiteName}” definitief verwijderen? Alleen deze website en de gekoppelde crawldata, acties, integraties en rapportages worden verwijderd. De hoofdklant blijft bestaan.`)) return;
+  const message = $("#clients-message");
+  try {
+    await api(`/api/v1/websites/${websiteId}`, {method:"DELETE"});
+    if (localStorage.getItem(WEBSITE_STORAGE_KEY) === websiteId) localStorage.removeItem(WEBSITE_STORAGE_KEY);
+    if (state.websiteOnboarding?.website_id === websiteId) {
+      clearTimeout(onboardingPollTimer); state.websiteOnboarding = null; state.verificationFileContent = null; localStorage.removeItem(ONBOARDING_STORAGE_KEY);
+    }
+    message.classList.remove("error"); message.textContent = `Website “${websiteName}” verwijderd. De hoofdklant is behouden.`;
+    await loadClients(clientId); await loadOrganization();
   } catch (error) { message.classList.add("error"); message.textContent = error.message; }
 }
 
@@ -3540,6 +3554,7 @@ for (const selector of ["#member-rows", "#member-cards"]) {
 }
 $("#client-directory-search").addEventListener("input", renderClientDirectory);
 function handleClientDirectoryClick(event) {
+  const websiteRemove = event.target.closest(".website-delete"); if (websiteRemove) { deleteWebsite(websiteRemove.dataset.websiteId, websiteRemove.dataset.websiteName, websiteRemove.dataset.clientId); return; }
   const open = event.target.closest(".client-open"); if (open) { openClient(open.dataset.clientId); return; }
   const save = event.target.closest(".client-save"); if (save) { saveClient(save.dataset.clientId, save.closest("tr, article").querySelector(".client-name-input")); return; }
   const remove = event.target.closest(".client-delete"); if (remove) deleteClient(remove.dataset.clientId, remove.dataset.clientName);
