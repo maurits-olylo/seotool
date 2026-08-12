@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.models.user import SecurityAuditEvent
+from app.services.security_incidents import detect_security_incidents
 
 
 def hash_audit_source(source: str | None) -> str | None:
@@ -37,4 +38,6 @@ def record_security_event(
         details=details or {},
     )
     db.add(event)
+    db.flush()
+    detect_security_incidents(db, event=event)
     return event

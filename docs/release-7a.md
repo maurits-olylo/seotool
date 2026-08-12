@@ -387,3 +387,22 @@ Status: lokaal geïmplementeerd; eerste geplande GitHub-cyclus blijft open.
 - Daardoor worden nieuwe advisories en databasewijzigingen ook zonder repositorywijziging opnieuw
   tegen beide images en de runtime-lock getoetst.
 - Iedere update blijft onderworpen aan hashes, tests, SBOM, SAST, secretscan en beide Trivy-gates.
+
+### Fase 7F — Securitydetectie en incidentregister
+
+Status: lokaal geïmplementeerd; stagingacceptatie blijft open.
+
+- Bestaande audit-events worden automatisch beoordeeld op herhaalde login- en MFA-fouten en op
+  promotie naar een beheerdersrol.
+- Detectie maakt één idempotent, duurzaam incident per regel, bron en dag en heropent een opgelost
+  incident wanneer hetzelfde patroon terugkomt.
+- Alleen de superuser kan incidenten opvragen, herdetectie starten of met een concrete toelichting
+  afsluiten.
+- Open incidenten degraderen de operationele systeemstatus.
+- Bewijs bevat uitsluitend regelmetadata, hashes en interne identifiers; geen wachtwoorden, tokens,
+  adressen of klantpayloads.
+- `scripts/accept-release-7f-staging.py` bewijst detectie, drempel, idempotentie, afhandeling en
+  fixturecleanup.
+
+Externe, wijzigingsbeschermde EU-opslag en een gekozen notificatiekanaal blijven noodzakelijk om
+SEC-14 volledig te sluiten. Deze fase introduceert daarvoor niet stilzwijgend een leverancier.

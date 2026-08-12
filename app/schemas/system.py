@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.schemas.common import Timestamped
 
@@ -22,3 +22,25 @@ class QueueDeadLetterRead(Timestamped):
 
 class QueueDeadLetterResolution(BaseModel):
     resolution: str
+
+
+class SecurityIncidentRead(Timestamped):
+    fingerprint: str
+    rule_id: str
+    severity: str
+    status: str
+    title: str
+    summary: str
+    first_detected_at: datetime
+    last_detected_at: datetime
+    occurrence_count: int
+    source_hash: str | None
+    actor_user_id: UUID | None
+    client_id: UUID | None
+    evidence: dict[str, object]
+    resolved_at: datetime | None
+    resolution: str | None
+
+
+class SecurityIncidentResolution(BaseModel):
+    resolution: str = Field(min_length=10, max_length=2000)

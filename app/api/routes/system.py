@@ -11,8 +11,13 @@ from app.core.config import get_settings
 from app.core.queue import enqueue_crawl_job
 from app.core.security import Principal, require_api_key
 from app.db.session import get_db
-from app.models.system import QueueDeadLetter
-from app.schemas.system import QueueDeadLetterRead, QueueDeadLetterResolution
+from app.models.system import QueueDeadLetter, SecurityIncident
+from app.schemas.system import (
+    QueueDeadLetterRead,
+    QueueDeadLetterResolution,
+    SecurityIncidentRead,
+    SecurityIncidentResolution,
+)
 from app.services.authorization import require_global_role
 from app.services.crawl_deployment import (
     deployment_drain_status,
@@ -20,6 +25,10 @@ from app.services.crawl_deployment import (
     start_deployment_drain,
 )
 from app.services.dead_letters import DeadLetterError, requeue_dead_letter, resolve_dead_letter
+from app.services.security_incidents import (
+    detect_security_incidents,
+    resolve_security_incident,
+)
 from app.services.system_status import build_queue_status
 
 router = APIRouter(tags=["system"])
@@ -31,6 +40,62 @@ def _dead_letter_or_404(dead_letter_id: UUID, db: Session) -> QueueDeadLetter:
     if record is None:
         raise HTTPException(status_code=404, detail="Dead letter not found")
     return record
+
+
+def _security_incident_or_404(incident_id: UUID, db: Session) -> SecurityIncident:
+    incident = db.get(SecurityIncident, incident_id)
+    if incident is None:
+        raise HTTPException(status_code=404, detail="Securityincident niet gevonden")
+    return incident
+
+
+@router.get("/system/security-incidents", response_model=list[SecurityIncidentRead])
+def list_security_incidents(
+    status: str | None = Query(default="open"),
+    limit: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> list[SecurityIncident]:
+    require_global_role(principal, "superuser")
+    query = select(SecurityIncident).order_by(SecurityIncident.last_detected_at.desc()).limit(limit)
+    if status:
+        if status == "open":
+            query = query.where(SecurityIncident.status.in_({"open", "reopened", "investigating"}))
+        else:
+            query = query.where(SecurityIncident.status == status)
+    return list(db.scalars(query))
+
+
+@router.post("/system/security-incidents/detect", response_model=list[SecurityIncidentRead])
+def run_security_incident_detection(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> list[SecurityIncident]:
+    require_global_role(principal, "superuser")
+    incidents = detect_security_incidents(db)
+    db.commit()
+    return incidents
+
+
+@router.post(
+    "/system/security-incidents/{incident_id}/resolve",
+    response_model=SecurityIncidentRead,
+)
+def resolve_detected_security_incident(
+    incident_id: UUID,
+    payload: SecurityIncidentResolution,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> SecurityIncident:
+    require_global_role(principal, "superuser")
+    incident = _security_incident_or_404(incident_id, db)
+    try:
+        resolve_security_incident(incident, payload.resolution)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    db.commit()
+    db.refresh(incident)
+    return incident
 
 
 @router.get("/system/dead-letters", response_model=list[QueueDeadLetterRead])
@@ -187,8 +252,23 @@ def system_status(
     )
     dead_letters = {queue_name: int(count) for queue_name, count in dead_letter_rows}
     unresolved_dead_letters = sum(dead_letters.values())
-    healthy = database_status == "ok" and unresolved_dead_letters == 0 and all(
-        queue["status"] == "ok" for queue in queue_status["queues"].values()
+    open_security_incidents = (
+        int(
+            db.scalar(
+                select(func.count(SecurityIncident.id)).where(
+                    SecurityIncident.status.in_({"open", "reopened", "investigating"})
+                )
+            )
+            or 0
+        )
+        if database_status == "ok"
+        else 0
+    )
+    healthy = (
+        database_status == "ok"
+        and unresolved_dead_letters == 0
+        and open_security_incidents == 0
+        and all(queue["status"] == "ok" for queue in queue_status["queues"].values())
     )
     return {
         "status": "ok" if healthy else "degraded",
@@ -198,5 +278,6 @@ def system_status(
             "unresolved": unresolved_dead_letters,
             "by_queue": dead_letters,
         },
+        "security_incidents": {"open": open_security_incidents},
         **queue_status,
     }

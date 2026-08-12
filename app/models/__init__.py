@@ -63,7 +63,12 @@ from app.models.sensor import (
     SensorMeasurementState,
     SensorOutcomeDefinition,
 )
-from app.models.system import CrawlDeploymentControl, QueueDeadLetter, RetentionOperation
+from app.models.system import (
+    CrawlDeploymentControl,
+    QueueDeadLetter,
+    RetentionOperation,
+    SecurityIncident,
+)
 from app.models.user import (
     ClientMembership,
     LoginAttempt,
@@ -94,6 +99,7 @@ __all__ = [
     "CrawlDeploymentControl",
     "RetentionOperation",
     "QueueDeadLetter",
+    "SecurityIncident",
     "Export",
     "Issue",
     "IssueComment",

@@ -85,3 +85,30 @@ class QueueDeadLetter(UUIDTimestampMixin, Base):
     payload: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     resolution: Mapped[str | None] = mapped_column(Text)
+
+
+class SecurityIncident(UUIDTimestampMixin, Base):
+    """Durable, reviewable incident created from security-audit patterns."""
+
+    __tablename__ = "security_incidents"
+    __table_args__ = (UniqueConstraint("fingerprint", name="uq_security_incident_fingerprint"),)
+
+    fingerprint: Mapped[str] = mapped_column(String(64), index=True)
+    rule_id: Mapped[str] = mapped_column(String(80), index=True)
+    severity: Mapped[str] = mapped_column(String(20), index=True)
+    status: Mapped[str] = mapped_column(String(30), default="open", index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    summary: Mapped[str] = mapped_column(Text)
+    first_detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    last_detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    occurrence_count: Mapped[int] = mapped_column(Integer, default=1)
+    source_hash: Mapped[str | None] = mapped_column(String(64), index=True)
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
+    client_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("clients.id", ondelete="SET NULL"), index=True
+    )
+    evidence: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resolution: Mapped[str | None] = mapped_column(Text)

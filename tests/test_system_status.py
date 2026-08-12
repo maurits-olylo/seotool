@@ -1,13 +1,17 @@
 from datetime import UTC, datetime
 from unittest.mock import Mock
 
+from sqlalchemy import select
+
 from app.api.routes.system import system_status
 from app.core.security import Principal
 from app.db.session import SessionLocal
 from app.models.client import Client
 from app.models.discovery import CrawlJob
-from app.models.system import QueueDeadLetter
+from app.models.system import QueueDeadLetter, SecurityIncident
+from app.models.user import SecurityAuditEvent
 from app.models.website import Website, WebsiteSettings
+from app.services.security_audit import record_security_event
 from app.services.system_status import build_queue_status
 
 
@@ -253,3 +257,71 @@ def test_system_status_reports_unresolved_dead_letters(monkeypatch) -> None:
         "unresolved": 1,
         "by_queue": {"crawls_full": 1},
     }
+
+
+def test_security_incident_detection_is_idempotent_and_resolvable(client) -> None:  # type: ignore[no-untyped-def]
+    now = datetime.now(UTC)
+    with SessionLocal() as db:
+        for _offset in range(5):
+            db.add(
+                SecurityAuditEvent(
+                    event_type="authentication.login",
+                    result="failed",
+                    source_hash="a" * 64,
+                    summary="Mislukte inlogpoging",
+                    occurred_at=now,
+                )
+            )
+        db.commit()
+
+    first = client.post("/api/v1/system/security-incidents/detect")
+    assert first.status_code == 200
+    assert len(first.json()) == 1
+    listed = client.get("/api/v1/system/security-incidents")
+    assert listed.status_code == 200
+    assert len(listed.json()) == 1
+    incident_id = listed.json()[0]["id"]
+    assert listed.json()[0]["rule_id"] == "repeated_login_failures"
+    assert listed.json()[0]["occurrence_count"] == 5
+    status = client.get("/api/v1/system/status").json()
+    assert status["status"] == "degraded"
+    assert status["security_incidents"] == {"open": 1}
+
+    client.post("/api/v1/system/security-incidents/detect")
+    with SessionLocal() as db:
+        assert db.query(SecurityIncident).count() == 1
+
+    resolved = client.post(
+        f"/api/v1/system/security-incidents/{incident_id}/resolve",
+        json={"resolution": "Bron beoordeeld; geen accountovername vastgesteld."},
+    )
+    assert resolved.status_code == 200
+    assert resolved.json()["status"] == "resolved"
+    assert client.get("/api/v1/system/security-incidents").json() == []
+    assert (
+        client.post(
+            f"/api/v1/system/security-incidents/{incident_id}/resolve",
+            json={"resolution": "kort"},
+        ).status_code
+        == 422
+    )
+
+
+def test_security_audit_automatically_creates_incident() -> None:
+    with SessionLocal() as db:
+        for _attempt in range(5):
+            record_security_event(
+                db,
+                event_type="authentication.login",
+                result="failed",
+                source_hash="b" * 64,
+                summary="Mislukte inlogpoging",
+            )
+        db.commit()
+        incident = db.scalar(
+            select(SecurityIncident).where(SecurityIncident.source_hash == "b" * 64)
+        )
+
+    assert incident is not None
+    assert incident.rule_id == "repeated_login_failures"
+    assert incident.occurrence_count == 5

@@ -46,6 +46,20 @@ Herhaal een mogelijk onderbroken muterend commando nooit direct. Controleer eers
 - Is opnieuw aanbieden niet zinvol, sluit dan af via
   `POST /api/v1/system/dead-letters/<id>/resolve` met een concrete toelichting.
 
+## Securityincidenten
+
+- Bekijk open incidenten via `GET /api/v1/system/security-incidents`; alleen de superuser heeft
+  toegang.
+- Controleer regel, ernst, detectieperiode, aantal gebeurtenissen, gehashte bron en betrokken actor
+  of klant. Het register bevat geen tokens, wachtwoorden, IP-adressen of payloads met klantdata.
+- Beveilig eerst het account: trek verdachte sessies in, controleer MFA en beperk zo nodig toegang.
+- Leg tijdlijn, scope, genomen maatregelen en meldingsbesluit buiten het incidentrecord vast in het
+  bevoegde incidentdossier. Deel geen gevoelige onderzoeksdetails via gewone taaknotities.
+- Sluit het incident pas via `POST /api/v1/system/security-incidents/<id>/resolve` wanneer oorzaak,
+  impact en herstel zijn beoordeeld. Een nieuw gelijk patroon heropent het incident automatisch.
+- Gebruik `POST /api/v1/system/security-incidents/detect` voor een gecontroleerde heranalyse of
+  incidentproef; normale security-events starten detectie automatisch.
+
 ## Defecte import
 
 - Controleer eerst de blijvende integratiestatus en de afzonderlijke GSC-, GA4- en Bing-fout.

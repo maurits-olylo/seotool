@@ -28,7 +28,7 @@ of hoge bevindingen meer meldt.
 | SEC-11 breed gedeelde secrets | grotendeels opgelost | secrets zijn per service begrensd, environmentbestanden vereisen veilige rechten en database-identiteiten zijn gescheiden |
 | SEC-12 rootcontainers | opgelost binnen NAS-beperkingen | applicaties draaien niet-root, read-only, zonder capabilities en met `no-new-privileges`; alleen de niet-ondersteunde PID-limiet resteert als platformbeperking |
 | SEC-13 back-upweerbaarheid | gedeeltelijk opgelost | versleutelde volledige herstelbundels, controles, privacy-ledger en periodieke taak werken; onafhankelijke immutable EU-kopie ontbreekt nog |
-| SEC-14 auditlogging/detectie | gedeeltelijk opgelost | duurzaam security-auditregister bestaat; externe bescherming, detectieregels en incidentproef zijn nog niet volledig geaccepteerd |
+| SEC-14 auditlogging/detectie | gedeeltelijk opgelost | duurzaam auditregister, automatische kernregels, incidentregister, statusdegradatie en herhaalbare incidentproef zijn lokaal geïmplementeerd; stagingacceptatie en externe beschermde opslag/alerts blijven open |
 | SEC-15 reproduceerbare supply chain | gedeeltelijk opgelost | gehashte locks, SHA-gepinde CI, SBOM en blokkerende scans draaien aantoonbaar op GitHub; drie cryptography-advisories en hoge/kritieke basisimagebevindingen houden de gate rood |
 | SEC-16 betrouwbaar testbewijs | opgelost voor huidige suite | de volledige suite van 628 tests, Ruff, Bandit en secretscan is op GitHub/Python 3.12 geslaagd; de afzonderlijke securitybevindingen blijven onder SEC-15 open |
 

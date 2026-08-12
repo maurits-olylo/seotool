@@ -59,11 +59,13 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO seo_integration;
 
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO seo_export;
 REVOKE ALL ON TABLE integration_connections, login_attempts, oauth_states, security_audit_events,
+  security_incidents,
   user_invitations, user_sessions, users FROM seo_export;
 GRANT SELECT, UPDATE ON TABLE exports TO seo_export;
 
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO seo_scheduler;
 REVOKE ALL ON TABLE integration_connections, login_attempts, oauth_states, security_audit_events,
+  security_incidents,
   user_invitations, user_sessions, users FROM seo_scheduler;
 GRANT INSERT, UPDATE, DELETE ON TABLE crawl_jobs, monthly_report_snapshots, retention_operations,
   website_integrations TO seo_scheduler;
