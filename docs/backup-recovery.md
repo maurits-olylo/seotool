@@ -131,6 +131,10 @@ retentie volgt op basis van gemeten pakketgroei.
 De implementatie voor fase 6B is gereed voor providerconfiguratie en acceptatie. De gate sluit pas
 na een echte upload, aantoonbaar geweigerde verwijdering en een restore uit uitsluitend Scaleway:
 
+De eerste echte upload is op 12 augustus 2026 geslaagd. Het script controleerde het remote object
+op omvang, SHA-256-metadata en `COMPLIANCE`-retentie. Het concrete objectpad en provideridentifiers
+worden bewust niet in Git-documentatie vastgelegd.
+
 - stel lifecycle pas in nadat is bewezen dat deze geen beschermde versies vóór beleidseinde raakt;
 - meet opslaggroei en stel een kostenwaarschuwing bij de provider in;
 - bewaar de herstelsleutel en herstelcredential aantoonbaar buiten de NAS.

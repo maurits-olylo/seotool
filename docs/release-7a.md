@@ -411,7 +411,7 @@ SEC-14 volledig te sluiten. Deze fase introduceert daarvoor niet stilzwijgend ee
 
 ### Fase 7G — Onafhankelijke immutable EU-back-up
 
-Status: lokaal geïmplementeerd; echte Scaleway-configuratie en stagingacceptatie blijven open.
+Status: eerste productie-upload geaccepteerd; verwijder- en onafhankelijke herstelproef blijven open.
 
 - Scaleway Object Storage Parijs `Standard Multi-AZ` is gekozen als onafhankelijke EU-locatie.
 - De implementatie gebruikt rechtstreeks de S3-API en voegt geen runtimepakket toe.
@@ -421,3 +421,6 @@ Status: lokaal geïmplementeerd; echte Scaleway-configuratie en stagingacceptati
   herstelt services en crawl-drain via de bestaande cleanup.
 - Een downloadroute schrijft atomair, valideert de checksum en ondersteunt een herstelproef zonder
   NAS-back-upvolume of NAS-uploadcredential.
+- Op 12 augustus 2026 is een bestaand productieherstelpakket vanaf de NAS naar de Parijse
+  Multi-AZ-bucket geüpload. De keten bevestigde remote SHA-256, omvang en `COMPLIANCE`-retentie.
+- De uploadcredential staat root-only op de NAS; de afzonderlijke restorecredential niet.
