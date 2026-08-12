@@ -14,4 +14,7 @@ def test_scheduled_backup_restores_services_and_drain_on_failure() -> None:
     assert 'if [ "$DRAIN_ACTIVE" = "true" ]' in script
     assert "resume-crawls" in script
     assert "scripts/check-backup.sh" in script
+    assert 'OFFSITE_BACKUP_CONFIG_FILE="${OFFSITE_BACKUP_CONFIG_FILE:-' in script
+    assert 'if [ "${S3_BACKUP_ENABLED:-false}" = "true" ]' in script
+    assert 'scripts/offsite-backup.py" upload' in script
     assert "curl --fail --silent --show-error http://127.0.0.1:8000/health" in script

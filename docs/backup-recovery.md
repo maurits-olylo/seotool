@@ -83,16 +83,52 @@ Productiedata wordt niet naar development gekopieerd. Hersteltests gebruiken syn
 stagingdata in een afzonderlijk Compose-project en afzonderlijke volumes. Alleen een later expliciet
 goedgekeurd, afgeschermd productieherstel mag een echt productiepakket ontsleutelen.
 
-## Retentie en fase 6B
+## Onafhankelijke EU-kopie
+
+De gekozen tweede locatie is Scaleway Object Storage in Parijs, klasse `Standard Multi-AZ`.
+De koppeling gebruikt uitsluitend de algemene S3-API; een andere compatibele EU-provider blijft
+daardoor technisch mogelijk. Het pakket is al lokaal versleuteld voordat het de NAS verlaat.
+
+`scripts/offsite-backup.py` uploadt de unieke timestampversie, bewaart de lokale SHA-256 als
+objectmetadata en controleert daarna omvang, checksummetadata en Object Lock-retentie. Alleen
+`COMPLIANCE` wordt geaccepteerd. Een gewone beheerder of gecompromitteerde NAS-uploadcredential kan
+het object gedurende de retentie daardoor niet verwijderen of overschrijven.
+
+Geheimen staan in twee root-only bestanden buiten het project:
+
+- `offsite-backup.env` met endpoint, regio, bucket, prefix, retentie en het credentialpad;
+- het credentialbestand met uitsluitend `AWS_ACCESS_KEY_ID` en `AWS_SECRET_ACCESS_KEY`.
+
+Beide bestanden moeten modus `0600` of `0400` hebben. De NAS-credential krijgt alleen upload,
+objectmetadata- en retentieleesrechten op de productieprefix; geen delete-, lifecycle-,
+bucketbeheer- of retention-bypassrecht. Een afzonderlijke herstelcredential blijft buiten de NAS.
+De bucket gebruikt versioning en een standaardretentie van dertig dagen in `COMPLIANCE`-modus.
+
+De dagelijkse wrapper uploadt pas na lokale checksum-, decryptie- en archiefcontrole. Een mislukte
+upload of ontbrekende COMPLIANCE-retentie maakt de hele geplande taak rood, terwijl services en
+crawl-drain via de bestaande cleanup altijd worden hersteld.
+
+Een herstelproef begint op een afzonderlijk systeem met de herstelcredential:
+
+```bash
+python3 scripts/offsite-backup.py download \
+  seo-monitor/production/seo-monitor-production-YYYYMMDDTHHMMSSZ.tar.enc \
+  /veilige/herstelmap/seo-monitor-production-YYYYMMDDTHHMMSSZ.tar.enc
+```
+
+Daarna controleert `scripts/check-backup.sh` het gedownloade pakket en voert `scripts/restore.sh`
+de bestaande geïsoleerde restoreprocedure uit. Een proef telt pas wanneer NAS-back-upvolume en
+NAS-uploadcredential daarbij niet zijn gebruikt.
+
+## Retentie
 
 Fase 6A behoudt lokaal standaard 30 dagen en verwijdert alleen correct benoemde versleutelde
 pakketten en hun checksum na afloop. Verlenging naar gelaagde dagelijkse, wekelijkse en maandelijkse
 retentie volgt op basis van gemeten pakketgroei.
 
-Release 7a-B fase 6B blijft een harde gate vóór Friends & Family en voegt toe:
+De implementatie voor fase 6B is gereed voor providerconfiguratie en acceptatie. De gate sluit pas
+na een echte upload, aantoonbaar geweigerde verwijdering en een restore uit uitsluitend Scaleway:
 
-- een tweede onafhankelijke opslaglocatie in de EU;
-- Object Lock of gelijkwaardige immutability zonder verwijderrecht voor productie;
-- automatische lifecycle en kostenbegrenzing;
-- herstel vanaf uitsluitend de onafhankelijke kopie;
-- operationeel bewijs dat verlies van NAS, project en productiecredentials kan worden overleefd.
+- stel lifecycle pas in nadat is bewezen dat deze geen beschermde versies vóór beleidseinde raakt;
+- meet opslaggroei en stel een kostenwaarschuwing bij de provider in;
+- bewaar de herstelsleutel en herstelcredential aantoonbaar buiten de NAS.

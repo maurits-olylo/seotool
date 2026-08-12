@@ -234,8 +234,8 @@ Taakplanner-taak roept uitsluitend `scripts/scheduled-backup.sh` aan; deze verzo
 voorkomt overlap en herstelt services en crawl-drain ook na een fout. Stel `PROJECT_DIR`,
 `BACKUP_DIR`, `BACKUP_KEY_FILE` en optioneel `BACKUP_RETENTION_DAYS` in. Maak de sleutel vooraf
 niet-tonend met `scripts/configure-backup-key.sh` en bewaar een herstelkopie buiten project en
-back-upvolume. De onafhankelijke EU-kopie en Object Lock volgen verplicht in Release 7a-B fase 6B
-vóór Friends & Family.
+back-upvolume. Configureer daarnaast de onafhankelijke Scaleway-kopie volgens
+`docs/backup-recovery.md`; de geplande wrapper accepteert alleen aantoonbare COMPLIANCE-retentie.
 
 Het productieprivacyregister gebruikt het vooraf ingerichte externe volume
 `seo-monitor-privacy-ledger-data`. Maak dit volume vóór de eerste API-start met Compose-labels voor

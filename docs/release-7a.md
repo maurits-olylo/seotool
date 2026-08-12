@@ -408,3 +408,16 @@ Status: geïmplementeerd en op staging geaccepteerd op 12 augustus 2026.
 
 Externe, wijzigingsbeschermde EU-opslag en een gekozen notificatiekanaal blijven noodzakelijk om
 SEC-14 volledig te sluiten. Deze fase introduceert daarvoor niet stilzwijgend een leverancier.
+
+### Fase 7G — Onafhankelijke immutable EU-back-up
+
+Status: lokaal geïmplementeerd; echte Scaleway-configuratie en stagingacceptatie blijven open.
+
+- Scaleway Object Storage Parijs `Standard Multi-AZ` is gekozen als onafhankelijke EU-locatie.
+- De implementatie gebruikt rechtstreeks de S3-API en voegt geen runtimepakket toe.
+- Back-ups blijven cliënt-side versleuteld en worden onder een unieke timestampnaam geplaatst.
+- Iedere upload wordt gecontroleerd op omvang, SHA-256-metadata en `COMPLIANCE` Object Lock.
+- De dagelijkse back-uptaak faalt hard wanneer off-site upload of retentiecontrole faalt, maar
+  herstelt services en crawl-drain via de bestaande cleanup.
+- Een downloadroute schrijft atomair, valideert de checksum en ondersteunt een herstelproef zonder
+  NAS-back-upvolume of NAS-uploadcredential.
