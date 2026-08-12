@@ -143,6 +143,8 @@ def test_security_workflow_is_read_only_and_pins_third_party_actions() -> None:
     assert "bandit -q -r app -ll" in workflow
     assert "detect-secrets scan" in workflow
     assert "severity: CRITICAL,HIGH" in workflow
+    assert "continue-on-error: true" in workflow
+    assert "Enforce container scan gate" in workflow
     for action_line in (
         "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
         "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405",

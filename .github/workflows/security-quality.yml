@@ -31,6 +31,21 @@ jobs:
       - name: Verify environment
         run: python -m pip check
 
+      - name: Generate reproducible CycloneDX SBOM
+        run: |
+          mkdir -p outputs/ci
+          cyclonedx-py requirements requirements.lock \
+            --output-reproducible --output-format JSON \
+            --output-file outputs/ci/sbom.cdx.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: seo-monitor-sbom
+          path: outputs/ci/sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Lint
         run: ruff check app tests scripts
 
@@ -48,22 +63,6 @@ jobs:
             > /tmp/seo-monitor-secrets.json
           python -c "import json; data=json.load(open('/tmp/seo-monitor-secrets.json')); count=sum(len(items) for items in data.get('results', {}).values()); print({'secret_candidates': count}); raise SystemExit(bool(count))"
 
-      - name: Generate reproducible CycloneDX SBOM
-        run: |
-          mkdir -p outputs/ci
-          cyclonedx-py requirements requirements.lock \
-            --output-reproducible --output-format JSON \
-            --output-file outputs/ci/sbom.cdx.json
-
-      - name: Upload SBOM
-        if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: seo-monitor-sbom
-          path: outputs/ci/sbom.cdx.json
-          if-no-files-found: error
-          retention-days: 30
-
       - name: Audit locked Python dependencies
         run: pip-audit -r requirements.lock --strict
 
@@ -78,6 +77,8 @@ jobs:
         run: docker build --pull --tag seo-monitor-ci:${{ github.sha }} .
 
       - name: Scan application image
+        id: scan-application
+        continue-on-error: true
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: seo-monitor-ci:${{ github.sha }}
@@ -90,6 +91,8 @@ jobs:
         run: docker build --pull --file Dockerfile.render --tag seo-monitor-render-ci:${{ github.sha }} .
 
       - name: Scan renderer image
+        id: scan-renderer
+        continue-on-error: true
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: seo-monitor-render-ci:${{ github.sha }}
@@ -97,3 +100,13 @@ jobs:
           exit-code: "1"
           ignore-unfixed: false
           severity: CRITICAL,HIGH
+
+      - name: Enforce container scan gate
+        if: always()
+        env:
+          APPLICATION_SCAN: ${{ steps.scan-application.outcome }}
+          RENDERER_SCAN: ${{ steps.scan-renderer.outcome }}
+        run: |
+          printf 'application_scan=%s\nrenderer_scan=%s\n' "$APPLICATION_SCAN" "$RENDERER_SCAN"
+          test "$APPLICATION_SCAN" = success
+          test "$RENDERER_SCAN" = success

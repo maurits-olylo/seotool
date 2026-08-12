@@ -1,5 +1,6 @@
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 from app.services.sensor_matomo import observation_to_matomo_command
@@ -130,7 +131,7 @@ def test_pinned_client_measurement_is_reproducible(tmp_path: Path) -> None:
     wrong_artifact.write_text("not the pinned client", encoding="utf-8")
     completed = subprocess.run(
         [
-            str(ROOT / ".venv" / "bin" / "python"),
+            sys.executable,
             "scripts/measure-sensor-client.py",
             wrong_artifact,
         ],
