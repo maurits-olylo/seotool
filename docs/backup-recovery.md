@@ -103,6 +103,8 @@ Beide bestanden moeten modus `0600` of `0400` hebben. De NAS-credential krijgt a
 objectmetadata- en retentieleesrechten op de productieprefix; geen delete-, lifecycle-,
 bucketbeheer- of retention-bypassrecht. Een afzonderlijke herstelcredential blijft buiten de NAS.
 De bucket gebruikt versioning en een standaardretentie van dertig dagen in `COMPLIANCE`-modus.
+Plaats de uploadcredential uitsluitend met `scripts/configure-offsite-backup.sh`. Het script leest
+beide waarden verborgen in, weigert bestaande configuratie te overschrijven en toont geen secrets.
 
 De dagelijkse wrapper uploadt pas na lokale checksum-, decryptie- en archiefcontrole. Een mislukte
 upload of ontbrekende COMPLIANCE-retentie maakt de hele geplande taak rood, terwijl services en
