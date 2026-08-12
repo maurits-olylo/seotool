@@ -318,8 +318,8 @@ read-only draaiende containers en hebben geen functionele of beveiligingsimpact.
 
 ### Fase 7B — CI, SBOM en geautomatiseerde scans
 
-Status: lokaal geïmplementeerd; eerste GitHub-run is nog niet geaccepteerd en de dependencygate
-blokkeert terecht op drie advisories waarvoor nog geen installeerbare fix bestaat.
+Status: CI-techniek op GitHub geaccepteerd; de releasegate blokkeert inhoudelijk op bekende
+dependency- en containerbevindingen waarvoor nog geen volledig installeerbare oplossing bestaat.
 
 - Python 3.12 gebruikt één gehashte CI-lock voor tests, linting en securitytools;
 - de workflow heeft alleen leesrecht, gebruikt geen `pull_request_target` en pint alle externe
@@ -337,3 +337,23 @@ de hoogst leverbare versie `48.0.1`, waarmee één advisory is opgelost. Drie ad
 versie 49 of 50 als fix, maar die versies zijn nog niet beschikbaar voor de Python 3.12-resolver.
 Zij worden niet genegeerd: de CI blijft rood totdat een installeerbare veilige versie bestaat of
 een afzonderlijke expliciete en tijdgebonden risicoacceptatie is goedgekeurd.
+
+### Fase 7C — Eerste gecontroleerde GitHub-run
+
+Status: CI-bewijs geaccepteerd; securitygate blijft rood.
+
+GitHub-run `31562107226` op commit `f224a6f` bewees op 12 augustus 2026 dat:
+
+- de gehashte Python 3.12-installatie en `pip check` slagen;
+- de volledige suite van 628 tests, Ruff, Bandit en de productiegerichte secretscan slagen;
+- een reproduceerbare CycloneDX-SBOM wordt gemaakt en als artifact bewaard;
+- beide applicatie-images worden gebouwd en onafhankelijk door Trivy worden gescand;
+- de afsluitende containergate rood blijft zodra een van beide scans faalt;
+- `pip-audit` de drie open advisories in `cryptography 48.0.1` blokkerend rapporteert;
+- Trivy voor de API-image 23 hoge/kritieke OS-bevindingen en twee Python-bevindingen meldt;
+- Trivy voor de rendererimage twee hoge OS-bevindingen en twee Python-bevindingen meldt.
+
+De workflow is daarmee functioneel geaccepteerd, maar deze releasefase is beveiligingsinhoudelijk
+niet vrijgegeven. Eerst moeten nieuwe veilige basisimages en cryptography-releases beschikbaar en
+opnieuw gelockt, gebouwd en gescand zijn, of moet voor iedere resterende bevinding afzonderlijk een
+expliciete, gemotiveerde en tijdgebonden risicoacceptatie worden vastgelegd.

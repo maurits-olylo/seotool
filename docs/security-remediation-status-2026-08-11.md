@@ -29,14 +29,15 @@ of hoge bevindingen meer meldt.
 | SEC-12 rootcontainers | opgelost binnen NAS-beperkingen | applicaties draaien niet-root, read-only, zonder capabilities en met `no-new-privileges`; alleen de niet-ondersteunde PID-limiet resteert als platformbeperking |
 | SEC-13 back-upweerbaarheid | gedeeltelijk opgelost | versleutelde volledige herstelbundels, controles, privacy-ledger en periodieke taak werken; onafhankelijke immutable EU-kopie ontbreekt nog |
 | SEC-14 auditlogging/detectie | gedeeltelijk opgelost | duurzaam security-auditregister bestaat; externe bescherming, detectieregels en incidentproef zijn nog niet volledig geaccepteerd |
-| SEC-15 reproduceerbare supply chain | gedeeltelijk opgelost | gehashte runtime-, render- en CI-locks, SHA-gepinde CI, SBOM, dependency-, secret-, SAST- en imagescans zijn geïmplementeerd; eerste GitHub-run en drie nog niet oplosbare cryptography-advisories blijven open |
-| SEC-16 betrouwbaar testbewijs | lokaal opgelost, CI open | volledige regressiesuites zijn herhaald lokaal geslaagd op de releaseflow; gecontroleerde CI-evidence ontbreekt nog |
+| SEC-15 reproduceerbare supply chain | gedeeltelijk opgelost | gehashte locks, SHA-gepinde CI, SBOM en blokkerende scans draaien aantoonbaar op GitHub; drie cryptography-advisories en hoge/kritieke basisimagebevindingen houden de gate rood |
+| SEC-16 betrouwbaar testbewijs | opgelost voor huidige suite | de volledige suite van 628 tests, Ruff, Bandit en secretscan is op GitHub/Python 3.12 geslaagd; de afzonderlijke securitybevindingen blijven onder SEC-15 open |
 
 ## Resterende securitygates
 
 1. Configureer een onafhankelijke versleutelde EU-back-up met Object Lock of gelijkwaardige
    verwijderbescherming en bewijs een volledige restore vanuit uitsluitend die kopie.
-2. Maak dependencies en builds reproduceerbaar en voeg CI, SBOM en blokkerende securityscans toe.
+2. Werk cryptography en beide basisimages bij zodra veilige uitgaven beschikbaar zijn en bewijs
+   daarna een volledig groene dependency- en containeraudit; negeer of accepteer niets stilzwijgend.
 3. Rond auditdetectie en incidentrespons af met beschermde opslag, concrete alerts en een
    operationele incidentproef.
 4. Laat daarna een onafhankelijke heraudit en penetratietest uitvoeren en leg ASVS-L2-bewijs en
