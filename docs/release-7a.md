@@ -390,7 +390,7 @@ Status: lokaal geïmplementeerd; eerste geplande GitHub-cyclus blijft open.
 
 ### Fase 7F — Securitydetectie en incidentregister
 
-Status: lokaal geïmplementeerd; stagingacceptatie blijft open.
+Status: geïmplementeerd en op staging geaccepteerd op 12 augustus 2026.
 
 - Bestaande audit-events worden automatisch beoordeeld op herhaalde login- en MFA-fouten en op
   promotie naar een beheerdersrol.
@@ -403,6 +403,8 @@ Status: lokaal geïmplementeerd; stagingacceptatie blijft open.
   adressen of klantpayloads.
 - `scripts/accept-release-7f-staging.py` bewijst detectie, drempel, idempotentie, afhandeling en
   fixturecleanup.
+- Staging draaide migratie `0065` als enige head en bevestigde vijf gebeurtenissen als één
+  opgelost incident, een schone fixturecleanup en een gezonde API/database.
 
 Externe, wijzigingsbeschermde EU-opslag en een gekozen notificatiekanaal blijven noodzakelijk om
 SEC-14 volledig te sluiten. Deze fase introduceert daarvoor niet stilzwijgend een leverancier.
