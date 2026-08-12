@@ -130,6 +130,18 @@ def test_application_images_install_only_hashed_locked_dependencies() -> None:
     assert "--hash=sha256:" in render_lock
 
 
+def test_application_images_pin_immutable_base_images() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    dockerfile = (project_root / "Dockerfile").read_text()
+    render_dockerfile = (project_root / "Dockerfile.render").read_text()
+
+    assert dockerfile.startswith("FROM python:3.12.13-slim-trixie@sha256:")
+    assert "FROM node:22-bookworm-slim@sha256:" in render_dockerfile
+    assert "FROM mcr.microsoft.com/playwright/python:v1.61.0-resolute@sha256:" in (
+        render_dockerfile
+    )
+
+
 def test_security_workflow_is_read_only_and_pins_third_party_actions() -> None:
     project_root = Path(__file__).resolve().parents[1]
     workflow = (project_root / ".github/workflows/security-quality.yml").read_text()
