@@ -13,19 +13,20 @@ import stat
 import sys
 import urllib.parse
 import xml.etree.ElementTree as ET
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Dict, Optional, Tuple  # noqa: UP035
 
 
 class OffsiteBackupError(RuntimeError):
     pass
 
 
-def _credentials(path: Path) -> tuple[str, str]:
+def _credentials(path: Path) -> Tuple[str, str]:  # noqa: UP006
     mode = stat.S_IMODE(path.stat().st_mode)
     if mode not in {0o400, 0o600}:
         raise OffsiteBackupError("S3 credentials file must have mode 0400 or 0600")
-    values: dict[str, str] = {}
+    values: Dict[str, str] = {}  # noqa: UP006
     for line in path.read_text().splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
@@ -67,18 +68,18 @@ class S3Client:
         key: str,
         *,
         body: bytes = b"",
-        body_path: Path | None = None,
+        body_path: Optional[Path] = None,  # noqa: UP045
         query: str = "",
-        extra_headers: dict[str, str] | None = None,
-    ) -> tuple[bytes, dict[str, str]]:
-        now = datetime.now(UTC)
+        extra_headers: Optional[Dict[str, str]] = None,  # noqa: UP006, UP045
+    ) -> Tuple[bytes, Dict[str, str]]:  # noqa: UP006
+        now = datetime.now(timezone.utc)  # noqa: UP017
         amz_date = now.strftime("%Y%m%dT%H%M%SZ")
         date = now.strftime("%Y%m%d")
         encoded_key = urllib.parse.quote(key.lstrip("/"), safe="/-_.~")
         canonical_uri = f"{self.base_path}/{self.bucket}/{encoded_key}"
         if body_path:
             payload_hash_builder = hashlib.sha256()
-            content_md5_builder = hashlib.md5(usedforsecurity=False)
+            content_md5_builder = hashlib.md5()  # noqa: S324 - required transport checksum
             with body_path.open("rb") as source:
                 while chunk := source.read(1024 * 1024):
                     payload_hash_builder.update(chunk)
@@ -151,11 +152,11 @@ def _object_key(path: Path) -> str:
     return f"{prefix}/{path.name}" if prefix else path.name
 
 
-def _retention_headers() -> dict[str, str]:
+def _retention_headers() -> Dict[str, str]:  # noqa: UP006
     days = int(os.environ.get("S3_BACKUP_OBJECT_LOCK_DAYS", "30"))
     if days < 1:
         raise OffsiteBackupError("Object Lock retention must be at least one day")
-    retain_until = datetime.now(UTC) + timedelta(days=days)
+    retain_until = datetime.now(timezone.utc) + timedelta(days=days)  # noqa: UP017
     return {
         "x-amz-object-lock-mode": "COMPLIANCE",
         "x-amz-object-lock-retain-until-date": retain_until.strftime("%Y-%m-%dT%H:%M:%SZ"),

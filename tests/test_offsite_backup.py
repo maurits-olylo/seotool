@@ -1,6 +1,7 @@
 import hashlib
 import importlib.util
 import stat
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -23,6 +24,22 @@ def test_credentials_require_restricted_file(tmp_path: Path) -> None:
 
     with pytest.raises(module.OffsiteBackupError, match="mode 0400 or 0600"):
         module._credentials(credentials)
+
+
+def test_script_parses_on_python_38_when_available() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    subprocess.run(
+        [
+            "python3",
+            "-c",
+            (
+                "import ast; "
+                "ast.parse(open('scripts/offsite-backup.py').read(), feature_version=(3, 8))"
+            ),
+        ],
+        cwd=project_root,
+        check=True,
+    )
 
 
 def test_upload_resolves_latest_link_and_requires_compliance(
