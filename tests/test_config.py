@@ -148,6 +148,8 @@ def test_security_workflow_is_read_only_and_pins_third_party_actions() -> None:
 
     assert "permissions:\n  contents: read" in workflow
     assert "pull_request_target:" not in workflow
+    assert 'cron: "15 4 * * 1"' in workflow
+    assert "workflow_dispatch:" in workflow
     assert "python-version: \"3.12\"" in workflow
     assert "pip install --require-hashes -r requirements-ci.lock" in workflow
     assert "pip-audit -r requirements.lock --strict" in workflow
@@ -164,6 +166,18 @@ def test_security_workflow_is_read_only_and_pins_third_party_actions() -> None:
         "aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25",
     ):
         assert action_line in workflow
+
+
+def test_dependabot_proposes_updates_without_automatic_deployment() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    config = (project_root / ".github/dependabot.yml").read_text()
+
+    assert "package-ecosystem: pip" in config
+    assert "package-ecosystem: docker" in config
+    assert "package-ecosystem: github-actions" in config
+    assert config.count("interval: weekly") == 3
+    assert "target-branch:" not in config
+    assert "assignees:" not in config
 
 
 def test_production_rejects_insecure_defaults() -> None:

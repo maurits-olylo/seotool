@@ -374,3 +374,16 @@ Status: gedeeltelijk opgelost; staging en productie nog niet bijgewerkt.
 De actuele distributierepositories leveren nog geen fixes voor de gemelde OS-pakketten. Ook
 cryptography 49/50 is nog niet installeerbaar. Daarom wordt geen betekenisloze package-upgrade,
 scanuitzondering of bredere risicoacceptatie toegevoegd.
+
+### Fase 7E — Automatische update- en CVE-signalering
+
+Status: lokaal geïmplementeerd; eerste geplande GitHub-cyclus blijft open.
+
+- Dependabot controleert wekelijks Python-packages, Dockerbasisimages en GitHub Actions.
+- Samenhangende updates worden per ecosysteem gegroepeerd en als reviewbare pull request aangeboden.
+- Er is geen automatische merge, release of deployment ingericht.
+- De volledige securityworkflow draait daarnaast iedere maandag om 04:15 UTC en kan handmatig
+  worden gestart.
+- Daardoor worden nieuwe advisories en databasewijzigingen ook zonder repositorywijziging opnieuw
+  tegen beide images en de runtime-lock getoetst.
+- Iedere update blijft onderworpen aan hashes, tests, SBOM, SAST, secretscan en beide Trivy-gates.
