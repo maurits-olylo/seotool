@@ -137,7 +137,7 @@ def test_application_images_pin_immutable_base_images() -> None:
 
     assert dockerfile.startswith("FROM python:3.12.13-slim-trixie@sha256:")
     assert "FROM node:22-bookworm-slim@sha256:" in render_dockerfile
-    assert "FROM mcr.microsoft.com/playwright/python:v1.61.0-resolute@sha256:" in (
+    assert "FROM mcr.microsoft.com/playwright/python:v1.61.0-noble@sha256:" in (
         render_dockerfile
     )
 

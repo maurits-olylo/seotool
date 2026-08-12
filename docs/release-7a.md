@@ -357,3 +357,20 @@ De workflow is daarmee functioneel geaccepteerd, maar deze releasefase is beveil
 niet vrijgegeven. Eerst moeten nieuwe veilige basisimages en cryptography-releases beschikbaar en
 opnieuw gelockt, gebouwd en gescand zijn, of moet voor iedere resterende bevinding afzonderlijk een
 expliciete, gemotiveerde en tijdgebonden risicoacceptatie worden vastgelegd.
+
+### Fase 7D — Immutable basisimages en updateproef
+
+Status: gedeeltelijk opgelost; staging en productie nog niet bijgewerkt.
+
+- De API-basis is vastgezet op de exacte Python `3.12.13-slim-trixie`-manifestdigest.
+- De tijdelijke Playwrightproef met Ubuntu 26.04 vergrootte de OS-set van twee naar zeven hoge
+  bevindingen en is daarom niet behouden.
+- De renderer blijft op Playwright `1.61.0-noble`, maar is nu eveneens op een exacte
+  multi-architecture manifestdigest vastgezet.
+- De Node-buildstage voor axe-core is op een exacte officiële manifestdigest vastgezet.
+- GitHub-run `31562595012` bewees dat beide nieuwe images bouwen en dat de onverhelpbare
+  bevindingen nog steeds blokkerend worden gerapporteerd.
+
+De actuele distributierepositories leveren nog geen fixes voor de gemelde OS-pakketten. Ook
+cryptography 49/50 is nog niet installeerbaar. Daarom wordt geen betekenisloze package-upgrade,
+scanuitzondering of bredere risicoacceptatie toegevoegd.
