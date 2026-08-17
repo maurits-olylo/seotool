@@ -64,20 +64,23 @@ TO seo_integration;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO seo_integration;
 
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO seo_export;
-REVOKE ALL ON TABLE integration_connections, login_attempts, oauth_states, security_audit_events,
-  security_incidents,
-  user_invitations, user_sessions, users FROM seo_export;
 GRANT SELECT, UPDATE ON TABLE exports TO seo_export;
 
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO seo_scheduler;
-REVOKE ALL ON TABLE integration_connections, login_attempts, oauth_states, security_audit_events,
-  security_incidents,
-  user_invitations, user_sessions, users FROM seo_scheduler;
 GRANT INSERT, UPDATE, DELETE ON TABLE crawl_jobs, monthly_report_snapshots, retention_operations,
   website_integrations TO seo_scheduler;
 GRANT INSERT ON TABLE effect_evaluations TO seo_scheduler;
 GRANT UPDATE (id) ON TABLE websites TO seo_scheduler;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO seo_scheduler;
+
+SELECT format('REVOKE ALL ON TABLE %I FROM seo_export, seo_scheduler', tablename)
+FROM pg_tables
+WHERE schemaname = 'public'
+  AND tablename IN (
+    'integration_connections', 'login_attempts', 'oauth_states', 'security_audit_events',
+    'security_incidents', 'user_invitations', 'user_sessions', 'users'
+  )
+\gexec
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO seo_api;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO seo_api;
