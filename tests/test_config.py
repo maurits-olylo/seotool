@@ -274,6 +274,12 @@ def test_database_role_policy_protects_sensitive_tables() -> None:
     assert "GRANT UPDATE (id) ON TABLE crawl_deployment_control TO seo_crawler" in policy
     assert "GRANT UPDATE (id) ON TABLE websites TO seo_scheduler" in policy
     assert "external_intelligence_requests, external_observations, external_usage_records" in policy
+    assert (
+        "recommendation_tasks, recommendation_verifications, retention_operations, url_links"
+        in policy
+    )
+    assert "GRANT UPDATE ON TABLE retention_operations TO seo_integration" in policy
+    assert "GRANT DELETE ON TABLE element_locations, url_links TO seo_integration" in policy
 
 
 def test_database_role_configurator_does_not_source_environment_files() -> None:

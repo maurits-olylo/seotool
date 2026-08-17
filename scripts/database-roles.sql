@@ -43,7 +43,13 @@ GRANT SELECT, INSERT ON TABLE effect_interventions, effect_evaluations TO seo_cr
 GRANT UPDATE (id) ON TABLE crawl_deployment_control TO seo_crawler;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO seo_crawler;
 
-GRANT SELECT ON TABLE changes, clients, issues, urls, website_settings, websites TO seo_integration;
+GRANT SELECT ON TABLE
+  changes, clients, crawl_jobs, crawl_runs, element_locations, issue_occurrences, issues,
+  recommendation_tasks, recommendation_verifications, retention_operations, url_links, urls,
+  website_settings, websites
+TO seo_integration;
+GRANT UPDATE ON TABLE retention_operations TO seo_integration;
+GRANT DELETE ON TABLE element_locations, url_links TO seo_integration;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
   bing_inbound_links, bing_link_targets, bing_page_metrics, bing_query_metrics,
   bing_referring_anchors, bing_referring_domains, google_analytics_event_metrics,
