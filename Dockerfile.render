@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436 AS axe-core
+FROM node:26-bookworm-slim@sha256:cd565714d4da3e84bfd341e31448f81d47c6362198f152345297c9c1154e6341 AS axe-core
 
 WORKDIR /opt/axe
 RUN npm pack axe-core@4.12.1 \
@@ -6,7 +6,7 @@ RUN npm pack axe-core@4.12.1 \
     && mv package/axe.min.js package/LICENSE ./ \
     && rm -rf package axe-core-4.12.1.tgz
 
-FROM mcr.microsoft.com/playwright/python:v1.61.0-noble@sha256:a9731514f24121d1dcd25d58d0a38146646d290a5998fd80d3e533e7b5e21c69
+FROM mcr.microsoft.com/playwright/python:v1.62.0-noble@sha256:aa81288e738725378becba5b3e06cb0f3a7f012a610e87e8d767a090ea3f740d
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
