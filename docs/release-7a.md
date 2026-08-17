@@ -411,7 +411,7 @@ SEC-14 volledig te sluiten. Deze fase introduceert daarvoor niet stilzwijgend ee
 
 ### Fase 7G — Onafhankelijke immutable EU-back-up
 
-Status: eerste productie-upload geaccepteerd; verwijder- en onafhankelijke herstelproef blijven open.
+Status: productie-upload en onverwijderbaarheid geaccepteerd; onafhankelijke herstelproef blijft open.
 
 - Scaleway Object Storage Parijs `Standard Multi-AZ` is gekozen als onafhankelijke EU-locatie.
 - De implementatie gebruikt rechtstreeks de S3-API en voegt geen runtimepakket toe.
@@ -424,3 +424,5 @@ Status: eerste productie-upload geaccepteerd; verwijder- en onafhankelijke herst
 - Op 12 augustus 2026 is een bestaand productieherstelpakket vanaf de NAS naar de Parijse
   Multi-AZ-bucket geüpload. De keten bevestigde remote SHA-256, omvang en `COMPLIANCE`-retentie.
 - De uploadcredential staat root-only op de NAS; de afzonderlijke restorecredential niet.
+- Op 17 augustus 2026 weigerde Scaleway ook voor de organisatiebeheerder de permanente
+  verwijdering van de concrete beschermde objectversie wegens Object Lock. De versie bleef intact.

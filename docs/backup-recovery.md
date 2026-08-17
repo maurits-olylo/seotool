@@ -135,6 +135,10 @@ De eerste echte upload is op 12 augustus 2026 geslaagd. Het script controleerde 
 op omvang, SHA-256-metadata en `COMPLIANCE`-retentie. Het concrete objectpad en provideridentifiers
 worden bewust niet in Git-documentatie vastgelegd.
 
+Op 17 augustus 2026 is via de Scaleway-console geprobeerd de specifieke beschermde objectversie
+permanent te verwijderen. Scaleway weigerde dit wegens Object Lock; er is geen delete marker als
+bewijs gebruikt en de objectversie bleef behouden. Alleen de onafhankelijke herstelproef resteert.
+
 - stel lifecycle pas in nadat is bewezen dat deze geen beschermde versies vóór beleidseinde raakt;
 - meet opslaggroei en stel een kostenwaarschuwing bij de provider in;
 - bewaar de herstelsleutel en herstelcredential aantoonbaar buiten de NAS.
