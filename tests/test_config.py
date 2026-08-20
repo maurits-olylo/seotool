@@ -97,6 +97,7 @@ def test_staging_application_containers_are_hardened() -> None:
     for service_name in (
         "api",
         "integration-worker",
+        "maintenance-worker",
         "render-artifacts-init",
         "render-worker",
         "migrate",
@@ -118,6 +119,18 @@ def test_staging_integration_worker_is_explicit_and_isolated() -> None:
     assert worker["environment"]["WORKER_QUEUES"] == "integrations"
     assert worker["networks"] == ["backend", "app-egress"]
     assert worker["mem_limit"] == "512m"
+
+
+def test_staging_maintenance_worker_is_explicit_and_isolated() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    compose = yaml.safe_load((project_root / "compose.staging.yaml").read_text())
+    worker = compose["services"]["maintenance-worker"]
+
+    assert worker["profiles"] == ["maintenance"]
+    assert worker["environment"]["WORKER_QUEUES"] == "maintenance"
+    assert worker["environment"]["SERVICE_ROLE"] == "maintenance-worker"
+    assert worker["networks"] == ["backend"]
+    assert worker["mem_limit"] == "384m"
 
 
 def test_production_maintenance_queue_has_a_dedicated_worker() -> None:
