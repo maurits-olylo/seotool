@@ -95,6 +95,7 @@ def test_staging_application_containers_are_hardened() -> None:
 
     for service_name in (
         "api",
+        "integration-worker",
         "render-artifacts-init",
         "render-worker",
         "migrate",
@@ -105,6 +106,17 @@ def test_staging_application_containers_are_hardened() -> None:
         assert service["cap_drop"] == ["ALL"]
         assert service["security_opt"] == ["no-new-privileges:true"]
         assert service["pids_limit"] in {64, 256}
+
+
+def test_staging_integration_worker_is_explicit_and_isolated() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    compose = yaml.safe_load((project_root / "compose.staging.yaml").read_text())
+    worker = compose["services"]["integration-worker"]
+
+    assert worker["profiles"] == ["integrations"]
+    assert worker["environment"]["WORKER_QUEUES"] == "integrations"
+    assert worker["networks"] == ["backend", "app-egress"]
+    assert worker["mem_limit"] == "512m"
 
 
 def test_application_image_runs_as_non_root_user() -> None:

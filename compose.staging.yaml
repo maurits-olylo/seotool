@@ -57,6 +57,35 @@ services:
     mem_limit: 1536m
     restart: unless-stopped
 
+  integration-worker:
+    <<: *app-hardening
+    profiles: ["integrations"]
+    build: .
+    environment:
+      <<: *runtime-env
+      DATABASE_URL: ${INTEGRATION_DATABASE_URL:?INTEGRATION_DATABASE_URL is required}
+      SERVICE_ROLE: integration-worker
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      BING_CLIENT_ID: ${BING_CLIENT_ID:-}
+      BING_CLIENT_SECRET: ${BING_CLIENT_SECRET:-}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-}
+      WORKER_QUEUES: integrations
+      WORKER_NAME: integrations-staging-1
+    command: python -m app.worker
+    networks: [backend, app-egress]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "from app.worker import worker_is_registered; assert worker_is_registered()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    cpu_shares: 128
+    mem_limit: 512m
+    restart: unless-stopped
+
   postgres:
     image: postgres:16-alpine
     environment:

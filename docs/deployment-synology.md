@@ -105,8 +105,10 @@ sudo docker compose --env-file .env.staging -f compose.staging.yaml config \
   | grep -E '127\.0\.0\.1|seo-monitor-staging-(postgres|redis|exports)-data'
 ```
 
-De eerste opdracht moet zonder profiel exact `api`, `postgres` en `redis` tonen. Start daarna eerst de
-gegevensdiensten, voer de migraties uit en start de API:
+De eerste opdracht moet zonder profiel exact `api`, `postgres` en `redis` tonen. Gebruik het profiel
+`integrations` alleen voor een gecontroleerde integratieproef; dit voegt uitsluitend de begrensde
+`integration-worker` toe en start geen scheduler of crawler. Start daarna eerst de gegevensdiensten,
+voer de migraties uit en start de API:
 
 ```bash
 sudo docker compose --env-file .env.staging -f compose.staging.yaml build api
