@@ -143,7 +143,7 @@ services:
       DATAFORSEO_PASSWORD: ${DATAFORSEO_PASSWORD:-}
       EXTERNAL_SERP_ESTIMATED_COST_MICROS: ${EXTERNAL_SERP_ESTIMATED_COST_MICROS:-0}
       EXTERNAL_AI_CITATIONS_ESTIMATED_COST_MICROS: ${EXTERNAL_AI_CITATIONS_ESTIMATED_COST_MICROS:-0}
-      WORKER_QUEUES: integrations,maintenance,performance
+      WORKER_QUEUES: integrations,performance
       WORKER_NAME: integrations-1
     command: python -m app.worker
     networks: [backend, app-egress]
@@ -157,6 +157,28 @@ services:
       retries: 3
     cpu_shares: 384
     mem_limit: 1536m
+    restart: unless-stopped
+  maintenance-worker:
+    <<: *app-hardening
+    build: .
+    environment:
+      <<: *runtime-env
+      DATABASE_URL: ${INTEGRATION_DATABASE_URL:?INTEGRATION_DATABASE_URL is required}
+      SERVICE_ROLE: maintenance-worker
+      WORKER_QUEUES: maintenance
+      WORKER_NAME: maintenance-1
+    command: python -m app.worker
+    networks: [backend]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "from app.worker import worker_is_registered; assert worker_is_registered()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    cpu_shares: 128
+    mem_limit: 512m
     restart: unless-stopped
   export-worker:
     <<: *app-hardening

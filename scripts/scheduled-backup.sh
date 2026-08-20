@@ -41,7 +41,7 @@ cleanup() {
   set +e
   cd "$PROJECT_DIR" 2>/dev/null
   if [ "$WRITERS_STOPPED" = "true" ]; then
-    compose up -d integration-worker export-worker scheduler
+    compose up -d integration-worker maintenance-worker export-worker scheduler
     sleep 40
   fi
   if [ "$DRAIN_ACTIVE" = "true" ]; then
@@ -55,7 +55,7 @@ trap cleanup EXIT HUP INT TERM
 cd "$PROJECT_DIR"
 compose exec -T api python -m app.maintenance pause-crawls --wait --timeout 600
 DRAIN_ACTIVE=true
-compose stop integration-worker export-worker scheduler
+compose stop integration-worker maintenance-worker export-worker scheduler
 WRITERS_STOPPED=true
 
 PROJECT_DIR="$PROJECT_DIR" \
@@ -78,10 +78,10 @@ if [ "${S3_BACKUP_ENABLED:-false}" = "true" ]; then
     "$BACKUP_DIR/seo-monitor-production-latest.tar.enc"
 fi
 
-compose up -d integration-worker export-worker scheduler
+compose up -d integration-worker maintenance-worker export-worker scheduler
 WRITERS_STOPPED=false
 sleep 40
-compose ps integration-worker export-worker scheduler
+compose ps integration-worker maintenance-worker export-worker scheduler
 curl --fail --silent --show-error http://127.0.0.1:8000/health
 compose exec -T api python -m app.maintenance resume-crawls
 DRAIN_ACTIVE=false

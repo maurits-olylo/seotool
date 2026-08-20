@@ -51,6 +51,7 @@ TO seo_integration;
 GRANT SELECT, INSERT ON TABLE activity_log TO seo_integration;
 GRANT UPDATE ON TABLE retention_operations TO seo_integration;
 GRANT DELETE ON TABLE element_locations, url_links TO seo_integration;
+GRANT SELECT, INSERT, UPDATE ON TABLE queue_dead_letters TO seo_integration;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
   bing_inbound_links, bing_link_targets, bing_page_metrics, bing_query_metrics,
   bing_referring_anchors, bing_referring_domains, google_analytics_event_metrics,

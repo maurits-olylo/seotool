@@ -10,6 +10,8 @@ services:
     restart: always
   integration-worker:
     restart: always
+  maintenance-worker:
+    restart: always
   export-worker:
     restart: always
   render-worker:

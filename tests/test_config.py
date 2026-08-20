@@ -69,6 +69,7 @@ def test_application_containers_are_hardened() -> None:
         "crawl-worker-2",
         "crawl-worker-3",
         "integration-worker",
+        "maintenance-worker",
         "export-worker",
         "render-artifacts-init",
         "render-worker",
@@ -117,6 +118,19 @@ def test_staging_integration_worker_is_explicit_and_isolated() -> None:
     assert worker["environment"]["WORKER_QUEUES"] == "integrations"
     assert worker["networks"] == ["backend", "app-egress"]
     assert worker["mem_limit"] == "512m"
+
+
+def test_production_maintenance_queue_has_a_dedicated_worker() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    compose = yaml.safe_load((project_root / "compose.yaml").read_text())
+    integration_worker = compose["services"]["integration-worker"]
+    maintenance_worker = compose["services"]["maintenance-worker"]
+
+    assert integration_worker["environment"]["WORKER_QUEUES"] == "integrations,performance"
+    assert maintenance_worker["environment"]["WORKER_QUEUES"] == "maintenance"
+    assert maintenance_worker["environment"]["SERVICE_ROLE"] == "maintenance-worker"
+    assert maintenance_worker["networks"] == ["backend"]
+    assert maintenance_worker["mem_limit"] == "512m"
 
 
 def test_application_image_runs_as_non_root_user() -> None:
@@ -234,6 +248,7 @@ def test_compose_limits_sensitive_environment_by_service() -> None:
     )
     assert sensitive.isdisjoint(services["worker"]["environment"])
     assert sensitive.isdisjoint(services["crawl-worker-2"]["environment"])
+    assert sensitive.isdisjoint(services["maintenance-worker"]["environment"])
     assert sensitive.isdisjoint(services["export-worker"]["environment"])
     assert sensitive.isdisjoint(services["scheduler"]["environment"])
     assert "TOKEN_ENCRYPTION_KEY" in services["integration-worker"]["environment"]
@@ -257,6 +272,7 @@ def test_compose_uses_service_specific_database_urls() -> None:
         "crawl-worker-3": "CRAWLER_DATABASE_URL",
         "render-worker": "CRAWLER_DATABASE_URL",
         "integration-worker": "INTEGRATION_DATABASE_URL",
+        "maintenance-worker": "INTEGRATION_DATABASE_URL",
         "export-worker": "EXPORT_DATABASE_URL",
         "scheduler": "SCHEDULER_DATABASE_URL",
     }
@@ -298,6 +314,7 @@ def test_database_role_policy_protects_sensitive_tables() -> None:
     assert "GRANT UPDATE ON TABLE retention_operations TO seo_integration" in policy
     assert "GRANT SELECT, INSERT ON TABLE activity_log TO seo_integration" in policy
     assert "GRANT DELETE ON TABLE element_locations, url_links TO seo_integration" in policy
+    assert "GRANT SELECT, INSERT, UPDATE ON TABLE queue_dead_letters TO seo_integration" in policy
 
 
 def test_database_role_configurator_does_not_source_environment_files() -> None:
@@ -382,7 +399,13 @@ def test_crawler_network_is_separated_from_other_egress() -> None:
         assert services[service_name]["networks"] == ["backend", "crawler-egress"]
     for service_name in ("api", "integration-worker"):
         assert services[service_name]["networks"] == ["backend", "app-egress"]
-    for service_name in ("export-worker", "scheduler", "postgres", "redis"):
+    for service_name in (
+        "maintenance-worker",
+        "export-worker",
+        "scheduler",
+        "postgres",
+        "redis",
+    ):
         assert services[service_name]["networks"] == ["backend"]
 
 

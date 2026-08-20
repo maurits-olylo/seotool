@@ -8,7 +8,7 @@ def test_scheduled_backup_restores_services_and_drain_on_failure() -> None:
     assert 'if [ "$(id -u)" -ne 0 ]' in script
     assert 'mkdir "$LOCK_DIR"' in script
     assert "pause-crawls --wait --timeout 600" in script
-    assert "compose stop integration-worker export-worker scheduler" in script
+    assert "compose stop integration-worker maintenance-worker export-worker scheduler" in script
     assert 'trap cleanup EXIT HUP INT TERM' in script
     assert 'if [ "$WRITERS_STOPPED" = "true" ]' in script
     assert 'if [ "$DRAIN_ACTIVE" = "true" ]' in script

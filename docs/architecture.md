@@ -250,8 +250,9 @@ opnieuw admission uit; de payload is bewijs en nooit zelfstandig uitvoerbare cod
 
 Iedere geslaagde of gedeeltelijk geslaagde volledige crawl maakt idempotent één
 `retention_operation` per automatisch datatype aan. De scheduler zet verschuldigde, wachtende,
-mislukte of onderbroken operaties op de afzonderlijke RQ-queue `maintenance`; de
-integration-worker verwerkt die queue naast integraties.
+mislukte of onderbroken operaties op de afzonderlijke RQ-queue `maintenance`. Een eigen
+maintenance-worker verwerkt uitsluitend deze queue, zodat langlopende providerimports retentie
+niet kunnen verdringen.
 
 Een operatie vergrendelt de websiterij per batch. De scheduler gebruikt dezelfde rijlock voor
 nieuwe crawls. Voor iedere verwijdering wordt bovendien gecontroleerd dat voor de website geen

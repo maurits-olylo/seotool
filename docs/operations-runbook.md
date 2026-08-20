@@ -31,6 +31,8 @@ Controleer vóór uitvoering:
 Herhaal een mogelijk onderbroken muterend commando nooit direct. Controleer eerst
 `retention_operations`, de actuele audit en de batchtellingen. De scheduler hervat `pending`,
 `waiting_for_crawl`, verlopen `running` en `failed` operaties via dezelfde idempotente operatie.
+De afzonderlijke `maintenance-worker` verwerkt uitsluitend onderhoud en deelt geen capaciteit met
+Google-, Bing-, Matomo- of performance-imports.
 
 ## Vastgelopen worker of operatie
 
