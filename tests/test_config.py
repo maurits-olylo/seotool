@@ -325,6 +325,7 @@ def test_database_role_policy_protects_sensitive_tables() -> None:
         in policy
     )
     assert "GRANT UPDATE ON TABLE retention_operations TO seo_integration" in policy
+    assert "GRANT UPDATE (id) ON TABLE websites TO seo_integration" in policy
     assert "GRANT SELECT, INSERT ON TABLE activity_log TO seo_integration" in policy
     assert "GRANT DELETE ON TABLE element_locations, url_links TO seo_integration" in policy
     assert "GRANT SELECT, INSERT, UPDATE ON TABLE queue_dead_letters TO seo_integration" in policy
