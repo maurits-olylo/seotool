@@ -13,10 +13,33 @@ from app.models.website import Website
 from app.services import integration_sync
 from app.services.integration_sync import (
     _history_chunks,
+    _public_sync_error,
     _set_history_sync_status,
     _sync_matomo_history,
     _sync_search_console_history,
 )
+
+
+def test_public_sync_error_never_exposes_database_details() -> None:
+    error = RuntimeError(
+        "permission denied for table activity_log [SQL: INSERT INTO activity_log] "
+        "[parameters: {'secret': 'internal-id'}]"
+    )
+
+    message = _public_sync_error("Matomo", error)
+
+    assert message == "Matomo: synchronisatie mislukt; bekijk het serverlog"
+    assert "activity_log" not in message
+    assert "internal-id" not in message
+
+
+def test_public_sync_error_distinguishes_reconnect_and_retry() -> None:
+    assert _public_sync_error("Google", ValueError("Google account is not connected")) == (
+        "Google: koppeling vereist"
+    )
+    assert _public_sync_error("Bing", TimeoutError("timeout")) == (
+        "Bing: tijdelijk niet bereikbaar; automatische retry volgt"
+    )
 
 
 def test_completed_history_sync_serializes_date_coverage() -> None:

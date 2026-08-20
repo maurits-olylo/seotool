@@ -24,6 +24,15 @@ logger = structlog.get_logger()
 HISTORY_CHUNK_DAYS = 28
 
 
+def _public_sync_error(service: str, exc: Exception) -> str:
+    message = str(exc).lower()
+    if "not connected" in message or "reconnect required" in message:
+        return f"{service}: koppeling vereist"
+    if "tijdelijk" in message or "temporarily" in message or "timeout" in message:
+        return f"{service}: tijdelijk niet bereikbaar; automatische retry volgt"
+    return f"{service}: synchronisatie mislukt; bekijk het serverlog"
+
+
 def _date_as_iso(value: date | None) -> str | None:
     return value.isoformat() if value else None
 
@@ -116,7 +125,7 @@ async def _synchronize_website_integrations(
             except Exception as exc:
                 db.rollback()
                 logger.exception("search_console_sync_failed", website_id=str(website_id))
-                errors.append(f"Search Console: {exc}")
+                errors.append(_public_sync_error("Search Console", exc))
         if "ga4" in services:
             try:
                 result = await sync_google_analytics(db, website_id, days)
@@ -124,7 +133,7 @@ async def _synchronize_website_integrations(
             except Exception as exc:
                 db.rollback()
                 logger.exception("ga4_sync_failed", website_id=str(website_id))
-                errors.append(f"GA4: {exc}")
+                errors.append(_public_sync_error("GA4", exc))
         if "matomo" in services:
             try:
                 result = await _sync_matomo_history(db, website_id, days)
@@ -132,7 +141,7 @@ async def _synchronize_website_integrations(
             except Exception as exc:
                 db.rollback()
                 logger.exception("matomo_sync_failed", website_id=str(website_id))
-                errors.append(f"Matomo: {exc}")
+                errors.append(_public_sync_error("Matomo", exc))
         if "bing_webmaster" in services:
             try:
                 result = await sync_bing_webmaster(db, website_id, days)
@@ -140,7 +149,7 @@ async def _synchronize_website_integrations(
             except Exception as exc:
                 db.rollback()
                 logger.exception("bing_sync_failed", website_id=str(website_id))
-                errors.append(f"Bing: {exc}")
+                errors.append(_public_sync_error("Bing", exc))
         if errors:
             message = "; ".join(errors)
             _set_history_sync_status(

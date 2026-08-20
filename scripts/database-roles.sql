@@ -48,6 +48,7 @@ GRANT SELECT ON TABLE
   recommendation_tasks, recommendation_verifications, retention_operations, url_links, urls,
   website_settings, websites
 TO seo_integration;
+GRANT SELECT, INSERT ON TABLE activity_log TO seo_integration;
 GRANT UPDATE ON TABLE retention_operations TO seo_integration;
 GRANT DELETE ON TABLE element_locations, url_links TO seo_integration;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE

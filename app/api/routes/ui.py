@@ -81,7 +81,7 @@ def app_interface(
         response = RedirectResponse("/login", status_code=302)
         response.delete_cookie("seo_session", samesite="lax")
         return response
-    return FileResponse(UI_ROOT / "index.html")
+    return FileResponse(UI_ROOT / "index.html", headers={"Cache-Control": "no-store"})
 
 
 @router.get("/privacy", include_in_schema=False)
