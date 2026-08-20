@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models.integrations import IntegrationConnection
+from app.services.integration_errors import TransientIntegrationError
 from app.services.oauth import decrypt_token, encrypt_token, oauth_error_message
 
 
@@ -39,17 +40,25 @@ async def get_google_access_token(db: Session, connection: IntegrationConnection
         )
         raise ValueError(connection.last_error)
     settings = get_settings()
-    async with httpx.AsyncClient(timeout=20) as http:
-        response = await http.post(
-            "https://oauth2.googleapis.com/token",
-            data={
-                "client_id": settings.google_client_id,
-                "client_secret": settings.google_client_secret,
-                "refresh_token": refresh_token,
-                "grant_type": "refresh_token",
-            },
-        )
+    db.commit()
+    try:
+        async with httpx.AsyncClient(timeout=20) as http:
+            response = await http.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "client_id": settings.google_client_id,
+                    "client_secret": settings.google_client_secret,
+                    "refresh_token": refresh_token,
+                    "grant_type": "refresh_token",
+                },
+            )
+    except httpx.RequestError as exc:
+        raise TransientIntegrationError(
+            "Google token service is tijdelijk niet bereikbaar"
+        ) from exc
     if response.status_code != 200:
+        if response.status_code == 429 or response.status_code >= 500:
+            raise TransientIntegrationError("Google token service is tijdelijk niet beschikbaar")
         _mark_connection_error(db, connection, oauth_error_message("Google", response))
         raise ValueError(connection.last_error)
     payload = response.json()

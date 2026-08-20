@@ -1148,9 +1148,8 @@ async function syncSearchConsole() {
   button.disabled = true; button.textContent = "Importeren…"; message.textContent = "";
   try {
     const result = await api(`/api/v1/websites/${websiteId}/integrations/search_console/sync`, {method: "POST"});
-    message.textContent = `${result.rows} dag/pagina-regels geïmporteerd; ${result.matched_urls} gekoppeld aan URLs.`;
+    message.textContent = "GSC-import staat in de wachtrij en wordt op de achtergrond uitgevoerd.";
     button.textContent = "Opnieuw synchroniseren";
-    await loadIssues();
   } catch (error) { message.textContent = "GSC-import is mislukt."; button.textContent = "Opnieuw proberen"; }
   finally { button.disabled = false; }
 }
@@ -1162,9 +1161,8 @@ async function syncGa4() {
   button.disabled = true; button.textContent = "Importeren…"; message.textContent = "";
   try {
     const result = await api(`/api/v1/websites/${websiteId}/integrations/ga4/sync`, {method: "POST"});
-    message.textContent = `${result.rows} dag/landingspagina-regels geïmporteerd; ${result.matched_urls} gekoppeld aan URLs.`;
+    message.textContent = "GA4-import staat in de wachtrij en wordt op de achtergrond uitgevoerd.";
     button.textContent = "Opnieuw synchroniseren";
-    await Promise.all([loadIssues(), loadAnalyticsQualityStatus()]);
   } catch (error) { message.textContent = "GA4-import is mislukt."; button.textContent = "Opnieuw proberen"; }
   finally { button.disabled = false; }
 }
@@ -1176,11 +1174,8 @@ async function syncMatomo() {
   button.disabled = true; button.textContent = "Importeren…"; message.textContent = "";
   try {
     const result = await api(`/api/v1/websites/${websiteId}/integrations/matomo/sync`, {method:"POST"});
-    const percentage = result.url_match_rate == null ? "onbekend" : `${Math.round(result.url_match_rate * 100)}%`;
-    const warning = result.warnings?.length ? ` Waarschuwing: ${result.warnings.join("; ")}.` : "";
-    message.textContent = `${result.page_rows} pagina-regels geïmporteerd; ${result.matched_urls} gekoppeld (${percentage}).${warning}`;
+    message.textContent = "Matomo-import staat in de wachtrij en wordt op de achtergrond uitgevoerd.";
     button.textContent = "Opnieuw synchroniseren";
-    await Promise.all([loadIssues(), loadAnalyticsQualityStatus()]);
   } catch (error) { message.textContent = error.message; button.textContent = "Opnieuw proberen"; }
   finally { button.disabled = false; }
 }
@@ -1192,9 +1187,7 @@ async function syncBing() {
   button.disabled = true; button.textContent = "Importeren…"; message.textContent = "";
   try {
     const result = await api(`/api/v1/websites/${websiteId}/integrations/bing_webmaster/sync`, {method: "POST"});
-    const limited = result.link_counts_truncated || result.link_details_truncated ? " De linkimport bereikte de veiligheidslimiet; dit is opgeslagen als gedeeltelijke dekking." : "";
-    const linkStatus = result.link_api_status === "unavailable_empty" ? " Bing leverde via de API geen backlinkdekking; bestaande exportdata blijft behouden." : ` ${result.link_targets} linkdoelen en ${result.link_details} inkomende links geïmporteerd.`;
-    message.textContent = `${result.page_rows} pagina-regels en ${result.query_rows} zoektermregels geïmporteerd; ${result.matched_urls} gekoppeld aan URL’s.${linkStatus}${limited}`;
+    message.textContent = "Bing-import staat in de wachtrij en wordt op de achtergrond uitgevoerd.";
     button.textContent = "Opnieuw synchroniseren";
   } catch (error) { message.textContent = "Bing-import is mislukt."; button.textContent = "Opnieuw proberen"; }
   finally { button.disabled = false; }

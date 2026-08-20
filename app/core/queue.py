@@ -154,10 +154,11 @@ def _worker_queue_names(worker: Worker) -> set[str]:
 def enqueue_integration_sync(
     website_id: str,
     days: int | None = None,
+    services: list[str] | None = None,
     *,
     job_id: str,
 ) -> bool:
-    args: tuple[object, ...] = (website_id,) if days is None else (website_id, days)
+    args: tuple[object, ...] = (website_id, days, services)
     return _enqueue(
         INTEGRATION_QUEUE,
         "app.services.integration_sync.synchronize_website_integrations",
@@ -167,6 +168,7 @@ def enqueue_integration_sync(
             "website_id": website_id,
             "job_type": "integration_sync",
             "days": days,
+            "services": services,
         },
     )
 

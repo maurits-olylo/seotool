@@ -75,13 +75,23 @@ async def _sync_matomo_history(
     return _history_result(results)
 
 
-def synchronize_website_integrations(website_id: str, days: int | None = None) -> None:
-    asyncio.run(_synchronize_website_integrations(UUID(website_id), days))
+def synchronize_website_integrations(
+    website_id: str,
+    days: int | None = None,
+    services: list[str] | None = None,
+) -> None:
+    asyncio.run(_synchronize_website_integrations(UUID(website_id), days, services))
 
 
-async def _synchronize_website_integrations(website_id: UUID, days: int | None = None) -> None:
+async def _synchronize_website_integrations(
+    website_id: UUID,
+    days: int | None = None,
+    selected_services: list[str] | None = None,
+) -> None:
     with SessionLocal() as db:
-        _set_history_sync_status(db, website_id, "running", days=days)
+        _set_history_sync_status(
+            db, website_id, "running", days=days, services=selected_services
+        )
         services = set(
             db.scalars(
                 select(WebsiteIntegration.service).where(
@@ -92,6 +102,8 @@ async def _synchronize_website_integrations(website_id: UUID, days: int | None =
                 )
             )
         )
+        if selected_services is not None:
+            services.intersection_update(selected_services)
         errors: list[str] = []
         if "search_console" in services:
             try:
@@ -131,9 +143,18 @@ async def _synchronize_website_integrations(website_id: UUID, days: int | None =
                 errors.append(f"Bing: {exc}")
         if errors:
             message = "; ".join(errors)
-            _set_history_sync_status(db, website_id, "failed", days=days, error=message)
+            _set_history_sync_status(
+                db,
+                website_id,
+                "failed",
+                days=days,
+                error=message,
+                services=selected_services,
+            )
             raise RuntimeError(message)
-        _set_history_sync_status(db, website_id, "succeeded", days=days)
+        _set_history_sync_status(
+            db, website_id, "succeeded", days=days, services=selected_services
+        )
 
 
 def _set_history_sync_status(
@@ -143,15 +164,15 @@ def _set_history_sync_status(
     *,
     days: int | None,
     error: str | None = None,
+    services: list[str] | None = None,
 ) -> None:
     """Persist queue state on all mapped data sources so it survives a browser refresh."""
+    selected = services or ["search_console", "ga4", "bing_webmaster", "matomo"]
     mappings = list(
         db.scalars(
             select(WebsiteIntegration).where(
                 WebsiteIntegration.website_id == website_id,
-                WebsiteIntegration.service.in_(
-                    ["search_console", "ga4", "bing_webmaster", "matomo"]
-                ),
+                WebsiteIntegration.service.in_(selected),
             )
         )
     )

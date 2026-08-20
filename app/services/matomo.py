@@ -16,6 +16,7 @@ from app.models.integrations import (
 )
 from app.models.website import Website
 from app.services.analytics_quality import reconcile_matomo_quality_issues
+from app.services.integration_errors import TransientIntegrationError
 from app.services.metric_storage import insert_metric_rows
 from app.services.oauth import decrypt_token
 from app.services.security import validate_public_http_url
@@ -81,9 +82,11 @@ async def list_matomo_sites(
                 },
             )
         except httpx.RequestError as exc:
-            raise ValueError("Matomo server could not be reached") from exc
+            raise TransientIntegrationError("Matomo server could not be reached") from exc
     if response.is_redirect:
         raise ValueError("Matomo server redirected the API request")
+    if response.status_code == 429 or response.status_code >= 500:
+        raise TransientIntegrationError("Matomo server is temporarily unavailable")
     if response.status_code != 200:
         raise ValueError("Matomo connection was rejected")
     try:

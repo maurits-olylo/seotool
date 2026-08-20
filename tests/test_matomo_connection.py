@@ -20,6 +20,7 @@ from app.models.integrations import (
 from app.models.website import Website, WebsiteSettings
 from app.services import matomo
 from app.services.analytics_provider import analytics_page_totals, analytics_page_totals_between
+from app.services.integration_errors import TransientIntegrationError
 from app.services.oauth import decrypt_token
 
 
@@ -111,6 +112,43 @@ def test_connect_and_select_human_matomo_site(client: TestClient, monkeypatch) -
         )
         assert selected is not None
         assert selected.external_property_id == "7"
+    get_settings.cache_clear()
+
+
+def test_transient_matomo_failure_does_not_disconnect(client: TestClient, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setenv("TOKEN_ENCRYPTION_KEY", "0d" * 32)
+    get_settings.cache_clear()
+
+    async def fake_sites(_server_url: str, _token: str):  # type: ignore[no-untyped-def]
+        return [{"id": "7", "name": "Example", "main_url": "https://example.com"}]
+
+    monkeypatch.setattr(
+        integrations,
+        "normalize_matomo_server_url",
+        lambda _url: "https://analytics.example.com/index.php",
+    )
+    monkeypatch.setattr(integrations, "list_matomo_sites", fake_sites)
+    customer = client.post("/api/v1/clients", json={"name": "Transient Matomo"}).json()
+    connected = client.put(
+        f"/api/v1/clients/{customer['id']}/integrations/matomo",
+        json={"server_url": "https://analytics.example.com", "token_auth": "matomo-secret"},
+    )
+    assert connected.status_code == 200
+
+    async def unavailable(_connection):  # type: ignore[no-untyped-def]
+        raise TransientIntegrationError("Matomo tijdelijk niet bereikbaar")
+
+    monkeypatch.setattr(integrations, "list_connection_sites", unavailable)
+    response = client.get(f"/api/v1/clients/{customer['id']}/integrations/matomo/sites")
+
+    assert response.status_code == 503
+    with SessionLocal() as db:
+        connection = db.scalar(
+            select(IntegrationConnection).where(IntegrationConnection.provider == "matomo")
+        )
+        assert connection is not None
+        assert connection.status == "connected"
+        assert connection.last_error is None
     get_settings.cache_clear()
 
 

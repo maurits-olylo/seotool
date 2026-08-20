@@ -80,6 +80,40 @@ def test_completed_history_sync_serializes_date_coverage() -> None:
         )
 
 
+def test_single_service_status_does_not_overwrite_other_mapping() -> None:
+    with SessionLocal() as db:
+        customer = Client(name="Filtered history customer")
+        website = Website(client=customer, name="Example", base_url="https://example.com")
+        db.add_all([customer, website])
+        db.flush()
+        connection = IntegrationConnection(
+            client_id=customer.id, provider="google", status="connected"
+        )
+        db.add(connection)
+        db.flush()
+        search = WebsiteIntegration(
+            website_id=website.id,
+            connection_id=connection.id,
+            service="search_console",
+            external_property_id="sc-domain:example.com",
+        )
+        analytics = WebsiteIntegration(
+            website_id=website.id,
+            connection_id=connection.id,
+            service="ga4",
+            external_property_id="properties/1",
+        )
+        db.add_all([search, analytics])
+        db.commit()
+
+        _set_history_sync_status(
+            db, website.id, "running", days=28, services=["search_console"]
+        )
+
+        assert search.settings["history_sync"]["status"] == "running"
+        assert "history_sync" not in analytics.settings
+
+
 def test_history_chunks_cover_period_without_overlap() -> None:
     chunks = _history_chunks(65, through=date(2026, 8, 4))
 

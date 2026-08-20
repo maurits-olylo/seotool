@@ -1,5 +1,19 @@
 # Operationeel runbook
 
+## Integratiestabiliteit
+
+- Handmatige Google-, Bing- en Matomo-synchronisaties lopen altijd via de integratieworker. De
+  API bevestigt alleen dat de taak in de wachtrij staat en houdt tijdens providerverzoeken geen
+  databaseverbinding bezet.
+- Een timeout, HTTP 429 of providerfout vanaf HTTP 500 is tijdelijk en mag opgeslagen
+  inloggegevens niet ongeldig verklaren. Laat de queue-retry aflopen en controleer daarna de
+  concrete mappingfout.
+- Vraag alleen om opnieuw koppelen bij een definitieve authenticatiefout, zoals `invalid_grant`,
+  ingetrokken toestemming, een ongeldig Matomo-token of ontbrekende rechten.
+- Een externe Google OAuth-app met publicatiestatus `Testing` geeft voor de gebruikte
+  Search Console- en GA4-scopes refresh tokens met een levensduur van zeven dagen. Productie moet
+  daarom de Google OAuth-publicatiestatus `In production` gebruiken.
+
 ## Retentieaudit
 
 Gebruik `python -m app.maintenance retention-audit` in de API-container. Het resultaat is read-only

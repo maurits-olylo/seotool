@@ -18,6 +18,7 @@ from app.models.integrations import (
     WebsiteIntegration,
 )
 from app.models.website import Website
+from app.services.integration_errors import TransientIntegrationError
 from app.services.oauth import decrypt_token, encrypt_token, oauth_error_message
 from app.services.url_matching import find_equivalent_website_url_id
 from app.services.url_normalization import InvalidUrlError
@@ -61,17 +62,23 @@ async def get_bing_access_token(db: Session, connection: IntegrationConnection) 
         )
         raise ValueError(connection.last_error)
     settings = get_settings()
-    async with httpx.AsyncClient(timeout=20) as http:
-        response = await http.post(
-            BING_TOKEN_URL,
-            data={
-                "client_id": settings.bing_client_id,
-                "client_secret": settings.bing_client_secret,
-                "refresh_token": refresh_token,
-                "grant_type": "refresh_token",
-            },
-        )
+    db.commit()
+    try:
+        async with httpx.AsyncClient(timeout=20) as http:
+            response = await http.post(
+                BING_TOKEN_URL,
+                data={
+                    "client_id": settings.bing_client_id,
+                    "client_secret": settings.bing_client_secret,
+                    "refresh_token": refresh_token,
+                    "grant_type": "refresh_token",
+                },
+            )
+    except httpx.RequestError as exc:
+        raise TransientIntegrationError("Bing token service is tijdelijk niet bereikbaar") from exc
     if response.status_code != 200:
+        if response.status_code == 429 or response.status_code >= 500:
+            raise TransientIntegrationError("Bing token service is tijdelijk niet beschikbaar")
         _mark_connection_error(db, connection, oauth_error_message("Bing", response))
         raise ValueError(connection.last_error)
     payload = response.json()

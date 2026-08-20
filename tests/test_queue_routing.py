@@ -54,6 +54,23 @@ def test_integration_syncs_use_dedicated_queue(monkeypatch) -> None:
     )
 
 
+def test_single_integration_sync_keeps_service_filter(monkeypatch) -> None:
+    queue = Mock()
+    queue.count = 0
+    monkeypatch.setattr("app.core.queue.get_queue", Mock(return_value=queue))
+
+    enqueue_integration_sync(
+        "website-id", 28, ["matomo"], job_id="matomo-sync-id"
+    )
+
+    assert queue.enqueue.call_args.args[:4] == (
+        "app.services.integration_sync.synchronize_website_integrations",
+        "website-id",
+        28,
+        ["matomo"],
+    )
+
+
 def test_retention_uses_dedicated_maintenance_queue(monkeypatch) -> None:
     queue = Mock()
     queue.count = 0

@@ -55,14 +55,13 @@ from app.services.bing_backlink_import import (
     InvalidBingBacklinkExport,
     import_bing_backlink_exports,
 )
-from app.services.bing_integrations import BING_TOKEN_URL, list_bing_sites, sync_bing_webmaster
-from app.services.google_analytics import sync_google_analytics
+from app.services.bing_integrations import BING_TOKEN_URL, list_bing_sites
 from app.services.google_integrations import list_google_properties
+from app.services.integration_errors import TransientIntegrationError
 from app.services.matomo import (
     list_connection_sites,
     list_matomo_sites,
     normalize_matomo_server_url,
-    sync_matomo,
 )
 from app.services.oauth import (
     BING_SCOPES,
@@ -75,7 +74,6 @@ from app.services.oauth import (
     google_authorization_url,
     google_is_configured,
 )
-from app.services.search_console import sync_search_console
 from app.services.url_inspection import sync_url_inspection
 
 router = APIRouter(tags=["integrations"])
@@ -357,6 +355,8 @@ async def matomo_sites(
         raise HTTPException(status_code=409, detail="Matomo is not connected")
     try:
         return {"sites": await list_connection_sites(connection)}
+    except TransientIntegrationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:
         connection.status = "error"
         connection.last_error = str(exc)
@@ -740,18 +740,38 @@ def integration_history_status(
     }
 
 
-@router.post("/websites/{website_id}/integrations/search_console/sync")
-async def synchronize_search_console(
+def _queue_single_integration_sync(
+    db: Session,
+    website_id: UUID,
+    service: str,
+    days: int,
+) -> dict[str, object]:
+    if not queue_has_capacity(INTEGRATION_QUEUE):
+        raise HTTPException(status_code=503, detail="De integratiewachtrij is tijdelijk vol")
+    queued = enqueue_integration_sync(
+        str(website_id),
+        days,
+        [service],
+        job_id=f"integration-{service}-{website_id}-{uuid.uuid4()}",
+    )
+    if not queued:
+        raise HTTPException(status_code=503, detail="De integratiewachtrij is tijdelijk vol")
+    db.commit()
+    return {"status": "queued", "service": service, "days": days}
+
+
+@router.post(
+    "/websites/{website_id}/integrations/search_console/sync",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def synchronize_search_console(
     website_id: UUID,
     days: int = Query(default=28, ge=1, le=480),
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> dict[str, object]:
     require_website_access(db, principal, website_id, admin=True)
-    try:
-        return await sync_search_console(db, website_id, days)
-    except ValueError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return _queue_single_integration_sync(db, website_id, "search_console", days)
 
 
 @router.get(
@@ -835,46 +855,46 @@ def synchronize_pagespeed(
     return {"status": "queued", "strategy": strategy, "limit": limit}
 
 
-@router.post("/websites/{website_id}/integrations/ga4/sync")
-async def synchronize_google_analytics(
+@router.post(
+    "/websites/{website_id}/integrations/ga4/sync",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def synchronize_google_analytics(
     website_id: UUID,
     days: int = Query(default=28, ge=1, le=480),
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> dict[str, object]:
     require_website_access(db, principal, website_id, admin=True)
-    try:
-        return await sync_google_analytics(db, website_id, days)
-    except ValueError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return _queue_single_integration_sync(db, website_id, "ga4", days)
 
 
-@router.post("/websites/{website_id}/integrations/matomo/sync")
-async def synchronize_matomo(
+@router.post(
+    "/websites/{website_id}/integrations/matomo/sync",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def synchronize_matomo(
     website_id: UUID,
     days: int = Query(default=28, ge=1, le=480),
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> dict[str, object]:
     require_website_access(db, principal, website_id, admin=True)
-    try:
-        return await sync_matomo(db, website_id, days)
-    except ValueError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return _queue_single_integration_sync(db, website_id, "matomo", days)
 
 
-@router.post("/websites/{website_id}/integrations/bing_webmaster/sync")
-async def synchronize_bing_webmaster(
+@router.post(
+    "/websites/{website_id}/integrations/bing_webmaster/sync",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def synchronize_bing_webmaster(
     website_id: UUID,
     days: int = Query(default=480, ge=1, le=480),
     db: Session = Depends(get_db),
     principal: Principal = Depends(require_api_key),
 ) -> dict[str, object]:
     require_website_access(db, principal, website_id, admin=True)
-    try:
-        return await sync_bing_webmaster(db, website_id, days)
-    except ValueError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return _queue_single_integration_sync(db, website_id, "bing_webmaster", days)
 
 
 @router.post("/websites/{website_id}/integrations/bing_webmaster/backlinks/import")
