@@ -195,65 +195,17 @@ def system_status(
 ) -> dict[str, Any]:
     require_global_role(principal, "superuser", "admin", "user")
     database_status = "ok"
+    dead_letters: dict[str, int] = {}
+    unresolved_dead_letters: int | None = None
+    open_security_incidents: int | None = None
     try:
         db.execute(text("SELECT 1"))
-    except SQLAlchemyError:
-        database_status = "unavailable"
-
-    try:
-        queue_status = build_queue_status()
-    except Exception:  # Redis/RQ failures must be reported, not break this endpoint.
-        logger.warning("system_queue_status_unavailable", exc_info=True)
-        queue_status = {
-            "redis": "unavailable",
-            "queues": {
-                "crawls": {"status": "unavailable", "workers": 0, "queued_jobs": 0},
-                "crawls_light": {
-                    "status": "unavailable",
-                    "workers": 0,
-                    "queued_jobs": 0,
-                },
-                "crawls_full": {
-                    "status": "unavailable",
-                    "workers": 0,
-                    "queued_jobs": 0,
-                },
-                "sitemaps": {
-                    "status": "unavailable",
-                    "workers": 0,
-                    "queued_jobs": 0,
-                },
-                "verifications": {
-                    "status": "unavailable",
-                    "workers": 0,
-                    "queued_jobs": 0,
-                },
-                "integrations": {
-                    "status": "unavailable",
-                    "workers": 0,
-                    "queued_jobs": 0,
-                },
-                "maintenance": {
-                    "status": "unavailable",
-                    "workers": 0,
-                    "queued_jobs": 0,
-                },
-                "exports": {"status": "unavailable", "workers": 0, "queued_jobs": 0},
-            },
-        }
-    dead_letter_rows = (
-        db.execute(
+        dead_letter_rows = db.execute(
             select(QueueDeadLetter.queue_name, func.count(QueueDeadLetter.id))
             .where(QueueDeadLetter.status == "unresolved")
             .group_by(QueueDeadLetter.queue_name)
         ).all()
-        if database_status == "ok"
-        else []
-    )
-    dead_letters = {queue_name: int(count) for queue_name, count in dead_letter_rows}
-    unresolved_dead_letters = sum(dead_letters.values())
-    open_security_incidents = (
-        int(
+        incident_count = int(
             db.scalar(
                 select(func.count(SecurityIncident.id)).where(
                     SecurityIncident.status.in_({"open", "reopened", "investigating"})
@@ -261,9 +213,34 @@ def system_status(
             )
             or 0
         )
-        if database_status == "ok"
-        else 0
-    )
+        dead_letters = {queue_name: int(count) for queue_name, count in dead_letter_rows}
+        unresolved_dead_letters = sum(dead_letters.values())
+        open_security_incidents = incident_count
+    except SQLAlchemyError:
+        db.rollback()
+        database_status = "unavailable"
+        logger.warning("system_database_status_unavailable")
+
+    try:
+        queue_status = build_queue_status()
+    except Exception:  # Keep independent database and worker results available.
+        logger.warning("system_queue_status_unavailable")
+        queue_status = {
+            "redis": "unavailable",
+            "queues": {
+                name: {"status": "unknown", "workers": None, "queued_jobs": None}
+                for name in (
+                    "crawls",
+                    "crawls_light",
+                    "crawls_full",
+                    "sitemaps",
+                    "verifications",
+                    "integrations",
+                    "maintenance",
+                    "exports",
+                )
+            },
+        }
     healthy = (
         database_status == "ok"
         and unresolved_dead_letters == 0
@@ -274,10 +251,7 @@ def system_status(
         "status": "ok" if healthy else "degraded",
         "api": "ok",
         "database": database_status,
-        "dead_letters": {
-            "unresolved": unresolved_dead_letters,
-            "by_queue": dead_letters,
-        },
+        "dead_letters": {"unresolved": unresolved_dead_letters, "by_queue": dead_letters},
         "security_incidents": {"open": open_security_incidents},
         **queue_status,
     }

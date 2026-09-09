@@ -365,3 +365,35 @@ def test_url_export_includes_current_and_historical_sources() -> None:
     assert row["crawl_depth"] == 2
     assert row["current_sources"] == "internal_link"
     assert row["historical_sources"] == "sitemap"
+
+
+def test_assignee_labels_do_not_read_credentials() -> None:
+    from sqlalchemy import event
+
+    with SessionLocal() as db:
+        user = User(
+            email="assignee@example.test", password_hash="not-for-export", display_name=None
+        )
+        db.add(user)
+        db.commit()
+        user_id = user.id
+        statements: list[str] = []
+
+        def record_query(conn, cursor, statement, parameters, context, executemany):
+            statements.append(statement)
+
+        connection = db.connection()
+        event.listen(connection, "before_cursor_execute", record_query)
+        try:
+            assert export_service._assigned_user_labels(db, set()) == {}
+            assert statements == []
+            assert export_service._assigned_user_labels(db, {user_id}) == {
+                user_id: "assignee@example.test"
+            }
+        finally:
+            event.remove(connection, "before_cursor_execute", record_query)
+        assert len(statements) == 1
+        assert "users.display_name" in statements[0]
+        assert "users.email" in statements[0]
+        assert "password_hash" not in statements[0]
+        assert "mfa_" not in statements[0]

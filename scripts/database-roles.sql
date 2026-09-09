@@ -85,5 +85,8 @@ WHERE schemaname = 'public'
   )
 \gexec
 
+-- Export assignee labels without access to password, MFA or session data.
+GRANT SELECT (id, display_name, email) ON TABLE users TO seo_export;
+
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO seo_api;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO seo_api;

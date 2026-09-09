@@ -92,9 +92,7 @@ def _datasets(
         elif selected_type == "tasks":
             tasks = [task for task in tasks if task.id in selected_ids]
     source_rows = (
-        list(db.scalars(select(UrlSource).where(UrlSource.url_id.in_(url_ids))))
-        if url_ids
-        else []
+        list(db.scalars(select(UrlSource).where(UrlSource.url_id.in_(url_ids)))) if url_ids else []
     )
     sources_by_url: dict[object, list[UrlSource]] = {}
     for source in source_rows:
@@ -105,13 +103,8 @@ def _datasets(
         .order_by(CrawlRun.started_at.desc())
         .limit(1)
     )
-    assigned_user_ids = {
-        task.assigned_to_user_id for task in tasks if task.assigned_to_user_id
-    }
-    users = {
-        user.id: user
-        for user in db.scalars(select(User).where(User.id.in_(assigned_user_ids)))
-    }
+    assigned_user_ids = {task.assigned_to_user_id for task in tasks if task.assigned_to_user_id}
+    user_labels = _assigned_user_labels(db, assigned_user_ids)
     issues_by_id = {issue.id: issue for issue in issues}
     job_issues_by_url = {
         listing.url_id: [
@@ -185,9 +178,7 @@ def _datasets(
                     url.page_type,
                     url.crawl_depth,
                     " | ".join(
-                        sorted(
-                            {source.source_type for source in sources_by_url.get(url.id, [])}
-                        )
+                        sorted({source.source_type for source in sources_by_url.get(url.id, [])})
                     ),
                     " | ".join(
                         _current_source_types(sources_by_url.get(url.id, []), latest_full_run)
@@ -344,7 +335,7 @@ def _datasets(
                     task.status,
                     task.primary_role,
                     " | ".join(task.supporting_roles or []),
-                    _user_label(users.get(task.assigned_to_user_id)),
+                    user_labels.get(task.assigned_to_user_id, ""),
                     task.effort_min_minutes,
                     task.effort_max_minutes,
                     task.verification_status,
@@ -380,10 +371,15 @@ def _seen_since(seen_at: datetime, started_at: datetime) -> bool:
     return seen_at.replace(tzinfo=None) >= started_at.replace(tzinfo=None)
 
 
-def _user_label(user: User | None) -> str:
-    if user is None:
-        return ""
-    return user.display_name or user.email
+def _assigned_user_labels(db: Session, user_ids: set[uuid.UUID]) -> dict[uuid.UUID, str]:
+    if not user_ids:
+        return {}
+    return {
+        user_id: display_name or email
+        for user_id, display_name, email in db.execute(
+            select(User.id, User.display_name, User.email).where(User.id.in_(user_ids))
+        )
+    }
 
 
 def _job_validation_status(listing: JobListing, issues: list[Issue]) -> str:

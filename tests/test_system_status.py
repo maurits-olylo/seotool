@@ -325,3 +325,51 @@ def test_security_audit_automatically_creates_incident() -> None:
     assert incident is not None
     assert incident.rule_id == "repeated_login_failures"
     assert incident.occurrence_count == 5
+
+
+def test_database_table_failure_preserves_worker_status(monkeypatch) -> None:
+    from sqlalchemy.exc import SQLAlchemyError
+
+    monkeypatch.setattr(
+        "app.api.routes.system.build_queue_status",
+        lambda: {
+            "redis": "ok",
+            "queues": {
+                "exports": {
+                    "status": "ok",
+                    "workers": 1,
+                    "queued_jobs": 0,
+                }
+            },
+        },
+    )
+    db = Mock()
+    # SELECT 1 succeeds, but a status table cannot be read.
+    db.execute.side_effect = [Mock(), SQLAlchemyError("permission denied")]
+    result = system_status(
+        db=db,
+        principal=Principal(user_id=None, role="superuser", is_api_key=True),
+    )
+    db.rollback.assert_called_once()
+    assert result["status"] == "degraded"
+    assert result["database"] == "unavailable"
+    assert result["dead_letters"]["unresolved"] is None
+    assert result["security_incidents"]["open"] is None
+    assert result["queues"]["exports"]["workers"] == 1
+
+
+def test_redis_failure_does_not_invent_zero_workers(monkeypatch) -> None:
+    def fail():
+        raise ConnectionError("redis unavailable")
+
+    monkeypatch.setattr("app.api.routes.system.build_queue_status", fail)
+    with SessionLocal() as db:
+        result = system_status(
+            db=db,
+            principal=Principal(user_id=None, role="superuser", is_api_key=True),
+        )
+    assert result["database"] == "ok"
+    assert result["redis"] == "unavailable"
+    assert result["dead_letters"]["unresolved"] == 0
+    for queue in result["queues"].values():
+        assert queue == {"status": "unknown", "workers": None, "queued_jobs": None}
