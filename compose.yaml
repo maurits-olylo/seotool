@@ -183,6 +183,8 @@ services:
   export-worker:
     <<: *app-hardening
     build: .
+    # XLSX sheet XML can exceed the shared 64 MiB memory-backed scratch limit.
+    tmpfs: []
     environment:
       <<: *runtime-env
       DATABASE_URL: ${EXPORT_DATABASE_URL:?EXPORT_DATABASE_URL is required}
@@ -190,7 +192,7 @@ services:
       WORKER_QUEUES: exports
       WORKER_NAME: exports-1
     command: python -m app.worker
-    volumes: ["exports_data:/app/exports"]
+    volumes: ["exports_data:/app/exports", "export_tmp_data:/tmp"]
     networks: [backend]
     depends_on:
       postgres: {condition: service_healthy}
@@ -348,6 +350,7 @@ volumes:
   postgres_data:
   redis_data:
   exports_data:
+  export_tmp_data:
   render_artifacts_data:
   privacy_ledger_data:
     external: true

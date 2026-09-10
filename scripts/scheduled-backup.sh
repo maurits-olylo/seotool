@@ -41,11 +41,18 @@ cleanup() {
   set +e
   cd "$PROJECT_DIR" 2>/dev/null
   if [ "$WRITERS_STOPPED" = "true" ]; then
-    compose up -d integration-worker maintenance-worker export-worker scheduler
+    if ! compose up -d integration-worker maintenance-worker export-worker scheduler; then
+      echo "Writer restart failed; crawl pause retained for manual recovery" >&2
+      rmdir "$LOCK_DIR" 2>/dev/null
+      exit 1
+    fi
     sleep 40
   fi
   if [ "$DRAIN_ACTIVE" = "true" ]; then
-    compose exec -T api python -m app.maintenance resume-crawls
+    if ! compose exec -T api python -m app.maintenance resume-crawls; then
+      echo "Crawl resume failed; inspect paused jobs before retrying" >&2
+      exit_status=1
+    fi
   fi
   rmdir "$LOCK_DIR" 2>/dev/null
   exit "$exit_status"
@@ -53,10 +60,12 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 
 cd "$PROJECT_DIR"
-compose exec -T api python -m app.maintenance pause-crawls --wait --timeout 600
+# A timeout may occur after the database pause has already been committed.
 DRAIN_ACTIVE=true
-compose stop integration-worker maintenance-worker export-worker scheduler
+compose exec -T api python -m app.maintenance pause-crawls --wait --timeout 600
+# A failed stop can still have stopped some services.
 WRITERS_STOPPED=true
+compose stop integration-worker maintenance-worker export-worker scheduler
 
 PROJECT_DIR="$PROJECT_DIR" \
 BACKUP_DIR="$BACKUP_DIR" \

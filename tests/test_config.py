@@ -87,7 +87,12 @@ def test_application_containers_are_hardened() -> None:
         assert service["pids_limit"] in {64, 256}
         assert service["mem_limit"]
         assert service["cpu_shares"]
-        assert any(value.startswith("/tmp:") for value in service["tmpfs"])
+        if service_name == "export-worker":
+            assert service["tmpfs"] == []
+            assert "export_tmp_data:/tmp" in service["volumes"]
+            assert "export_tmp_data" in compose["volumes"]
+        else:
+            assert any(value.startswith("/tmp:") for value in service["tmpfs"])
 
 
 def test_staging_application_containers_are_hardened() -> None:
@@ -176,9 +181,7 @@ def test_application_images_pin_immutable_base_images() -> None:
 
     assert dockerfile.startswith("FROM python:3.12.13-slim-trixie@sha256:")
     assert "FROM node:22-bookworm-slim@sha256:" in render_dockerfile
-    assert "FROM mcr.microsoft.com/playwright/python:v1.61.0-noble@sha256:" in (
-        render_dockerfile
-    )
+    assert "FROM mcr.microsoft.com/playwright/python:v1.61.0-noble@sha256:" in (render_dockerfile)
 
 
 def test_security_workflow_is_read_only_and_pins_third_party_actions() -> None:
@@ -189,7 +192,7 @@ def test_security_workflow_is_read_only_and_pins_third_party_actions() -> None:
     assert "pull_request_target:" not in workflow
     assert 'cron: "15 4 * * 1"' in workflow
     assert "workflow_dispatch:" in workflow
-    assert "python-version: \"3.12\"" in workflow
+    assert 'python-version: "3.12"' in workflow
     assert "pip install --require-hashes -r requirements-ci.lock" in workflow
     assert "pip-audit -r requirements.lock --strict" in workflow
     assert "cyclonedx-py requirements requirements.lock" in workflow
@@ -269,9 +272,7 @@ def test_compose_limits_sensitive_environment_by_service() -> None:
     assert "DATAFORSEO_PASSWORD" in services["integration-worker"]["environment"]
     assert "INITIAL_SUPERUSER_PASSWORD" not in services["integration-worker"]["environment"]
     assert "privacy_ledger_data:/app/privacy-ledger" in services["api"]["volumes"]
-    assert compose["volumes"]["privacy_ledger_data"]["name"] == (
-        "seo-monitor-privacy-ledger-data"
-    )
+    assert compose["volumes"]["privacy_ledger_data"]["name"] == ("seo-monitor-privacy-ledger-data")
     assert compose["volumes"]["privacy_ledger_data"]["external"] is True
 
 
@@ -439,11 +440,11 @@ def test_crawler_firewall_blocks_non_public_ipv4_ranges() -> None:
     ):
         assert destination in script
     assert 'iptables -F "$CHAIN_NAME"' in script
-    assert '-j DROP' in script
-    assert '--reject-with' not in script
-    assert '/etc/resolv.conf' in script
-    assert '-p udp --dport 53 -j RETURN' in script
-    assert '-p tcp --dport 53 -j RETURN' in script
+    assert "-j DROP" in script
+    assert "--reject-with" not in script
+    assert "/etc/resolv.conf" in script
+    assert "-p udp --dport 53 -j RETURN" in script
+    assert "-p tcp --dport 53 -j RETURN" in script
     assert 'iptables -I DOCKER-USER 1 -j "$CHAIN_NAME"' in script
     assert 'test "$LINK_POSITION" -lt "$RETURN_POSITION"' in script
     assert "iptables -F DOCKER-USER" not in script
@@ -452,16 +453,12 @@ def test_crawler_firewall_blocks_non_public_ipv4_ranges() -> None:
 
 def test_crawler_network_bootstrap_is_idempotent_and_validates_isolation() -> None:
     project_root = Path(__file__).resolve().parents[1]
-    network_script = (
-        project_root / "scripts/ensure-crawler-egress-network.sh"
-    ).read_text()
-    firewall_script = (
-        project_root / "scripts/ensure-crawler-egress-firewall.sh"
-    ).read_text()
+    network_script = (project_root / "scripts/ensure-crawler-egress-network.sh").read_text()
+    firewall_script = (project_root / "scripts/ensure-crawler-egress-firewall.sh").read_text()
 
     assert 'docker network inspect "$NETWORK_NAME"' in network_script
     assert "docker network create" in network_script
-    assert 'com.docker.compose.network=crawler-egress' in network_script
+    assert "com.docker.compose.network=crawler-egress" in network_script
     assert 'DRIVER" != "bridge"' in network_script
     assert 'INTERNAL" != "false"' in network_script
     assert 'IPV6_ENABLED" != "false"' in network_script
@@ -470,9 +467,7 @@ def test_crawler_network_bootstrap_is_idempotent_and_validates_isolation() -> No
 
 def test_boot_restore_configures_production_and_staging_firewalls() -> None:
     project_root = Path(__file__).resolve().parents[1]
-    script = (
-        project_root / "scripts/restore-crawler-egress-firewalls.sh"
-    ).read_text()
+    script = (project_root / "scripts/restore-crawler-egress-firewalls.sh").read_text()
 
     assert "PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" in script
     assert "CRAWLER_EGRESS_NETWORK_NAME=seo-monitor-crawler-egress" in script
