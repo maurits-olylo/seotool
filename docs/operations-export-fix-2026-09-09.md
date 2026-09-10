@@ -17,6 +17,7 @@ The operations UI previously displayed missing status as zero workers and a fail
 - tests/test_system_status.py
 - tests/test_operations_ui.cjs
 - docs/operations-export-fix-2026-09-09.md
+- scripts/verify-operations-recovery.py
 
 ## Local validation
 
@@ -38,3 +39,13 @@ Use the agreed local git archive, streaming SSH upload and existing interactive 
 The migration changes only reversible column privileges and rewrites no data, so this change does not itself require an additional full backup. For rollback, coordinate the application rollback and the 0066 downgrade; the previous export code retains its known defect.
 
 Acceptance: authenticated system status; real worker counts; a small crawl on the selected website; CSV and Excel exports including an assigned task; download and inspect output. Retrying a previously failed export requires a new export request, not just a worker restart. No deployment or production mutation has been performed in this phase.
+
+## Production diagnosis received 10 September 2026
+
+All reported containers were healthy. Production is at revision 0064; security_incidents is absent. This missing table explains the status-query failure. The export role lacks the three label column grants. The diagnostic stopped at the missing table, before worker registrations were queried.
+
+The release must apply both 0065 (new empty security incident table) and 0066 (column grants). PostgreSQL offline SQL for the complete 0064-to-0066 path was generated and reviewed. The 50 targeted tests passed again. Live PostgreSQL testing remains unavailable locally and is not claimed as passed.
+
+The archive includes scripts/verify-operations-recovery.py. Run its api mode inside api and exports mode inside export-worker after migration and restart. It verifies the effective production roles, schema revision, health and registered workers, then generates and opens temporary CSV/Excel exports for Schipper using the actual restricted export role. It performs read-only database transactions, prints only counts/status and removes its temporary export files. It does not enqueue jobs or test authenticated browser downloads; those remain a final UI acceptance step.
+
+Only the API and export worker are restarted. The migration tool image must also be rebuilt to include both migrations. No extra full backup is necessary for the additive empty table and reversible grants. Existing unrelated outputs are excluded from the archive.
