@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SEO Monitor</title>
   <link rel="stylesheet" href="/ui/assets/app.css">
+  <link rel="stylesheet" href="/ui/assets/internal-links.css?v=20260911">
   <link rel="stylesheet" href="/ui/assets/responsive.css?v=20260722-5">
   <link rel="stylesheet" href="/ui/assets/dashboard.css">
   <link rel="stylesheet" href="/ui/assets/actionable.css?v=20260731-4">
@@ -165,6 +166,17 @@
       </section>
       <section id="urls-view" class="hidden">
         <header><div><span class="eyebrow">ANALYSE</span><h1>URL’s</h1><p class="intro">Bekijk bereikbaarheid, indexatie, crawl-diepte en actieve signalen per URL.</p></div></header>
+        <section class="panel internal-links-panel" aria-labelledby="internal-links-title">
+          <div class="panel-head"><div><span class="eyebrow">INTERNE LINKS</span><h2 id="internal-links-title">Meest gelinkte pagina’s</h2></div><button id="internal-links-refresh" class="detail-button" type="button">Vernieuwen</button></div>
+          <p id="internal-links-context" role="status">Selecteer een website.</p>
+          <p>Unieke verwijzende pagina’s uit de laatste geslaagde volledige crawl. Inclusief nofollow; links naar dezelfde pagina tellen niet mee. Dit zijn eigen crawlgegevens, geen GSC-tellingen.</p>
+          <h3>Top 10 van de website</h3><div id="internal-links-chart"></div>
+          <div class="url-filters"><input id="internal-links-search" type="search" placeholder="Zoek doelpagina" aria-label="Zoek intern gelinkte doelpagina"><select id="internal-links-order" aria-label="Sorteer intern gelinkte pagina’s"><option value="links_desc">Meeste verwijzende pagina’s</option><option value="links_asc">Minste verwijzende pagina’s</option><option value="url">URL alfabetisch</option></select></div>
+          <div class="table-wrap"><table><thead><tr><th>Doelpagina</th><th>Verwijzende pagina’s</th><th>Verschil</th><th>Status bij crawl</th><th></th></tr></thead><tbody id="internal-links-rows"></tbody></table></div>
+          <p id="internal-links-empty" class="empty" role="status"></p>
+          <footer class="pager"><button id="internal-links-previous" class="page-button" type="button" disabled>Vorige</button><span id="internal-links-page"></span><button id="internal-links-next" class="page-button" type="button" disabled>Volgende</button></footer>
+          <section id="internal-links-detail" class="hidden" aria-labelledby="internal-links-detail-title"><h3 id="internal-links-detail-title">Verwijzende pagina’s</h3><p id="internal-links-detail-context" role="status"></p><div class="table-wrap"><table><thead><tr><th>Bronpagina</th><th>Linkteksten</th></tr></thead><tbody id="internal-links-sources"></tbody></table></div><button id="internal-links-more" class="detail-button" type="button" hidden>Meer bronpagina’s</button></section>
+        </section>
         <section id="url-coverage-summary" class="cards url-coverage-summary"></section>
         <section id="url-coverage-context" class="coverage-context" role="status"></section>
         <section class="panel urls-panel">
@@ -262,6 +274,7 @@
   </dialog>
   <dialog id="mfa-dialog" aria-labelledby="mfa-title"><h2 id="mfa-title">Tweestapsverificatie instellen</h2><p>Scan deze QR-code met je authenticator-app.</p><div class="mfa-qr-wrap"><img id="mfa-qr-code" alt="QR-code voor tweestapsverificatie"></div><details class="mfa-manual"><summary>Handmatig instellen</summary><label>Geheime sleutel<input id="mfa-secret" readonly></label></details><h3>Herstelcodes</h3><p>Bewaar deze codes veilig. Iedere code werkt één keer.</p><pre id="mfa-recovery-codes"></pre><label>Code uit authenticator<input id="mfa-confirm-code" inputmode="numeric" autocomplete="one-time-code"></label><button id="confirm-mfa" class="primary-button" type="button">Activeren</button><p id="mfa-message" class="operation-message" role="status"></p></dialog>
   <section id="first-crawl-progress" class="panel onboarding-progress hidden" aria-live="polite"><span class="eyebrow">EERSTE RESULTATEN</span><h3 id="first-crawl-progress-title">Controle wordt voorbereid</h3><p id="first-crawl-progress-message"></p><div class="progress-track"><span id="first-crawl-progress-bar"></span></div><p id="first-crawl-progress-metrics" class="onboarding-progress-metrics"></p><article id="onboarding-measurement-quality" class="onboarding-measurement hidden"><strong id="onboarding-measurement-title"></strong><span id="onboarding-measurement-message"></span><small id="onboarding-measurement-evidence"></small></article><div class="verification-actions"><button id="retry-first-crawl" class="primary-button hidden" type="button">Opnieuw proberen</button><button id="view-first-results" class="primary-button hidden" type="button">Bekijk eerste inzichten</button><button id="configure-onboarding-measurement" class="secondary-button hidden" type="button">Meetkwaliteit instellen</button></div></section>
-  <script src="/ui/assets/app.js?v=20260820-1" defer></script>
+  <script src="/ui/assets/app.js?v=20260911-1" defer></script>
+  <script src="/ui/assets/internal-links.js?v=20260911" defer></script>
 </body>
 </html>

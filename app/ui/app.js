@@ -1963,6 +1963,7 @@ function urlIndexState(url) {
 }
 
 function renderUrls() {
+  window.loadInternalLinks?.();
   const query = $("#url-search").value.trim().toLowerCase();
   const status = $("#url-status-filter").value;
   const indexation = $("#url-index-filter").value;
