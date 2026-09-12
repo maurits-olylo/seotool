@@ -157,3 +157,47 @@ def test_membership_required_for_link_data(client) -> None:
         assert response.status_code in {403, 404}
     finally:
         app.dependency_overrides.pop(require_api_key)
+
+
+def test_review_labels_boundaries_and_technical_errors() -> None:
+    from app.services.internal_links import classify_items
+
+    def item(path, count, status=200, change=0):
+        return dict(
+            url=f"https://example.test{path}",
+            incoming_pages=count,
+            status_code=status,
+            change=change,
+        )
+
+    rows = [
+        item("/menu", 8),
+        item("/content", 7),
+        item("/few", 2),
+        item("/unknown", 0, None),
+        item("/admin-panel/forms/save", 9, 500),
+        item("/lost", 4, 200, -3),
+        item("/apiary", 0),
+    ]
+    summary = classify_items(rows, 10)
+    assert summary == dict(attention=4, low=2, lost=1, errors=1, repeated=2, technical=1)
+    assert "repeated" in rows[0]["signals"] and "repeated" not in rows[1]["signals"]
+    assert rows[3]["signals"] == []
+    assert {"technical", "errors", "attention"} <= set(rows[4]["signals"])
+    assert "technical" not in rows[6]["signals"]
+    classify_items(rows, 9)
+    assert all("repeated" not in row["signals"] for row in rows)
+
+
+def test_review_filters_and_summary_are_independent_of_search(client) -> None:
+    ids = fixture()
+    url = f"/api/v1/websites/{ids['website']}/internal-links"
+    data = client.get(
+        url, params={"view": "low", "q": "zero", "limit": 5, "order": "priority"}
+    ).json()
+    assert data["total"] == 1
+    assert data["summary"]["low"] == 4
+    assert "low" in data["items"][0]["signals"]
+    assert client.get(url, params={"view": "errors"}).json()["total"] == 0
+    assert client.get(url, params={"view": "technical"}).json()["total"] == 0
+    assert client.get(url, params={"view": "invalid"}).status_code == 422

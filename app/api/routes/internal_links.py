@@ -18,7 +18,10 @@ router = APIRouter(tags=["internal links"])
 def internal_link_ranking(
     website_id: UUID,
     q: str = Query(default="", max_length=200),
-    order: Literal["links_desc", "links_asc", "url"] = "links_desc",
+    view: Literal[
+        "all", "pages", "attention", "low", "lost", "errors", "repeated", "technical"
+    ] = "all",
+    order: Literal["links_desc", "links_asc", "url", "priority"] = "links_desc",
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=25, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -27,7 +30,20 @@ def internal_link_ranking(
     require_website_access(db, principal, website_id)
     result = ranking(db, website_id)
     items = [item for item in result["items"] if q.casefold() in item["url"].casefold()]
-    if order == "links_asc":
+    if view == "pages":
+        items = [item for item in items if "technical" not in item["signals"]]
+    elif view != "all":
+        items = [item for item in items if view in item["signals"]]
+    if order == "priority":
+        items.sort(
+            key=lambda item: (
+                0 if "errors" in item["signals"] else 1 if "lost" in item["signals"] else 2,
+                -item["incoming_pages"] if "errors" in item["signals"] else (item["change"] or 0),
+                item["incoming_pages"],
+                item["url"],
+            )
+        )
+    elif order == "links_asc":
         items.sort(key=lambda item: (item["incoming_pages"], item["url"]))
     elif order == "url":
         items.sort(key=lambda item: item["url"])

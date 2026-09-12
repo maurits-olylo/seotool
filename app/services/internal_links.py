@@ -2,6 +2,7 @@
 
 from datetime import UTC, timedelta
 from typing import Any
+from urllib.parse import unquote, urlsplit
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -118,8 +119,11 @@ def ranking(db: Session, website_id: UUID) -> dict[str, Any]:
                     else None,
                 }
             )
+    summary = classify_items(items, len(statuses))
     items.sort(key=lambda item: (-item["incoming_pages"], item["url"]))
     return {
+        "summary": summary,
+        "measured_urls": len(statuses),
         "crawl_run_id": run.id,
         "finished_at": run.finished_at,
         "previous_finished_at": previous.finished_at if previous else None,
@@ -171,3 +175,31 @@ def referring_pages(
             for row in sources
         ],
     }
+
+
+def classify_items(items: list[dict[str, Any]], measured_urls: int) -> dict[str, int]:
+    """Label review candidates, never infer DOM position from frequency."""
+    summary = dict.fromkeys(("attention", "low", "lost", "errors", "repeated", "technical"), 0)
+    for item in items:
+        path = unquote(urlsplit(item["url"]).path).lower().rstrip("/")
+        technical = (
+            any(
+                path == prefix or path.startswith(prefix + "/")
+                for prefix in ("/admin-panel", "/wp-admin", "/wp-json", "/cdn-cgi", "/api")
+            )
+            or path == "/wp-login.php"
+        )
+        count = item["incoming_pages"]
+        status = item["status_code"]
+        flags = {
+            "technical": technical,
+            "repeated": measured_urls >= 10 and count / measured_urls >= 0.8,
+            "low": not technical and status == 200 and count <= 2,
+            "lost": (item["change"] or 0) < 0,
+            "errors": count > 0 and status is not None and status >= 400,
+        }
+        flags["attention"] = flags["low"] or flags["lost"] or flags["errors"]
+        item["signals"] = [key for key, value in flags.items() if value]
+        for key, value in flags.items():
+            summary[key] += int(value)
+    return summary

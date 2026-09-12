@@ -1,6 +1,6 @@
-# Meest gelinkte pagina’s
+# Interne links: aandachtspunten
 
-Het scherm **Metingen → URL’s** bevat een top 10, een doorzoekbare en sorteerbare tabel en per doelpagina de verwijzende pagina’s met hun linkteksten.
+Het scherm **Metingen → URL’s** toont compacte selecties voor weinig verwijzingen, verloren verwijzingen, gelinkte foutpagina’s, breed herhaalde links en technische URL’s. De tabel toont vijf rijen per pagina. Bronpagina’s en linkteksten openen op aanvraag; tabellen hebben een begrensde hoogte.
 
 ## Definitie
 
@@ -44,3 +44,21 @@ Gewijzigd:
 76 gerichte API- en exporttests geslaagd (inclusief vijf tests voor dit overzicht). Browsercontrole met afzonderlijke testgegevens: grafiek, bronpagina’s, HTML-escaping, websitewissel en weergave op desktop en mobiel. De voorbeelden zijn geen actuele productiemetingen.
 
 Geen nieuwe dependency, migratie of workerwijziging. Voor productie hoeft alleen de API-service met de meegeleverde interface opnieuw gebouwd en gestart te worden, via de bestaande Synology-deploymentroute. Deze fase levert de lokaal geteste wijziging; productie-uitrol volgt apart.
+
+
+## Verbetering 12 september 2026
+
+De grote top-10-grafiek is uit de interface verwijderd. De API behoudt `top` voor compatibiliteit. De interface selecteert standaard `view=attention&order=priority&limit=5`.
+
+- `low`: status 200, maximaal twee unieke verwijzende pagina’s, geen herkend technisch pad. Dit is een controlepunt, geen bewijs van een orphan page of SEO-fout.
+- `lost`: een negatieve verandering tegenover de vorige volledige crawl; een verschil kan ook door gewijzigd crawlbereik ontstaan.
+- `errors`: status 400 of hoger met minstens één verwijzende pagina. Deze komen eerst, gesorteerd op aantal verwijzingen; daarna verliezen en weinig gelinkte pagina’s.
+- `repeated`: aantal verwijzende pagina’s is minstens 80% van het aantal URL’s met snapshots in deze crawl, bij minstens tien gemeten URL’s. Dit is een frequentiesignaal; menu-, footer- of hoofdtekstpositie is onbekend.
+- `technical`: exacte paden en onderliggende paden van `/admin-panel`, `/wp-admin`, `/wp-json`, `/cdn-cgi`, `/api`, plus `/wp-login.php`. Case en URL-encoding worden genormaliseerd. Dit is een beperkte herkenningslijst, geen volledige paginatypeclassificatie.
+- `pages` sluit uitsluitend herkende technische URL’s uit; `all` behoudt alles. Technische foutpagina’s en verliezen blijven in aandachtspunten zichtbaar.
+
+API-filter `view` ondersteunt deze waarden plus `attention`. `summary` bevat websitebrede aantallen vóór zoeken en paginering; categorieën kunnen overlappen. Er worden geen links verwijderd of opnieuw geclassificeerd in de database.
+
+Zeven gerichte tests geslaagd. Browsercontrole gebruikt synthetische gegevens en controleert vijf rijen, filters, bronpagina’s, escaping, paginering, mobiel en websitewissel. Geen migratie vereist. Alleen API/interface moet bij een volgende uitrol worden herbouwd.
+
+Ook gewijzigd: `scripts/verify-internal-links-release.py` controleert het nieuwe interfacekenmerk. Deze controle leest de dataservice onder de API-databaserol en publieke assets; productie-HTTP met gebruikerssessie wordt afzonderlijk in de ingelogde interface gecontroleerd.
