@@ -48,7 +48,7 @@ def main() -> None:
         in (Path(__file__).resolve().parents[1] / "app/ui/index.html").read_text()
     )
     assert b"data-internal-target" in fetch("/ui/assets/internal-links.js?v=20260912")
-    assert b"internal-link-bar" in fetch("/ui/assets/internal-links.css?v=20260912")
+    assert b"internal-links-summary" in fetch("/ui/assets/internal-links.css?v=20260912")
     print(
         f"Internal link data and assets verified: {len(result['items'])} URLs; "
         f"top page has {sources['total']} referring pages; "
