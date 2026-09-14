@@ -94,6 +94,12 @@ jobs:
       - name: Build renderer image
         run: docker build --pull --file Dockerfile.render --tag seo-monitor-render-ci:${{ github.sha }} .
 
+      - name: Verify renderer runtime without network
+        run: |
+          docker run --rm --network none --read-only \
+            --tmpfs /tmp:rw,size=512m --cap-drop ALL --security-opt no-new-privileges \
+            seo-monitor-render-ci:${{ github.sha }} python scripts/verify-renderer-image.py
+
       - name: Scan renderer image
         id: scan-renderer
         continue-on-error: true
