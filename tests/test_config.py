@@ -179,9 +179,9 @@ def test_application_images_pin_immutable_base_images() -> None:
     dockerfile = (project_root / "Dockerfile").read_text()
     render_dockerfile = (project_root / "Dockerfile.render").read_text()
 
-    assert dockerfile.startswith("FROM python:3.12.13-slim-trixie@sha256:")
+    assert dockerfile.startswith("FROM python:3.12.14-slim-trixie@sha256:")
     assert "FROM node:22-bookworm-slim@sha256:" in render_dockerfile
-    assert "FROM mcr.microsoft.com/playwright/python:v1.61.0-noble@sha256:" in (render_dockerfile)
+    assert "FROM mcr.microsoft.com/playwright/python:v1.62.0-noble@sha256:" in (render_dockerfile)
 
 
 def test_security_workflow_is_read_only_and_pins_third_party_actions() -> None:
