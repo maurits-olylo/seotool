@@ -66,7 +66,7 @@ def internal_link_sources(
     if (
         not run
         or run.website_id != website_id
-        or run.status != "succeeded"
+        or run.status not in {"succeeded", "partially_succeeded"}
         or run.crawl_type != "full_site_crawl"
         or not run.finished_at
         or not target

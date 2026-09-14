@@ -269,7 +269,7 @@ def test_operations_status_ignores_stale_website_responses(client: TestClient) -
     assert 'id="tasks-view"' in page.text
     assert 'id="notification-popover"' in page.text
     assert 'href="/ui/assets/task-center.css?v=20260804-1"' in page.text
-    assert 'href="/ui/assets/urls.css?v=20260804-1"' in page.text
+    assert 'href="/ui/assets/urls.css?v=20260914-1"' in page.text
     assert 'id="url-coverage-summary"' in page.text
     assert 'id="url-source-filter"' in page.text
     assert 'id="export-tasks"' in page.text
@@ -2800,6 +2800,8 @@ def test_url_overview_includes_active_issue_summary(client: TestClient) -> None:
 
 
 def test_url_detail_returns_shortest_internal_route(client: TestClient) -> None:
+    from app.models.common import utc_now
+
     customer = client.post("/api/v1/clients", json={"name": "Route context"}).json()
     website = client.post(
         "/api/v1/websites",
@@ -2818,6 +2820,7 @@ def test_url_detail_returns_shortest_internal_route(client: TestClient) -> None:
             website_id=website_id,
             crawl_type="full_site_crawl",
             status="succeeded",
+            finished_at=utc_now(),
         )
         db.add(run)
         db.flush()

@@ -21,7 +21,7 @@ def completed_runs(db: Session, website_id: UUID) -> list[CrawlRun]:
             .where(
                 CrawlRun.website_id == website_id,
                 CrawlRun.crawl_type == "full_site_crawl",
-                CrawlRun.status == "succeeded",
+                CrawlRun.status.in_(("succeeded", "partially_succeeded")),
                 CrawlRun.finished_at.is_not(None),
             )
             .order_by(CrawlRun.finished_at.desc(), CrawlRun.id.desc())
@@ -116,12 +116,19 @@ def ranking(db: Session, website_id: UUID) -> dict[str, Any]:
                     "status_code": statuses.get(url_id),
                     "change": count - previous_counts.get(url_id, 0)
                     if url_id in previous_ids
+                    and run.status == "succeeded"
+                    and previous is not None
+                    and previous.status == "succeeded"
                     else None,
                 }
             )
     summary = classify_items(items, len(statuses))
     items.sort(key=lambda item: (-item["incoming_pages"], item["url"]))
     return {
+        "crawl_status": run.status,
+        "failed_urls": run.failed_urls,
+        "crawled_urls": run.crawled_urls,
+        "comparison_available": bool(previous and previous.status == run.status == "succeeded"),
         "summary": summary,
         "measured_urls": len(statuses),
         "crawl_run_id": run.id,

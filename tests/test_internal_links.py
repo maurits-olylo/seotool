@@ -201,3 +201,56 @@ def test_review_filters_and_summary_are_independent_of_search(client) -> None:
     assert client.get(url, params={"view": "errors"}).json()["total"] == 0
     assert client.get(url, params={"view": "technical"}).json()["total"] == 0
     assert client.get(url, params={"view": "invalid"}).status_code == 422
+
+
+def test_partial_full_crawl_exposes_links_sources_and_coverage(client) -> None:
+    from uuid import UUID
+
+    ids = fixture()
+    with SessionLocal() as db:
+        run = db.get(CrawlRun, UUID(ids["run"]))
+        run.status = "partially_succeeded"
+        run.started_at = utc_now()
+        run.finished_at = utc_now()
+        run.crawled_urls = 5633
+        run.failed_urls = 5
+        target = db.get(Url, UUID(ids["target"]))
+        target.crawl_depth = 0
+        db.commit()
+    base = f"/api/v1/websites/{ids['website']}"
+    data = client.get(base + "/internal-links").json()
+    assert data["crawl_run_id"] == ids["run"]
+    assert data["failed_urls"] == 5 and data["crawled_urls"] == 5633
+    assert data["top"][0]["incoming_pages"] == 2
+    assert data["comparison_available"] is False
+    assert all(row["change"] is None for row in data["items"])
+    sources = client.get(
+        base + f"/internal-links/{ids['target']}/sources", params={"crawl_run_id": ids["run"]}
+    )
+    assert sources.status_code == 200 and sources.json()["total"] == 2
+    coverage = client.get(base + "/url-coverage").json()
+    assert "5 mislukt" in coverage["context"]
+    assert "Nog geen" not in coverage["context"]
+    assert coverage["reliable"] is False
+    route = client.get(f"/api/v1/urls/{ids['target']}/crawl-route").json()
+    assert route["route"] == ["https://example.test/target"]
+    assert route["reliable"] is False
+
+
+def test_unfinished_partial_crawl_is_not_eligible(client) -> None:
+    from uuid import UUID
+
+    ids = fixture()
+    with SessionLocal() as db:
+        run = db.get(CrawlRun, UUID(ids["run"]))
+        run.status = "partially_succeeded"
+        run.finished_at = None
+        db.commit()
+    base = f"/api/v1/websites/{ids['website']}"
+    assert client.get(base + "/internal-links").json()["crawl_run_id"] != ids["run"]
+    assert (
+        client.get(
+            base + f"/internal-links/{ids['target']}/sources", params={"crawl_run_id": ids["run"]}
+        ).status_code
+        == 404
+    )

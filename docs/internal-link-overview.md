@@ -62,3 +62,14 @@ API-filter `view` ondersteunt deze waarden plus `attention`. `summary` bevat web
 Zeven gerichte tests geslaagd. Browsercontrole gebruikt synthetische gegevens en controleert vijf rijen, filters, bronpagina’s, escaping, paginering, mobiel en websitewissel. Geen migratie vereist. Alleen API/interface moet bij een volgende uitrol worden herbouwd.
 
 Ook gewijzigd: `scripts/verify-internal-links-release.py` controleert het nieuwe interfacekenmerk. Deze controle leest de dataservice onder de API-databaserol en publieke assets; productie-HTTP met gebruikerssessie wordt afzonderlijk in de ingelogde interface gecontroleerd.
+
+
+## Deelresultaten uit volledige crawls — 14 september 2026
+
+Afgeronde `partially_succeeded` volledige crawls zijn nu ook beschikbaar in het linkoverzicht en de bronpagina’s. De laatste twee afgeronde volledige crawls worden geselecteerd op einddatum. Lopende, gepauzeerde, geannuleerde en mislukte crawls blijven uitgesloten, evenals light checks. De oorspronkelijke status wordt niet gewijzigd.
+
+Het overzicht vermeldt bij deelresultaten aantallen verwerkte en mislukte URL’s en waarschuwt dat linkaantallen onvolledig kunnen zijn. Als een van beide vergelijkingscrawls deels geslaagd is, wordt geen verschil berekend; daardoor worden ontbrekende bronnen niet als verloren verwijzingen gepresenteerd. Bestaande frequentie- en laag-aantalfilters zijn controlepunten op de beschikbare gegevens.
+
+De URL-dekkingsmelding benoemt een deels geslaagde crawl als afgerond met ontbrekende resultaten, in plaats van te melden dat geen volledige crawl bestaat. Dekking en kortste route blijven voorlopig (`reliable=false`); beschikbare routes kunnen wel worden getoond.
+
+Aanvullend gewijzigd: `app/api/routes/discovery.py` voor dekkingscontext en beschikbare routes. Geen migratie en geen nieuwe crawl vereist om bestaande deelresultaten te tonen.

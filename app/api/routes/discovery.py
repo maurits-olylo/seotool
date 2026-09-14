@@ -130,6 +130,18 @@ def get_url_coverage(
         if reliable
         else "Nog geen voltooide volledige crawl; actuele dekking is voorlopig"
     )
+    if (
+        latest_full_run
+        and latest_full_run.status == "partially_succeeded"
+        and latest_full_run.finished_at
+    ):
+        context = (
+            "Dekking uit afgeronde volledige crawl van "
+            f"{latest_full_run.started_at.date().isoformat()}; "
+            f"deels geslaagd: {latest_full_run.crawled_urls} URL’s verwerkt, "
+            f"{latest_full_run.failed_urls} mislukt. Beschikbare resultaten worden getoond; "
+            "dekking kan onvolledig zijn"
+        )
     return UrlCoverageRead(
         total_active_urls=len(url_ids),
         source_counts=source_counts,
@@ -164,6 +176,12 @@ def _url_read_with_depth_context(
             f"Kortste interne route uit voltooide crawl van {crawl_date}"
             if url.crawl_depth is not None
             else f"Geen interne route gevonden in voltooide crawl van {crawl_date}"
+        )
+    elif run.status == "partially_succeeded" and run.finished_at:
+        reliable = False
+        context = (
+            f"Route uit deels geslaagde volledige crawl; {run.failed_urls} URL’s mislukt. "
+            "Een kortere route via ontbrekende pagina’s kan niet worden uitgesloten"
         )
     elif run.status in {"running", "pause_requested", "paused"}:
         reliable = False
@@ -271,7 +289,12 @@ def get_crawl_route(
         .limit(1)
     )
     context = _url_read_with_depth_context(target, run).crawl_depth_context
-    if not run or run.status != "succeeded" or target.crawl_depth is None:
+    if (
+        not run
+        or run.status not in {"succeeded", "partially_succeeded"}
+        or not run.finished_at
+        or target.crawl_depth is None
+    ):
         return CrawlRouteRead(reliable=False, depth=target.crawl_depth, route=[], context=context)
     route = [target.normalized_url]
     current = target
@@ -302,7 +325,7 @@ def get_crawl_route(
         current = predecessor
         current_depth -= 1
     return CrawlRouteRead(
-        reliable=True,
+        reliable=run.status == "succeeded",
         depth=target.crawl_depth,
         route=list(reversed(route)),
         context=context,
