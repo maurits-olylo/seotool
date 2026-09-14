@@ -25,3 +25,18 @@
 .internal-links-panel .url-filters { grid-template-columns:minmax(180px,1fr) minmax(220px,1fr) minmax(220px,1fr); }
 .internal-links-panel .table-wrap { max-height:440px; }
 @media(max-width:800px) { .internal-links-panel .url-filters { grid-template-columns:1fr; } }
+
+/* Only the ranking has an action column; source-detail tables do not. */
+.internal-links-panel > .table-wrap th:last-child,
+.internal-links-panel > .table-wrap td:last-child {
+  position:sticky;
+  right:0;
+  z-index:1;
+  width:128px;
+  min-width:128px;
+  padding:12px;
+  background:#fff;
+  box-shadow:-5px 0 8px -7px #15231d;
+}
+.internal-links-panel > .table-wrap td:last-child .detail-button { width:100%; white-space:normal; }
+.internal-links-panel th:nth-child(2),.internal-links-panel td:nth-child(2) { min-width:0; }
