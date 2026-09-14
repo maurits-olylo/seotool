@@ -85,7 +85,8 @@ jobs:
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: seo-monitor-ci:${{ github.sha }}
-          format: table
+          format: json
+          output: /tmp/application-scan.json
           exit-code: "1"
           ignore-unfixed: false
           severity: CRITICAL,HIGH
@@ -99,7 +100,8 @@ jobs:
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: seo-monitor-render-ci:${{ github.sha }}
-          format: table
+          format: json
+          output: /tmp/renderer-scan.json
           exit-code: "1"
           ignore-unfixed: false
           severity: CRITICAL,HIGH
@@ -110,6 +112,18 @@ jobs:
           APPLICATION_SCAN: ${{ steps.scan-application.outcome }}
           RENDERER_SCAN: ${{ steps.scan-renderer.outcome }}
         run: |
+          python - <<'PYTHON'
+          import json
+          from pathlib import Path
+          for filename in ("/tmp/application-scan.json", "/tmp/renderer-scan.json"):
+              path = Path(filename)
+              if path.exists():
+                  for result in json.loads(path.read_text()).get("Results", []):
+                      for item in result.get("Vulnerabilities", []):
+                          print(filename, result.get("Target"), item.get("PkgName"),
+                                item.get("InstalledVersion"), item.get("VulnerabilityID"),
+                                item.get("FixedVersion"), item.get("PkgPath"))
+          PYTHON
           printf 'application_scan=%s\nrenderer_scan=%s\n' "$APPLICATION_SCAN" "$RENDERER_SCAN"
           test "$APPLICATION_SCAN" = success
           test "$RENDERER_SCAN" = success
