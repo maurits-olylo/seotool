@@ -6,23 +6,26 @@ RUN npm pack axe-core@4.12.1 \
     && mv package/axe.min.js package/LICENSE ./ \
     && rm -rf package axe-core-4.12.1.tgz
 
-FROM python:3.12.14-slim-trixie@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea
+FROM mcr.microsoft.com/playwright/python:v1.62.0-noble@sha256:aa81288e738725378becba5b3e06cb0f3a7f012a610e87e8d767a090ea3f740d
 
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-WORKDIR /app
-COPY requirements.lock requirements-render.lock ./
-RUN pip install --no-cache-dir --require-hashes \
-    -r requirements.lock -r requirements-render.lock \
-    && python -m playwright install --with-deps chromium \
-    && apt-get purge -y xvfb xserver-common \
-    && apt-get update \
+# Apply current distribution security fixes; CI scans the resulting image.
+RUN apt-get update \
     && apt-get upgrade -y --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/* \
-    && groupadd --gid 1000 pwuser \
-    && useradd --uid 1000 --gid pwuser --create-home pwuser \
-    && chmod -R a+rX /ms-playwright
+    && apt-get purge -y gstreamer1.0-plugins-bad libgstreamer-plugins-bad1.0-0 \
+    && rm -rf /var/lib/apt/lists/* /ms-playwright/firefox-* /ms-playwright/webkit-*
+
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+
+COPY requirements.lock requirements-render.lock ./
+# This disposable image intentionally manages its global Python environment.
+# OS upgrades restore the upstream EXTERNALLY-MANAGED marker.
+RUN pip install --break-system-packages --no-cache-dir --require-hashes \
+    -r requirements.lock -r requirements-render.lock \
+    && python -m pip uninstall --break-system-packages -y pip
 COPY --from=axe-core /opt/axe/axe.min.js /opt/axe/axe.min.js
 COPY --from=axe-core /opt/axe/LICENSE /opt/axe/LICENSE
 COPY --chown=pwuser:pwuser . .
+
 USER pwuser
 CMD ["python", "-m", "app.worker"]
