@@ -17,7 +17,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
 
 COPY requirements.lock requirements-render.lock ./
-RUN pip install --no-cache-dir --require-hashes \
+# This disposable image intentionally manages its global Python environment.
+# OS upgrades restore the upstream EXTERNALLY-MANAGED marker.
+RUN pip install --break-system-packages --no-cache-dir --require-hashes \
     -r requirements.lock -r requirements-render.lock
 COPY --from=axe-core /opt/axe/axe.min.js /opt/axe/axe.min.js
 COPY --from=axe-core /opt/axe/LICENSE /opt/axe/LICENSE
