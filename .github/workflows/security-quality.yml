@@ -79,6 +79,13 @@ jobs:
       - name: Build application image
         run: docker build --pull --tag seo-monitor-ci:${{ github.sha }} .
 
+      - name: Verify application runtime without network
+        run: |
+          docker run --rm --network none --read-only \
+            --tmpfs /tmp:rw,size=128m --cap-drop ALL --security-opt no-new-privileges \
+            -e APP_ENV=test -e DATABASE_URL=sqlite+pysqlite:///:memory: \
+            seo-monitor-ci:${{ github.sha }} python scripts/verify-application-image.py
+
       - name: Scan application image
         id: scan-application
         continue-on-error: true

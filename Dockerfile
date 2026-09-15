@@ -1,13 +1,24 @@
-FROM python:3.12.14-slim-trixie@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea
-# Apply current distribution security fixes; CI scans the resulting image.
+FROM ubuntu:24.04@sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca03082da254 AS runtime-base
+
+# Use distribution-maintained Python 3.12, including its security backports.
 RUN apt-get update \
     && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends python3 ca-certificates tzdata \
     && rm -rf /var/lib/apt/lists/*
 
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+FROM runtime-base AS dependencies
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3-venv \
+    && python3 -m venv /opt/venv
+COPY requirements.lock /tmp/requirements.lock
+WORKDIR /tmp
+RUN /opt/venv/bin/pip install --no-cache-dir --require-hashes -r requirements.lock \
+    && /opt/venv/bin/python -m pip uninstall -y pip
+
+FROM runtime-base AS application
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH="/opt/venv/bin:$PATH"
+COPY --from=dependencies /opt/venv /opt/venv
 WORKDIR /app
-COPY requirements.lock ./
-RUN pip install --no-cache-dir --require-hashes -r requirements.lock
 RUN groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home app
 COPY --chown=app:app . .
 RUN mkdir -p /app/exports && chown app:app /app/exports
