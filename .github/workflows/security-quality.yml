@@ -100,6 +100,29 @@ jobs:
             --tmpfs /tmp:rw,size=512m --cap-drop ALL --security-opt no-new-privileges \
             seo-monitor-render-ci:${{ github.sha }} python scripts/verify-renderer-image.py
 
+      - name: Locate residual renderer package records
+        run: |
+          docker run --rm --network none --read-only --user 0 --entrypoint python \
+            seo-monitor-render-ci:${{ github.sha }} -c '
+          import os
+          from pathlib import Path
+          for root in ("/usr", "/opt", "/ms-playwright", "/root"):
+              for directory, _, files in os.walk(root):
+                  for name in files:
+                      path = Path(directory) / name
+                      if name.endswith(".whl"):
+                          print("WHEEL", path)
+                      if name.endswith(".json") or name in ("METADATA", "vendor.txt"):
+                          try:
+                              if path.stat().st_size > 20000000:
+                                  continue
+                              data = path.read_text(errors="replace")
+                              if ("msgpack" in data and "1.1.2" in data) or ("setuptools" in data and "70.3.0" in data):
+                                  print("OLD_PACKAGE_RECORD", path)
+                          except OSError:
+                              pass
+          '
+
       - name: Scan renderer image
         id: scan-renderer
         continue-on-error: true
