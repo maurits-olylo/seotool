@@ -22,7 +22,8 @@ COPY requirements.lock requirements-render.lock ./
 # OS upgrades restore the upstream EXTERNALLY-MANAGED marker.
 RUN pip install --break-system-packages --no-cache-dir --require-hashes \
     -r requirements.lock -r requirements-render.lock \
-    && python -m pip uninstall --break-system-packages -y pip
+    && python -m pip uninstall --break-system-packages -y virtualenv pip \
+    && rm -rf /root/.cache/virtualenv
 COPY --from=axe-core /opt/axe/axe.min.js /opt/axe/axe.min.js
 COPY --from=axe-core /opt/axe/LICENSE /opt/axe/LICENSE
 COPY --chown=pwuser:pwuser . .
