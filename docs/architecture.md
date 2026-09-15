@@ -7,6 +7,21 @@ HTTP-verzoeken. De scheduler wordt in fase 5 verantwoordelijk voor periodieke jo
 Alle database-ID's zijn UUID's en tijdstempels worden in UTC opgeslagen. Crawler-, snapshot-,
 wijzigings- en issuecomponenten blijven onderling gescheiden.
 
+## Containerbasis
+
+De applicatiecontainer gebruikt Ubuntu 24.04 LTS met de door Ubuntu onderhouden Python 3.12.
+Beveiligingsreparaties komen via distributiepakketten; het Python-patchnummer alleen geeft daarom
+niet aan welke reparaties aanwezig zijn. De basisimage is met digest vastgezet en de build installeert
+beschikbare distributie-updates. Een aparte bouwfase installeert de gehashte Python-lockfile in
+`/opt/venv`; installatiehulpmiddelen blijven buiten de uiteindelijke container. UID/GID 10001,
+de bestaande opstartcommando's en `/app/exports` blijven behouden.
+
+De renderer gebruikt de bij de Playwright-versie passende Noble-image met alleen Chromium.
+CI controleert beide uiteindelijke images op HIGH/CRITICAL-bevindingen, inclusief nog niet
+gerepareerde bevindingen. Daarnaast draaien functionele proeven zonder netwerk, als niet-root,
+met een alleen-lezen bestandssysteem. Scanresultaten gelden voor de geteste build; een herbouw
+kan nieuwere distributiepakketten bevatten en moet opnieuw worden gecontroleerd.
+
 ## Authenticatie
 
 De publieke productschil is zonder sessie toegankelijk. Interne teamleden gebruiken een persoonlijk

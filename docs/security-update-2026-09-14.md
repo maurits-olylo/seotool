@@ -1,13 +1,13 @@
 # Security dependency update — 14 September 2026
 
-Status: published and validated on `codex/security-dependencies-20260914`; not deployed. Full tests pass, but the container security gate remains red.
+Status: published and validated on `codex/security-dependencies-20260914`; not deployed. The full security-quality workflow is green for runtime commit `95a166c`.
 
 ## Changes
 
 - `pyproject.toml`: cryptography >=50.0.1,<51 and Playwright 1.62.0.
 - `requirements.lock`, `requirements-ci.lock`: cryptography 50.0.1 with wheel SHA-256 values verified against the PyPI release JSON. Other dependency versions remain unchanged. This targeted refresh was used because the Intel macOS pip-compile environment cannot resolve the new target wheels; CI must verify installation and resolution.
 - `requirements-render.lock`: Playwright 1.62.0 wheel hashes from PyPI, matching the renderer image.
-- `Dockerfile`: official Python 3.12.14 slim-trixie image pinned to its verified registry digest.
+- `Dockerfile`: Ubuntu 24.04 LTS pinned to its verified registry digest, with distribution-maintained Python 3.12 and an isolated `/opt/venv` built in a separate stage.
 - `Dockerfile.render`: Playwright 1.62.0 noble and refreshed Node 22 bookworm-slim build-stage digest, verified through registry manifests.
 - `tests/test_config.py`: expected image versions updated.
 
@@ -20,7 +20,7 @@ Status: published and validated on `codex/security-dependencies-20260914`; not d
 - Docker is not running locally. Local Python tests with the old installed cryptography package would not validate the upgrade.
 - Cryptography 49+ no longer ships Intel macOS wheels. Linux/Python 3.12 remains the production and CI validation target; no unsupported local wheel is substituted.
 - The user subsequently explicitly authorized publication and workflow execution on the control branch. That authorization was used; production and GitHub main were not updated.
-- Production is unchanged. A green dependency audit alone does not establish that the new OS/browser images are clean. Remaining high/critical findings must be evaluated after Trivy runs; no automatic exception is permitted.
+- Production is unchanged. The dependency audit and both container scans pass for the final tested build; no scan exceptions were introduced.
 
 ## Sources
 
@@ -32,7 +32,7 @@ Status: published and validated on `codex/security-dependencies-20260914`; not d
 This update does not close the broader security gates documented in `docs/security-remediation-status-2026-08-11.md`.
 
 
-## GitHub validation outcome — 15 September 2026
+## Intermediate renderer validation — 15 September 2026
 
 [Validated runtime and scan run](https://github.com/maurits-olylo/seotool/actions/runs/34945401996) at commit `4988de8`:
 
@@ -43,7 +43,7 @@ This update does not close the broader security gates documented in `docs/securi
 - Application scan still fails: 44 package/advisory occurrences across eight distinct CVEs: CVE-2025-69720, CVE-2026-16742, CVE-2026-54369, CVE-2026-76642, CVE-2026-78408, CVE-2026-78409, CVE-2026-78410, CVE-2026-9538. No fixed package version is supplied by the scanner for these findings on the selected distribution. This is not proof that they cannot affect the application.
 - The overall workflow correctly remains red. No findings have been suppressed, accepted or excluded.
 
-## Final implementation
+## Renderer implementation
 
 - `Dockerfile` and `Dockerfile.render` apply available distribution upgrades at build time. Base digests remain pinned, but resulting OS package versions depend on the build date; retain CI evidence for each release.
 - `Dockerfile.render` retains the supported Playwright Noble image and removes unused Firefox/WebKit browser bundles and the two GStreamer bad-plugin packages. The application uses Chromium only. Its exercised rendering functionality continues to work; this test is not a guarantee for every website or media format.
@@ -52,8 +52,46 @@ This update does not close the broader security gates documented in `docs/securi
 - `scripts/verify-renderer-image.py` performs the offline runtime checks above.
 - `.github/workflows/security-quality.yml` runs the actual image smoke test, reports residual package locations and emits JSON-based finding details. Severity and blocking policy are unchanged.
 
-## Follow-up
+## Final application correction and validation
 
-The next phase should assess the remaining application OS dependencies and a supported minimal base, including runtime compatibility and vulnerability reachability. Do not remove essential libraries blindly or treat missing fixed versions as accepted risk. Do not deploy this as a fully remediated security release while the gate is red.
+The application now uses official Ubuntu 24.04 LTS, digest
+`sha256:224a1869083a311ef3f13648a154ba79832fbef6364d31493642ca03082da254`,
+with Ubuntu-maintained Python 3.12. Security fixes are backported by the distribution;
+the upstream Python patch number alone is not an indicator of its patch status.
+See [Ubuntu release notes](https://documentation.ubuntu.com/release-notes/24.04/).
 
-Changes were published only to `codex/security-dependencies-20260914`. GitHub main and NAS production remain unchanged. The original broader security gates in `docs/security-remediation-status-2026-08-11.md` remain open.
+A separate build stage installs the hashed lockfile into `/opt/venv`. The final image
+contains the runtime and installed dependencies, without pip or the venv installation
+packages from the build stage. UID/GID 10001, service commands and export directory
+permissions are preserved. No database migration or application behavior change is included.
+
+[Successful full workflow](https://github.com/maurits-olylo/seotool/actions/runs/34955863726)
+at runtime commit `95a166c`:
+
+- 654 tests pass; Ruff, Bandit, secrets scan and locked dependency audit pass.
+- Both container images build and both Trivy scan gates succeed: zero HIGH/CRITICAL
+  findings under the existing policy, including unfixed findings. No suppression or
+  severity-policy change was made.
+- Actual application image: non-root UID, native Python module imports, TLS trust roots,
+  timezones, Fernet encryption, lxml parsing, Excel write/read and the API health endpoint
+  with SQLite pass without network, with a read-only filesystem and dropped capabilities.
+- Actual renderer image: non-root Chromium, JavaScript, PNG screenshots, axe and Fernet pass
+  under the same restricted runtime conditions.
+- 29 local configuration tests and local Ruff validation also passed.
+
+Additional changed files in this phase: `Dockerfile`, `tests/test_config.py`,
+`scripts/verify-application-image.py`, `.github/workflows/security-quality.yml`,
+`docs/architecture.md`, and this report.
+
+## Release boundary
+
+The new runtime has not been exercised against the NAS PostgreSQL/Redis services or live
+crawl workloads. Those require deployment-specific checks. The image smoke test is a
+compatibility check, not an end-to-end production validation. Rebuilds pull current OS
+updates and therefore require renewed scan evidence.
+
+Changes were published only to `codex/security-dependencies-20260914`. GitHub main and NAS
+production remain unchanged. Next phase: prepare the approved NAS release and its health,
+worker and export checks through the existing deployment route. This green workflow closes
+these dependency/container findings for the tested build; it does not automatically close
+unrelated gates in `docs/security-remediation-status-2026-08-11.md`.
