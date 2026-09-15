@@ -93,9 +93,7 @@ def test_reports_missing_fields_and_visible_content_mismatch_contextually() -> N
         )
         db.flush()
 
-        found = analyze_contextual_structured_data(
-            db, website_id=website.id, crawl_run_id=run.id
-        )
+        found = analyze_contextual_structured_data(db, website_id=website.id, crawl_run_id=run.id)
 
         assert {issue.issue_type for issue in found} == {
             "structured_data_required_fields_missing",
@@ -106,9 +104,7 @@ def test_reports_missing_fields_and_visible_content_mismatch_contextually() -> N
             for issue in found
             if issue.issue_type == "structured_data_required_fields_missing"
         )
-        evidence = db.scalar(
-            select(Issue).where(Issue.id == missing.id)
-        )
+        evidence = db.scalar(select(Issue).where(Issue.id == missing.id))
         assert evidence is not None
 
 
@@ -157,13 +153,9 @@ def test_reports_only_measured_broken_internal_schema_images() -> None:
         )
         db.flush()
 
-        found = analyze_contextual_structured_data(
-            db, website_id=website.id, crawl_run_id=run.id
-        )
+        found = analyze_contextual_structured_data(db, website_id=website.id, crawl_run_id=run.id)
 
-        assert [issue.issue_type for issue in found] == [
-            "structured_data_image_unreachable"
-        ]
+        assert [issue.issue_type for issue in found] == ["structured_data_image_unreachable"]
 
 
 def test_complete_contextual_schema_produces_no_generic_missing_schema_issue() -> None:
@@ -205,10 +197,7 @@ def test_complete_contextual_schema_produces_no_generic_missing_schema_issue() -
         db.flush()
 
         assert (
-            analyze_contextual_structured_data(
-                db, website_id=website.id, crawl_run_id=run.id
-            )
-            == []
+            analyze_contextual_structured_data(db, website_id=website.id, crawl_run_id=run.id) == []
         )
 
 
@@ -253,3 +242,88 @@ def _snapshot(url, run, *, has_breadcrumb):  # type: ignore[no-untyped-def]
         schema_data=[],
         is_indexable=True,
     )
+
+
+def test_publisher_is_not_compared_to_page_title_but_other_checks_remain() -> None:
+    from app.services.structured_data_analysis import _contextual_schema_signals
+
+    snapshot = UrlSnapshot(
+        status_code=200, title="Artikelen", headings={}, main_content="Overzicht"
+    )
+    nodes = contextual_schema_nodes(
+        [
+            {
+                "@graph": [
+                    {"@type": "Organization", "name": "HUMAN - Radicaal menselijk"},
+                    {
+                        "@type": "Article",
+                        "headline": "Artikelen",
+                        "image": "https://example.com/img.jpg",
+                        "datePublished": "2026-09-01",
+                    },
+                ]
+            }
+        ]
+    )
+    signals = _contextual_schema_signals(snapshot, nodes, {})
+    assert {signal.issue_type for signal in signals} == {"structured_data_required_fields_missing"}
+    assert signals[0].evidence["schemas"][0]["schema_type"] == "Organization"
+
+
+def test_schema_comparison_normalizes_typography_and_requires_review() -> None:
+    from app.services.structured_data_analysis import _contextual_schema_signals
+
+    snapshot = UrlSnapshot(status_code=200, title="Groene — stoel", headings={}, main_content="")
+    nodes = [
+        ("Product", {"name": "GROENE  stoel", "image": "/image.jpg", "offers": {"price": "20"}})
+    ]
+    assert _contextual_schema_signals(snapshot, nodes, {}) == []
+    nodes[0][1]["name"] = "Blauwe tafel"
+    signals = _contextual_schema_signals(snapshot, nodes, {})
+    assert len(signals) == 1
+    assert signals[0].confidence == "low"
+    assert signals[0].evidence["decision_required"] is True
+    snapshot.title = ""
+    assert _contextual_schema_signals(snapshot, nodes, {}) == []
+
+
+def test_legacy_schema_alert_is_reviewed_not_counted_as_website_repair() -> None:
+    with SessionLocal() as db:
+        website = Website(
+            client=Client(name="Legacy schema"), name="Legacy", base_url="https://example.com/"
+        )
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        run = _run(db, website.id)
+        url = _url(db, website.id, 55)
+        db.add(
+            UrlSnapshot(
+                url_id=url.id,
+                crawl_run_id=run.id,
+                requested_url=url.normalized_url,
+                final_url=url.normalized_url,
+                status_code=200,
+                title="Artikelen",
+                headings={},
+                main_content="Overzicht",
+                schema_data=[
+                    {"@type": "Organization", "name": "Publisher", "url": "https://example.com/"}
+                ],
+            )
+        )
+        issue = Issue(
+            website_id=website.id,
+            url_id=url.id,
+            issue_type="structured_data_visible_content_mismatch",
+            category="structured_data",
+            severity="medium",
+            title="Old",
+            description="Old",
+            recommended_action="Old",
+        )
+        db.add(issue)
+        db.flush()
+        analyze_contextual_structured_data(db, website_id=website.id, crawl_run_id=run.id)
+        assert issue.status == "review"
+        assert issue.resolved_at is None

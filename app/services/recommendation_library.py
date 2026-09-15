@@ -277,13 +277,42 @@ DEFINITIONS = (
         ("page",),
     ),
     RecommendationDefinition(
+        "decide_vacancy_disposition",
+        "1",
+        frozenset({"expired_job_posting", "expired_job_posting_linked", "expired_job_posting_404"}),
+        "Bepaal wat er met de verlopen of verdwenen vacature moet gebeuren",
+        "content",
+        ("seo_analytics", "development"),
+        "high",
+        (20, 90),
+        "needs_decision",
+        (
+            "Laat de vacatureverantwoordelijke vastleggen of de vacature actief, gesloten "
+            "maar behouden, of verwijderd moet zijn; bepaal een eventuele passende opvolger.",
+            "Actief: laat de webbouwer de pagina herstellen en controleer met de "
+            "vacatureverantwoordelijke de inhoud en toepasselijke JobPosting-markup.",
+            "Gesloten maar behouden: laat de redacteur de sluiting zichtbaar maken en "
+            "de sollicitatieactie beëindigen; laat de webbouwer de markup passend afhandelen.",
+            "Verwijderd: laat de redacteur interne verwijzingen aanpassen en de webbouwer "
+            "de sitemap bijwerken. Redirect alleen naar een inhoudelijk passende vervanger.",
+            "Controleer uitsluitend de gekozen route en leg de uitkomst vast.",
+        ),
+        (
+            "Het besluit en de betrokken uitvoerders zijn vastgelegd.",
+            "Bij actief: de pagina en sollicitatie werken en de JobPosting klopt met de inhoud.",
+            "Bij gesloten maar behouden: de sluiting is duidelijk, solliciteren is beëindigd "
+            "en de markup past bij de gekozen toestand.",
+            "Bij verwijderd: interne verwijzingen, sitemap en HTTP-afhandeling passen bij "
+            "het besluit; geldige JobPosting-markup op de verwijderde pagina is niet vereist.",
+        ),
+        ("changed", "source"),
+        ("Besluit van de vacatureverantwoordelijke over de gewenste vacaturestatus.",),
+    ),
+    RecommendationDefinition(
         "repair_job_posting_markup",
         "1",
         frozenset(
             {
-                "expired_job_posting",
-                "expired_job_posting_linked",
-                "expired_job_posting_404",
                 "job_posting_schema_missing",
                 "job_posting_missing_fields",
                 "job_posting_invalid_dates",

@@ -458,3 +458,49 @@ def test_full_crawl_limits_query_variants_per_path(monkeypatch) -> None:  # type
     with SessionLocal() as db:
         run = db.scalar(select(CrawlRun).where(CrawlRun.crawl_job_id == job_id))
         assert run and run.skipped_urls == 1
+
+
+def test_preseeded_sitemap_chain_keeps_shortest_depth(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    pages = {
+        "https://example.com/": b'<main><a href="/z-section">Section</a></main>',
+        "https://example.com/z-section": b'<main><a href="/a-deep">Deep</a></main>',
+        "https://example.com/a-deep": b"<main>Deep</main>",
+        "https://example.com/sitemap.xml": b'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://example.com/a-deep</loc></url><url><loc>https://example.com/z-section</loc></url></urlset>',
+    }
+
+    def fake_fetch(url: str, **kwargs: object) -> FetchResult:
+        return FetchResult(
+            requested_url=url,
+            final_url=url,
+            status_code=200,
+            redirect_chain=[],
+            headers={"content-type": "application/xml" if url.endswith(".xml") else "text/html"},
+            content=pages[url],
+            response_time_ms=1,
+        )
+
+    monkeypatch.setattr("app.jobs.fetch_url", fake_fetch)
+    monkeypatch.setattr("app.jobs._respect_request_delay", lambda *_: None)
+    with SessionLocal() as db:
+        website = Website(
+            client=Client(name="Seeded"), name="Seeded", base_url="https://example.com/"
+        )
+        website.settings = WebsiteSettings(respect_robots_txt=False)
+        db.add(website)
+        db.flush()
+        job = CrawlJob(
+            website_id=website.id,
+            job_type="full_site_crawl",
+            settings_snapshot={"max_urls": 10, "respect_robots_txt": False},
+        )
+        db.add(job)
+        db.commit()
+        job_id = str(job.id)
+    execute_crawl_job(job_id)
+    with SessionLocal() as db:
+        depths = {url.normalized_url: url.crawl_depth for url in db.scalars(select(Url))}
+        assert depths == {
+            "https://example.com/": 0,
+            "https://example.com/z-section": 1,
+            "https://example.com/a-deep": 2,
+        }

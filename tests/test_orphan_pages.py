@@ -1,136 +1,196 @@
+from datetime import timedelta
+
+import pytest
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
 from app.models.client import Client
-from app.models.crawl import CrawlRun
+from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
 from app.models.discovery import CrawlJob, Url, UrlSource
-from app.models.issues import Issue, IssueOccurrence
+from app.models.issues import Issue
 from app.models.website import Website, WebsiteSettings
+from app.services.crawl_reachability import crawl_reachability
 from app.services.internal_link_analysis import detect_orphan_pages
-from app.services.issue_engine import reconcile_issues
 
 
-def test_detects_sitemap_url_without_crawl_depth_as_orphan() -> None:
-    with SessionLocal() as db:
-        client = Client(name="Orphan client")
-        website = Website(client=client, name="Orphan site", base_url="https://example.com/")
-        website.settings = WebsiteSettings()
-        db.add(website)
+def _graph(db: Session) -> tuple[Website, CrawlRun, dict[str, Url]]:
+    website = Website(client=Client(name="Graph"), name="Graph", base_url="https://example.com/")
+    website.settings = WebsiteSettings()
+    db.add(website)
+    db.flush()
+    job = CrawlJob(website_id=website.id, job_type="full_site_crawl")
+    db.add(job)
+    db.flush()
+    run = CrawlRun(website_id=website.id, crawl_job_id=job.id, crawl_type="full_site_crawl")
+    db.add(run)
+    db.flush()
+    urls = {}
+    for path in ("/", "/section", "/deep", "/isolated"):
+        url = Url(website_id=website.id, normalized_url=f"https://example.com{path}")
+        db.add(url)
         db.flush()
-        reachable = Url(
-            website_id=website.id,
-            normalized_url="https://example.com/reachable",
-            crawl_depth=1,
-        )
-        orphan = Url(
-            website_id=website.id,
-            normalized_url="https://example.com/orphan",
-            crawl_depth=None,
-            current_status_code=200,
-            is_indexable=True,
-        )
-        db.add_all([reachable, orphan])
-        db.flush()
-        db.add_all(
-            [
-                UrlSource(
-                    url_id=reachable.id,
-                    source_type="sitemap",
-                    source_url="https://example.com/sitemap.xml",
-                ),
-                UrlSource(
-                    url_id=orphan.id,
-                    source_type="sitemap",
-                    source_url="https://example.com/sitemap.xml",
-                ),
-            ]
-        )
-        job = CrawlJob(website_id=website.id, job_type="full_site_crawl")
-        db.add(job)
-        db.flush()
-        run = CrawlRun(
-            crawl_job_id=job.id,
-            website_id=website.id,
-            crawl_type="full_site_crawl",
-        )
-        db.add(run)
-        db.flush()
-
-        found = detect_orphan_pages(
-            db,
-            website_id=website.id,
-            crawl_run_id=run.id,
-        )
-        db.flush()
-        assert [url.normalized_url for url in found] == ["https://example.com/orphan"]
-        issue = db.scalar(select(Issue))
-        assert issue and issue.issue_type == "orphan_page"
-        assert issue.url_id == orphan.id
-        assert issue.title == "Indexeerbare pagina staat buiten de interne sitestructuur"
-        assert "Dit bewijst nog niet" in issue.description
-        occurrence = db.scalar(
-            select(IssueOccurrence).where(IssueOccurrence.issue_id == issue.id)
-        )
-        assert occurrence and occurrence.evidence["decision_required"] is True
-        assert "Bepaal eerst" in issue.recommended_action
-        assert "Voeg een relevante interne link toe" not in issue.recommended_action
-
-        reconcile_issues(
-            db,
-            website_id=website.id,
-            url_id=orphan.id,
-            crawl_run_id=run.id,
-            snapshot_id=None,
-            signals=[],
-            checked_issue_types={"http_404", "thin_content"},
-        )
-        assert issue.status == "new"
-
-        orphan.crawl_depth = 2
-        assert (
-            detect_orphan_pages(
-                db,
-                website_id=website.id,
-                crawl_run_id=run.id,
-            )
-            == []
-        )
-        assert issue.status == "resolved"
-
-
-def test_does_not_flag_unchecked_sitemap_url_as_orphan() -> None:
-    with SessionLocal() as db:
-        client = Client(name="Unchecked orphan client")
-        website = Website(client=client, name="Unchecked site", base_url="https://example.com")
-        website.settings = WebsiteSettings()
-        db.add(website)
-        db.flush()
-        unchecked = Url(
-            website_id=website.id,
-            normalized_url="https://example.com/unchecked",
-            crawl_depth=None,
-        )
-        db.add(unchecked)
-        db.flush()
+        urls[path] = url
         db.add(
             UrlSource(
-                url_id=unchecked.id,
-                source_type="sitemap",
-                source_url="https://example.com/sitemap.xml",
+                url_id=url.id, source_type="sitemap", source_url="https://example.com/sitemap.xml"
             )
         )
-        job = CrawlJob(website_id=website.id, job_type="full_site_crawl")
-        db.add(job)
-        db.flush()
-        run = CrawlRun(
-            crawl_job_id=job.id,
-            website_id=website.id,
-            crawl_type="full_site_crawl",
+        db.add(
+            UrlSnapshot(
+                url_id=url.id,
+                crawl_run_id=run.id,
+                requested_url=url.normalized_url,
+                final_url=url.normalized_url,
+                status_code=200,
+                is_indexable=True,
+                content_type="text/html",
+            )
         )
-        db.add(run)
+    db.flush()
+    return website, run, urls
+
+
+def _link(db: Session, run: CrawlRun, source: Url, target: Url) -> None:
+    db.add(
+        UrlLink(
+            crawl_run_id=run.id,
+            source_url_id=source.id,
+            target_url_id=target.id,
+            target_url=target.normalized_url,
+            is_internal=True,
+            is_nofollow=True,
+        )
+    )
+    db.flush()
+
+
+def test_orphans_use_run_graph_not_mutable_depth_or_status() -> None:
+    with SessionLocal() as db:
+        site, run, urls = _graph(db)
+        _link(db, run, urls["/"], urls["/section"])
+        _link(db, run, urls["/section"], urls["/deep"])
+        _link(db, run, urls["/isolated"], urls["/isolated"])
+        urls["/isolated"].crawl_depth = 1  # Current register may belong to a later crawl.
+        urls["/isolated"].current_status_code = 404
+        found = detect_orphan_pages(db, website_id=site.id, crawl_run_id=run.id)
+        assert [u.id for u in found] == [urls["/isolated"].id]
+        graph = crawl_reachability(db, website_id=site.id, crawl_run_id=run.id)
+        assert graph.depths[urls["/deep"].id] == 2
+        issue = db.scalar(select(Issue).where(Issue.issue_type == "orphan_page"))
+        assert issue and issue.status == "new"
+        _link(db, run, urls["/deep"], urls["/isolated"])
+        assert detect_orphan_pages(db, website_id=site.id, crawl_run_id=run.id) == []
+        assert issue.status == "review"  # Same-run corrected evidence is not a repair.
+        assert issue.resolved_at is None
+
+
+@pytest.mark.parametrize("failure", ["missing", "timeout", "root404"])
+def test_incomplete_reachable_sources_do_not_create_or_resolve_orphans(failure: str) -> None:
+    with SessionLocal() as db:
+        site, run, urls = _graph(db)
+        _link(db, run, urls["/"], urls["/section"])
+        target = urls["/"] if failure == "root404" else urls["/section"]
+        snapshot = db.scalar(select(UrlSnapshot).where(UrlSnapshot.url_id == target.id))
+        assert snapshot
+        if failure == "missing":
+            db.delete(snapshot)
+        else:
+            snapshot.status_code = 404 if failure == "root404" else None
+        issue = Issue(
+            website_id=site.id,
+            url_id=urls["/isolated"].id,
+            issue_type="orphan_page",
+            category="internal_links",
+            severity="medium",
+            title="Old",
+            description="Old",
+            recommended_action="Old",
+        )
+        db.add(issue)
         db.flush()
+        assert detect_orphan_pages(db, website_id=site.id, crawl_run_id=run.id) == []
+        assert issue.status == "new"
 
-        found = detect_orphan_pages(db, website_id=website.id, crawl_run_id=run.id)
 
-        assert found == []
-        assert db.scalar(select(Issue).where(Issue.url_id == unchecked.id)) is None
+def test_isolated_linked_group_and_stale_sources_do_not_prove_root_route() -> None:
+    with SessionLocal() as db:
+        site, run, urls = _graph(db)
+        _link(db, run, urls["/section"], urls["/deep"])
+        _link(db, run, urls["/deep"], urls["/section"])
+        db.add(
+            UrlSource(
+                url_id=urls["/section"].id,
+                source_type="internal_link",
+                source_url=urls["/"].normalized_url,
+                last_seen_at=run.started_at - timedelta(days=1),
+            )
+        )
+        found = detect_orphan_pages(db, website_id=site.id, crawl_run_id=run.id)
+        assert {u.id for u in found} == {urls[p].id for p in ("/section", "/deep", "/isolated")}
+
+
+def test_old_sitemap_membership_and_unchecked_urls_do_not_create_orphans() -> None:
+    with SessionLocal() as db:
+        site, run, urls = _graph(db)
+        for source in db.scalars(select(UrlSource)):
+            source.last_seen_at = run.started_at - timedelta(days=1)
+        assert detect_orphan_pages(db, website_id=site.id, crawl_run_id=run.id) == []
+        source = db.scalar(select(UrlSource).where(UrlSource.url_id == urls["/isolated"].id))
+        assert source
+        source.last_seen_at = run.started_at
+        snapshot = db.scalar(select(UrlSnapshot).where(UrlSnapshot.url_id == urls["/isolated"].id))
+        assert snapshot
+        db.delete(snapshot)
+        assert detect_orphan_pages(db, website_id=site.id, crawl_run_id=run.id) == []
+
+
+def test_redirect_destination_has_same_depth_and_other_run_links_are_ignored() -> None:
+    with SessionLocal() as db:
+        site, run, urls = _graph(db)
+        root = db.scalar(select(UrlSnapshot).where(UrlSnapshot.url_id == urls["/"].id))
+        assert root
+        root.final_url = urls["/section"].normalized_url
+        _link(db, run, urls["/section"], urls["/deep"])
+        other_job = CrawlJob(website_id=site.id, job_type="full_site_crawl")
+        db.add(other_job)
+        db.flush()
+        other_run = CrawlRun(
+            website_id=site.id, crawl_job_id=other_job.id, crawl_type="full_site_crawl"
+        )
+        db.add(other_run)
+        db.flush()
+        _link(db, other_run, urls["/"], urls["/isolated"])
+        graph = crawl_reachability(db, website_id=site.id, crawl_run_id=run.id)
+        assert graph.complete
+        assert graph.depths[urls["/section"].id] == 0
+        assert graph.depths[urls["/deep"].id] == 1
+        assert urls["/isolated"].id not in graph.depths
+
+
+def test_redirect_response_covers_destination_without_separate_request() -> None:
+    with SessionLocal() as db:
+        site, run, urls = _graph(db)
+        root = db.scalar(select(UrlSnapshot).where(UrlSnapshot.url_id == urls["/"].id))
+        destination = db.scalar(
+            select(UrlSnapshot).where(UrlSnapshot.url_id == urls["/section"].id)
+        )
+        assert root and destination
+        root.final_url = urls["/section"].normalized_url
+        db.delete(destination)
+        _link(db, run, urls["/"], urls["/deep"])
+        graph = crawl_reachability(db, website_id=site.id, crawl_run_id=run.id)
+        assert graph.complete
+        assert graph.depths[urls["/section"].id] == 0
+        assert graph.depths[urls["/deep"].id] == 1
+
+
+def test_excluded_and_technical_targets_do_not_block_navigation_evidence() -> None:
+    with SessionLocal() as db:
+        site, run, urls = _graph(db)
+        site.settings.excluded_url_patterns = ["*/isolated"]
+        _link(db, run, urls["/"], urls["/isolated"])
+        _link(db, run, urls["/"], urls["/section"])
+        graph = crawl_reachability(db, website_id=site.id, crawl_run_id=run.id)
+        assert graph.complete
+        assert urls["/isolated"].id not in graph.depths

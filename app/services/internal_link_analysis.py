@@ -5,10 +5,11 @@ from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session, aliased
 
 from app.models.common import utc_now
-from app.models.crawl import UrlLink, UrlSnapshot
+from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
 from app.models.discovery import Url, UrlSource
 from app.models.integrations import GoogleAnalyticsMetric, SearchConsoleMetric
-from app.models.issues import Issue
+from app.models.issues import Issue, IssueOccurrence
+from app.services.crawl_reachability import crawl_reachability
 from app.services.discovery_pages import discovery_only_url_ids
 from app.services.element_locations import mark_target_elements_for_targets
 from app.services.issue_engine import reconcile_issues
@@ -40,6 +41,11 @@ MAX_WEAK_INBOUND_LINKS = 1
 
 
 def detect_orphan_pages(db: Session, *, website_id: object, crawl_run_id: object) -> list[Url]:
+    graph = crawl_reachability(db, website_id=website_id, crawl_run_id=crawl_run_id)
+    run = db.get(CrawlRun, crawl_run_id)
+    if run is None or not graph.complete:
+        # Missing measurements cannot establish absence or resolve existing issues.
+        return []
     discovery_only_ids = discovery_only_url_ids(
         db,
         website_id=website_id,
@@ -52,23 +58,30 @@ def detect_orphan_pages(db: Session, *, website_id: object, crawl_run_id: object
             .where(
                 Url.website_id == website_id,
                 Url.is_active.is_(True),
-                Url.current_status_code == 200,
-                Url.is_indexable.is_(True),
-                Url.crawl_depth.is_(None),
                 UrlSource.source_type == "sitemap",
+                UrlSource.last_seen_at >= run.started_at,
+                UrlSource.last_seen_at <= (run.finished_at or utc_now()),
             )
             .distinct()
             .order_by(Url.normalized_url)
         )
     )
-    orphan_urls = [url for url in orphan_urls if url.id not in discovery_only_ids]
+    orphan_urls = [
+        url
+        for url in orphan_urls
+        if url.id not in discovery_only_ids
+        and url.id not in graph.depths
+        and (snapshot := graph.snapshots.get(url.id)) is not None
+        and snapshot.status_code == 200
+        and snapshot.is_indexable is True
+    ]
     for url in orphan_urls:
         reconcile_issues(
             db,
             website_id=website_id,
             url_id=url.id,
             crawl_run_id=crawl_run_id,
-            snapshot_id=None,
+            snapshot_id=graph.snapshots[url.id].id,
             signals=[
                 IssueSignal(
                     issue_type="orphan_page",
@@ -90,6 +103,9 @@ def detect_orphan_pages(db: Session, *, website_id: object, crawl_run_id: object
                         "crawl_depth": None,
                         "structure_status": "outside_internal_structure",
                         "decision_required": True,
+                        "reachability_version": 2,
+                        "crawl_run_id": str(crawl_run_id),
+                        "root_route_checked": True,
                     },
                 )
             ],
@@ -101,14 +117,45 @@ def detect_orphan_pages(db: Session, *, website_id: object, crawl_run_id: object
             select(Issue).where(
                 Issue.website_id == website_id,
                 Issue.issue_type == "orphan_page",
-                Issue.status.not_in(["resolved", "verified", "ignored", "accepted_risk"]),
+                Issue.status.not_in(["verified", "ignored", "accepted_risk"]),
             )
         )
     )
     for issue in existing:
-        if issue.url_id not in orphan_ids:
-            issue.status = "resolved"
-            issue.resolved_at = utc_now()
+        if issue.url_id not in orphan_ids and issue.url_id in graph.depths:
+            occurrence = db.scalar(
+                select(IssueOccurrence)
+                .where(IssueOccurrence.issue_id == issue.id)
+                .order_by(IssueOccurrence.detected_at.desc())
+                .limit(1)
+            )
+            if (
+                occurrence
+                and occurrence.crawl_run_id != crawl_run_id
+                and (occurrence.evidence or {}).get("reachability_version") == 2
+            ):
+                reconcile_issues(
+                    db,
+                    website_id=website_id,
+                    url_id=issue.url_id,
+                    crawl_run_id=crawl_run_id,
+                    snapshot_id=graph.snapshots.get(issue.url_id).id
+                    if issue.url_id in graph.snapshots
+                    else None,
+                    signals=[],
+                    checked_issue_types={"orphan_page"},
+                )
+                continue
+            # Reclassification is not proof of a website repair. Retain historical evidence
+            # and request review rather than crediting a completed customer action.
+            if issue.status == "resolved":
+                continue
+            issue.status = "review"
+            issue.recommended_action = (
+                "De opgeslagen linkgraaf bevat een interne route. Beoordeel of de eerdere "
+                "melding door een meetfout of een websitewijziging is vervallen. "
+                "Er is op basis van deze meting geen nieuwe linkopdracht nodig."
+            )
     return orphan_urls
 
 

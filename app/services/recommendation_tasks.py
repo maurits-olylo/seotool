@@ -113,7 +113,6 @@ def create_task_from_issues(
         )
         .where(
             RecommendationTaskIssue.issue_id.in_(issue_ids),
-            RecommendationTask.recommendation_type == definition.key,
             RecommendationTask.status.in_(ACTIVE_TASK_STATUSES),
         )
         .limit(1)
@@ -151,7 +150,11 @@ def create_task_from_issues(
         effort_max_minutes=definition.effort_minutes[1] if definition.effort_minutes else None,
         effort_confidence="medium" if definition.effort_minutes else "low",
         feasibility=definition.feasibility,
-        action=issue.recommended_action,
+        action=(
+            definition.steps[0]
+            if definition.key == "decide_vacancy_disposition"
+            else issue.recommended_action
+        ),
         rationale=issue.description,
         steps=list(definition.steps),
         required_input=list(definition.required_input),
@@ -163,9 +166,7 @@ def create_task_from_issues(
     )
     db.add(task)
     db.flush()
-    db.add_all(
-        RecommendationTaskIssue(task_id=task.id, issue_id=item.id) for item in issues
-    )
+    db.add_all(RecommendationTaskIssue(task_id=task.id, issue_id=item.id) for item in issues)
     url_scope = {
         scoped
         for item in issues

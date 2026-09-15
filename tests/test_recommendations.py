@@ -81,8 +81,8 @@ def _task_fixture(db):  # type: ignore[no-untyped-def]
 
 
 def test_library_contains_compact_unique_mvp() -> None:
-    assert len(DEFINITIONS) == 22
-    assert len({definition.key for definition in DEFINITIONS}) == 22
+    assert len(DEFINITIONS) == 23
+    assert len({definition.key for definition in DEFINITIONS}) == len(DEFINITIONS)
     assert recommendation_for_issue_type("internally_linked_404").key == (
         "repair_broken_internal_link"
     )
@@ -227,7 +227,7 @@ def test_recommendation_task_api_lifecycle(client, monkeypatch) -> None:  # type
 
     definitions = client.get("/api/v1/recommendation-types")
     assert definitions.status_code == 200
-    assert len(definitions.json()) == 22
+    assert len(definitions.json()) == 23
 
     created = client.post(f"/api/v1/issues/{issue_id}/recommendation-task")
     assert created.status_code == 201
@@ -342,9 +342,7 @@ def test_recommendation_task_api_lifecycle(client, monkeypatch) -> None:  # type
     )
     assert implemented.status_code == 200
     assert implemented.json()["implemented_at"] is not None
-    requested = client.get(
-        f"/api/v1/recommendation-tasks/{task_id}/verifications"
-    ).json()[0]
+    requested = client.get(f"/api/v1/recommendation-tasks/{task_id}/verifications").json()[0]
     assert requested["status"] == "queued"
     assert queued == [requested["id"]]
     duplicate_verification = client.post(f"/api/v1/recommendation-tasks/{task_id}/verifications")
@@ -947,3 +945,36 @@ def test_client_role_can_read_but_not_change_recommendation_tasks(client) -> Non
         ).status_code
         == 403
     )
+
+
+def test_vacancy_disposition_precedes_technical_markup_work() -> None:
+    definition = recommendation_for_issue_type("expired_job_posting_404")
+    assert definition is not None
+    assert definition.key == "decide_vacancy_disposition"
+    assert definition.primary_role == "content"
+    assert definition.feasibility == "needs_decision"
+    assert definition.required_input
+    assert "Bij verwijderd:" in definition.completion_criteria[-1]
+    assert "niet vereist" in definition.completion_criteria[-1]
+    assert recommendation_for_issue_type("expired_job_posting") == definition
+    assert recommendation_for_issue_type("expired_job_posting_linked") == definition
+    markup = recommendation_for_issue_type("job_posting_missing_fields")
+    assert markup is not None and markup.key == "repair_job_posting_markup"
+    assert markup.primary_role == "development"
+
+
+def test_changed_vacancy_definition_does_not_duplicate_or_overwrite_existing_task() -> None:
+    from app.core.security import Principal
+    from app.services.recommendation_tasks import RecommendationTaskError, create_task_from_issue
+
+    with SessionLocal() as db:
+        _website, _url, issue, task = _task_fixture(db)
+        issue.issue_type = "expired_job_posting_404"
+        task.recommendation_type = "repair_job_posting_markup"
+        task.acceptance_criteria = ["Original agreed criteria"]
+        db.add(RecommendationTaskIssue(task_id=task.id, issue_id=issue.id))
+        db.flush()
+        with pytest.raises(RecommendationTaskError, match="actieve taak"):
+            create_task_from_issue(db, issue=issue, principal=Principal(user_id=None, role="admin"))
+        assert task.acceptance_criteria == ["Original agreed criteria"]
+        assert task.recommendation_type == "repair_job_posting_markup"

@@ -19,6 +19,7 @@ from app.services.asset_registry import update_asset_record
 from app.services.content_similarity import detect_duplicate_content
 from app.services.contextual_404 import classify_404_issues
 from app.services.crawl_deployment import pause_job_if_deployment_active
+from app.services.crawl_reachability import update_crawl_depths
 from app.services.element_locations import mark_target_elements
 from app.services.http_crawler import CrawlError, fetch_metadata, fetch_url
 from app.services.indexation_analysis import analyze_indexation_consistency
@@ -402,6 +403,8 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
         raise RuntimeError("Website does not exist")
     if not resumed:
         db.execute(update(Url).where(Url.website_id == website.id).values(crawl_depth=None))
+    if resumed:
+        update_crawl_depths(db, website_id=website.id, crawl_run_id=run.id)
     root = register_url(
         db,
         website_id=website.id,
@@ -489,7 +492,9 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
                 .order_by(Url.normalized_url)
             )
         )
-        discovered_by_source = list(
+        # Images are registered as sources rather than navigation links. Keep auditing
+        # current assets, but never use historical source records to infer HTML routes.
+        asset_sources = list(
             db.scalars(
                 select(Url)
                 .join(UrlSource, UrlSource.url_id == Url.id)
@@ -497,11 +502,23 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
                     Url.website_id == website.id,
                     UrlSource.source_type == "internal_link",
                     UrlSource.source_url == url.normalized_url,
+                    UrlSource.last_seen_at >= run.started_at,
                 )
-                .order_by(Url.normalized_url)
             )
         )
-        discovered = list({item.id: item for item in [*discovered, *discovered_by_source]}.values())
+        discovered = list(
+            {
+                item.id: item
+                for item in [
+                    *discovered,
+                    *(
+                        item
+                        for item in asset_sources
+                        if not is_probable_html_page(item.normalized_url)
+                    ),
+                ]
+            }.values()
+        )
         for target in discovered:
             group = query_variant_group(target.normalized_url)
             is_new_frontier_url = target.id not in frontier_ids
@@ -523,6 +540,11 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
                 target.crawl_depth is None or next_depth < target.crawl_depth
             ):
                 target.crawl_depth = next_depth
+                if target.id in pending_ids:
+                    pending = [
+                        (queued_id, next_depth if queued_id == target.id else queued_depth)
+                        for queued_id, queued_depth in pending
+                    ]
             frontier_ids.add(target.id)
             if group is not None and is_new_frontier_url:
                 query_variant_counts[group] = query_variant_counts.get(group, 0) + 1
@@ -533,6 +555,7 @@ def _crawl_full_site(  # type: ignore[no-untyped-def]
     run.discovered_urls = len(frontier_ids)
     complete = not pending
     if complete:
+        update_crawl_depths(db, website_id=website.id, crawl_run_id=run.id)
         _analyze_stored_site_results(db, job=job, progress_run=run, source_run=run)
     db.commit()
     return complete

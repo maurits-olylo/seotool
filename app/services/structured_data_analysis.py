@@ -1,4 +1,6 @@
 import math
+import re
+import unicodedata
 from urllib.parse import urljoin, urlsplit
 
 from sqlalchemy import select
@@ -6,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.crawl import UrlSnapshot
 from app.models.discovery import Url
-from app.models.issues import Issue
+from app.models.issues import Issue, IssueOccurrence
 from app.services.issue_engine import reconcile_issues
 from app.services.technical_checks import IssueSignal
 from app.services.url_filtering import is_probable_html_page
@@ -132,6 +134,49 @@ def analyze_contextual_structured_data(
     for url, snapshot in rows:
         nodes = contextual_schema_nodes(snapshot.schema_data or [])
         signals = _contextual_schema_signals(snapshot, nodes, known_urls)
+        if snapshot.status_code != 200 or snapshot.error_message:
+            continue
+        checked_types = set(CONTEXTUAL_SCHEMA_ISSUE_TYPES)
+        mismatch_type = "structured_data_visible_content_mismatch"
+        if not any(signal.issue_type == mismatch_type for signal in signals):
+            existing = db.scalar(
+                select(Issue).where(
+                    Issue.website_id == website_id,
+                    Issue.url_id == url.id,
+                    Issue.issue_type == mismatch_type,
+                )
+            )
+            occurrence = (
+                db.scalar(
+                    select(IssueOccurrence)
+                    .where(IssueOccurrence.issue_id == existing.id)
+                    .order_by(IssueOccurrence.detected_at.desc())
+                    .limit(1)
+                )
+                if existing
+                else None
+            )
+            legacy = (
+                occurrence is None or (occurrence.evidence or {}).get("comparison_version") != 2
+            )
+            if (
+                legacy
+                and existing
+                and existing.status
+                not in {
+                    "resolved",
+                    "verified",
+                    "ignored",
+                    "accepted_risk",
+                }
+            ):
+                existing.status = "review"
+                existing.recommended_action = (
+                    "De aangescherpte vergelijking bevestigt deze melding niet. "
+                    "Beoordeel de eerdere onderbouwing; dit is geen bewezen websiteherstel."
+                )
+            if legacy:
+                checked_types.discard(mismatch_type)
         touched.extend(
             reconcile_issues(
                 db,
@@ -140,7 +185,7 @@ def analyze_contextual_structured_data(
                 crawl_run_id=crawl_run_id,
                 snapshot_id=snapshot.id,
                 signals=signals,
-                checked_issue_types=CONTEXTUAL_SCHEMA_ISSUE_TYPES,
+                checked_issue_types=checked_types,
             )
         )
     db.commit()
@@ -197,7 +242,8 @@ def _contextual_schema_signals(
             " ".join((snapshot.headings or {}).get("h1", [])),
             snapshot.main_content or "",
         ]
-    ).casefold()
+    )
+    visible = _comparable_text(visible)
     for schema_type, node in nodes:
         required, one_of_groups = CONTEXTUAL_SCHEMA_REQUIREMENTS[schema_type]
         missing_fields = [field for field in required if not _has_value(node.get(field))]
@@ -217,9 +263,11 @@ def _contextual_schema_signals(
         identity_field = "headline" if "headline" in node else "name"
         identity = node.get(identity_field)
         if (
-            isinstance(identity, str)
+            schema_type not in {"Organization", "LocalBusiness"}
+            and isinstance(identity, str)
             and len(identity.strip()) >= 3
-            and identity.strip().casefold() not in visible
+            and bool(visible)
+            and _comparable_text(identity) not in visible
         ):
             mismatches.append(
                 {
@@ -274,19 +322,22 @@ def _contextual_schema_signals(
                 issue_type="structured_data_visible_content_mismatch",
                 category="structured_data",
                 severity="medium",
-                confidence="medium",
-                title="Structured data wijkt af van zichtbare pagina-inhoud",
+                confidence="low",
+                title="Controleer de relatie tussen structured data en pagina-inhoud",
                 description=(
                     "De primaire naam of kop uit de markup is niet herkenbaar in title, H1 of "
                     "hoofdcontent."
                 ),
                 recommended_action=(
-                    "Maak de primaire schemanaam of headline gelijk aan de inhoud die bezoekers "
-                    "werkelijk zien."
+                    "Controleer eerst of deze entiteit het hoofdonderwerp van de pagina is "
+                    "en of de inhoud volledig is uitgelezen. Pas alleen een aangetoonde "
+                    "inhoudelijke afwijking aan; neem niet automatisch de paginatitel over."
                 ),
                 evidence={
                     "source": "json_ld",
                     "mismatches": mismatches,
+                    "decision_required": True,
+                    "comparison_version": 2,
                     "cause_key": _schema_cause_key(mismatches),
                 },
             )
@@ -350,3 +401,8 @@ def _is_deep_content_page(url: Url, snapshot: UrlSnapshot) -> bool:
         and snapshot.is_indexable is True
         and not snapshot.redirect_chain
     )
+
+
+def _comparable_text(value: str) -> str:
+    """Ignore case, typography and whitespace without guessing semantic equivalence."""
+    return " ".join(re.findall(r"\w+", unicodedata.normalize("NFKC", value).casefold()))
