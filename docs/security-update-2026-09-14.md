@@ -32,17 +32,28 @@ Status: published and validated on `codex/security-dependencies-20260914`; not d
 This update does not close the broader security gates documented in `docs/security-remediation-status-2026-08-11.md`.
 
 
-## GitHub validation outcome
+## GitHub validation outcome — 15 September 2026
 
-[Final diagnostic run](https://github.com/maurits-olylo/seotool/actions/runs/34846326439) at commit `a688328`:
+[Validated runtime and scan run](https://github.com/maurits-olylo/seotool/actions/runs/34945401996) at commit `4988de8`:
 
 - 654 tests pass on Python 3.12. Lint, Bandit, secrets scan and pip-audit pass.
 - Both container images build successfully.
-- Application scan: 44 HIGH package/advisory occurrences, 0 CRITICAL. Eight distinct CVEs remain: CVE-2025-69720, CVE-2026-16742, CVE-2026-54369, CVE-2026-76642, CVE-2026-78408, CVE-2026-78409, CVE-2026-78410, CVE-2026-9538. The scanner supplies no fixed package version for these on the selected distribution.
-- Renderer scan: 2 HIGH OS occurrences of CVE-2025-3887, plus 2 HIGH Python findings (msgpack 1.1.2 / GHSA-6v7p-g79w-8964 and setuptools 70.3.0 / CVE-2025-47273). No CRITICAL findings.
-- Setuptools 84.0.0 installs successfully; the older copy still reported by the scanner is not the newly installed top-level package. Pip upstream vendors setuptools 70.3.0, but exact image-level provenance and affected code still require verification; no risk exception is asserted.
-- Ubuntu lists the Noble GStreamer fix as ESM Apps / Ubuntu Pro only: https://ubuntu.com/security/CVE-2025-3887 . No subscription was purchased and no packages were silently excluded.
+- Renderer scan succeeds: zero HIGH or CRITICAL findings under the existing policy, including unfixed vulnerabilities.
+- The actual renderer runs as its non-root user with no network, a read-only filesystem, dropped capabilities and temporary storage. Chromium launch, JavaScript, PNG screenshots, axe analysis and Fernet encryption/decryption pass.
+- Application scan still fails: 44 package/advisory occurrences across eight distinct CVEs: CVE-2025-69720, CVE-2026-16742, CVE-2026-54369, CVE-2026-76642, CVE-2026-78408, CVE-2026-78409, CVE-2026-78410, CVE-2026-9538. No fixed package version is supplied by the scanner for these findings on the selected distribution. This is not proof that they cannot affect the application.
+- The overall workflow correctly remains red. No findings have been suppressed, accepted or excluded.
 
-Additional files changed during validation: `Dockerfile` and `Dockerfile.render` apply available distribution upgrades at build time. Their base digests stay pinned, but resulting OS package versions depend on the build date; retain CI evidence for each release. `requirements-render.lock` pins setuptools 84.0.0 with PyPI hashes. The renderer explicitly manages its disposable global Python environment with `--break-system-packages` because OS upgrades restore the EXTERNALLY-MANAGED marker. `.github/workflows/security-quality.yml` now emits JSON-based finding details; severity and blocking policy are unchanged.
+## Final implementation
 
-Next work: assess/remove unnecessary runtime tooling or choose a supported alternative base, establish actual reachability of remaining findings, then rebuild and re-scan. Do not call this release security-approved or deploy it as a fully remediated security release while the gate remains red.
+- `Dockerfile` and `Dockerfile.render` apply available distribution upgrades at build time. Base digests remain pinned, but resulting OS package versions depend on the build date; retain CI evidence for each release.
+- `Dockerfile.render` retains the supported Playwright Noble image and removes unused Firefox/WebKit browser bundles and the two GStreamer bad-plugin packages. The application uses Chromium only. Its exercised rendering functionality continues to work; this test is not a guarantee for every website or media format.
+- `requirements-render.lock` pins setuptools 84.0.0 with PyPI hashes. The renderer manages its disposable global Python environment with `--break-system-packages` because OS upgrades restore the EXTERNALLY-MANAGED marker.
+- `Dockerfile.render` removes build-only pip and virtualenv after dependency installation, along with `/root/.cache/virtualenv`. The diagnostic run located the old package records in the upstream virtualenv pip cache, including its vendored code and inventory. Complete unused tooling/cache was removed, not just security inventory files.
+- `scripts/verify-renderer-image.py` performs the offline runtime checks above.
+- `.github/workflows/security-quality.yml` runs the actual image smoke test, reports residual package locations and emits JSON-based finding details. Severity and blocking policy are unchanged.
+
+## Follow-up
+
+The next phase should assess the remaining application OS dependencies and a supported minimal base, including runtime compatibility and vulnerability reachability. Do not remove essential libraries blindly or treat missing fixed versions as accepted risk. Do not deploy this as a fully remediated security release while the gate is red.
+
+Changes were published only to `codex/security-dependencies-20260914`. GitHub main and NAS production remain unchanged. The original broader security gates in `docs/security-remediation-status-2026-08-11.md` remain open.
