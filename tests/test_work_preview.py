@@ -378,3 +378,69 @@ def test_old_analysis_cannot_be_refreshed_by_occurrence_timestamp(client):
     item = client.get(f"/api/v1/websites/{site}/work-preview").json()["items"][0]
     assert item["lane"] == "research"
     assert item["evidence_code"] == "old_analysis"
+
+
+@pytest.mark.parametrize("kind", ["orphan_page", "structured_data_visible_content_mismatch"])
+def test_historical_json_nul_does_not_break_preview(client, kind):
+    site, url, _ = setup_site()
+    with SessionLocal() as db:
+        record = db.scalar(select(Issue).where(Issue.website_id == site))
+        record.issue_type = kind
+        snapshot = db.scalar(select(UrlSnapshot).where(UrlSnapshot.url_id == url))
+        snapshot.metadata_hash = "full"
+        occurrence = db.scalar(select(IssueOccurrence).where(IssueOccurrence.issue_id == record.id))
+        occurrence.evidence = {
+            "unrelated": "titel\x00vervolg",
+            "root_route_checked": True,
+            "comparison_version": 3,
+        }
+        db.commit()
+    statements = []
+
+    def capture(conn, cursor, statement, parameters, context, executemany):
+        statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", capture)
+    try:
+        response = client.get(f"/api/v1/websites/{site}/work-preview")
+    finally:
+        event.remove(engine, "before_cursor_execute", capture)
+    assert response.status_code == 200
+    assert response.json()["items"][0]["current_evidence"] is True
+    # Database-side JSON extraction was the production failure, including keys
+    # outside the malformed string. Require raw JSON text for all preview reads.
+    assert not any("JSON_EXTRACT" in statement or "->>" in statement for statement in statements)
+    with SessionLocal() as db:
+        record = db.scalar(select(IssueOccurrence).where(IssueOccurrence.issue_id == record.id))
+        assert record.evidence["unrelated"] == "titel\x00vervolg"
+
+
+def test_postgres_escaped_nul_reading():
+    """Exercise the actual PostgreSQL JSON behavior; optional locally, required in CI."""
+    import json
+    import os
+
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.orm import Session
+
+    from app.services.work_preview import read_evidence
+
+    url = os.environ.get("WORK_PREVIEW_POSTGRES_URL")
+    if not url:
+        pytest.skip("Dedicated PostgreSQL regression database not configured")
+    postgres = create_engine(url)
+    occurrence_id = uuid4()
+    payload = {"unrelated": "titel\x00vervolg", "root_route_checked": True, "comparison_version": 3}
+    try:
+        with postgres.connect() as connection, connection.begin():
+            connection.execute(
+                text("CREATE TEMP TABLE issue_occurrences (id uuid, evidence json) ON COMMIT DROP")
+            )
+            connection.execute(
+                text("INSERT INTO issue_occurrences VALUES (:id, CAST(:payload AS json))"),
+                {"id": occurrence_id, "payload": json.dumps(payload)},
+            )
+            with Session(bind=connection) as db:
+                assert dict(read_evidence(db, [occurrence_id])) == {occurrence_id: payload}
+    finally:
+        postgres.dispose()

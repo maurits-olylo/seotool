@@ -1,11 +1,13 @@
 """Read-only pilot: explain readiness without creating or resolving work."""
 
+import json
 from collections import Counter
+from collections.abc import Iterator
 from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import Text, cast, func, select
 from sqlalchemy.orm import Session
 
 from app.models.common import utc_now
@@ -201,6 +203,19 @@ def assess(
     )
 
 
+def read_evidence(db: Session, occurrence_ids: list[UUID]) -> Iterator[tuple[UUID, dict]]:
+    """Decode raw PostgreSQL JSON in Python, including escaped control characters."""
+    if not occurrence_ids:
+        return
+    for occurrence_id, raw in db.execute(
+        select(IssueOccurrence.id, cast(IssueOccurrence.evidence, Text))
+        .where(IssueOccurrence.id.in_(occurrence_ids))
+        .execution_options(yield_per=200)
+    ):
+        payload = json.loads(raw) if raw else {}
+        yield occurrence_id, payload if isinstance(payload, dict) else {}
+
+
 def preview(
     db: Session,
     website_id: UUID,
@@ -263,8 +278,6 @@ def preview(
             IssueOccurrence.snapshot_id,
             IssueOccurrence.crawl_run_id,
             IssueOccurrence.detected_at,
-            IssueOccurrence.evidence["root_route_checked"].as_boolean().label("root_route_checked"),
-            IssueOccurrence.evidence["comparison_version"].as_integer().label("comparison_version"),
             func.row_number()
             .over(
                 partition_by=IssueOccurrence.issue_id,
@@ -279,6 +292,24 @@ def preview(
     evidence = {
         row.issue_id: row for row in db.execute(select(occurrences).where(occurrences.c.n == 1))
     }
+    # PostgreSQL json can store escaped NUL, but ->> parses and rejects it even
+    # in unrelated fields. Read only required latest evidence as raw text and
+    # decode in Python; never rewrite historical evidence to make a read succeed.
+    flag_ids = [
+        evidence[issue.id].id
+        for issue in issues
+        if issue.id in evidence
+        and issue.issue_type in {"orphan_page", "structured_data_visible_content_mismatch"}
+    ]
+    flags = {}
+    for occurrence_id, payload in read_evidence(db, flag_ids):
+        flags[occurrence_id] = {
+            "root_route_checked": isinstance(payload, dict)
+            and payload.get("root_route_checked") is True,
+            "comparison_version": payload.get("comparison_version")
+            if isinstance(payload, dict) and type(payload.get("comparison_version")) is int
+            else None,
+        }
     runs = {
         run.id: run for run in db.scalars(select(CrawlRun).where(CrawlRun.website_id == website_id))
     }
@@ -310,6 +341,7 @@ def preview(
             runs,
             latest_full,
             now,
+            flags=flags.get(occurrence.id) if occurrence else None,
         )
         linked = sorted(tasks.get(issue.id, []), key=lambda task: str(task.id))
         result = assess(
@@ -367,15 +399,13 @@ def preview(
     visible_ids = [item["issue_id"] for item in visible]
     # Load small allowlisted details only for the displayed issues, not all history.
     detail_ids = [evidence[i].id for i in visible_ids if i in evidence]
-    details = {
-        o.issue_id: o.evidence
-        for o in db.scalars(select(IssueOccurrence).where(IssueOccurrence.id.in_(detail_ids)))
-    }
+    details = dict(read_evidence(db, detail_ids))
     for item in visible:
         if item["issue_type"] == "query_content_review":
             continue
         item["evidence_facts"] = evidence_facts(
-            item["issue_type"], details.get(item["issue_id"]) or {}
+            item["issue_type"],
+            details.get(evidence[item["issue_id"]].id, {}) if item["issue_id"] in evidence else {},
         )
     return dict(
         generated_at=now,

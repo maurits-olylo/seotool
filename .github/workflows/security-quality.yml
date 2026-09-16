@@ -19,6 +19,17 @@ jobs:
   python-quality:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: preview_regression
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 127.0.0.1:55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d preview_regression"
+          --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
       - name: Check out exact revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -53,6 +64,8 @@ jobs:
         run: ruff check app tests scripts
 
       - name: Test
+        env:
+          WORK_PREVIEW_POSTGRES_URL: postgresql+psycopg://postgres@127.0.0.1:55432/preview_regression
         run: pytest
 
       - name: Static security analysis

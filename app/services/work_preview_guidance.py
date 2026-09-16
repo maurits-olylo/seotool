@@ -26,6 +26,8 @@ def evidence_state(
     runs: dict,
     latest_full: Any,
     now: datetime,
+    *,
+    flags: dict | None = None,
 ) -> tuple[bool, str, str]:
     """Keep full-analysis evidence through light checks; never certify missing routes."""
     if not occurrence:
@@ -61,7 +63,7 @@ def evidence_state(
                     "routebewijs ontbreekt."
                 ),
             )
-    if kind == "orphan_page" and getattr(occurrence, "root_route_checked", None) is not True:
+    if kind == "orphan_page" and (flags or {}).get("root_route_checked") is not True:
         return (
             False,
             "route_proof_needed",
@@ -69,7 +71,7 @@ def evidence_state(
         )
     if (
         kind == "structured_data_visible_content_mismatch"
-        and getattr(occurrence, "comparison_version", None) != 3
+        and (flags or {}).get("comparison_version") != 3
     ):
         return (
             False,
@@ -221,6 +223,8 @@ def next_step(kind: str) -> tuple[str, str, str]:
 def evidence_facts(kind: str, data: dict) -> list[str]:
     """Allowlisted, bounded facts, never raw HTML or arbitrary evidence dumps."""
     facts = []
+    if not isinstance(data, dict):
+        return facts
     if kind.startswith("duplicate_"):
         if data.get("value"):
             facts.append("Gemeten gedeelde waarde: " + str(data["value"])[:600])

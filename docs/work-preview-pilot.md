@@ -91,3 +91,15 @@ read-only access and authorization.
 
 Deploy only the API after release checks. No migration or worker restart is needed.
 No new database fields, dependencies or production records are introduced.
+
+## PostgreSQL escaped-NUL regression
+
+PostgreSQL `json` may retain escaped U+0000 in historical evidence. Extracting even
+an unrelated key with `->>` can fail while converting that JSON to text values.
+The preview therefore selects raw `CAST(evidence AS TEXT)` only for the required
+latest occurrences and decodes it in Python. It retains only the two typed flags
+for classification; visible details use the same reader. No historical data is
+rewritten, stripped or deleted. Non-object JSON remains insufficient evidence.
+CI exercises the shared reader against an isolated PostgreSQL 16 temporary table
+containing escaped NUL. SQLite API regressions additionally assert that preview
+queries use no database-side JSON extraction and preserve the stored evidence.
