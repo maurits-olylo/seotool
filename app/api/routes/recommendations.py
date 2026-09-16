@@ -46,6 +46,7 @@ from app.services.recommendation_tasks import (
     verification_scope_plan,
 )
 from app.services.recommendation_verifications import request_verification
+from app.services.work_preview import LANES, preview
 
 router = APIRouter(tags=["recommendations"])
 
@@ -418,3 +419,25 @@ def _task_or_404(db: Session, task_id: UUID) -> RecommendationTask:
     if not task:
         raise HTTPException(status_code=404, detail="Recommendation task not found")
     return task
+
+
+@router.get("/websites/{website_id}/work-preview")
+def work_preview(
+    website_id: UUID,
+    lane: str | None = Query(default=None),
+    q: str = Query(default="", max_length=200),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=50),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict:
+    from urllib.parse import urlsplit
+
+    website = require_website_access(db, principal, website_id, admin=True)
+    if (urlsplit(website.base_url).hostname or "").removeprefix("www.") not in {
+        "schipperkozijnen.nl", "human.nl"
+    }:
+        raise HTTPException(status_code=404, detail="Deze website valt buiten de pilot.")
+    if lane is not None and lane not in LANES:
+        raise HTTPException(status_code=422, detail="Onbekende selectie.")
+    return preview(db, website_id, lane=lane, offset=offset, limit=limit, q=q)

@@ -84,6 +84,17 @@ def app_interface(
     return FileResponse(UI_ROOT / "index.html", headers={"Cache-Control": "no-store"})
 
 
+@router.get("/app/work-preview", include_in_schema=False)
+def work_preview_interface(
+    seo_session: str | None = Cookie(default=None), db: Session = Depends(get_db)
+) -> Response:
+    user_id = session_user_id(seo_session)
+    user = db.get(User, user_id) if user_id else None
+    if not user or not user.is_active:
+        return RedirectResponse("/login", status_code=302)
+    return FileResponse(UI_ROOT / "work-preview.html", headers={"Cache-Control": "no-store"})
+
+
 @router.get("/privacy", include_in_schema=False)
 def privacy() -> FileResponse:
     return FileResponse(UI_ROOT / "privacy.html")
