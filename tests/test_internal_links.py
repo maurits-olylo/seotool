@@ -254,3 +254,63 @@ def test_unfinished_partial_crawl_is_not_eligible(client) -> None:
         ).status_code
         == 404
     )
+
+
+def test_form_only_history_excluded_from_both_counts_and_sources(client) -> None:
+    from uuid import UUID
+
+    from sqlalchemy import select
+
+    from app.models.crawl import ElementLocation
+
+    ids = fixture()
+    with SessionLocal() as db:
+        run = db.get(CrawlRun, UUID(ids["run"]))
+        a = db.scalar(select(Url).where(Url.normalized_url == "https://example.test/a"))
+        snapshot = db.scalar(
+            select(UrlSnapshot).where(
+                UrlSnapshot.url_id == a.id, UrlSnapshot.crawl_run_id == run.id
+            )
+        )
+        element = ElementLocation(
+            website_id=run.website_id,
+            source_url_id=a.id,
+            snapshot_id=snapshot.id,
+            crawl_run_id=run.id,
+            element_type="button",
+            target_url="https://example.test/target",
+            html_fragment="<button>Send</button>",
+        )
+        db.add(element)
+        db.commit()
+        element_ids = (run.website_id, a.id, snapshot.id, run.id)
+    base = f"/api/v1/websites/{ids['website']}/internal-links"
+    data = client.get(base).json()
+    target = next(item for item in data["items"] if item["url_id"] == ids["target"])
+    assert target["incoming_pages"] == 1
+    sources = client.get(
+        f"{base}/{ids['target']}/sources", params={"crawl_run_id": ids["run"]}
+    ).json()
+    assert sources["total"] == 1
+    assert sources["items"][0]["anchor_texts"] == ["Nofollow"]
+    with SessionLocal() as db:
+        website_id, source_id, snapshot_id, run_id = element_ids
+        db.add(
+            ElementLocation(
+                website_id=website_id,
+                source_url_id=source_id,
+                snapshot_id=snapshot_id,
+                crawl_run_id=run_id,
+                element_type="a",
+                target_url="https://example.test/target",
+                html_fragment="<a>Link</a>",
+            )
+        )
+        db.commit()
+    assert (
+        client.get(f"{base}/{ids['target']}/sources", params={"crawl_run_id": ids["run"]}).json()[
+            "total"
+        ]
+        == 2
+    )
+    assert client.get(base).json()["top"][0]["incoming_pages"] == 2

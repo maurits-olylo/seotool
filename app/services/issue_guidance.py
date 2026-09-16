@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from app.models.issues import Issue
+from app.services.recommendation_library import recommendation_for_issue_type
 
 
 @dataclass(frozen=True)
@@ -398,6 +399,10 @@ def build_issue_guidance(issue: Issue, evidence: dict[str, object]) -> dict[str,
         )
     )
     action = issue.recommended_action.strip()
+    definition = recommendation_for_issue_type(guidance_type)
+    vacancy_decision = definition and definition.key == "decide_vacancy_disposition"
+    if vacancy_decision:
+        verification_text = " ".join(definition.completion_criteria)
     source_keys = SOURCE_KEYS_BY_TYPE.get(guidance_type, ())
     return {
         "relevance": {"text": relevance, "basis": "interpretation"},
@@ -407,7 +412,9 @@ def build_issue_guidance(issue: Issue, evidence: dict[str, object]) -> dict[str,
             if alternative_statement
             else None
         ),
-        "steps": [action]
+        "steps": list(definition.steps)
+        if vacancy_decision
+        else [action]
         if action
         else ["Beoordeel het opgeslagen bewijs en bepaal de passende wijziging."],
         "verification": verification_text,

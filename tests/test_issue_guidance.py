@@ -53,9 +53,7 @@ def test_guidance_falls_back_to_observation_and_safe_verification() -> None:
 
 
 def test_guidance_adds_specific_value_and_source_for_job_schema() -> None:
-    job_guidance = build_issue_guidance(
-        _issue("job_posting_schema_missing", "structured_data"), {}
-    )
+    job_guidance = build_issue_guidance(_issue("job_posting_schema_missing", "structured_data"), {})
     assert "Google" in job_guidance["relevance"]["text"]  # type: ignore[index]
     assert job_guidance["sources"][0]["publisher"] == "Google Search Central"  # type: ignore[index]
 
@@ -68,9 +66,7 @@ def test_pagination_guidance_treats_repeated_signals_as_one_template_review() ->
 
     assert "één technisch geheel" in guidance["relevance"]["text"]  # type: ignore[index]
     assert guidance["verification"] == "geen lege grenspagina's"
-    assert {source["publisher"] for source in guidance["sources"]} == {
-        "Google Search Central"
-    }
+    assert {source["publisher"] for source in guidance["sources"]} == {"Google Search Central"}
 
 
 def test_grouped_redirect_guidance_focuses_on_the_source_page() -> None:
@@ -121,3 +117,13 @@ def test_alt_guidance_uses_accessibility_context_and_source() -> None:
             "publisher": "W3C WAI",
         }
     ]
+
+
+def test_existing_vacancy_guidance_uses_current_decision_route_without_mutation() -> None:
+    issue = _issue("expired_job_posting_404", "content")
+    issue.recommended_action = "Stel een redirect in."
+    guidance = build_issue_guidance(issue, {"verification": "De fout moet verdwijnen"})
+    assert "vacatureverantwoordelijke" in guidance["steps"][0]
+    assert any("Redirect alleen" in step for step in guidance["steps"])
+    assert "gekozen" in guidance["verification"] or "Bij verwijderd" in guidance["verification"]
+    assert issue.recommended_action == "Stel een redirect in."

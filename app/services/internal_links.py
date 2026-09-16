@@ -5,13 +5,28 @@ from typing import Any
 from urllib.parse import unquote, urlsplit
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import Select, func, select, tuple_
 from sqlalchemy.orm import Session, aliased
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.models.common import utc_now
-from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
+from app.models.crawl import CrawlRun, ElementLocation, UrlLink, UrlSnapshot
 from app.models.discovery import Url
 from app.services.retention_policy import POLICIES
+
+
+def navigation_link(crawl_run_id: UUID) -> ColumnElement[bool]:
+    """Filter same-crawl form-only pairs once, without guessing from URL names."""
+
+    def element_pairs(kind: str) -> Select[tuple[UUID, str | None]]:
+        return select(ElementLocation.source_url_id, ElementLocation.target_url).where(
+            ElementLocation.crawl_run_id == crawl_run_id,
+            ElementLocation.target_url.is_not(None),
+            ElementLocation.element_type == kind,
+        )
+
+    form_only = element_pairs("button").except_(element_pairs("a"))
+    return tuple_(UrlLink.source_url_id, UrlLink.target_url).not_in(form_only)
 
 
 def completed_runs(db: Session, website_id: UUID) -> list[CrawlRun]:
@@ -44,6 +59,7 @@ def link_counts(db: Session, run: CrawlRun) -> dict[UUID, int]:
             .where(
                 UrlLink.crawl_run_id == run.id,
                 UrlLink.is_internal.is_(True),
+                navigation_link(run.id),
                 source.website_id == run.website_id,
                 target.website_id == run.website_id,
                 source.id != target.id,
@@ -157,6 +173,7 @@ def referring_pages(
             UrlLink.crawl_run_id == run.id,
             UrlLink.target_url_id == target_id,
             UrlLink.is_internal.is_(True),
+            navigation_link(run.id),
             Url.id != target_id,
         )
         .distinct()
@@ -171,6 +188,7 @@ def referring_pages(
                 UrlLink.crawl_run_id == run.id,
                 UrlLink.target_url_id == target_id,
                 UrlLink.is_internal.is_(True),
+                navigation_link(run.id),
                 UrlLink.source_url_id.in_(source_ids),
             )
         ):

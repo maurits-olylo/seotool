@@ -113,5 +113,5 @@ def test_recalculates_issues_from_latest_full_crawl_without_fetching(monkeypatch
         assert (
             len(list(db.scalars(select(Change).where(Change.website_id == job.website_id)))) == 1
         )
-        assert db.get(Issue, stale_issue_id).status == "verified"  # type: ignore[union-attr]
-        assert db.get(Issue, stale_cluster_id).status == "resolved"  # type: ignore[union-attr]
+        assert db.get(Issue, stale_issue_id).status == "review"  # type: ignore[union-attr]
+        assert db.get(Issue, stale_cluster_id).status == "review"  # type: ignore[union-attr]

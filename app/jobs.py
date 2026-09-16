@@ -29,6 +29,7 @@ from app.services.international_indexation import analyze_international_indexati
 from app.services.issue_engine import reconcile_issues
 from app.services.job_identifier_analysis import analyze_job_identifier_risk
 from app.services.pagination_analysis import analyze_pagination_series
+from app.services.reanalysis import stored_reanalysis, superseded_for_reanalysis
 from app.services.retention_operations import create_retention_operations
 from app.services.robots import RobotsRules
 from app.services.server_error_analysis import analyze_server_error_incident
@@ -580,31 +581,45 @@ def _recalculate_stored_issues(db, job: CrawlJob, run: CrawlRun) -> None:  # typ
     run.asset_urls = source_run.asset_urls
     run.skipped_urls = source_run.skipped_urls
     run.failed_urls = source_run.failed_urls
-    snapshots = list(
-        db.scalars(
-            select(UrlSnapshot)
-            .where(UrlSnapshot.crawl_run_id == source_run.id)
-            .order_by(UrlSnapshot.checked_at)
+    with stored_reanalysis(db, website_id=job.website_id, source_run_id=source_run.id):
+        snapshots = list(
+            db.scalars(
+                select(UrlSnapshot)
+                .where(UrlSnapshot.crawl_run_id == source_run.id)
+                .order_by(UrlSnapshot.checked_at)
+            )
         )
-    )
-    run.phase = "issue_recalculation"
-    run.phase_current = 0
-    run.phase_total = len(snapshots)
-    for index, snapshot in enumerate(snapshots, start=1):
-        analyze_snapshot(db, snapshot, detect_changes=False)
-        run.phase_current = index
-        if index % 100 == 0:
-            _check_crawl_control(db, job, run, force_heartbeat=True)
-            db.commit()
-    _analyze_stored_site_results(db, job=job, progress_run=run, source_run=source_run)
-    _set_crawl_phase(db, run, "404_analysis")
-    classify_404_issues(
-        db,
-        website_id=job.website_id,
-        crawl_run_id=source_run.id,
-        check_control=lambda: _check_crawl_control(db, job, run),
-    )
-    _set_crawl_phase(db, run, "finalizing")
+        superseded = sum(
+            superseded_for_reanalysis(db, url_id=snapshot.url_id, snapshot_id=snapshot.id)
+            for snapshot in snapshots
+        )
+        job.settings_snapshot = {
+            **(job.settings_snapshot or {}),
+            "reanalysis": {
+                "source_run_id": str(source_run.id),
+                "snapshot_candidates": len(snapshots),
+                "superseded_snapshots_skipped": superseded,
+                "policy": "preserve_newer_measurements_no_repair_claim",
+            },
+        }
+        run.phase = "issue_recalculation"
+        run.phase_current = 0
+        run.phase_total = len(snapshots)
+        for index, snapshot in enumerate(snapshots, start=1):
+            analyze_snapshot(db, snapshot, detect_changes=False)
+            run.phase_current = index
+            if index % 100 == 0:
+                _check_crawl_control(db, job, run, force_heartbeat=True)
+                db.commit()
+        _analyze_stored_site_results(db, job=job, progress_run=run, source_run=source_run)
+        _set_crawl_phase(db, run, "404_analysis")
+        classify_404_issues(
+            db,
+            website_id=job.website_id,
+            crawl_run_id=source_run.id,
+            check_control=lambda: _check_crawl_control(db, job, run),
+        )
+        _set_crawl_phase(db, run, "finalizing")
 
 
 def _analyze_stored_site_results(

@@ -10,6 +10,7 @@ from app.models.crawl import UrlSnapshot
 from app.models.discovery import Url
 from app.models.issues import Issue, IssueOccurrence
 from app.services.issue_engine import reconcile_issues
+from app.services.reanalysis import superseded_for_reanalysis
 from app.services.technical_checks import IssueSignal
 from app.services.url_filtering import is_probable_html_page
 from app.services.url_normalization import InvalidUrlError, normalize_url
@@ -132,6 +133,8 @@ def analyze_contextual_structured_data(
     }
     touched: list[Issue] = []
     for url, snapshot in rows:
+        if superseded_for_reanalysis(db, url_id=url.id, snapshot_id=snapshot.id):
+            continue
         nodes = contextual_schema_nodes(snapshot.schema_data or [])
         signals = _contextual_schema_signals(snapshot, nodes, known_urls)
         if snapshot.status_code != 200 or snapshot.error_message:

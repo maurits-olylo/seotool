@@ -825,7 +825,9 @@ async function loadClients(preferredClientId = null, preferredWebsiteId = null) 
 async function loadWebsites(preferredWebsiteId = null) {
   const clientId = $("#client-select").value;
   if (!clientId) { state.websites = []; state.issues = []; $("#website-select").innerHTML = ""; render(); return; }
-  state.websites = await api(`/api/v1/websites?client_id=${clientId}`);
+  const websites = await api(`/api/v1/websites?client_id=${clientId}`);
+  if (clientId !== $("#client-select").value) return;
+  state.websites = websites;
   $("#website-select").innerHTML = state.websites.map(option).join("");
   const selectedWebsiteId = preferredWebsiteId || localStorage.getItem(WEBSITE_STORAGE_KEY);
   if (selectedWebsiteId && state.websites.some((website) => website.id === selectedWebsiteId)) $("#website-select").value = selectedWebsiteId;
@@ -1847,6 +1849,7 @@ async function openTaskNotification(notificationId, taskId) {
 }
 
 async function loadIssues() {
+  const requestId = state.issuesRequestId = (state.issuesRequestId || 0) + 1;
   const websiteId = $("#website-select").value;
   if (!websiteId) {
     state.issues = [];
@@ -1870,6 +1873,7 @@ async function loadIssues() {
       api(`/api/v1/websites/${websiteId}/integrations`),
     ]).then(([connections, mappings]) => ({connections, mappings})).catch(() => ({connections: [], mappings: []})) : Promise.resolve({connections: [], mappings: []}),
   ]);
+  if (requestId !== state.issuesRequestId || websiteId !== $("#website-select").value || clientId !== $("#client-select").value) return;
   state.issues = issues;
   state.suppressions = suppressions;
   state.integrationHealth = integrationHealth;
@@ -2313,7 +2317,7 @@ function renderOperations() {
 
 async function startCrawl(jobType) {
   if (jobType === "full_site_crawl" && !window.confirm("Volledige crawl starten? Dit controleert de gehele website.")) return;
-  if (jobType === "recalculate_issues" && !window.confirm("Acties herberekenen vanuit de laatste volledige crawl? Er worden geen pagina’s opnieuw gedownload.")) return;
+  if (jobType === "recalculate_issues" && !window.confirm("Opgeslagen bevindingen opnieuw beoordelen? Nieuwere metingen blijven leidend. Dit bewijst geen herstel en downloadt geen pagina’s.")) return;
   const buttons = {
     light_check: $("#start-light-check"),
     full_site_crawl: $("#start-full-crawl"),
@@ -3402,8 +3406,59 @@ $("#confirm-mfa").addEventListener("click", async () => {
 });
 $("#profile-toggle").addEventListener("click", () => { const open = $("#profile-popover").classList.toggle("hidden") === false; $("#profile-toggle").setAttribute("aria-expanded", String(open)); });
 $("#mobile-nav-toggle").addEventListener("click", () => { const open = $("#app").classList.toggle("mobile-nav-open"); $("#mobile-nav-toggle").setAttribute("aria-expanded", String(open)); });
-$("#client-select").addEventListener("change", async () => { localStorage.setItem(CLIENT_STORAGE_KEY, $("#client-select").value); localStorage.removeItem(WEBSITE_STORAGE_KEY); state.crawlRuns = []; state.changesRequestId += 1; state.changes = []; state.changeGroups = []; await loadWebsites(); if (state.currentView === "integrations") await loadIntegrations(); if (state.currentView === "dashboard") await loadDashboard(); });
-$("#website-select").addEventListener("change", async () => { localStorage.setItem(WEBSITE_STORAGE_KEY, $("#website-select").value); state.selectedReportSnapshotId = null; state.consultantInsights = null; state.contentAnalysis = null; state.questionScopes = null; state.externalEvidenceRequests.clear(); state.contentAnalysisPage = 1; state.operationsRequestId += 1; state.changesRequestId += 1; state.operationsLoading = false; state.crawlRuns = []; state.showCrawlArchive = false; state.activeCrawlJob = null; state.exports = []; state.changes = []; state.changeGroups = []; if (state.currentView === "changes") renderTableState("#change-rows", 5, "Wijzigingen worden geladen…"); if (state.currentView === "operations") renderOperations(); if (state.currentView === "changes") await loadChanges(); await loadIssues(); if (state.currentView === "integrations") await loadIntegrations(); if (state.currentView === "insights") await loadConsultantInsights(); if (["contentAnalysis", "opportunities"].includes(state.currentView)) await loadContentAnalysis(); if (state.currentView === "urls") renderUrls(); if (state.currentView === "vacancies") await loadJobListings(); if (state.currentView === "operations") await loadOperations(); if (state.currentView === "dashboard") await loadDashboard(); });
+function clearWebsiteViewState() {
+  state.clientReport = null;
+  state.jobListings = [];
+  state.jobSummary = null;
+  state.issues = [];
+  state.urlRecords = [];
+  state.urls = new Map();
+  state.issuesRequestId = (state.issuesRequestId || 0) + 1;
+  state.selectedReportSnapshotId = null;
+  state.consultantInsights = null;
+  state.contentAnalysis = null;
+  state.questionScopes = null;
+  state.externalEvidenceRequests.clear();
+  state.contentAnalysisPage = 1;
+  state.operationsRequestId += 1;
+  state.changesRequestId += 1;
+  state.operationsLoading = false;
+  state.crawlRuns = [];
+  state.showCrawlArchive = false;
+  state.activeCrawlJob = null;
+  state.exports = [];
+  state.changes = [];
+  state.changeGroups = [];
+  if (state.currentView === "changes") renderTableState("#change-rows", 5, "Wijzigingen worden geladen…");
+  if (state.currentView === "operations") renderOperations();
+}
+
+async function refreshSelectedWebsite(loadSignals = true) {
+  if (state.currentView === "changes") await loadChanges();
+  if (loadSignals) await loadIssues();
+  if (state.currentView === "integrations") await loadIntegrations();
+  if (state.currentView === "insights") await loadConsultantInsights();
+  if (["contentAnalysis", "opportunities"].includes(state.currentView)) await loadContentAnalysis();
+  if (state.currentView === "urls") renderUrls();
+  if (state.currentView === "vacancies") await loadJobListings();
+  if (state.currentView === "operations") await loadOperations();
+  if (state.currentView === "dashboard") await loadDashboard();
+}
+
+$("#client-select").addEventListener("change", async () => {
+  const clientId = $("#client-select").value;
+  localStorage.setItem(CLIENT_STORAGE_KEY, clientId);
+  localStorage.removeItem(WEBSITE_STORAGE_KEY);
+  clearWebsiteViewState();
+  $("#website-select").innerHTML = "";
+  await loadWebsites();
+  if (clientId === $("#client-select").value) await refreshSelectedWebsite(false);
+});
+$("#website-select").addEventListener("change", async () => {
+  localStorage.setItem(WEBSITE_STORAGE_KEY, $("#website-select").value);
+  clearWebsiteViewState();
+  await refreshSelectedWebsite();
+});
 for (const selector of ["#severity-filter", "#scope-filter", "#nature-filter", "#type-filter", "#impact-filter"]) $(selector).addEventListener("change", () => { state.page = 1; render(); });
 $("#status-filter").addEventListener("change", loadIssues);
 $("#search-filter").addEventListener("input", () => { state.page = 1; render(); });

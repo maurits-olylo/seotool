@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models.common import utc_now
 from app.models.issues import Issue, IssueOccurrence, IssueSuppression
+from app.services.reanalysis import KEY, superseded_for_reanalysis
 from app.services.technical_checks import IssueSignal
 
 REOPENABLE_STATUSES = {"resolved", "verified", "ignored"}
@@ -20,6 +21,9 @@ def reconcile_issues(
     signals: Iterable[IssueSignal],
     checked_issue_types: set[str],
 ) -> list[Issue]:
+    if superseded_for_reanalysis(db, url_id=url_id, snapshot_id=snapshot_id):
+        return []
+    reanalysis = KEY in db.info
     now = utc_now()
     signal_map = {signal.issue_type: signal for signal in signals}
     suppressed_types = set(
@@ -43,6 +47,12 @@ def reconcile_issues(
     touched: list[Issue] = []
     for issue_type, signal in signal_map.items():
         issue = by_type.get(issue_type)
+        if (
+            reanalysis
+            and issue
+            and issue.status in {"resolved", "verified", "ignored", "accepted_risk"}
+        ):
+            continue
         if issue is None:
             issue = Issue(
                 website_id=website_id,
@@ -58,13 +68,14 @@ def reconcile_issues(
             db.add(issue)
             db.flush()
         else:
-            issue.last_detected_at = now
+            if not reanalysis:
+                issue.last_detected_at = now
             issue.severity = signal.severity
             issue.confidence = signal.confidence
             issue.title = signal.title
             issue.description = signal.description
             issue.recommended_action = signal.recommended_action
-            if issue.status in REOPENABLE_STATUSES:
+            if issue.status in REOPENABLE_STATUSES and not reanalysis:
                 issue.status = "new"
                 issue.resolved_at = None
                 issue.verified_at = None
@@ -93,6 +104,10 @@ def reconcile_issues(
             or issue.issue_type not in checked_issue_types
             or issue.issue_type in signal_map
         ):
+            continue
+        if reanalysis:
+            if issue.status not in {"resolved", "verified", "ignored", "accepted_risk"}:
+                issue.status = "review"
             continue
         if issue.status == "resolved":
             issue.status = "verified"
