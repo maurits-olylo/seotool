@@ -1,7 +1,7 @@
 """Read-only pilot: explain readiness without creating or resolving work."""
 
 from collections import Counter
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -14,12 +14,16 @@ from app.models.discovery import Url
 from app.models.issues import Issue, IssueOccurrence
 from app.models.recommendations import RecommendationTask, RecommendationTaskIssue
 from app.services.recommendation_library import recommendation_for_issue_type
+from app.services.work_preview_guidance import evidence_facts, evidence_state, next_step
+from app.services.work_preview_opportunities import query_reviews
 
 LANES = {
     "execute": "Nu uitvoeren",
     "decision": "Beslissing nodig",
     "research": "Eerst onderzoeken",
     "periodic": "Periodieke beoordeling",
+    "verification": "Herstel controleren",
+    "opportunity": "Inhoudelijke kansen",
     "history": "Resultaten en historie",
     "unassessed": "Nog niet beoordeeld",
 }
@@ -61,6 +65,7 @@ def assess(
     partial: bool,
     tasks: list[RecommendationTask],
     now: datetime,
+    evidence_reason: str = "De passende bewijsmeting ontbreekt.",
 ) -> dict[str, Any]:
     """A template's 'direct' label is not approval or proof of a chosen solution."""
     definition = recommendation_for_issue_type(issue.issue_type)
@@ -78,7 +83,7 @@ def assess(
         step = "Bekijk het vastgelegde resultaat; maak geen dubbele opdracht."
     elif issue.status == "resolved":
         lane, reason, step = (
-            "research",
+            "verification",
             "Herstel wacht nog op verificatie.",
             "Controleer het herstel met nieuw bewijs.",
         )
@@ -99,8 +104,20 @@ def assess(
             "Beoordeel bewijs en gewenste uitkomst voordat werk wordt vrijgegeven.",
         )
     elif not current_evidence or issue.confidence != "high" or issue.status == "review":
-        lane, reason = "research", "Bewijs is niet actueel genoeg, onzeker of nog ter beoordeling."
-        step = "Controleer de nieuwste meting en de onderbouwing van dit specifieke signaal."
+        lane = "research"
+        reasons = []
+        if not current_evidence:
+            reasons.append(evidence_reason)
+        if issue.confidence != "high":
+            reasons.append("De detectie is onzeker; een inhoudelijke beoordeling ontbreekt.")
+        if issue.status == "review":
+            reasons.append("Dit signaal staat expliciet ter beoordeling.")
+        reason = " ".join(reasons)
+        step = (
+            definition.steps[0]
+            if definition and definition.steps
+            else "Controleer de vacaturestatus en sluitingsdatum."
+        )
     elif issue.issue_type in DECISIONS:
         lane, reason = "decision", "De juiste uitvoering hangt af van een inhoudelijk besluit."
         step = (
@@ -118,6 +135,25 @@ def assess(
             "Een technisch signaal alleen legt de juiste oplossing nog niet vast.",
         )
         step = "Controleer bron, doel en bedoelde uitkomst; leg de concrete wijziging vast."
+    if lane in {"research", "decision"} and not issue.issue_type.startswith("expired_job_posting"):
+        step, role, criteria = next_step(issue.issue_type)
+    if lane == "verification":
+        _, role, _ = next_step(issue.issue_type)
+        step = (
+            "Controleer of een route vanaf de homepage in een volledige "
+            "siteanalyse aantoonbaar is; een light check is hiervoor onvoldoende."
+            if issue.issue_type == "orphan_page"
+            else (
+                "Vergelijk de meting na het gemelde herstel met het oorspronkelijke "
+                "bewijs. Controleer hetzelfde onderdeel voordat het signaal wordt geverifieerd."
+            )
+        )
+        criteria = (
+            "De passende nameting bevestigt het herstel, of laat concreet zien "
+            "wat nog niet is opgelost."
+        )
+    if lane == "history":
+        criteria = "Geen nieuwe opdracht nodig voor dit afgehandelde signaal."
     # Existing work remains visible. Only already approved, direct work can qualify.
     approved = next(
         (
@@ -151,7 +187,7 @@ def assess(
         )
         step, criteria = approved.steps[0], " · ".join(approved.acceptance_criteria)
         role = ROLES.get(approved.primary_role, role)
-    if partial:
+    if partial and issue.issue_type == "orphan_page" and lane != "history":
         reason += " De broncrawl is deels geslaagd; ontbrekende routes zijn niet bewezen."
     if tasks:
         reason += " Er bestaat al werk: beoordeel dat voordat een nieuwe taak wordt gemaakt."
@@ -173,6 +209,7 @@ def preview(
     offset: int = 0,
     limit: int = 20,
     q: str = "",
+    include_history: bool = False,
 ) -> dict[str, Any]:
     now = utc_now()
     issues = list(db.scalars(select(Issue).where(Issue.website_id == website_id)))
@@ -182,6 +219,9 @@ def preview(
             UrlSnapshot.id,
             UrlSnapshot.url_id,
             UrlSnapshot.checked_at,
+            UrlSnapshot.status_code,
+            UrlSnapshot.final_url,
+            UrlSnapshot.error_message,
             func.row_number()
             .over(
                 partition_by=UrlSnapshot.url_id,
@@ -194,12 +234,37 @@ def preview(
         .subquery()
     )
     latest = {row.url_id: row for row in db.execute(select(snapshots).where(snapshots.c.n == 1))}
+    analysis_query = (
+        select(
+            UrlSnapshot.id,
+            UrlSnapshot.url_id,
+            UrlSnapshot.checked_at,
+            UrlSnapshot.status_code,
+            UrlSnapshot.final_url,
+            UrlSnapshot.error_message,
+            func.row_number()
+            .over(
+                partition_by=UrlSnapshot.url_id,
+                order_by=(UrlSnapshot.checked_at.desc(), UrlSnapshot.id.desc()),
+            )
+            .label("n"),
+        )
+        .join(Url, Url.id == UrlSnapshot.url_id)
+        .where(Url.website_id == website_id, UrlSnapshot.metadata_hash.is_not(None))
+        .subquery()
+    )
+    analyzed = {
+        row.url_id: row for row in db.execute(select(analysis_query).where(analysis_query.c.n == 1))
+    }
     occurrences = (
         select(
+            IssueOccurrence.id,
             IssueOccurrence.issue_id,
             IssueOccurrence.snapshot_id,
             IssueOccurrence.crawl_run_id,
             IssueOccurrence.detected_at,
+            IssueOccurrence.evidence["root_route_checked"].as_boolean().label("root_route_checked"),
+            IssueOccurrence.evidence["comparison_version"].as_integer().label("comparison_version"),
             func.row_number()
             .over(
                 partition_by=IssueOccurrence.issue_id,
@@ -214,11 +279,15 @@ def preview(
     evidence = {
         row.issue_id: row for row in db.execute(select(occurrences).where(occurrences.c.n == 1))
     }
-    runs = dict(
-        db.execute(
-            select(CrawlRun.id, CrawlRun.status).where(CrawlRun.website_id == website_id)
-        ).all()
-    )
+    runs = {
+        run.id: run for run in db.scalars(select(CrawlRun).where(CrawlRun.website_id == website_id))
+    }
+    full_runs = [
+        r
+        for r in runs.values()
+        if r.crawl_type == "full_site_crawl" and r.status in {"succeeded", "partially_succeeded"}
+    ]
+    latest_full = max(full_runs, key=lambda r: r.started_at) if full_runs else None
     urls = dict(
         db.execute(select(Url.id, Url.normalized_url).where(Url.website_id == website_id)).all()
     )
@@ -233,24 +302,37 @@ def preview(
     for issue in issues:
         measured = latest.get(issue.url_id)
         occurrence = evidence.get(issue.id)
-        fresh = bool(
-            measured
-            and occurrence
-            and occurrence.snapshot_id == measured.id
-            and measured.checked_at.replace(tzinfo=UTC) >= now - timedelta(days=7)
-            and runs.get(occurrence.crawl_run_id) in {"succeeded", "partially_succeeded"}
+        fresh, evidence_code, evidence_reason = evidence_state(
+            issue.issue_type,
+            occurrence,
+            measured,
+            analyzed.get(issue.url_id),
+            runs,
+            latest_full,
+            now,
         )
         linked = sorted(tasks.get(issue.id, []), key=lambda task: str(task.id))
         result = assess(
             issue,
             current_evidence=fresh,
-            partial=bool(occurrence and runs.get(occurrence.crawl_run_id) == "partially_succeeded"),
+            partial=bool(
+                occurrence
+                and runs.get(occurrence.crawl_run_id)
+                and runs[occurrence.crawl_run_id].status == "partially_succeeded"
+            ),
             tasks=linked,
             now=now,
+            evidence_reason=evidence_reason,
         )
         items.append(
             dict(
                 issue_id=issue.id,
+                evidence_code=evidence_code,
+                evidence_reason=evidence_reason,
+                analysis_checked_at=analyzed[issue.url_id].checked_at
+                if issue.url_id in analyzed
+                else None,
+                evidence_facts=[],
                 title=issue.title,
                 issue_type=issue.issue_type,
                 url=urls.get(issue.url_id),
@@ -265,11 +347,14 @@ def preview(
                 **result,
             )
         )
+    signal_count = len(items)
+    items.extend(query_reviews(db, website_id, now))
     counts = Counter(item["lane"] for item in items)
     selected = [
         item
         for item in items
-        if (not lane or item["lane"] == lane)
+        if (include_history or lane == "history" or item["lane"] != "history")
+        and (not lane or item["lane"] == lane)
         and q.casefold() in (item["title"] + " " + (item["url"] or "")).casefold()
     ]
     selected.sort(
@@ -278,12 +363,27 @@ def preview(
             str(item["issue_id"]),
         )
     )
+    visible = selected[offset : offset + limit]
+    visible_ids = [item["issue_id"] for item in visible]
+    # Load small allowlisted details only for the displayed issues, not all history.
+    detail_ids = [evidence[i].id for i in visible_ids if i in evidence]
+    details = {
+        o.issue_id: o.evidence
+        for o in db.scalars(select(IssueOccurrence).where(IssueOccurrence.id.in_(detail_ids)))
+    }
+    for item in visible:
+        if item["issue_type"] == "query_content_review":
+            continue
+        item["evidence_facts"] = evidence_facts(
+            item["issue_type"], details.get(item["issue_id"]) or {}
+        )
     return dict(
         generated_at=now,
-        rule_version="pilot-1",
-        total_signals=len(items),
+        rule_version="pilot-2",
+        total_signals=signal_count,
+        total_opportunities=len(items) - signal_count,
         counts={key: counts[key] for key in LANES},
         total=len(selected),
-        items=selected[offset : offset + limit],
+        items=visible,
         lanes=LANES,
     )

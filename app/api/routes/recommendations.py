@@ -425,6 +425,7 @@ def _task_or_404(db: Session, task_id: UUID) -> RecommendationTask:
 def work_preview(
     website_id: UUID,
     lane: str | None = Query(default=None),
+    include_history: bool = Query(default=False),
     q: str = Query(default="", max_length=200),
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=50),
@@ -435,9 +436,12 @@ def work_preview(
 
     website = require_website_access(db, principal, website_id, admin=True)
     if (urlsplit(website.base_url).hostname or "").removeprefix("www.") not in {
-        "schipperkozijnen.nl", "human.nl"
+        "schipperkozijnen.nl",
+        "human.nl",
     }:
         raise HTTPException(status_code=404, detail="Deze website valt buiten de pilot.")
     if lane is not None and lane not in LANES:
         raise HTTPException(status_code=422, detail="Onbekende selectie.")
-    return preview(db, website_id, lane=lane, offset=offset, limit=limit, q=q)
+    return preview(
+        db, website_id, lane=lane, offset=offset, limit=limit, q=q, include_history=include_history
+    )

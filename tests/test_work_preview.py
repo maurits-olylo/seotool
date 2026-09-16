@@ -39,7 +39,7 @@ def issue(kind="sitemap_404", status="new", confidence="high"):
         ("possibly_outdated_content", "new", False, "periodic"),
         ("unknown_future_type", "new", True, "unassessed"),
         ("sitemap_404", "verified", False, "history"),
-        ("sitemap_404", "resolved", True, "research"),
+        ("sitemap_404", "resolved", True, "verification"),
         ("sitemap_404", "new", False, "research"),
         ("sitemap_404", "review", True, "research"),
         ("internally_linked_redirect", "new", True, "research"),
@@ -112,7 +112,9 @@ def setup_site():
         )
         db.add(run)
         db.flush()
-        snapshot = UrlSnapshot(url_id=url.id, crawl_run_id=run.id, requested_url=url.normalized_url)
+        snapshot = UrlSnapshot(
+            url_id=url.id, crawl_run_id=run.id, requested_url=url.normalized_url, status_code=404
+        )
         db.add(snapshot)
         db.flush()
         record = issue()
@@ -192,3 +194,187 @@ def test_high_severity_age_finding_requires_review():
     sample.severity = "high"
     result = assess(sample, current_evidence=True, partial=False, tasks=[], now=utc_now())
     assert result["lane"] == "research"
+
+
+def test_full_evidence_survives_light_check_but_not_changed_destination(client):
+    site, url, run = setup_site()
+    with SessionLocal() as db:
+        record = db.scalar(select(Issue).where(Issue.website_id == site))
+        record.issue_type = "duplicate_meta_description"
+        snapshot = db.scalar(select(UrlSnapshot).where(UrlSnapshot.url_id == url))
+        snapshot.metadata_hash = "full-analysis"
+        snapshot.status_code = 200
+        snapshot.final_url = "https://www.human.nl/page"
+        occurrence = db.scalar(select(IssueOccurrence).where(IssueOccurrence.issue_id == record.id))
+        occurrence.evidence = {
+            "value": "Shared description",
+            "related_urls": ["https://www.human.nl/other"],
+        }
+        light = UrlSnapshot(
+            url_id=url,
+            crawl_run_id=run,
+            requested_url=snapshot.requested_url,
+            final_url=snapshot.final_url,
+            status_code=200,
+            checked_at=utc_now() + timedelta(seconds=1),
+        )
+        db.add(light)
+        db.commit()
+        light_id = light.id
+    endpoint = f"/api/v1/websites/{site}/work-preview"
+    item = client.get(endpoint).json()["items"][0]
+    assert item["lane"] == "decision"
+    assert item["current_evidence"] is True
+    assert "https://www.human.nl/other" in " ".join(item["evidence_facts"])
+    assert "Shared description" in " ".join(item["evidence_facts"])
+    assert "doelgroep" in item["first_step"]
+    with SessionLocal() as db:
+        db.get(UrlSnapshot, light_id).final_url = "https://www.human.nl/changed"
+        db.commit()
+    item = client.get(endpoint).json()["items"][0]
+    assert item["lane"] == "research"
+    assert item["evidence_code"] == "changed_reachability"
+
+
+def test_history_and_verification_are_separate(client):
+    site, _, _ = setup_site()
+    with SessionLocal() as db:
+        record = db.scalar(select(Issue).where(Issue.website_id == site))
+        record.status = "verified"
+        db.commit()
+    endpoint = f"/api/v1/websites/{site}/work-preview"
+    data = client.get(endpoint).json()
+    assert data["items"] == [] and data["counts"]["history"] == 1
+    assert client.get(endpoint, params={"lane": "history"}).json()["total"] == 1
+    assert client.get(endpoint, params={"include_history": True}).json()["total"] == 1
+    with SessionLocal() as db:
+        record = db.scalar(select(Issue).where(Issue.website_id == site))
+        record.status = "resolved"
+        db.commit()
+    assert client.get(endpoint).json()["items"][0]["lane"] == "verification"
+
+
+@pytest.mark.parametrize("kind", ["orphan_page", "sitemap_404"])
+def test_snapshotless_site_evidence_is_explained(client, kind):
+    site, _, _ = setup_site()
+    with SessionLocal() as db:
+        record = db.scalar(select(Issue).where(Issue.website_id == site))
+        record.issue_type, record.status = kind, "review"
+        occurrence = db.scalar(select(IssueOccurrence).where(IssueOccurrence.issue_id == record.id))
+        occurrence.snapshot_id = None
+        db.commit()
+    item = client.get(f"/api/v1/websites/{site}/work-preview").json()["items"][0]
+    assert item["evidence_code"] == "site_evidence_needed"
+    assert "ter beoordeling" in item["reason"]
+    assert "homepagina" not in item["first_step"]  # UI consistently calls it homepage.
+    assert ("homepage" if kind == "orphan_page" else "sitemap") in item["first_step"]
+
+
+def test_schema_review_identifies_organization_and_no_blanket_route_warning():
+    from app.services.work_preview_guidance import evidence_facts
+
+    result = assess(
+        issue("structured_data_visible_content_mismatch", confidence="low"),
+        current_evidence=False,
+        partial=True,
+        tasks=[],
+        now=utc_now(),
+        evidence_reason="Oud bewijs",
+    )
+    assert "organisatienaam" in result["first_step"]
+    assert "ontbrekende routes" not in result["reason"]
+    facts = evidence_facts(
+        "structured_data_visible_content_mismatch",
+        {
+            "mismatches": [
+                {"schema_type": "Organization", "field": "name", "schema_value": "Voorbeeld"}
+            ]
+        },
+    )
+    assert "Organization" in facts[0] and "Voorbeeld" in facts[0]
+    assert "huidige schemavergelijking" in facts[-1]
+
+
+def test_query_review_uses_stored_period_and_existing_work_read_only(client):
+    from app.models.integrations import SearchConsoleQueryMetric
+    from app.models.recommendations import RecommendationTaskUrl
+
+    site, url, _ = setup_site()
+    with SessionLocal() as db:
+        task = RecommendationTask(
+            website_id=site,
+            recommendation_type="content_question_gap",
+            definition_version="1",
+            title="Bestaand inhoudelijk werk",
+            category="content",
+            primary_role="content",
+            priority_reason="Afgesproken",
+            feasibility="review_required",
+            action="Beoordeel",
+            rationale="Zoekvraag",
+        )
+        db.add(task)
+        db.flush()
+        db.add(RecommendationTaskUrl(task_id=task.id, url_id=url, role="page"))
+        for days, impressions in [(10, 80), (11, 20), (40, 999)]:
+            db.add(
+                SearchConsoleQueryMetric(
+                    website_id=site,
+                    url_id=url,
+                    page_url="https://www.human.nl/page",
+                    query="hoe los ik het probleem op",
+                    date=utc_now().date() - timedelta(days=days),
+                    impressions=impressions,
+                    clicks=2,
+                )
+            )
+        db.commit()
+    statements = []
+
+    def capture(conn, cursor, statement, parameters, context, executemany):
+        statements.append(statement.lstrip().split()[0].upper())
+
+    event.listen(engine, "before_cursor_execute", capture)
+    try:
+        response = client.get(
+            f"/api/v1/websites/{site}/work-preview", params={"lane": "opportunity"}
+        )
+    finally:
+        event.remove(engine, "before_cursor_execute", capture)
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert "actualiseer" in item["reason"]
+    assert "100 vertoningen" in " ".join(item["evidence_facts"])
+    assert "999" not in " ".join(item["evidence_facts"])
+    assert "pas daarna" in item["first_step"]
+    assert item["tasks"][0]["title"] == "Bestaand inhoudelijk werk"
+    assert response.json()["total_opportunities"] == 1
+    assert not set(statements) & {"INSERT", "UPDATE", "DELETE"}
+
+
+def test_age_only_case_has_no_route_warning():
+    result = assess(
+        issue("possibly_outdated_content"),
+        current_evidence=False,
+        partial=True,
+        tasks=[],
+        now=utc_now(),
+    )
+    assert result["lane"] == "periodic"
+    assert result["role"] == "Eindredacteur"
+    assert "archieffunctie" in result["first_step"]
+    assert "routes" not in result["reason"]
+
+
+def test_old_analysis_cannot_be_refreshed_by_occurrence_timestamp(client):
+    site, url, _ = setup_site()
+    with SessionLocal() as db:
+        record = db.scalar(select(Issue).where(Issue.website_id == site))
+        record.issue_type = "duplicate_meta_description"
+        snapshot = db.scalar(select(UrlSnapshot).where(UrlSnapshot.url_id == url))
+        snapshot.metadata_hash = "analyzed"
+        snapshot.checked_at = utc_now() - timedelta(days=8)
+        db.commit()
+    item = client.get(f"/api/v1/websites/{site}/work-preview").json()["items"][0]
+    assert item["lane"] == "research"
+    assert item["evidence_code"] == "old_analysis"
