@@ -462,7 +462,10 @@ def test_full_crawl_limits_query_variants_per_path(monkeypatch) -> None:  # type
 
 def test_preseeded_sitemap_chain_keeps_shortest_depth(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     pages = {
-        "https://example.com/": b'<main><a href="/z-section">Section</a></main>',
+        "https://example.com/": (
+            b'<main><a href="/z-section">Section</a>'
+            b'<form action="/save" method="post"><button>Send</button></form></main>'
+        ),
         "https://example.com/z-section": b'<main><a href="/a-deep">Deep</a></main>',
         "https://example.com/a-deep": b"<main>Deep</main>",
         "https://example.com/sitemap.xml": b'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://example.com/a-deep</loc></url><url><loc>https://example.com/z-section</loc></url></urlset>',

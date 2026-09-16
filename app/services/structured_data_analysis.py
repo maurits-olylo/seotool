@@ -157,7 +157,7 @@ def analyze_contextual_structured_data(
                 else None
             )
             legacy = (
-                occurrence is None or (occurrence.evidence or {}).get("comparison_version") != 2
+                occurrence is None or (occurrence.evidence or {}).get("comparison_version") != 3
             )
             if (
                 legacy
@@ -268,6 +268,11 @@ def _contextual_schema_signals(
             and len(identity.strip()) >= 3
             and bool(visible)
             and _comparable_text(identity) not in visible
+            and not (
+                schema_type in {"Article", "BlogPosting", "NewsArticle"}
+                and identity_field == "headline"
+                and _headline_variant_matches(snapshot, identity)
+            )
         ):
             mismatches.append(
                 {
@@ -337,7 +342,7 @@ def _contextual_schema_signals(
                     "source": "json_ld",
                     "mismatches": mismatches,
                     "decision_required": True,
-                    "comparison_version": 2,
+                    "comparison_version": 3,
                     "cause_key": _schema_cause_key(mismatches),
                 },
             )
@@ -406,3 +411,30 @@ def _is_deep_content_page(url: Url, snapshot: UrlSnapshot) -> bool:
 def _comparable_text(value: str) -> str:
     """Ignore case, typography and whitespace without guessing semantic equivalence."""
     return " ".join(re.findall(r"\w+", unicodedata.normalize("NFKC", value).casefold()))
+
+
+def _headline_variant_matches(snapshot: UrlSnapshot, headline: str) -> bool:
+    """Recognize a narrowly evidenced editorial wrapper, not semantic similarity.
+
+    Remove one imperative prefix, optionally followed by a publisher suffix that is
+    itself visible in the title's branding segment. The remaining phrase must contain
+    at least three words and match the visible title/H1 as a contiguous word sequence.
+    Broadcast labels, dates, negations and arbitrary extra words are never discarded.
+    """
+    normalized = _comparable_text(headline)
+    match = re.match(r"^(?:kijk|bekijk|lees|watch|read) (.+)$", normalized)
+    if match is None:
+        return False
+    core = match.group(1)
+    if " bij " in core:
+        without_brand, brand = core.rsplit(" bij ", 1)
+        # A pipe explicitly separates the publisher/site label from the page title.
+        title_parts = (snapshot.title or "").rsplit("|", 1)
+        if len(title_parts) == 2 and len(brand) >= 3:
+            branding = _comparable_text(title_parts[1])
+            if f" {brand} " in f" {branding} ":
+                core = without_brand
+    if len(core.split()) < 3 or len(core) < 10:
+        return False
+    titles = [snapshot.title or "", *(snapshot.headings or {}).get("h1", [])]
+    return any(f" {core} " in f" {_comparable_text(title.split('|', 1)[0])} " for title in titles)

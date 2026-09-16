@@ -327,3 +327,124 @@ def test_legacy_schema_alert_is_reviewed_not_counted_as_website_repair() -> None
         analyze_contextual_structured_data(db, website_id=website.id, crawl_run_id=run.id)
         assert issue.status == "review"
         assert issue.resolved_at is None
+
+
+def test_narrow_headline_variants_match_production_examples_without_fuzzy_approval() -> None:
+    from app.services.structured_data_analysis import _headline_variant_matches
+
+    examples = [
+        ("Kijk 3LAB: Sjiek de friemel", "3LAB: Sjiek de Friemel", "3LAB: Sjiek de Friemel", True),
+        ("Kijk It will rain bij HUMAN", "It will rain", "3LAB: It will rain", True),
+        (
+            "Kijk Tessel in Cyberspace",
+            "Kijk de onlineserie 'Tessel in cyberspace'",
+            "3LAB: Tessel in Cyberspace",
+            True,
+        ),
+        ("Kijk Filmlab: Merhamet op NPO 3", "Merhamet", "3LAB: Merhamet", False),
+        (
+            "Kijk 2Doc Kort: Blauw Licht - Herinneringen van een Ambulancebroeder",
+            "Blauw Licht",
+            "Blauw licht",
+            False,
+        ),
+        (
+            "Update hoofdpersonen Gewoon liefde - Human - 2Doc",
+            "We kregen reacties uit de hele wereld",
+            "We kregen reacties uit de hele wereld",
+            False,
+        ),
+        ("Kijk It will rain niet", "It will rain", "It will rain", False),
+        ("Kijk It will rain morgen", "It will rain", "It will rain", False),
+        ("Kijk It will rain bij ANDER", "It will rain", "It will rain", False),
+        ("Kijk de film", "de film", "de film", False),
+        ("Kijk It will rainfall", "It will rain", "It will rain", False),
+    ]
+    for headline, title, h1, expected in examples:
+        snapshot = UrlSnapshot(title=title + " | HUMAN - Radicaal menselijk", headings={"h1": [h1]})
+        assert _headline_variant_matches(snapshot, headline) is expected, headline
+
+
+def test_headline_variants_do_not_disable_other_schema_checks_or_product_names() -> None:
+    from app.services.structured_data_analysis import _contextual_schema_signals
+
+    snapshot = UrlSnapshot(
+        status_code=200,
+        title="It will rain | HUMAN",
+        headings={"h1": ["It will rain"]},
+        main_content="Beschrijving",
+    )
+    article = [("Article", {"headline": "Kijk It will rain bij HUMAN"})]
+    signals = _contextual_schema_signals(snapshot, article, {})
+    assert {s.issue_type for s in signals} == {"structured_data_required_fields_missing"}
+    product = [("Product", {"name": "Kijk It will rain bij HUMAN"})]
+    signals = _contextual_schema_signals(snapshot, product, {})
+    assert "structured_data_visible_content_mismatch" in {s.issue_type for s in signals}
+    mismatch = next(
+        s for s in signals if s.issue_type == "structured_data_visible_content_mismatch"
+    )
+    assert mismatch.evidence["comparison_version"] == 3
+
+
+def test_version_two_headline_alert_becomes_review_not_repair_after_variant_rule() -> None:
+    from app.models.issues import IssueOccurrence
+
+    with SessionLocal() as db:
+        website = Website(
+            client=Client(name="Variant"), name="Variant", base_url="https://example.com/"
+        )
+        website.settings = WebsiteSettings()
+        db.add(website)
+        db.flush()
+        run = _run(db, website.id)
+        url = _url(db, website.id, 77)
+        snapshot = UrlSnapshot(
+            url_id=url.id,
+            crawl_run_id=run.id,
+            requested_url=url.normalized_url,
+            status_code=200,
+            title="It will rain | HUMAN",
+            headings={"h1": ["It will rain"]},
+            main_content="Film",
+            schema_data=[
+                {
+                    "@type": "Article",
+                    "headline": "Kijk It will rain bij HUMAN",
+                    "image": "https://example.com/image.jpg",
+                    "datePublished": "2026-09-01",
+                }
+            ],
+        )
+        issue = Issue(
+            website_id=website.id,
+            url_id=url.id,
+            issue_type="structured_data_visible_content_mismatch",
+            category="structured_data",
+            severity="medium",
+            title="Old",
+            description="Old",
+            recommended_action="Old",
+        )
+        db.add_all([snapshot, issue])
+        db.flush()
+        occurrence = IssueOccurrence(
+            issue_id=issue.id,
+            crawl_run_id=run.id,
+            snapshot_id=snapshot.id,
+            evidence={
+                "comparison_version": 2,
+                "mismatches": [
+                    {
+                        "schema_type": "Article",
+                        "field": "headline",
+                        "schema_value": "Kijk It will rain bij HUMAN",
+                    }
+                ],
+            },
+        )
+        db.add(occurrence)
+        db.flush()
+        analyze_contextual_structured_data(db, website_id=website.id, crawl_run_id=run.id)
+        assert issue.status == "review"
+        assert issue.resolved_at is None and issue.verified_at is None
+        assert occurrence.evidence["comparison_version"] == 2

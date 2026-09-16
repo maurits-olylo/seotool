@@ -192,3 +192,33 @@ def test_skips_broken_absolute_links_embedded_as_internal_paths() -> None:
         "https://www.human.nl/articles/http-status",
         "https://external.example/page",
     ]
+
+
+def test_form_actions_are_evidence_not_navigational_links() -> None:
+    page = extract_page(
+        """<main>
+        <form action="/admin-panel/forms/save" method="post">
+          <button>Versturen</button><button formaction="/special-save">Anders versturen</button>
+          <a href="/privacy">Privacy</a>
+        </form>
+        <a href="/admin-panel/help">Handleiding</a>
+        </main>""",
+        "https://example.com/",
+    )
+    assert {link.target_url for link in page.links} == {
+        "https://example.com/privacy",
+        "https://example.com/admin-panel/help",
+    }
+    assert {e.target_url for e in page.elements if e.element_type == "button"} == {
+        "https://example.com/admin-panel/forms/save",
+        "https://example.com/special-save",
+    }
+
+
+def test_actual_anchor_to_same_form_destination_is_still_a_link() -> None:
+    page = extract_page(
+        '<form action="/target"><button>Send</button></form><a href="/target">Open</a>',
+        "https://example.com/",
+    )
+    assert len(page.links) == 1
+    assert page.links[0].anchor_text == "Open"

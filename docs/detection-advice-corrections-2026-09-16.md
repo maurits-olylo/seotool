@@ -63,3 +63,48 @@ database session. Production diagnostics still require the existing NAS shell.
 - `tests/test_structured_data_analysis.py`
 - `tests/test_recommendations.py`
 - `docs/detection-advice-corrections-2026-09-16.md` (new)
+
+### Final refinement: form actions and headline variants
+
+Form buttons remain `ElementLocation` evidence, including resolved form targets and
+placeholder/application diagnostics. They no longer produce navigation `UrlLink` records
+or discover new pages via form actions. The crawler does not submit a form. A real
+anchor remains navigable even if its URL looks like an administration endpoint.
+Already registered URLs remain in the URL inventory and can still be checked as known
+URLs; this change does not bulk-remove them or rewrite their historical HTTP results.
+
+Historical reachability filters a source/target edge only when same-crawl element
+evidence identifies a button target and contains no actual anchor to the same target
+on that source. Missing evidence keeps the link; an anchor on another page does not
+change the classification for this source. Historical reports based on unmodified raw
+link records retain their original counts until refreshed with a new crawl. This is
+not a blanket domain/path exclusion or a rewrite of old link data.
+
+Article/BlogPosting/NewsArticle headlines get a deliberately narrow variant check:
+remove one leading Kijk/Bekijk/Lees/Watch/Read and, optionally, a trailing `bij <publisher>`
+only when that publisher is visible in the title branding after `|`. At least three
+words and ten characters must remain, as an exact contiguous word sequence in the
+visible title or H1. Arbitrary labels, dates and extra words are not discarded; product
+names do not use this exception. Other structured-data checks remain active. Version 3
+marks older disappearing alerts for review, retaining their original evidence instead
+of claiming website repair.
+
+Replaying this check on the six supplied HUMAN examples recognizes Sjiek de Friemel,
+It will rain and Tessel in Cyberspace. Gewoon liefde, Blauw licht and Merhamet remain
+review items. This is not a projection onto all 540 alerts, a semantic validator or an
+independent live website check. The bounded examples are not statistically representative.
+
+Additional affected files in this refinement:
+
+- `app/services/html_extraction.py`
+- `tests/test_html_extraction.py`
+- `tests/test_element_locations.py`
+
+No schema migration, extra dependency, production data rewrite, push or deployment is
+part of these local corrections. Bundle this refinement with 04748d2 and 7a2737a. Before
+an eventual release, account for the previously prepared security changes already on
+local main as well; do not describe a full archive as containing only these rule changes.
+The productive UI and its bulk handling of historical findings have not been changed.
+
+Final local validation: all 680 tests passed, as did Ruff and diff whitespace checks.
+The existing test-client deprecation warning remains unrelated to this package.

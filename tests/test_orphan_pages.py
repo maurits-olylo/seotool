@@ -254,3 +254,67 @@ def test_blocker_reasons_distinguish_measurement_gaps(status, content_type, erro
         graph = crawl_reachability(db, website_id=site.id, crawl_run_id=run.id)
         assert not graph.complete
         assert graph.blockers == {urls["/deep"].id: reason}
+
+
+@pytest.mark.parametrize("anchor_present", [False, True])
+def test_historical_form_edge_uses_element_evidence_and_preserves_real_anchor(
+    anchor_present: bool,
+) -> None:
+    from app.models.crawl import ElementLocation
+
+    with SessionLocal() as db:
+        site, run, urls = _graph(db)
+        _link(db, run, urls["/"], urls["/deep"])
+        root_snapshot = db.scalar(select(UrlSnapshot).where(UrlSnapshot.url_id == urls["/"].id))
+        failed = db.scalar(select(UrlSnapshot).where(UrlSnapshot.url_id == urls["/deep"].id))
+        assert root_snapshot and failed
+        failed.status_code = 500
+        for element_type in ["button", "a"] if anchor_present else ["button"]:
+            db.add(
+                ElementLocation(
+                    website_id=site.id,
+                    source_url_id=urls["/"].id,
+                    snapshot_id=root_snapshot.id,
+                    crawl_run_id=run.id,
+                    element_type=element_type,
+                    target_url=urls["/deep"].normalized_url,
+                    html_fragment="<button>Send</button>",
+                )
+            )
+        db.flush()
+        graph = crawl_reachability(db, website_id=site.id, crawl_run_id=run.id)
+        assert graph.complete is (not anchor_present)
+        assert (urls["/deep"].id in graph.depths) is anchor_present
+        assert bool(graph.blockers) is anchor_present
+
+
+def test_old_form_evidence_does_not_hide_a_link_in_a_new_crawl() -> None:
+    from app.models.crawl import ElementLocation
+
+    with SessionLocal() as db:
+        site, run, urls = _graph(db)
+        _link(db, run, urls["/"], urls["/deep"])
+        other_job = CrawlJob(website_id=site.id, job_type="full_site_crawl")
+        db.add(other_job)
+        db.flush()
+        other_run = CrawlRun(
+            website_id=site.id, crawl_job_id=other_job.id, crawl_type="full_site_crawl"
+        )
+        db.add(other_run)
+        db.flush()
+        snapshot = db.scalar(select(UrlSnapshot).where(UrlSnapshot.url_id == urls["/"].id))
+        assert snapshot
+        db.add(
+            ElementLocation(
+                website_id=site.id,
+                source_url_id=urls["/"].id,
+                snapshot_id=snapshot.id,
+                crawl_run_id=other_run.id,
+                element_type="button",
+                target_url=urls["/deep"].normalized_url,
+                html_fragment="<button>Send</button>",
+            )
+        )
+        db.flush()
+        graph = crawl_reachability(db, website_id=site.id, crawl_run_id=run.id)
+        assert graph.depths[urls["/deep"].id] == 1

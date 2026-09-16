@@ -105,8 +105,7 @@ def extract_page(html: str, page_url: str) -> ExtractedPage:
         "canonical": canonical,
         "canonical_urls": canonical_urls,
         "hreflang_links": [
-            {"language": link.language, "target_url": link.target_url}
-            for link in hreflang_links
+            {"language": link.language, "target_url": link.target_url} for link in hreflang_links
         ],
         "robots": robots,
         "headings": headings,
@@ -226,7 +225,9 @@ def _collect_schema_types(value: object, types: set[str]) -> None:
 def _extract_links(soup: BeautifulSoup, page_url: str) -> list[ExtractedLink]:
     page_host = urlsplit(page_url).hostname
     links: list[ExtractedLink] = []
-    for tag in soup.find_all(["a", "button"]):
+    # Form actions are interaction evidence, not pages to visit with a crawler GET.
+    # Buttons remain in page.elements with their resolved targets and diagnostics.
+    for tag in soup.find_all("a"):
         target = _element_target(tag, page_url)
         if target is None:
             continue
@@ -404,11 +405,7 @@ def _initial_element_issue_types(
     if tag.name in {"a", "button"}:
         form = tag.find_parent("form") if tag.name == "button" else None
         raw = _clean_text(
-            str(
-                tag.get("href")
-                or tag.get("formaction")
-                or (form.get("action") if form else "")
-            )
+            str(tag.get("href") or tag.get("formaction") or (form.get("action") if form else ""))
         )
         placeholder = bool(re.search(r"(?:\{\{|\{%|\[\[|cms://|\$\{)", raw, re.I))
         invalid = not raw or raw == "#" or raw.lower().startswith("javascript:")
@@ -472,8 +469,10 @@ def _nearby_text(tag: Tag, *, previous: bool) -> str | None:
                 words = value.split()
                 selected = words[-8:] if previous else words[:8]
                 return " ".join(selected)[:160]
-        node = finder(string=True) if node is None else (
-            node.find_previous(string=True) if previous else node.find_next(string=True)
+        node = (
+            finder(string=True)
+            if node is None
+            else (node.find_previous(string=True) if previous else node.find_next(string=True))
         )
     return None
 
@@ -486,9 +485,7 @@ def _css_selector(tag: Tag) -> str | None:
     current: Tag | None = tag
     while current is not None and current.name not in {"[document]", "html"}:
         siblings = (
-            list(current.parent.find_all(current.name, recursive=False))
-            if current.parent
-            else []
+            list(current.parent.find_all(current.name, recursive=False)) if current.parent else []
         )
         position = siblings.index(current) + 1 if current in siblings else 1
         parts.append(f"{current.name}:nth-of-type({position})")
@@ -501,9 +498,7 @@ def _xpath(tag: Tag) -> str | None:
     current: Tag | None = tag
     while current is not None and current.name != "[document]":
         siblings = (
-            list(current.parent.find_all(current.name, recursive=False))
-            if current.parent
-            else []
+            list(current.parent.find_all(current.name, recursive=False)) if current.parent else []
         )
         position = siblings.index(current) + 1 if current in siblings else 1
         parts.append(f"{current.name}[{position}]")

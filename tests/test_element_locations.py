@@ -110,8 +110,11 @@ def test_extracts_multiple_issue_elements_and_duplicate_context() -> None:
     assert any("cms_link_placeholder" in item.issue_types for item in page.elements)
     assert all("invalid_or_empty_link" not in item.issue_types for item in page.elements)
     assert any("broken_application_cta" in item.issue_types for item in page.elements)
+    assert all(link.target_url != "https://example.com/solliciteren" for link in page.links)
     assert any(
-        link.target_url == "https://example.com/solliciteren" for link in page.links
+        element.element_type == "button"
+        and element.target_url == "https://example.com/solliciteren"
+        for element in page.elements
     )
     icon_link = next(item for item in page.elements if "zonder-tekst" in (item.target_url or ""))
     assert icon_link.visible_text is None
@@ -189,9 +192,7 @@ def test_extracts_media_delivery_review_signals() -> None:
     image = next(item for item in page.elements if item.element_type == "img")
     video = next(item for item in page.elements if item.element_type == "video")
     iframe = next(item for item in page.elements if item.element_type == "iframe")
-    assert {"image_dimensions_missing", "image_responsive_source_missing"} <= set(
-        image.issue_types
-    )
+    assert {"image_dimensions_missing", "image_responsive_source_missing"} <= set(image.issue_types)
     assert {
         "video_missing_poster",
         "video_preload_auto",
@@ -249,16 +250,13 @@ def test_alt_checks_distinguish_content_function_and_decoration() -> None:
         "https://example.com/page",
     )
     images = {
-        item.target_url: set(item.issue_types)
-        & {"image_alt_missing", "functional_image_alt_empty"}
+        item.target_url: set(item.issue_types) & {"image_alt_missing", "functional_image_alt_empty"}
         for item in page.elements
         if item.element_type == "img"
     }
 
     assert images["https://example.com/missing-alt.jpg"] == {"image_alt_missing"}
-    assert images["https://example.com/functional-empty.jpg"] == {
-        "functional_image_alt_empty"
-    }
+    assert images["https://example.com/functional-empty.jpg"] == {"functional_image_alt_empty"}
     for target in {
         "https://example.com/described.jpg",
         "https://example.com/decorative.jpg",
@@ -350,9 +348,7 @@ def test_marks_many_targets_with_one_filtered_select() -> None:
         assert len(selects) == 1
         assert "crawl_run_id" in selects[0]
         locations = list(
-            db.scalars(
-                select(ElementLocation).where(ElementLocation.crawl_run_id == run_id)
-            )
+            db.scalars(select(ElementLocation).where(ElementLocation.crawl_run_id == run_id))
         )
         by_target = {location.target_url: location.issue_types for location in locations}
         assert by_target["https://example.com/one"] == ["internally_linked_404"]
@@ -408,7 +404,4 @@ def test_bulk_target_matching_checks_control_between_bounded_batches() -> None:
 
         assert updated == 3
         assert len(checks) == 2
-        assert all(
-            "internally_linked_redirect" in location.issue_types
-            for location in locations
-        )
+        assert all("internally_linked_redirect" in location.issue_types for location in locations)

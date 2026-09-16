@@ -7,7 +7,7 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.crawl import CrawlRun, UrlLink, UrlSnapshot
+from app.models.crawl import CrawlRun, ElementLocation, UrlLink, UrlSnapshot
 from app.models.discovery import Url
 from app.models.website import Website
 from app.services.link_filtering import is_non_navigational_link_target
@@ -23,6 +23,42 @@ class CrawlReachability:
     snapshots: dict[object, UrlSnapshot]
     complete: bool
     blockers: dict[object, str] = field(default_factory=dict)
+
+
+def form_only_link_edges(db: Session, *, crawl_run_id: object) -> set[tuple[object, str]]:
+    """Identify historical form edges from same-crawl element evidence, never URL names.
+
+    The legacy extractor only assigned button targets from form actions. A real anchor
+    to the same destination on the same source takes precedence and remains navigable.
+    Without element evidence a historical link remains in the graph.
+    """
+    buttons = set(
+        db.execute(
+            select(
+                ElementLocation.source_url_id,
+                ElementLocation.target_url,
+            ).where(
+                ElementLocation.crawl_run_id == crawl_run_id,
+                ElementLocation.element_type == "button",
+                ElementLocation.target_url.is_not(None),
+            )
+        ).tuples()
+    )
+    if not buttons:
+        return set()
+    anchors = set(
+        db.execute(
+            select(
+                ElementLocation.source_url_id,
+                ElementLocation.target_url,
+            ).where(
+                ElementLocation.crawl_run_id == crawl_run_id,
+                ElementLocation.element_type == "a",
+                ElementLocation.target_url.is_not(None),
+            )
+        ).tuples()
+    )
+    return buttons - anchors
 
 
 def crawl_reachability(
@@ -67,12 +103,18 @@ def crawl_reachability(
     if root_id is None or run.crawl_type != "full_site_crawl":
         return CrawlReachability({}, snapshots, False, {None: "root_or_full_crawl_missing"})
     edges: dict[object, set[object]] = defaultdict(set)
-    for source, target in db.execute(
-        select(UrlLink.source_url_id, UrlLink.target_url_id).where(
+    form_edges = form_only_link_edges(db, crawl_run_id=crawl_run_id)
+    for source, target, target_url in db.execute(
+        select(UrlLink.source_url_id, UrlLink.target_url_id, UrlLink.target_url).where(
             UrlLink.crawl_run_id == crawl_run_id, UrlLink.is_internal.is_(True)
         )
     ):
-        if source in urls and target in urls and source != target:
+        if (
+            source in urls
+            and target in urls
+            and source != target
+            and (source, target_url) not in form_edges
+        ):
             edges[source].add(target)
     navigation_snapshots = dict(snapshots)
     for source, snapshot in snapshots.items():
