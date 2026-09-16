@@ -5,7 +5,7 @@ from typing import Any
 from urllib.parse import unquote, urlsplit
 from uuid import UUID
 
-from sqlalchemy import Select, func, select, tuple_
+from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session, aliased
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -25,8 +25,18 @@ def navigation_link(crawl_run_id: UUID) -> ColumnElement[bool]:
             ElementLocation.element_type == kind,
         )
 
-    form_only = element_pairs("button").except_(element_pairs("a"))
-    return tuple_(UrlLink.source_url_id, UrlLink.target_url).not_in(form_only)
+    # NOT IN can become a repeatedly scanned materialized subplan when the
+    # evidence set exceeds PostgreSQL work_mem. NOT EXISTS permits a hash
+    # anti join and does not depend on nullable composite NOT IN semantics.
+    form_only = element_pairs("button").except_(element_pairs("a")).subquery()
+    return (
+        ~select(1)
+        .where(
+            form_only.c.source_url_id == UrlLink.source_url_id,
+            form_only.c.target_url == UrlLink.target_url,
+        )
+        .exists()
+    )
 
 
 def completed_runs(db: Session, website_id: UUID) -> list[CrawlRun]:
@@ -110,9 +120,10 @@ def ranking(db: Session, website_id: UUID) -> dict[str, Any]:
     previous = runs[1] if len(runs) > 1 else None
     if previous and previous.started_at.replace(tzinfo=UTC) < cutoff:
         previous = None
-    previous_counts = link_counts(db, previous) if previous else {}
+    comparable = bool(previous and previous.status == run.status == "succeeded")
+    previous_counts = link_counts(db, previous) if comparable else {}
     previous_ids = (
-        set(snapshot_statuses(db, previous)) | set(previous_counts) if previous else set()
+        set(snapshot_statuses(db, previous)) | set(previous_counts) if comparable else set()
     )
     candidate_ids = set(statuses) | set(counts)
     items = []
@@ -144,7 +155,7 @@ def ranking(db: Session, website_id: UUID) -> dict[str, Any]:
         "crawl_status": run.status,
         "failed_urls": run.failed_urls,
         "crawled_urls": run.crawled_urls,
-        "comparison_available": bool(previous and previous.status == run.status == "succeeded"),
+        "comparison_available": comparable,
         "summary": summary,
         "measured_urls": len(statuses),
         "crawl_run_id": run.id,

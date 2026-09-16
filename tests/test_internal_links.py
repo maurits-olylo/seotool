@@ -314,3 +314,50 @@ def test_form_only_history_excluded_from_both_counts_and_sources(client) -> None
         == 2
     )
     assert client.get(base).json()["top"][0]["incoming_pages"] == 2
+
+
+def test_partial_ranking_does_not_read_unused_previous_links(monkeypatch) -> None:
+    from uuid import UUID
+
+    from app.services import internal_links
+
+    ids = fixture()
+    original = internal_links.link_counts
+    queried = []
+
+    def tracked_counts(db, run):
+        queried.append(run.id)
+        return original(db, run)
+
+    monkeypatch.setattr(internal_links, "link_counts", tracked_counts)
+    with SessionLocal() as db:
+        run = db.get(CrawlRun, UUID(ids["run"]))
+        run.status = "partially_succeeded"
+        db.flush()
+        result = internal_links.ranking(db, run.website_id)
+    assert queried == [UUID(ids["run"])]
+    assert result["comparison_available"] is False
+    assert result["previous_finished_at"] is not None
+    assert all(item["change"] is None for item in result["items"])
+
+
+def test_navigation_filter_allows_postgres_anti_join() -> None:
+    from uuid import uuid4
+
+    from sqlalchemy import select
+    from sqlalchemy.dialects import postgresql
+
+    from app.services.internal_links import navigation_link
+
+    sql = str(
+        select(UrlLink.id)
+        .where(navigation_link(uuid4()))
+        .compile(
+            dialect=postgresql.dialect(),
+        )
+    )
+    assert "NOT (EXISTS" in sql
+    assert "NOT IN" not in sql
+    assert "EXCEPT" in sql
+    assert "anon_1.source_url_id = url_links.source_url_id" in sql
+    assert "anon_1.target_url = url_links.target_url" in sql

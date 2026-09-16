@@ -1852,6 +1852,7 @@ async function loadIssues() {
   const requestId = state.issuesRequestId = (state.issuesRequestId || 0) + 1;
   const websiteId = $("#website-select").value;
   if (!websiteId) {
+    state.issuesLoading = false;
     state.issues = [];
     state.suppressions = [];
     state.integrationHealth = {connections: [], mappings: []};
@@ -1863,17 +1864,27 @@ async function loadIssues() {
   const status = $("#status-filter").value || "active";
   const canAdmin = ["superuser", "admin"].includes(state.currentUser?.role);
   const clientId = $("#client-select").value;
-  const [issues, urls, coverage, suppressions, integrationHealth] = await Promise.all([
-    api(`/api/v1/websites/${websiteId}/issues?status=${encodeURIComponent(status)}`),
-    loadAllUrls(websiteId),
-    api(`/api/v1/websites/${websiteId}/url-coverage`),
-    api(`/api/v1/websites/${websiteId}/issue-suppressions`),
-    canAdmin ? Promise.all([
-      api(`/api/v1/clients/${clientId}/integrations`),
-      api(`/api/v1/websites/${websiteId}/integrations`),
-    ]).then(([connections, mappings]) => ({connections, mappings})).catch(() => ({connections: [], mappings: []})) : Promise.resolve({connections: [], mappings: []}),
-  ]);
+  let issues, urls, coverage, suppressions, integrationHealth;
+  try {
+    [issues, urls, coverage, suppressions, integrationHealth] = await Promise.all([
+      api(`/api/v1/websites/${websiteId}/issues?status=${encodeURIComponent(status)}`),
+      loadAllUrls(websiteId),
+      api(`/api/v1/websites/${websiteId}/url-coverage`),
+      api(`/api/v1/websites/${websiteId}/issue-suppressions`),
+      canAdmin ? Promise.all([
+        api(`/api/v1/clients/${clientId}/integrations`),
+        api(`/api/v1/websites/${websiteId}/integrations`),
+      ]).then(([connections, mappings]) => ({connections, mappings})).catch(() => ({connections: [], mappings: []})) : Promise.resolve({connections: [], mappings: []}),
+    ]);
+  } catch (error) {
+    if (requestId !== state.issuesRequestId || websiteId !== $("#website-select").value || clientId !== $("#client-select").value) return;
+    state.issuesLoading = false;
+    render();
+    $("#result-count").textContent = `Signalen konden niet worden geladen: ${error.message}`;
+    return;
+  }
   if (requestId !== state.issuesRequestId || websiteId !== $("#website-select").value || clientId !== $("#client-select").value) return;
+  state.issuesLoading = false;
   state.issues = issues;
   state.suppressions = suppressions;
   state.integrationHealth = integrationHealth;
@@ -2116,6 +2127,7 @@ async function loadOperations() {
       return null;
     });
     if (requestId !== state.operationsRequestId || websiteId !== $("#website-select").value) return;
+    state.operationsLoading = false;
     state.crawlRuns = crawlRuns;
     state.exports = exports;
     state.activeCrawlJob = currentJob;
@@ -2124,6 +2136,9 @@ async function loadOperations() {
     $("#operations-load-message").classList.toggle("error", !state.systemStatus);
     renderOperations();
   } catch (error) {
+    if (requestId !== state.operationsRequestId || websiteId !== $("#website-select").value) return;
+    state.operationsLoading = false;
+    $("#crawl-runs-empty").textContent = "Crawlhistorie kon niet worden geladen.";
     $("#operations-load-message").textContent = `Status kon niet worden bijgewerkt: ${error.message}`;
     $("#operations-load-message").classList.add("error");
   } finally {
@@ -2263,6 +2278,9 @@ function renderOperations() {
   $("#toggle-crawl-archive").textContent = state.showCrawlArchive
     ? "Toon alleen laatste 3"
     : `Toon archief (${state.crawlRuns.length - 3})`;
+  $("#crawl-runs-empty").textContent = state.operationsLoading
+    ? "Crawlhistorie wordt geladen…"
+    : "Voor deze website zijn nog geen crawls uitgevoerd.";
   $("#crawl-runs-empty").classList.toggle("hidden", state.crawlRuns.length !== 0);
   const activeRun = state.crawlRuns.find((run) => ["running", "paused", "pause_requested"].includes(run.status));
   const activeJob = state.activeCrawlJob;
@@ -2715,6 +2733,14 @@ function render() {
   const selectedOnPage = pageIds.filter((id) => state.selectedIssueIds.has(id)).length;
   $("#select-page-issues").checked = pageIds.length > 0 && selectedOnPage === pageIds.length;
   $("#select-page-issues").indeterminate = selectedOnPage > 0 && selectedOnPage < pageIds.length;
+  if (state.issuesLoading) {
+    $("#summary").innerHTML = "";
+    $("#result-count").textContent = "Signalen worden geladen…";
+    $("#empty").classList.add("hidden");
+    $("#page-label").textContent = "";
+    $("#previous-page").disabled = true;
+    $("#next-page").disabled = true;
+  }
   renderIssueBulkBar();
   renderSuppressions();
   if (state.currentView === "dashboard") renderDashboard();
@@ -3422,13 +3448,23 @@ function clearWebsiteViewState() {
   state.contentAnalysisPage = 1;
   state.operationsRequestId += 1;
   state.changesRequestId += 1;
-  state.operationsLoading = false;
+  state.operationsLoading = true;
   state.crawlRuns = [];
   state.showCrawlArchive = false;
   state.activeCrawlJob = null;
   state.exports = [];
   state.changes = [];
   state.changeGroups = [];
+  state.suppressions = [];
+  state.integrationHealth = {connections: [], mappings: []};
+  state.urlCoverage = null;
+  state.selectedIssueIds.clear();
+  state.selectedSuppressionIds.clear();
+  state.issuesLoading = true;
+  $("#crawl-action-message").textContent = "";
+  $("#operations-load-message").textContent = "";
+  $("#type-filter").innerHTML = '<option value="">Alle issue-types</option>';
+  render();
   if (state.currentView === "changes") renderTableState("#change-rows", 5, "Wijzigingen worden geladen…");
   if (state.currentView === "operations") renderOperations();
 }
