@@ -43,8 +43,7 @@ MAX_WEAK_INBOUND_LINKS = 1
 def detect_orphan_pages(db: Session, *, website_id: object, crawl_run_id: object) -> list[Url]:
     graph = crawl_reachability(db, website_id=website_id, crawl_run_id=crawl_run_id)
     run = db.get(CrawlRun, crawl_run_id)
-    if run is None or not graph.complete:
-        # Missing measurements cannot establish absence or resolve existing issues.
+    if run is None:
         return []
     discovery_only_ids = discovery_only_url_ids(
         db,
@@ -69,7 +68,8 @@ def detect_orphan_pages(db: Session, *, website_id: object, crawl_run_id: object
     orphan_urls = [
         url
         for url in orphan_urls
-        if url.id not in discovery_only_ids
+        if graph.complete
+        and url.id not in discovery_only_ids
         and url.id not in graph.depths
         and (snapshot := graph.snapshots.get(url.id)) is not None
         and snapshot.status_code == 200
@@ -122,6 +122,8 @@ def detect_orphan_pages(db: Session, *, website_id: object, crawl_run_id: object
         )
     )
     for issue in existing:
+        # Positive route evidence remains usable even when another branch is unknown.
+        # Only new claims of absence require a complete graph.
         if issue.url_id not in orphan_ids and issue.url_id in graph.depths:
             occurrence = db.scalar(
                 select(IssueOccurrence)

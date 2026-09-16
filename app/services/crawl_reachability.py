@@ -1,7 +1,7 @@
 """Reconstruct navigation using one crawl, independently of mutable URL depth."""
 
 from collections import defaultdict, deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import structlog
 from sqlalchemy import select
@@ -22,6 +22,7 @@ class CrawlReachability:
     depths: dict[object, int]
     snapshots: dict[object, UrlSnapshot]
     complete: bool
+    blockers: dict[object, str] = field(default_factory=dict)
 
 
 def crawl_reachability(
@@ -36,7 +37,7 @@ def crawl_reachability(
     website = db.get(Website, website_id)
     run = db.get(CrawlRun, crawl_run_id)
     if not website or not run or run.website_id != website_id:
-        return CrawlReachability({}, {}, False)
+        return CrawlReachability({}, {}, False, {None: "website_or_crawl_missing"})
     settings = website.settings
     excluded = settings.excluded_url_patterns if settings else []
     options = NormalizationOptions(
@@ -64,7 +65,7 @@ def crawl_reachability(
     except InvalidUrlError:
         root_id = None
     if root_id is None or run.crawl_type != "full_site_crawl":
-        return CrawlReachability({}, snapshots, False)
+        return CrawlReachability({}, snapshots, False, {None: "root_or_full_crawl_missing"})
     edges: dict[object, set[object]] = defaultdict(set)
     for source, target in db.execute(
         select(UrlLink.source_url_id, UrlLink.target_url_id).where(
@@ -89,11 +90,19 @@ def crawl_reachability(
     depths: dict[object, int] = {root_id: 0}
     pending = deque([root_id])
     complete = True
+    blockers: dict[object, str] = {}
     while pending:
         source = pending.popleft()
         snapshot = navigation_snapshots.get(source)
         if snapshot is None or snapshot.error_message or snapshot.status_code is None:
             complete = False
+            blockers[source] = (
+                "missing_snapshot"
+                if snapshot is None
+                else "fetch_error"
+                if snapshot.error_message
+                else "missing_status"
+            )
             continue
         if snapshot.status_code in {404, 410}:
             continue
@@ -102,6 +111,9 @@ def crawl_reachability(
             "application/xhtml+xml",
         }:
             complete = False
+            blockers[source] = (
+                "http_status_not_usable" if snapshot.status_code != 200 else "content_type_not_html"
+            )
             continue
         neighbours = [(target, 1) for target in edges[source]]
         if snapshot.final_url:
@@ -119,14 +131,20 @@ def crawl_reachability(
     # A failed root cannot prove anything about the website's navigation.
     root = snapshots.get(root_id)
     complete = complete and root is not None and root.status_code == 200
+    if root is not None and root.status_code in {404, 410}:
+        blockers[root_id] = "root_unavailable"
+    if root_id in blockers:
+        # Merely seeding the configured root is not measured navigation evidence.
+        depths.clear()
     logger.info(
         "crawl_reachability_evaluated",
         website_id=str(website_id),
         crawl_run_id=str(crawl_run_id),
         reachable=len(depths),
         complete=complete,
+        blocking_sources=len(blockers),
     )
-    return CrawlReachability(depths, snapshots, complete)
+    return CrawlReachability(depths, snapshots, complete, blockers)
 
 
 def update_crawl_depths(db: Session, *, website_id: object, crawl_run_id: object) -> None:

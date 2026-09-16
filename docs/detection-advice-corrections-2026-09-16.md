@@ -32,6 +32,24 @@ Local fixtures cover a seeded chain in adversarial ordering, resume, isolated gr
 
 Next: compare old and new classifications against the stored production data in a read-only run. Do not bulk-close legacy findings based on the synthetic proof. After that comparison, decide which historical alerts should be withdrawn and which require website work. UI simplification and role dependency workflows remain separate phases.
 
+### Follow-up after the production comparison
+
+The read-only comparison found positive routes for 279 Schipper and 3,555 HUMAN legacy
+orphan findings, while both graphs remained incomplete. The original early return was
+too broad: an unknown branch must not block review of an independently proven route.
+Orphan creation still requires complete negative evidence; positive routes now remain
+eligible for legacy review (or the versioned resolution lifecycle) on a partial graph.
+No new absence claim is made for the other branches. A failed root contributes no
+positive route evidence merely because it was seeded.
+
+`CrawlReachability.blockers` reports source IDs and reason codes for missing snapshots,
+fetch errors, missing/unsuitable HTTP status, non-HTML responses and unavailable roots.
+It does not expose error messages or content in logs. A subsequent read-only diagnostic
+bundles this exact helper, reports bounded source examples, and samples at most six
+remaining schema mismatches per site with bounded title/H1/content evidence. The
+synthetic tests cover both complete and partial graphs and preserve an untouched
+database session. Production diagnostics still require the existing NAS shell.
+
 ## Files
 
 - `app/jobs.py`

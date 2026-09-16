@@ -111,6 +111,10 @@ def test_incomplete_reachable_sources_do_not_create_or_resolve_orphans(failure: 
         db.flush()
         assert detect_orphan_pages(db, website_id=site.id, crawl_run_id=run.id) == []
         assert issue.status == "new"
+        if failure == "root404":
+            graph = crawl_reachability(db, website_id=site.id, crawl_run_id=run.id)
+            assert graph.depths == {}
+            assert graph.blockers == {urls["/"].id: "root_unavailable"}
 
 
 def test_isolated_linked_group_and_stale_sources_do_not_prove_root_route() -> None:
@@ -194,3 +198,59 @@ def test_excluded_and_technical_targets_do_not_block_navigation_evidence() -> No
         graph = crawl_reachability(db, website_id=site.id, crawl_run_id=run.id)
         assert graph.complete
         assert urls["/isolated"].id not in graph.depths
+
+
+def test_partial_graph_reviews_proven_route_but_keeps_unknown_issue() -> None:
+    with SessionLocal() as db:
+        site, run, urls = _graph(db)
+        _link(db, run, urls["/"], urls["/section"])
+        _link(db, run, urls["/"], urls["/deep"])
+        missing = db.scalar(select(UrlSnapshot).where(UrlSnapshot.url_id == urls["/deep"].id))
+        assert missing
+        db.delete(missing)
+        issues = {}
+        for path in ("/section", "/isolated"):
+            issue = Issue(
+                website_id=site.id,
+                url_id=urls[path].id,
+                issue_type="orphan_page",
+                category="internal_links",
+                severity="medium",
+                title="Old",
+                description="Old",
+                recommended_action="Old",
+            )
+            db.add(issue)
+            issues[path] = issue
+        db.flush()
+        graph = crawl_reachability(db, website_id=site.id, crawl_run_id=run.id)
+        assert graph.complete is False
+        assert graph.blockers == {urls["/deep"].id: "missing_snapshot"}
+        assert detect_orphan_pages(db, website_id=site.id, crawl_run_id=run.id) == []
+        assert issues["/section"].status == "review"
+        assert issues["/section"].resolved_at is None
+        assert issues["/isolated"].status == "new"
+        assert issues["/isolated"].recommended_action == "Old"
+
+
+@pytest.mark.parametrize(
+    "status,content_type,error,reason",
+    [
+        (500, "text/html", None, "http_status_not_usable"),
+        (200, "application/pdf", None, "content_type_not_html"),
+        (None, None, "timeout", "fetch_error"),
+        (None, None, None, "missing_status"),
+    ],
+)
+def test_blocker_reasons_distinguish_measurement_gaps(status, content_type, error, reason) -> None:  # type: ignore[no-untyped-def]
+    with SessionLocal() as db:
+        site, run, urls = _graph(db)
+        _link(db, run, urls["/"], urls["/deep"])
+        snapshot = db.scalar(select(UrlSnapshot).where(UrlSnapshot.url_id == urls["/deep"].id))
+        assert snapshot
+        snapshot.status_code = status
+        snapshot.content_type = content_type
+        snapshot.error_message = error
+        graph = crawl_reachability(db, website_id=site.id, crawl_run_id=run.id)
+        assert not graph.complete
+        assert graph.blockers == {urls["/deep"].id: reason}
