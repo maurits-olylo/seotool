@@ -444,3 +444,98 @@ def test_postgres_escaped_nul_reading():
                 assert dict(read_evidence(db, [occurrence_id])) == {occurrence_id: payload}
     finally:
         postgres.dispose()
+
+
+def test_duplicate_group_preserves_counts_members_search_and_pagination(client):
+    site, url_id, run_id = setup_site()
+    with SessionLocal() as db:
+        first = db.scalar(select(Issue).where(Issue.website_id == site))
+        first.issue_type = "duplicate_meta_description"
+        other = Url(website_id=site, normalized_url="https://www.human.nl/second")
+        db.add(other)
+        db.flush()
+        second = issue("duplicate_meta_description")
+        second.website_id, second.url_id, second.category = site, other.id, "onpage"
+        db.add(second)
+        db.flush()
+        first_occurrence = db.scalar(
+            select(IssueOccurrence).where(IssueOccurrence.issue_id == first.id)
+        )
+        first_occurrence.evidence = {"value": "Shared", "related_urls": [other.normalized_url]}
+        db.add(
+            IssueOccurrence(
+                issue_id=second.id,
+                crawl_run_id=run_id,
+                evidence={"value": "Shared", "related_urls": ["https://www.human.nl/page"]},
+            )
+        )
+        # Both lack suitable content evidence and must stay in research.
+        first_occurrence.snapshot_id = None
+        second_id = second.id
+        db.commit()
+    root = f"/api/v1/websites/{site}/work-preview"
+    data = client.get(root, params={"q": "second", "limit": 1}).json()
+    assert data["total"] == 1
+    assert data["total_signals"] == 2
+    assert data["counts"]["research"] == 2
+    assert len(data["items"][0]["members"]) == 2
+    assert client.get(root, params={"offset": 1}).json()["items"] == []
+    with SessionLocal() as db:
+        db.get(Issue, second_id).status = "review"
+        db.commit()
+    assert client.get(root).json()["total"] == 2
+
+
+@pytest.mark.parametrize("difference", ["value", "crawl", "missing", "one_way"])
+def test_duplicate_groups_require_reciprocal_identical_evidence(difference):
+    from types import SimpleNamespace
+
+    from app.services.work_preview_groups import group_duplicates
+
+    base = dict(
+        issue_type="duplicate_title",
+        lane="research",
+        status="new",
+        severity="high",
+        evidence_code="old",
+        reason="Review",
+        first_step="Compare",
+        completion="Decided",
+        tasks=[],
+    )
+    items = [
+        dict(base, issue_id=1, url="https://example.com/a"),
+        dict(base, issue_id=2, url="https://example.com/b"),
+    ]
+    evidence = {i: SimpleNamespace(id=i, crawl_run_id=1) for i in [1, 2]}
+    details = {
+        1: {"value": "Same", "related_urls": [items[1]["url"]]},
+        2: {"value": "Same", "related_urls": [items[0]["url"]]},
+    }
+    if difference == "value":
+        details[2]["value"] = "Different"
+    elif difference == "crawl":
+        evidence[2].crawl_run_id = 2
+    elif difference == "missing":
+        details[2] = {}
+    else:
+        details[2]["related_urls"] = ["https://example.com/c"]
+    assert len(group_duplicates(items, evidence, details)) == 2
+
+
+def test_task_detail_uses_same_review_as_preview(client):
+    site, _, _ = setup_site()
+    with SessionLocal() as db:
+        record = db.scalar(select(Issue).where(Issue.website_id == site))
+        record.issue_type = "internally_linked_redirect"
+        record.status = "review"
+        record_id = record.id
+        db.commit()
+    response = client.post(f"/api/v1/issues/{record_id}/recommendation-task")
+    assert response.status_code == 201
+    task_id = response.json()["id"]
+    detail = client.get(f"/api/v1/recommendation-tasks/{task_id}").json()
+    card = client.get(f"/api/v1/websites/{site}/work-preview").json()["items"][0]
+    assert detail["readiness"]["lane"] == card["lane"] == "research"
+    assert detail["readiness"]["first_step"] == card["first_step"]
+    assert detail["readiness"]["reason"] == card["reason"]

@@ -29,6 +29,38 @@ LANES = {
     "history": "Resultaten en historie",
     "unassessed": "Nog niet beoordeeld",
 }
+
+
+def task_readiness(db: Session, task: RecommendationTask, issue_ids: list[UUID]) -> dict:
+    """Use the same evidence rules for this task, including every linked issue."""
+    ids = list(set(issue_ids + ([task.primary_issue_id] if task.primary_issue_id else [])))
+    data = preview(
+        db,
+        task.website_id,
+        issue_ids=ids,
+        task_id=task.id,
+        include_history=True,
+        limit=max(1, len(ids)),
+    )
+    items = data["items"]
+    blocked = next((item for item in items if item["lane"] != "execute"), None)
+    if not items or blocked:
+        return {
+            "lane": blocked["lane"] if blocked else "unassessed",
+            "label": LANES[blocked["lane"]] if blocked else "Eerst beoordelen",
+            "reason": blocked["reason"] if blocked else "Onderbouwend signaal ontbreekt.",
+            "first_step": blocked["first_step"]
+            if blocked
+            else "Controleer bewijs en gewenste uitkomst.",
+        }
+    return {
+        "lane": "execute",
+        "label": LANES["execute"],
+        "reason": items[0]["reason"],
+        "first_step": items[0]["first_step"],
+    }
+
+
 DECISIONS = {
     "http_404",
     "http_410",
@@ -225,9 +257,16 @@ def preview(
     limit: int = 20,
     q: str = "",
     include_history: bool = False,
+    issue_ids: list[UUID] | None = None,
+    task_id: UUID | None = None,
 ) -> dict[str, Any]:
     now = utc_now()
-    issues = list(db.scalars(select(Issue).where(Issue.website_id == website_id)))
+    issue_query = select(Issue).where(Issue.website_id == website_id)
+    if issue_ids is not None:
+        issue_query = issue_query.where(Issue.id.in_(issue_ids))
+    issues = list(db.scalars(issue_query))
+    scoped_urls = [i.url_id for i in issues if i.url_id]
+
     # Narrow projections: never load page HTML/content for the pilot.
     snapshots = (
         select(
@@ -246,6 +285,7 @@ def preview(
         )
         .join(Url, Url.id == UrlSnapshot.url_id)
         .where(Url.website_id == website_id)
+        .where(Url.id.in_(scoped_urls) if issue_ids is not None else True)
         .subquery()
     )
     latest = {row.url_id: row for row in db.execute(select(snapshots).where(snapshots.c.n == 1))}
@@ -266,6 +306,7 @@ def preview(
         )
         .join(Url, Url.id == UrlSnapshot.url_id)
         .where(Url.website_id == website_id, UrlSnapshot.metadata_hash.is_not(None))
+        .where(Url.id.in_(scoped_urls) if issue_ids is not None else True)
         .subquery()
     )
     analyzed = {
@@ -287,6 +328,7 @@ def preview(
         )
         .join(Issue, Issue.id == IssueOccurrence.issue_id)
         .where(Issue.website_id == website_id)
+        .where(Issue.id.in_(issue_ids) if issue_ids is not None else True)
         .subquery()
     )
     evidence = {
@@ -352,13 +394,17 @@ def preview(
                 and runs.get(occurrence.crawl_run_id)
                 and runs[occurrence.crawl_run_id].status == "partially_succeeded"
             ),
-            tasks=linked,
+            tasks=[t for t in linked if task_id is None or t.id == task_id],
             now=now,
             evidence_reason=evidence_reason,
         )
         items.append(
             dict(
                 issue_id=issue.id,
+                url_id=issue.url_id,
+                source_run_id=latest_full.id if latest_full and latest_full.finished_at else None,
+                source_run_at=latest_full.finished_at if latest_full else None,
+                source_run_status=latest_full.status if latest_full else None,
                 evidence_code=evidence_code,
                 evidence_reason=evidence_reason,
                 analysis_checked_at=analyzed[issue.url_id].checked_at
@@ -375,19 +421,42 @@ def preview(
                 evidence_at=occurrence.detected_at if occurrence else None,
                 snapshot_id=occurrence.snapshot_id if occurrence else None,
                 latest_checked_at=measured.checked_at if measured else None,
-                tasks=[dict(id=t.id, title=t.title, status=t.status) for t in linked],
+                tasks=[
+                    dict(
+                        id=t.id, title=t.title, status=t.status, primary_issue_id=t.primary_issue_id
+                    )
+                    for t in linked
+                ],
                 **result,
             )
         )
     signal_count = len(items)
-    items.extend(query_reviews(db, website_id, now))
+    if issue_ids is None:
+        items.extend(query_reviews(db, website_id, now))
+    opportunity_count = len(items) - signal_count
     counts = Counter(item["lane"] for item in items)
+    # Exact duplicate groups only; the raw signal counters stay unchanged.
+    duplicate_ids = [
+        evidence[i["issue_id"]].id
+        for i in items
+        if i["issue_type"] in {"duplicate_title", "duplicate_meta_description"}
+        and i["issue_id"] in evidence
+    ]
+    duplicate_details = dict(read_evidence(db, duplicate_ids))
+    from app.services.work_preview_groups import group_duplicates
+
+    items = group_duplicates(items, evidence, duplicate_details)
     selected = [
         item
         for item in items
         if (include_history or lane == "history" or item["lane"] != "history")
         and (not lane or item["lane"] == lane)
-        and q.casefold() in (item["title"] + " " + (item["url"] or "")).casefold()
+        and q.casefold()
+        in (
+            item["title"]
+            + " "
+            + " ".join(member.get("url") or "" for member in item.get("members", [item]))
+        ).casefold()
     ]
     selected.sort(
         key=lambda item: (
@@ -411,7 +480,7 @@ def preview(
         generated_at=now,
         rule_version="pilot-2",
         total_signals=signal_count,
-        total_opportunities=len(items) - signal_count,
+        total_opportunities=opportunity_count,
         counts={key: counts[key] for key in LANES},
         total=len(selected),
         items=visible,

@@ -212,6 +212,8 @@ def get_recommendation_task(
             .order_by(RecommendationTaskEvent.occurred_at)
         )
     )
+    from app.services.work_preview import task_readiness
+
     return {
         **RecommendationTaskRead.model_validate(task).model_dump(),
         "issue_ids": issue_ids,
@@ -226,6 +228,7 @@ def get_recommendation_task(
             for task_url, normalized_url in url_rows
         ],
         "events": events,
+        "readiness": task_readiness(db, task, issue_ids),
     }
 
 

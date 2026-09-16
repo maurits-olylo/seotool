@@ -813,6 +813,29 @@ async function createInvitation(event) {
   } catch (error) { message.textContent = error.message; }
 }
 
+async function openWorkPreviewLink() {
+  const query = new URLSearchParams(window.location.search);
+  const websiteId = query.get("website_id"), taskId = query.get("task_id"), issueId = query.get("issue_id");
+  if (!websiteId || (!taskId && !issueId)) return false;
+  try {
+    const website = await api(`/api/v1/websites/${encodeURIComponent(websiteId)}`);
+    const target = await api(taskId ? `/api/v1/recommendation-tasks/${encodeURIComponent(taskId)}` : `/api/v1/issues/${encodeURIComponent(issueId)}`);
+    if (target.website_id !== website.id) throw new Error("Deze taak of dit signaal hoort bij een andere website.");
+    const targetIssueId = taskId ? target.primary_issue_id || target.issue_ids?.[0] : target.id;
+    if (!targetIssueId) throw new Error("Deze taak heeft geen gekoppeld signaal om te openen.");
+    const targetIssue = taskId ? await api(`/api/v1/issues/${encodeURIComponent(targetIssueId)}`) : target;
+    if (targetIssue.website_id !== website.id) throw new Error("Het gekoppelde signaal hoort bij een andere website.");
+    clearWebsiteViewState();
+    await loadClients(website.client_id, website.id);
+    if ($("#website-select").value !== website.id) throw new Error("De geselecteerde website is niet beschikbaar.");
+    showView(taskId ? "tasks" : "actions");
+    await showIssue(targetIssueId, taskId);
+  } catch (error) {
+    alert(`Openen vanuit de voorvertoning mislukt: ${error.message}`);
+  }
+  return true;
+}
+
 async function loadClients(preferredClientId = null, preferredWebsiteId = null) {
   state.clients = await api("/api/v1/clients");
   $("#client-select").innerHTML = state.clients.map(option).join("");
@@ -2842,7 +2865,8 @@ async function restoreSelectedSuppressions() {
   }
 }
 
-async function showIssue(issueId) {
+async function showIssue(issueId, requestedTaskId = null) {
+  state.requestedTaskId = requestedTaskId;
   state.selectedIssueId = issueId;
   state.selectedInspectionSnapshotId = null;
   state.selectedRecommendationTask = null;
@@ -3044,7 +3068,7 @@ async function loadIssueRecommendation(issue) {
     if (state.selectedIssueId !== issue.id) return;
     state.recommendationDefinitions = definitions;
     state.taskMembers = members;
-    const taskSummary = tasks.find((task) => task.primary_issue_id === issue.id) || null;
+    const taskSummary = tasks.find((task) => state.requestedTaskId ? task.id === state.requestedTaskId : task.primary_issue_id === issue.id) || null;
     if (taskSummary) {
       const taskId = taskSummary.id;
       [
@@ -3072,6 +3096,14 @@ async function loadIssueRecommendation(issue) {
   }
 }
 
+function recommendationNextStep(task) {
+  if (task.status === "closed") return ["Geen actie nodig", "Deze taak is afgesloten."];
+  if (task.status === "implemented") return ["Controleer het resultaat", "Bekijk de verificatie hieronder voordat je het herstel als bevestigd beschouwt."];
+  const readiness = task.readiness;
+  if (!readiness || readiness.lane !== "execute") return [readiness?.label || "Eerst beoordelen", [readiness?.reason, readiness?.first_step].filter(Boolean).join(" ") || "Controleer bewijs, gewenste uitkomst en eigenaar voordat de uitvoering begint."];
+  return [task.status === "in_progress" ? "Rond het werk af" : "Start de uitvoering", readiness.first_step];
+}
+
 function renderRecommendationTask(issue, supported = true) {
   const task = state.selectedRecommendationTask;
   const content = $("#recommendation-task-content");
@@ -3091,16 +3123,7 @@ function renderRecommendationTask(issue, supported = true) {
     .map((value) => `<option value="${value}">${escapeHtml(taskStatusLabels[value] || value)}</option>`)
     .join("");
   const assigneeOptions = `<option value="">Niet toegewezen</option>${taskAssigneeOptions().map((member) => `<option value="${member.id}" ${member.id === task.assigned_to_user_id ? "selected" : ""}>${escapeHtml(member.display_name || member.email)}${member.id === state.currentUser?.id ? " (jij)" : ""}</option>`).join("")}`;
-  const nextStep = task.feasibility === "needs_decision"
-    ? ["Neem eerst een besluit", task.required_input[0] || "Bepaal welke uitkomst voor deze pagina bedoeld is."]
-    : ({
-    open: ["Bepaal wie dit oppakt", "Plan de taak of zet deze op ‘In uitvoering’ zodra het werk begint."],
-    planned: ["Start de uitvoering", "Zet de taak op ‘In uitvoering’ wanneer iemand ermee begint."],
-    in_progress: ["Rond het werk af", "Voer de stappen uit en meld de taak daarna als ‘Uitgevoerd’."],
-    waiting_for_input: ["Lever de ontbrekende input", "Zet de taak terug op ‘Gepland’ of ‘In uitvoering’ zodra de blokkade is opgelost."],
-    implemented: ["Controle loopt automatisch", "SEO Monitor controleert de uitvoering en werkt de taak daarna zelf bij."],
-    closed: ["Geen actie nodig", "Deze taak is afgesloten. Heropen haar alleen wanneer opnieuw werk nodig is."],
-  }[task.status] || ["Bepaal de volgende stap", "Werk de taakstatus bij zodra de situatie verandert."]);
+  const nextStep = recommendationNextStep(task);
   const controls = canWrite
     ? `<section class="task-panel task-controls-panel"><div class="task-section-heading"><span>03</span><div><small>Werk bijwerken</small><h4>Kies eigenaar en taakstatus</h4></div></div><div class="task-controls"><label>Eigenaar<select id="recommendation-task-owner">${assigneeOptions}</select><small>Laat leeg zolang nog niet bekend is wie de taak oppakt.</small></label><label>Nieuwe status<select id="recommendation-task-status">${statusOptions}</select></label><label class="task-comment">Korte toelichting<textarea id="recommendation-task-comment" maxlength="2000" placeholder="Optioneel, behalve bij heropenen"></textarea></label><label id="task-close-reason-label" class="task-close-reason hidden">Waarom wordt de taak afgesloten?<select id="recommendation-task-close-reason">${Object.entries(closeReasonLabels).map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join("")}</select></label><button id="save-recommendation-task" class="primary-button" type="button" disabled>Taak bijwerken</button></div></section>`
     : "";
@@ -3118,7 +3141,7 @@ function renderRecommendationTask(issue, supported = true) {
   const nextStepPanel = decision
     ? ""
     : `<section class="task-next-step" aria-label="Volgende stap"><span>Volgende stap</span><div><strong>${escapeHtml(nextStep[0])}</strong><p>${escapeHtml(nextStep[1])}</p></div></section>`;
-  content.innerHTML = `<article class="task-card"><header class="task-card-head"><div><span class="task-kicker">Aanbevolen uitvoering</span><h3>${escapeHtml(task.title)}</h3><div class="task-meta"><span>${escapeHtml(taskRoleLabels[task.primary_role] || task.primary_role)}</span><span>${escapeHtml(effort)}</span><span class="task-priority ${escapeHtml(task.priority)}">${escapeHtml(labels[task.priority] || task.priority)} prioriteit</span></div></div><span class="task-status status-${escapeHtml(task.status)}">${escapeHtml(taskStatusLabels[task.status] || task.status)}</span></header>${nextStepPanel}${decision}<div class="task-columns"><section class="task-panel"><div class="task-section-heading"><span>01</span><h4>Wat moet ik doen?</h4></div><ol>${task.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol></section><section class="task-panel task-criteria"><div class="task-section-heading"><span>02</span><h4>Wanneer is het klaar?</h4></div><ul>${task.acceptance_criteria.map((criterion) => `<li>${escapeHtml(criterion)}</li>`).join("")}</ul></section></div>${controls}${verification}${feedbackSummary}${feedbackForm}</article>`;
+  content.innerHTML = `<article class="task-card"><header class="task-card-head"><div><span class="task-kicker">Bestaande taak</span><h3>${escapeHtml(task.title)}</h3><div class="task-meta"><span>${escapeHtml(taskRoleLabels[task.primary_role] || task.primary_role)}</span><span>${escapeHtml(effort)}</span><span class="task-priority ${escapeHtml(task.priority)}">${escapeHtml(labels[task.priority] || task.priority)} prioriteit</span></div></div><span class="task-status status-${escapeHtml(task.status)}">${escapeHtml(taskStatusLabels[task.status] || task.status)}</span></header>${nextStepPanel}${decision}<div class="task-columns"><section class="task-panel"><div class="task-section-heading"><span>01</span><h4>${task.readiness?.lane === "execute" ? "Wat moet ik doen?" : "Uitvoeringsstappen na beoordeling"}</h4></div><ol>${task.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol></section><section class="task-panel task-criteria"><div class="task-section-heading"><span>02</span><h4>Wanneer is het klaar?</h4></div><ul>${task.acceptance_criteria.map((criterion) => `<li>${escapeHtml(criterion)}</li>`).join("")}</ul></section></div>${controls}${verification}${feedbackSummary}${feedbackForm}</article>`;
 }
 
 function renderTaskVerification(canWrite) {
@@ -3705,7 +3728,7 @@ api("/api/v1/me").then(async (user) => {
   }
   await loadClients();
   return true;
-}).then((workspaceReady) => {
+}).then(async (workspaceReady) => {
   if (!workspaceReady) return;
   showApp();
   const integrationResult = new URLSearchParams(window.location.search).get("integration");
@@ -3720,5 +3743,5 @@ api("/api/v1/me").then(async (user) => {
     $("#integration-message").textContent = integrationMessages[integrationResult] || "De koppeling is niet voltooid. Probeer opnieuw.";
     $("#integration-message").classList.remove("hidden");
     window.history.replaceState({}, "", `/app#${VIEW_HASHES.integrations}`);
-  } else showView(viewFromHash(), false);
+  } else if (!await openWorkPreviewLink()) showView(viewFromHash(), false);
 }).catch(() => showLogin());

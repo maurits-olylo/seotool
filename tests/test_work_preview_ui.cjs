@@ -16,12 +16,12 @@ async function test() {
       lane:'research',severity:'medium',title:'<img src=x onerror=alert(1)>',
       url:'javascript:alert(1)',reason:'Controleer',first_step:'Stap',role:'Redactie',
       completion:'Gereed',description:'Bewijs',evidence_reason:'Passende meting',
-      evidence_facts:['<script>alert(1)</script>'],tasks:[]}]};
+      evidence_facts:['<script>alert(1)</script>'],issue_id:'issue',url_id:'url',source_run_id:'run',source_run_status:'partially_succeeded',tasks:[{id:'task',title:'Bestaande taak',status:'planned'}]}]};
   vm.runInNewContext(source, {document:{getElementById:get},URL,URLSearchParams,
     location:{search:'?website_id=pilot'},fetch:async path=>{
       requests.push(String(path));
       return {ok:true,json:async()=>path==='/api/v1/websites'?
-        [{id:'pilot',name:'Pilot',base_url:'https://human.nl'}]:payload};
+        [{id:'pilot',name:'Pilot',base_url:'https://human.nl'}]:String(path).includes('/sources?')?{total:1,items:[{url:'javascript:alert(1)',anchor_texts:['<b>bron</b>']}]}:payload};
     }});
   const settle=()=>new Promise(resolve=>setImmediate(resolve));
   await settle();
@@ -30,6 +30,17 @@ async function test() {
   assert.match(get('cards').innerHTML,/href="#"/);
   assert.match(get('cards').innerHTML,/Passende meting/);
   assert.doesNotMatch(requests.at(-1),/include_history/);
+  assert.match(get('cards').innerHTML,/website_id=pilot&amp;task_id=task/);
+  assert.match(get('cards').innerHTML,/website_id=pilot&amp;issue_id=issue/);
+  assert.match(get('cards').innerHTML,/bronlijst kan onvolledig/);
+  const output={innerHTML:'',insertAdjacentHTML(_,v){this.innerHTML+=v;}};
+  const button={dataset:{sourceUrl:'url',sourceRun:'run',offset:'0'},previousElementSibling:output};
+  await get('cards').handlers.click({target:{closest:()=>button}});
+  assert.match(requests.at(-1),/sources\?crawl_run_id=run&offset=0&limit=25/);
+  assert.match(output.innerHTML,/&lt;b&gt;bron/);
+  assert.doesNotMatch(output.innerHTML,/href="javascript:/);
+  assert.equal(button.disabled,true);
+  assert.equal(button.dataset.offset,'1');
   get('lane').value='all'; get('lane').handlers.change(); await settle();
   assert.match(requests.at(-1),/include_history=true/);
   assert.doesNotMatch(requests.at(-1),/lane=all/);

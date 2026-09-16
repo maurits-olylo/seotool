@@ -63,7 +63,14 @@ def query_reviews(db: Session, website_id: UUID, now: datetime) -> list[dict]:
             RecommendationTask.website_id == website_id, RecommendationTaskUrl.url_id.in_(by_url)
         )
     ):
-        linked.setdefault(url_id, []).append(dict(id=task.id, title=task.title, status=task.status))
+        linked.setdefault(url_id, []).append(
+            dict(
+                id=task.id,
+                title=task.title,
+                status=task.status,
+                primary_issue_id=task.primary_issue_id,
+            )
+        )
     result = []
     for url_id, queries in by_url.items():
         queries.sort(key=lambda row: (-row.impressions, row.query))

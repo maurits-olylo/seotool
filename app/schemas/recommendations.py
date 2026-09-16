@@ -123,6 +123,7 @@ class RecommendationTaskDetailRead(RecommendationTaskRead):
     issue_ids: list[UUID]
     urls: list[RecommendationTaskUrlRead]
     events: list[RecommendationTaskEventRead]
+    readiness: dict[str, str] = Field(default_factory=dict)
 
 
 class RecommendationTaskUpdate(BaseModel):
