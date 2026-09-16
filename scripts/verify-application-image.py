@@ -3,6 +3,7 @@
 import asyncio
 import importlib
 import os
+import runpy
 import ssl
 from io import BytesIO
 from zoneinfo import ZoneInfo
@@ -37,6 +38,7 @@ async def main() -> None:
         response = await client.get("/health")
         assert response.status_code == 200
         assert response.json() == {"status": "ok", "database": "ok"}
+    runpy.run_path("scripts/verify-detection-release.py")["verify_rules"]()
     print("Non-root API, SQLite, native modules, TLS roots, timezones and Excel verified offline.")
 
 
