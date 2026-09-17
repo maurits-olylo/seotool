@@ -21,6 +21,7 @@ IssueStatus = Literal[
 
 
 class ChangeRead(ORMModel):
+    normalized_url: str | None = None
     id: UUID
     website_id: UUID
     url_id: UUID

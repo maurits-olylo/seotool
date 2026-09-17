@@ -13,8 +13,8 @@ assert.equal(ctx.recommendationNextStep({status:'planned',readiness:{lane:'execu
 const navigation = source.slice(source.indexOf('async function openWorkPreviewLink('), source.indexOf('async function loadClients('));
 async function run(mismatch=false, task=false) {
   const calls = [], selected = {value:'old-site'};
-  const context = {URLSearchParams, encodeURIComponent,
-    window:{location:{search: task ? '?website_id=site&task_id=task' : '?website_id=site&issue_id=issue'}},
+  const context = {URL, URLSearchParams, encodeURIComponent,
+    window:{history:{replaceState(){}},location:{href:'https://test/app?website_id=site&task_id=task#acties',search: task ? '?website_id=site&task_id=task' : '?website_id=site&issue_id=issue'}},
     api:async path=>{calls.push(path);return path.includes('/websites/') ? {id:'site',client_id:'client'} : path.includes('/recommendation-tasks/') ? {website_id:'site',primary_issue_id:'issue'} : {id:'issue',website_id:mismatch?'other':'site'};},
     showApp(){},clearWebsiteViewState(){calls.push('clear');},
     loadClients:async(client,site)=>{calls.push([client,site]); selected.value=site;},

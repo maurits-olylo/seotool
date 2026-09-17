@@ -171,13 +171,25 @@ def list_changes(
     }
     snapshots = {
         snapshot.id: snapshot
-        for snapshot in db.scalars(select(UrlSnapshot).where(UrlSnapshot.id.in_(snapshot_ids)))
+        for snapshot in db.execute(
+            select(UrlSnapshot.id, UrlSnapshot.crawl_run_id, UrlSnapshot.checked_at)
+            .where(UrlSnapshot.id.in_(snapshot_ids))
+        )
     }
+    url_names = dict(
+        db.execute(
+            select(Url.id, Url.normalized_url).where(
+                Url.website_id == website_id, Url.id.in_({change.url_id for change in changes})
+            )
+        ).all()
+    )
     return [
         {
             **ChangeRead.model_validate(change).model_dump(),
+            "normalized_url": url_names.get(change.url_id),
             "is_baseline": baseline_run_id is not None
-            and snapshots.get(change.current_snapshot_id).crawl_run_id == baseline_run_id,
+            and snapshots.get(change.current_snapshot_id) is not None
+            and snapshots[change.current_snapshot_id].crawl_run_id == baseline_run_id,
             "previous_checked_at": snapshots.get(change.previous_snapshot_id).checked_at
             if change.previous_snapshot_id and snapshots.get(change.previous_snapshot_id)
             else None,
@@ -336,6 +348,20 @@ def list_issues(
     principal: Principal = Depends(require_api_key),
 ) -> list[dict[str, object]]:
     require_website_access(db, principal, website_id)
+    issues = _visible_issues(db, website_id, issue_status)
+    impacts = _organic_impacts(db, website_id)
+    return [
+        {
+            **IssueRead.model_validate(issue).model_dump(),
+            "scope": issue_scope(issue.issue_type),
+            "nature": issue_nature(issue.issue_type),
+            "organic_impact": impacts.get(issue.url_id),
+        }
+        for issue in issues
+    ]
+
+
+def _visible_issues(db: Session, website_id: UUID, issue_status: str) -> list[Issue]:
     query = (
         select(Issue).where(Issue.website_id == website_id).order_by(Issue.last_detected_at.desc())
     )
@@ -392,16 +418,42 @@ def list_issues(
             or (issue.url_id, issue.issue_type) in grouped_template_issue_keys
         )
     ]
-    impacts = _organic_impacts(db, website_id)
-    return [
-        {
-            **IssueRead.model_validate(issue).model_dump(),
-            "scope": issue_scope(issue.issue_type),
-            "nature": issue_nature(issue.issue_type),
-            "organic_impact": impacts.get(issue.url_id),
-        }
-        for issue in issues
-    ]
+    return issues
+
+
+@router.get("/websites/{website_id}/issue-summary")
+def issue_summary(
+    website_id: UUID,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict[str, object]:
+    """Small dashboard payload, with exactly the same visibility rules as the list."""
+    require_website_access(db, principal, website_id)
+    issues = _visible_issues(db, website_id, "active")
+    counts = {"total": len(issues), "high": 0, "medium": 0, "low": 0}
+    for issue in issues:
+        if issue.severity in counts:
+            counts[issue.severity] += 1
+    candidates = [issue for issue in issues if issue.status == "new"] or issues
+    candidates.sort(
+        key=lambda issue: (
+            {"critical": -1, "high": 0, "medium": 1, "low": 2}.get(issue.severity, 3),
+            -issue.first_detected_at.timestamp(),
+            str(issue.id),
+        )
+    )
+    return {
+        "counts": counts,
+        "items": [
+            {
+                "id": issue.id,
+                "title": issue.title,
+                "severity": issue.severity,
+                "first_detected_at": issue.first_detected_at,
+            }
+            for issue in candidates[:5]
+        ],
+    }
 
 
 @router.post(

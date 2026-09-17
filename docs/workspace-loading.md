@@ -34,3 +34,28 @@ website mismatches, late responses and recovery instructions. After deployment m
 Schipper and HUMAN startup and direct task navigation using the same session conditions.
 Record time to usable target and errors; do not compare a production timing to a mocked
 unit-test duration. Validate reports, URLs, changes and website switching as well.
+
+## Independent dashboard reads
+
+The dashboard now uses a compact authorized `issue-summary` response (counts and at most
+five items), sharing the existing list's visibility/grouping rules. It does not download
+the URL inventory, impact enrichment, suppressions, coverage, exports or system health.
+The selected signal filter no longer changes dashboard totals. The summary still evaluates
+visible issues on the server; this is not a constant-time aggregate query.
+
+Each dashboard panel renders as its own request completes and distinguishes loading,
+failed and genuinely empty results. In-flight dashboard reads are deduplicated and scoped
+to a selection object: late replies cannot overwrite a later selection, including A–B–A.
+Crawl overview requests only the latest run. Existing report and vacancy endpoints remain
+in use; they may still require further optimization based on production measurements.
+
+Changes retain the full paginated history for correct grouping, including domain swaps.
+Their API reads only snapshot IDs, crawl IDs and check dates, not full snapshot content.
+Each change includes its authorized URL label so dashboard changes do not need the URL
+inventory. Successful task/issue deep links consume their navigation query parameters
+while retaining unrelated query parameters and the current view hash.
+
+Regression checks cover summary/list grouping parity, active-only and website isolation,
+bounded output, authorization, URL labels and lightweight snapshot queries, independent
+panel rendering, failure states, real zeros, deduplication and stale responses.
+Production loading times still require a new browser measurement after deployment.

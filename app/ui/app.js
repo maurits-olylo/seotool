@@ -831,6 +831,9 @@ async function openWorkPreviewLink() {
     showApp();
     showView(taskId ? "tasks" : "actions");
     await showIssue(targetIssueId, taskId, targetIssue, taskId ? target : null);
+    const cleanUrl = new URL(window.location.href);
+    for (const key of ["website_id", "task_id", "issue_id"]) cleanUrl.searchParams.delete(key);
+    window.history.replaceState(null, "", cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
   } catch (error) {
     showApp();
     alert(`Openen vanuit de voorvertoning mislukt: ${error.message}`);
@@ -2112,48 +2115,86 @@ function formatGoogleInspection(inspection) {
 
 async function loadDashboard() {
   const websiteId = $("#website-select").value;
-  if (!websiteId) { renderDashboard(); return; }
+  if (!websiteId) return;
+  if (state.dashboard?.websiteId === websiteId && state.dashboard.loading) return state.dashboard.promise;
+  const dashboard = {websiteId, loading: true, panels: {}, data: {}};
+  state.dashboard = dashboard;
+  const readChanges = async () => {
+    const changes = [];
+    for (let offset = 0; ; offset += 1000) {
+      const batch = await api(`/api/v1/websites/${websiteId}/changes?limit=1000&offset=${offset}`);
+      if (state.dashboard !== dashboard) return [];
+      changes.push(...batch);
+      if (batch.length < 1000) return groupChanges(changes);
+    }
+  };
+  const canAdmin = ["superuser", "admin"].includes(state.currentUser?.role);
+  const clientId = $("#client-select").value;
+  const loaders = {
+    signals: () => api(`/api/v1/websites/${websiteId}/issue-summary`),
+    changes: readChanges,
+    crawl: () => api(`/api/v1/websites/${websiteId}/crawl-runs?limit=1`),
+    performance: () => api(`/api/v1/websites/${websiteId}/client-report?period=month`),
+    vacancies: () => api(`/api/v1/websites/${websiteId}/job-listings`),
+    integrations: () => canAdmin ? Promise.all([
+      api(`/api/v1/clients/${clientId}/integrations`),
+      api(`/api/v1/websites/${websiteId}/integrations`),
+    ]).then(([connections, mappings]) => ({connections, mappings})) : Promise.resolve({connections: [], mappings: []}),
+  };
+  for (const key of Object.keys(loaders)) dashboard.panels[key] = "loading";
   renderDashboard();
-  await Promise.all([
-    ensureSignals(),
-    loadChanges().catch(() => {}),
-    loadOperations().catch(() => {}),
-    state.clientReport ? Promise.resolve() : loadClientReport().catch(() => {}),
-    state.jobListings.length ? Promise.resolve() : loadJobListings().catch(() => {}),
-  ]);
-  renderDashboard();
+  dashboard.promise = Promise.all(Object.entries(loaders).map(async ([key, load]) => {
+    try {
+      const result = await load();
+      if (state.dashboard !== dashboard || websiteId !== $("#website-select").value) return;
+      dashboard.data[key] = result;
+      dashboard.panels[key] = "ready";
+      if (key === "integrations") state.integrationHealth = result;
+    } catch (_error) {
+      if (state.dashboard !== dashboard) return;
+      dashboard.panels[key] = "error";
+    }
+    if (state.currentView === "dashboard") renderDashboard();
+  })).finally(() => { dashboard.loading = false; });
+  return dashboard.promise;
 }
 
 function renderDashboard() {
-  const activeIssues = state.issues.filter((issue) => ACTIVE_STATUSES.has(issue.status));
-  const issueCounts = {total: activeIssues.length, high: 0, medium: 0, low: 0};
-  activeIssues.forEach((issue) => { if (issueCounts[issue.severity] !== undefined) issueCounts[issue.severity] += 1; });
+  const dashboard = state.dashboard?.websiteId === $("#website-select").value ? state.dashboard : null;
+  const data = dashboard?.data || {};
+  const issueCounts = data.signals?.counts || {total: 0, high: 0, medium: 0, low: 0};
   $("#dashboard-priorities").innerHTML = [["total", "Actieve acties"], ["high", "Hoge prioriteit"], ["medium", "Middel"], ["low", "Laag"]]
     .map(([key, label]) => `<button type="button" class="card dashboard-priority ${key}" data-dashboard-priority="${key === "total" ? "" : key}" aria-label="${label}: ${issueCounts[key]}. Open actielijst"><strong>${issueCounts[key]}</strong><span>${label}</span><small>Bekijk acties →</small></button>`).join("");
-  const newIssues = activeIssues.filter((issue) => issue.status === "new");
-  const importantIssues = [...(newIssues.length ? newIssues : activeIssues)].sort((a, b) => ({high: 0, medium: 1, low: 2}[a.severity] - {high: 0, medium: 1, low: 2}[b.severity] || new Date(b.first_detected_at) - new Date(a.first_detected_at))).slice(0, 5);
+  const importantIssues = data.signals?.items || [];
   $("#dashboard-actions").innerHTML = importantIssues.map((issue) => `<article><strong>${escapeHtml(issue.title)}</strong><small><span class="severity ${issue.severity}">${labels[issue.severity]}</span> · ${new Date(issue.first_detected_at).toLocaleDateString("nl-NL")}</small></article>`).join("") || `<p class="dashboard-empty">Geen actieve technische acties.</p>`;
-  $("#dashboard-changes").innerHTML = state.changeGroups.slice(0, 5).map((group) => {
-    const target = group.incident_type === "domain_swap" ? `${group.affected_url_ids.length} geraakte URL’s` : state.urls.get(group.url_id) || "Onbekende URL";
+  $("#dashboard-changes").innerHTML = (data.changes || []).slice(0, 5).map((group) => {
+    const target = group.incident_type === "domain_swap" ? `${group.affected_url_ids.length} geraakte URL’s` : group.changes[0]?.normalized_url || "Onbekende URL";
     return `<article><strong>${escapeHtml(changeGroupLabel(group))}</strong><small>${escapeHtml(target)} · ${new Date(group.detected_at).toLocaleDateString("nl-NL")}</small></article>`;
   }).join("") || `<p class="dashboard-empty">Geen betekenisvolle wijzigingen gevonden.</p>`;
-  const current = state.clientReport?.current || {};
+  const current = data.performance?.current || {};
   $("#dashboard-performance").innerHTML = [[current.clicks, "GSC-klikken"], [current.sessions, "Organische sessies"], [current.key_events, "Gekwalificeerde leads"]].map(([value, label]) => {
     const available = value !== null && value !== undefined;
     return `<article class="${available ? "" : "unavailable"}"><strong>${available ? Number(value).toLocaleString("nl-NL") : "—"}</strong><span>${label}</span>${available ? "" : "<small>Geen gekoppelde data</small>"}</article>`;
   }).join("");
-  const vacancies = state.jobSummary || {};
+  const vacancies = data.vacancies?.summary || {};
   $("#dashboard-vacancies").innerHTML = [[vacancies.active, "Actief"], [vacancies.expiring_soon, "Loopt bijna af"], [vacancies.needs_attention, "Aandacht nodig"]].map(([value, label]) => `<article><strong>${Number(value || 0).toLocaleString("nl-NL")}</strong><span>${label}</span></article>`).join("");
-  const run = state.crawlRuns[0];
+  const run = data.crawl?.[0];
   const runMetrics = run ? crawlRunMetrics(run) : null;
   $("#dashboard-crawl").innerHTML = run ? `<article><strong>${labels[run.status] || run.status} · ${runMetrics.summary}</strong><small>${new Date(run.started_at).toLocaleString("nl-NL")} · ${run.failed_urls} mislukt · ${durationLabel(run)}</small></article>` : `<p class="dashboard-empty">Nog geen crawl uitgevoerd.</p>`;
   renderIntegrationWarning();
-  if (state.issuesLoading || state.signalsError) {
-    $("#dashboard-priorities").innerHTML = `<p>${state.signalsError ? "Signalen konden niet worden geladen. Open Signalen om opnieuw te proberen." : "Signalen worden geladen…"}</p>`;
-    $("#dashboard-actions").textContent = state.signalsError ? "Geen betrouwbare telling beschikbaar." : "Acties worden geladen…";
+  if (dashboard?.panels.integrations === "error") {
+    $("#integration-warning").classList.remove("hidden");
+    $("#integration-warning-title").textContent = "Integratiestatus niet beschikbaar";
+    $("#integration-warning-detail").textContent = "De status kon niet worden gecontroleerd. Open Overzicht opnieuw om te proberen.";
   }
-  if (!state.jobSummary) $("#dashboard-vacancies").textContent = "Vacatures worden geladen…";
-  if (state.operationsLoading) $("#dashboard-crawl").textContent = "Crawlstatus wordt geladen…";
+  const panels = {signals: ["priorities", "actions"], changes: ["changes"], performance: ["performance"], vacancies: ["vacancies"], crawl: ["crawl"]};
+  for (const [key, targets] of Object.entries(panels)) {
+    const status = dashboard?.panels[key] || "loading";
+    if (status === "ready") continue;
+    for (const target of targets) $("#dashboard-" + target).textContent = status === "error"
+      ? "Dit onderdeel kon niet worden geladen. Open Overzicht opnieuw om te proberen."
+      : "Gegevens worden geladen…";
+  }
 }
 
 async function loadOperations() {
@@ -3501,6 +3542,7 @@ $("#confirm-mfa").addEventListener("click", async () => {
 $("#profile-toggle").addEventListener("click", () => { const open = $("#profile-popover").classList.toggle("hidden") === false; $("#profile-toggle").setAttribute("aria-expanded", String(open)); });
 $("#mobile-nav-toggle").addEventListener("click", () => { const open = $("#app").classList.toggle("mobile-nav-open"); $("#mobile-nav-toggle").setAttribute("aria-expanded", String(open)); });
 function clearWebsiteViewState() {
+  state.dashboard = null;
   state.signalsWebsiteId = null;
   state.signalsRequest = null;
   state.signalsError = false;
@@ -3546,7 +3588,7 @@ async function refreshSelectedWebsite(loadSignals = true) {
   loadTaskNotifications().catch(() => {});
   if (state.currentView === "reports") await Promise.all([loadClientReport(), loadReportSnapshots()]);
   if (state.currentView === "changes") { await ensureSignals(); await loadChanges(); }
-  if (loadSignals && ["dashboard", "actions", "urls"].includes(state.currentView)) await ensureSignals();
+  if (loadSignals && ["actions", "urls"].includes(state.currentView)) await ensureSignals();
   if (state.currentView === "tasks") await loadTaskCenter();
   if (state.currentView === "integrations") await loadIntegrations();
   if (state.currentView === "insights") await loadConsultantInsights();

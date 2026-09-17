@@ -121,7 +121,7 @@ def test_information_architecture_and_legacy_routes_are_served(client: TestClien
     assert 'view === "opportunities" ? "opportunities"' in script.text
     assert 'id="content-effect-learning"' in page.text
     assert "Dit is beschrijvende historie; causaliteit is niet bewezen." in script.text
-    assert 'app.js?v=20260917-1' in page.text
+    assert 'app.js?v=20260917-2' in page.text
     assert 'reports: "rapportages"' in script.text
     assert 'operations: "crawls-exports"' in script.text
     assert 'organisatie: "clients"' in script.text
@@ -141,7 +141,7 @@ def test_guided_website_verification_interface_is_served(client: TestClient) -> 
     ]:
         assert f'id="{element_id}"' in page.text
     assert "/.well-known/thactual-verification.txt" in page.text
-    assert "app.js?v=20260917-1" in page.text
+    assert "app.js?v=20260917-2" in page.text
     assert "onboarding.css?v=20260811-1" in page.text
     for element_id in [
         "first-crawl-progress",
@@ -258,7 +258,7 @@ def test_operations_page_has_responsive_process_states(client: TestClient) -> No
 def test_operations_status_ignores_stale_website_responses(client: TestClient) -> None:
     page = client.get("/ui/assets/index.html")
     assert page.status_code == 200
-    assert 'src="/ui/assets/app.js?v=20260917-1"' in page.text
+    assert 'src="/ui/assets/app.js?v=20260917-2"' in page.text
     assert 'href="/ui/assets/issue-inspection.css?v=20260808-5"' in page.text
     script = client.get("/ui/assets/app.js").text
     assert "issue-inspection-page-select" in script
@@ -816,6 +816,7 @@ def test_user_cannot_access_another_clients_website_data(client: TestClient) -> 
         f"/api/v1/websites/{hidden_website_id}/urls",
         f"/api/v1/websites/{hidden_website_id}/crawl-runs",
         f"/api/v1/websites/{hidden_website_id}/issues",
+        f"/api/v1/websites/{hidden_website_id}/issue-summary",
         f"/api/v1/websites/{hidden_website_id}/client-report",
     ]
     for path in protected_paths:
@@ -2166,6 +2167,9 @@ def test_issue_list_hides_pagination_children_behind_series_review(client: TestC
 
     assert [item["issue_type"] for item in payload] == ["pagination_series_review"]
     assert payload[0]["nature"] == "review"
+    summary = client.get(f"/api/v1/websites/{website_id}/issue-summary").json()
+    assert summary["counts"] == {"total": 1, "high": 0, "medium": 0, "low": 1}
+    assert summary["items"][0]["id"] == payload[0]["id"]
 
 
 def test_issue_list_hides_sitemap_redirects_covered_by_pattern_review(
@@ -2862,3 +2866,91 @@ def test_url_detail_returns_shortest_internal_route(client: TestClient) -> None:
         "https://route.test/hub",
         "https://route.test/page",
     ]
+
+
+def test_dashboard_summary_is_bounded_and_uses_active_website_issues(client: TestClient) -> None:
+    customer = client.post("/api/v1/clients", json={"name": "Dashboard"}).json()
+    websites = [
+        client.post(
+            "/api/v1/websites",
+            json={"client_id": customer["id"], "name": name, "base_url": f"https://{name}.example"},
+        ).json()
+        for name in ("one", "two")
+    ]
+    with SessionLocal() as db:
+        for index in range(10):
+            db.add(
+                Issue(
+                    website_id=UUID(websites[0]["id"]),
+                    issue_type="missing_title",
+                    category="onpage",
+                    severity="high",
+                    title=f"Title {index}",
+                    status="resolved" if index == 9 else "new",
+                    description="Test",
+                    recommended_action="Test",
+                )
+            )
+        db.add(
+            Issue(
+                website_id=UUID(websites[1]["id"]),
+                issue_type="missing_title",
+                category="onpage",
+                severity="low",
+                title="Other",
+                description="Test",
+                recommended_action="Test",
+            )
+        )
+        db.commit()
+    response = client.get(f"/api/v1/websites/{websites[0]['id']}/issue-summary")
+    assert response.status_code == 200
+    summary = response.json()
+    assert summary["counts"] == {"total": 9, "high": 9, "medium": 0, "low": 0}
+    assert len(summary["items"]) == 5
+    assert all(item["title"] != "Other" for item in summary["items"])
+    assert client.get(f"/api/v1/websites/{uuid4()}/issue-summary").status_code == 404
+
+
+def test_changes_include_url_without_full_snapshot_content(client: TestClient) -> None:
+    from sqlalchemy import event
+
+    from app.models.issues import Change
+
+    customer = client.post("/api/v1/clients", json={"name": "Changes"}).json()
+    website = client.post("/api/v1/websites", json={
+        "client_id": customer["id"], "name": "Changes", "base_url": "https://example.com"
+    }).json()
+    website_id = UUID(website["id"])
+    with SessionLocal() as db:
+        url = Url(website_id=website_id, normalized_url="https://example.com/page")
+        job = CrawlJob(website_id=website_id, job_type="full_site_crawl")
+        db.add_all([url, job])
+        db.flush()
+        run = CrawlRun(website_id=website_id, crawl_job_id=job.id, crawl_type="full_site_crawl")
+        db.add(run)
+        db.flush()
+        snapshot = UrlSnapshot(url_id=url.id, crawl_run_id=run.id,
+                               requested_url=url.normalized_url, main_content="Large content")
+        db.add(snapshot)
+        db.flush()
+        db.add(Change(website_id=website_id, url_id=url.id, current_snapshot_id=snapshot.id,
+                      change_type="title_changed", old_value="Old", new_value="New"))
+        db.commit()
+        engine = db.get_bind()
+    statements = []
+
+    def capture(_conn, _cursor, statement, _parameters, _context, _many):
+        statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", capture)
+    try:
+        response = client.get(f"/api/v1/websites/{website_id}/changes")
+    finally:
+        event.remove(engine, "before_cursor_execute", capture)
+    assert response.status_code == 200
+    item = response.json()[0]
+    assert item["normalized_url"] == "https://example.com/page"
+    assert item["is_baseline"] is True
+    assert item["current_checked_at"] is not None
+    assert not any("url_snapshots.main_content" in statement for statement in statements)

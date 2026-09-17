@@ -18,8 +18,8 @@ async function run(){
   const calls=[];
   let showIssueArgs;
   const selected={value:'site'};
-  const nav={URLSearchParams,encodeURIComponent,
-    window:{location:{search:'?website_id=site&task_id=task'}},
+  const nav={URL,URLSearchParams,encodeURIComponent,
+    window:{location:{href:'https://test/app?website_id=site&task_id=task&keep=1#acties',search:'?website_id=site&task_id=task'},history:{replaceState:(_a,_b,path)=>assert.equal(path,'/app?keep=1#acties')}},
     api:async path=>{calls.push(path);if(path.includes('/websites/'))return{id:'site',client_id:'client'};if(path.includes('/recommendation-tasks/'))return{id:'task',website_id:'site',primary_issue_id:'issue'};return{id:'issue',website_id:'site'};},
     clearWebsiteViewState(){},showApp(){},showView(){},$ :()=>selected,
     loadClients:async(c,s,loadSignals)=>assert.equal(loadSignals,false),
