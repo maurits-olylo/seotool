@@ -55,6 +55,7 @@ async function selectionRegression() {
       assert.equal(elements.get('#website-select').value, 'schipper-site');
       calls.push('operations');
     },
+    async loadTaskNotifications() {},
     async loadIssues() { calls.push('issues'); },
   };
   const selection = source.slice(source.indexOf('function clearWebsiteViewState()'),
@@ -64,7 +65,7 @@ async function selectionRegression() {
   assert.deepEqual(calls, ['render', 'clear', 'websites', 'operations']);
   calls.length = 0;
   await handlers.get('#website-select')();
-  assert.deepEqual(calls, ['render', 'clear', 'issues', 'operations']);
+  assert.deepEqual(calls, ['render', 'clear', 'operations']);
   console.log('Client and website switches clear cached data and reload operations.');
 }
 selectionRegression().catch((error) => { console.error(error); process.exitCode = 1; });
@@ -77,7 +78,7 @@ async function staleIssuesRegression() {
     ['#status-filter', {value: 'active'}],
   ]);
   const state = {issues: ['current'], currentUser: {role: 'member'}};
-  const context = {state, $: (selector) => elements.get(selector),
+  const context = {state, render(){}, $: (selector) => elements.get(selector),
     api: async () => { await pending; return []; }, loadAllUrls: async () => [],
   };
   const loader = source.slice(source.indexOf('async function loadIssues()'),

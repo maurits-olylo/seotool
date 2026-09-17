@@ -16,9 +16,9 @@ async function run(mismatch=false, task=false) {
   const context = {URLSearchParams, encodeURIComponent,
     window:{location:{search: task ? '?website_id=site&task_id=task' : '?website_id=site&issue_id=issue'}},
     api:async path=>{calls.push(path);return path.includes('/websites/') ? {id:'site',client_id:'client'} : path.includes('/recommendation-tasks/') ? {website_id:'site',primary_issue_id:'issue'} : {id:'issue',website_id:mismatch?'other':'site'};},
-    clearWebsiteViewState(){calls.push('clear');},
+    showApp(){},clearWebsiteViewState(){calls.push('clear');},
     loadClients:async(client,site)=>{calls.push([client,site]); selected.value=site;},
-    $:()=>selected,showView:view=>calls.push(view),showIssue:async(id,task)=>calls.push(['open',id,task]),alert:msg=>calls.push(msg)};
+    $:()=>selected,showView:view=>calls.push(view),showIssue:async(id,task,issue,loadedTask)=>{assert.equal(issue.id, "issue"); if(task) assert.equal(loadedTask.primary_issue_id,"issue"); calls.push(['open',id,task]);},alert:msg=>calls.push(msg)};
   vm.runInNewContext(navigation, context);
   assert.equal(await context.openWorkPreviewLink(), true);
   if (mismatch) {

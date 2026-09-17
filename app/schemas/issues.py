@@ -106,6 +106,7 @@ class IssueGuidanceRead(BaseModel):
 
 
 class IssueDetailRead(IssueRead):
+    normalized_url: str | None = None
     evidence: dict[str, object]
     source_urls: list[str]
     elements: list[ElementLocationRead]

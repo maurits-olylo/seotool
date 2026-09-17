@@ -800,6 +800,9 @@ def get_issue(
         ][:200]
     return {
         **IssueRead.model_validate(issue).model_dump(),
+        "normalized_url": db.scalar(select(Url.normalized_url).where(Url.id == issue.url_id))
+        if issue.url_id
+        else None,
         "scope": issue_scope(issue.issue_type),
         "nature": issue_nature(issue.issue_type),
         "organic_impact": (

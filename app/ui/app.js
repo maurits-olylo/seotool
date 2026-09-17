@@ -58,10 +58,10 @@ async function api(path, options = {}) {
 }
 
 function showLogin() { stopOperationsPolling(); window.location.assign("/login"); }
-function showApp() { $("#app").classList.remove("hidden"); }
+function showApp() { $("#app").classList.remove("hidden"); $("#workspace-loading")?.classList.add("hidden"); }
 function escapeHtml(value = "") { const node = document.createElement("span"); node.textContent = value; return node.innerHTML; }
 function option(item) { return `<option value="${item.id}">${escapeHtml(item.name)}</option>`; }
-function issueUrl(issue) { return state.urls.get(issue.url_id) || ""; }
+function issueUrl(issue) { return issue.normalized_url || state.urls.get(issue.url_id) || ""; }
 function issueUrlLabel(issue) { return issueUrl(issue) || "Websitebreed issue"; }
 function impactLevel(issue) { return issue.organic_impact?.level || "none"; }
 function impactRank(issue) { return ({high: 0, medium: 1, low: 2, unknown: 3, none: 4})[impactLevel(issue)] ?? 4; }
@@ -826,26 +826,28 @@ async function openWorkPreviewLink() {
     const targetIssue = taskId ? await api(`/api/v1/issues/${encodeURIComponent(targetIssueId)}`) : target;
     if (targetIssue.website_id !== website.id) throw new Error("Het gekoppelde signaal hoort bij een andere website.");
     clearWebsiteViewState();
-    await loadClients(website.client_id, website.id);
+    await loadClients(website.client_id, website.id, false);
     if ($("#website-select").value !== website.id) throw new Error("De geselecteerde website is niet beschikbaar.");
+    showApp();
     showView(taskId ? "tasks" : "actions");
-    await showIssue(targetIssueId, taskId);
+    await showIssue(targetIssueId, taskId, targetIssue, taskId ? target : null);
   } catch (error) {
+    showApp();
     alert(`Openen vanuit de voorvertoning mislukt: ${error.message}`);
   }
   return true;
 }
 
-async function loadClients(preferredClientId = null, preferredWebsiteId = null) {
+async function loadClients(preferredClientId = null, preferredWebsiteId = null, loadSignals = true) {
   state.clients = await api("/api/v1/clients");
   $("#client-select").innerHTML = state.clients.map(option).join("");
   const selectedClientId = preferredClientId || localStorage.getItem(CLIENT_STORAGE_KEY);
   if (selectedClientId && state.clients.some((client) => client.id === selectedClientId)) $("#client-select").value = selectedClientId;
   if ($("#client-select").value) localStorage.setItem(CLIENT_STORAGE_KEY, $("#client-select").value);
-  await loadWebsites(preferredWebsiteId);
+  await loadWebsites(preferredWebsiteId, loadSignals);
 }
 
-async function loadWebsites(preferredWebsiteId = null) {
+async function loadWebsites(preferredWebsiteId = null, loadSignals = true) {
   const clientId = $("#client-select").value;
   if (!clientId) { state.websites = []; state.issues = []; $("#website-select").innerHTML = ""; render(); return; }
   const websites = await api(`/api/v1/websites?client_id=${clientId}`);
@@ -857,7 +859,10 @@ async function loadWebsites(preferredWebsiteId = null) {
   if ($("#website-select").value) localStorage.setItem(WEBSITE_STORAGE_KEY, $("#website-select").value);
   else localStorage.removeItem(WEBSITE_STORAGE_KEY);
   updateReportSelectors();
-  if ($("#website-select").value) await loadIssues();
+  if ($("#website-select").value) {
+    if (loadSignals) await ensureSignals();
+    loadTaskNotifications().catch(() => {});
+  }
   else { state.issues = []; state.urlRecords = []; state.urls = new Map(); render(); }
 }
 
@@ -1709,8 +1714,9 @@ function showView(view, updateHash = true) {
     loadContentAnalysis();
   }
   if (["clients", "team"].includes(view)) { applyOrganizationPresentation(view); loadOrganization(); }
+  if (["actions", "urls"].includes(view)) ensureSignals().then(() => { if (state.currentView === "urls") renderUrls(); });
   if (view === "urls") renderUrls();
-  if (view === "changes") loadChanges().catch(() => renderTableState("#change-rows", 5, "Wijzigingen konden niet worden geladen. Probeer het later opnieuw.", true));
+  if (view === "changes") ensureSignals().then(() => loadChanges()).catch(() => renderTableState("#change-rows", 5, "Wijzigingen konden niet worden geladen. Probeer het later opnieuw.", true));
   if (view === "vacancies") loadJobListings().catch(() => renderTableState("#vacancy-rows", 4, "Vacatures konden niet worden geladen. Probeer het later opnieuw.", true));
   if (view === "operations") { loadOperations(); startOperationsPolling(); } else stopOperationsPolling();
   if (updateHash) window.history.replaceState({}, "", `#${VIEW_HASHES[view]}`);
@@ -1806,7 +1812,9 @@ function formatTaskEffort(task) {
 
 async function loadTaskNotifications() {
   const websiteId = $("#website-select").value;
-  state.taskNotifications = websiteId ? await api(`/api/v1/websites/${websiteId}/task-notifications?limit=50`) : [];
+  const notifications = websiteId ? await api(`/api/v1/websites/${websiteId}/task-notifications?limit=50`) : [];
+  if (websiteId !== $("#website-select").value) return;
+  state.taskNotifications = notifications;
   renderTaskNotifications();
 }
 
@@ -1871,7 +1879,21 @@ async function openTaskNotification(notificationId, taskId) {
   if (task?.primary_issue_id) await showIssue(task.primary_issue_id);
 }
 
+async function ensureSignals() {
+  const websiteId = $("#website-select").value;
+  if (!websiteId || state.signalsWebsiteId === websiteId) return;
+  if (state.signalsRequest?.websiteId === websiteId) return state.signalsRequest.promise;
+  const request = {websiteId, promise: loadIssues()};
+  state.signalsRequest = request;
+  try { await request.promise; }
+  finally { if (state.signalsRequest === request) state.signalsRequest = null; }
+}
+
 async function loadIssues() {
+  state.issuesLoading = true;
+  state.signalsWebsiteId = null;
+  state.signalsError = false;
+  render();
   const requestId = state.issuesRequestId = (state.issuesRequestId || 0) + 1;
   const websiteId = $("#website-select").value;
   if (!websiteId) {
@@ -1903,11 +1925,14 @@ async function loadIssues() {
     if (requestId !== state.issuesRequestId || websiteId !== $("#website-select").value || clientId !== $("#client-select").value) return;
     state.issuesLoading = false;
     render();
+    state.signalsError = true;
+    if (state.currentView === "dashboard") renderDashboard();
     $("#result-count").textContent = `Signalen konden niet worden geladen: ${error.message}`;
     return;
   }
   if (requestId !== state.issuesRequestId || websiteId !== $("#website-select").value || clientId !== $("#client-select").value) return;
   state.issuesLoading = false;
+  state.signalsWebsiteId = websiteId;
   state.issues = issues;
   state.suppressions = suppressions;
   state.integrationHealth = integrationHealth;
@@ -1920,12 +1945,7 @@ async function loadIssues() {
   $("#type-filter").innerHTML = `<option value="">Alle issue-types</option>${types.map((type) => `<option value="${escapeHtml(type)}">${escapeHtml(type)}</option>`).join("")}`;
   state.page = 1;
   render();
-  await Promise.all([
-    loadClientReport(),
-    loadReportSnapshots(),
-    loadTaskNotifications().catch(() => { state.taskNotifications = []; renderTaskNotifications(); }),
-    state.currentUser?.role === "client" ? Promise.resolve() : loadJobListings(),
-  ]);
+
 }
 
 async function loadAllUrls(websiteId) {
@@ -2093,7 +2113,9 @@ function formatGoogleInspection(inspection) {
 async function loadDashboard() {
   const websiteId = $("#website-select").value;
   if (!websiteId) { renderDashboard(); return; }
+  renderDashboard();
   await Promise.all([
+    ensureSignals(),
     loadChanges().catch(() => {}),
     loadOperations().catch(() => {}),
     state.clientReport ? Promise.resolve() : loadClientReport().catch(() => {}),
@@ -2126,6 +2148,12 @@ function renderDashboard() {
   const runMetrics = run ? crawlRunMetrics(run) : null;
   $("#dashboard-crawl").innerHTML = run ? `<article><strong>${labels[run.status] || run.status} · ${runMetrics.summary}</strong><small>${new Date(run.started_at).toLocaleString("nl-NL")} · ${run.failed_urls} mislukt · ${durationLabel(run)}</small></article>` : `<p class="dashboard-empty">Nog geen crawl uitgevoerd.</p>`;
   renderIntegrationWarning();
+  if (state.issuesLoading || state.signalsError) {
+    $("#dashboard-priorities").innerHTML = `<p>${state.signalsError ? "Signalen konden niet worden geladen. Open Signalen om opnieuw te proberen." : "Signalen worden geladen…"}</p>`;
+    $("#dashboard-actions").textContent = state.signalsError ? "Geen betrouwbare telling beschikbaar." : "Acties worden geladen…";
+  }
+  if (!state.jobSummary) $("#dashboard-vacancies").textContent = "Vacatures worden geladen…";
+  if (state.operationsLoading) $("#dashboard-crawl").textContent = "Crawlstatus wordt geladen…";
 }
 
 async function loadOperations() {
@@ -2865,9 +2893,10 @@ async function restoreSelectedSuppressions() {
   }
 }
 
-async function showIssue(issueId, requestedTaskId = null) {
+async function showIssue(issueId, requestedTaskId = null, suppliedIssue = null, suppliedTask = null) {
   state.requestedTaskId = requestedTaskId;
   state.selectedIssueId = issueId;
+  state.selectedIssue = null;
   state.selectedInspectionSnapshotId = null;
   state.selectedRecommendationTask = null;
   state.recommendationFeedback = [];
@@ -2889,13 +2918,14 @@ async function showIssue(issueId, requestedTaskId = null) {
   $("#issue-dialog").showModal();
   let issue;
   try {
-    issue = await api(`/api/v1/issues/${issueId}`);
+    issue = suppliedIssue || await api(`/api/v1/issues/${issueId}`);
   } catch (error) {
     $("#issue-detail-loading .loading-spinner").classList.add("hidden");
     $("#issue-detail-loading strong").textContent = `Laden mislukt: ${error.message}`;
     return;
   }
-  if (!issue) return;
+  if (!issue || state.selectedIssueId !== issueId || issue.website_id !== $("#website-select").value) return;
+  state.selectedIssue = issue;
   $("#issue-detail-loading .loading-spinner").classList.remove("hidden");
   $("#issue-detail-loading").classList.add("hidden");
   $("#issue-detail-content").classList.remove("hidden");
@@ -2914,8 +2944,9 @@ async function showIssue(issueId, requestedTaskId = null) {
   $("#detail-alternative-section").classList.toggle("hidden", !guidance.alternative_explanation);
   $("#detail-cause").textContent = guidance.likely_cause?.text || "";
   $("#detail-alternative").textContent = guidance.alternative_explanation?.text || "";
-  $("#detail-steps").innerHTML = guidance.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("");
-  $("#detail-verification").textContent = guidance.verification;
+  const followup = issueFollowup(issue);
+  $("#detail-steps").innerHTML = (followup ? [followup.step] : guidance.steps).map((step) => `<li>${escapeHtml(step)}</li>`).join("");
+  $("#detail-verification").textContent = followup?.criterion || guidance.verification;
   const basisLabels = {fact: "Feitelijke meting", interpretation: "Systeeminterpretatie", hypothesis: "Hypothese"};
   if (guidance.likely_cause) {
     $("#detail-cause-basis").className = `basis-badge ${guidance.likely_cause.basis}`;
@@ -2950,8 +2981,7 @@ async function showIssue(issueId, requestedTaskId = null) {
   $("#source-heading").textContent = `Bronpagina’s met dit signaal (${sourceUrls.length})`;
   $("#detail-sources").innerHTML = sourceUrls.map((source) => `<li><a href="${escapeHtml(source)}" target="_blank" rel="noopener">${escapeHtml(source)}</a></li>`).join("");
   $("#source-section").classList.toggle("hidden", sourceUrls.length === 0);
-  await loadIssueInspection(issue.id);
-  await loadIssueRecommendation(issue);
+  await Promise.all([loadIssueInspection(issue.id), loadIssueRecommendation(issue, suppliedTask)]);
 }
 
 function inspectionTargetMarkup(target) {
@@ -2989,6 +3019,7 @@ async function loadIssueInspection(issueId) {
   const content = $("#issue-inspection-content");
   try {
     const inspection = await api(`/api/v1/issues/${issueId}/inspection`);
+    if (state.selectedIssueId !== issueId) return;
     section.classList.remove("hidden");
     const recheckButton = $("#issue-inspection-recheck");
     const canRecheck = inspection.live_recheck_available && ["superuser", "admin"].includes(state.currentUser?.role);
@@ -3048,7 +3079,8 @@ function pollIssueInspection(issueId, attempt) {
   }, 3000);
 }
 
-async function loadIssueRecommendation(issue) {
+async function loadIssueRecommendation(issue, suppliedTask = null) {
+  if (!issue) return;
   const content = $("#recommendation-task-content");
   const message = $("#recommendation-task-message");
   content.innerHTML = '<p class="task-loading">Taakgegevens worden geladen…</p>';
@@ -3061,7 +3093,7 @@ async function loadIssueRecommendation(issue) {
       ? api(`/api/v1/clients/${$("#client-select").value}/members`).catch(() => [])
       : Promise.resolve([]);
     const [tasks, definitions, members] = await Promise.all([
-      api(`/api/v1/websites/${issue.website_id}/recommendation-tasks?status=all`),
+      suppliedTask ? Promise.resolve([suppliedTask]) : api(`/api/v1/websites/${issue.website_id}/recommendation-tasks?status=all`),
       definitionsPromise,
       membersPromise,
     ]);
@@ -3071,17 +3103,14 @@ async function loadIssueRecommendation(issue) {
     const taskSummary = tasks.find((task) => state.requestedTaskId ? task.id === state.requestedTaskId : task.primary_issue_id === issue.id) || null;
     if (taskSummary) {
       const taskId = taskSummary.id;
-      [
-        state.selectedRecommendationTask,
-        state.recommendationFeedback,
-        state.recommendationVerificationPlan,
-        state.recommendationVerifications,
-      ] = await Promise.all([
-        api(`/api/v1/recommendation-tasks/${taskId}`),
+      const details = await Promise.all([
+        suppliedTask ? Promise.resolve(suppliedTask) : api(`/api/v1/recommendation-tasks/${taskId}`),
         api(`/api/v1/recommendation-tasks/${taskId}/feedback`),
         api(`/api/v1/recommendation-tasks/${taskId}/verification-plan`),
         api(`/api/v1/recommendation-tasks/${taskId}/verifications`),
       ]);
+      if (state.selectedIssueId !== issue.id) return;
+      [state.selectedRecommendationTask, state.recommendationFeedback, state.recommendationVerificationPlan, state.recommendationVerifications] = details;
     } else {
       state.selectedRecommendationTask = null;
       state.recommendationFeedback = [];
@@ -3094,6 +3123,18 @@ async function loadIssueRecommendation(issue) {
   } catch (error) {
     content.innerHTML = `<p class="task-loading">Taakgegevens konden niet worden geladen: ${escapeHtml(error.message)}</p>`;
   }
+}
+
+function issueFollowup(issue) {
+  if (issue?.status === "resolved") return {
+    step: "Controleer het gemelde herstel met een passende nameting. Vergelijk die met het oorspronkelijke bewijs; voer de eerdere wijzigingsopdracht niet opnieuw uit zonder nieuwe aanleiding.",
+    criterion: "Een passende nameting bevestigt het herstel, of toont concreet wat nog niet is opgelost.",
+  };
+  if (["verified", "ignored", "accepted_risk"].includes(issue?.status)) return {
+    step: "Dit signaal is afgehandeld. Bekijk de vastgelegde uitkomst; een nieuwe opdracht vereist nieuw bewijs of een nieuw besluit.",
+    criterion: "Geen nieuwe uitvoering nodig op basis van dit afgehandelde signaal.",
+  };
+  return null;
 }
 
 function recommendationNextStep(task) {
@@ -3115,6 +3156,10 @@ function renderRecommendationTask(issue, supported = true) {
     content.innerHTML = `<div class="task-empty"><p>${explanation}</p>${supported && canWrite ? '<button id="create-recommendation-task" class="primary-button" type="button">Maak uitvoeringstaak</button>' : ""}</div>`;
     return;
   }
+  if (task.readiness && task.readiness.lane !== "execute" && !issueFollowup(issue)) {
+    $("#detail-steps").innerHTML = `<li>${escapeHtml(task.readiness.first_step)}</li>`;
+    $("#detail-verification").textContent = "De genoemde beoordeling is vastgelegd voordat een wijziging wordt uitgevoerd.";
+  }
   const effort = task.effort_min_minutes === null
     ? "Nog niet ingeschat"
     : `${task.effort_min_minutes}–${task.effort_max_minutes} min`;
@@ -3135,13 +3180,11 @@ function renderRecommendationTask(issue, supported = true) {
     ? `<form id="recommendation-feedback-form" class="task-feedback-form"><h4>Uitvoeringsfeedback</h4><p>Deze gegevens blijven klantgebonden. Vrije opmerkingen worden nooit klantoverstijgend gebruikt.</p><div class="task-feedback-fields"><label>Werkelijke tijd (minuten)<input id="feedback-actual-minutes" type="number" min="0" max="100000"></label><label>Moeilijkheid<select id="feedback-difficulty"><option value="">Niet ingevuld</option><option value="easy">Makkelijker dan verwacht</option><option value="expected">Zoals verwacht</option><option value="hard">Moeilijker dan verwacht</option><option value="blocked">Geblokkeerd</option></select></label><label>Instructie bruikbaar<select id="feedback-helpful"><option value="">Niet ingevuld</option><option value="true">Ja</option><option value="false">Nee</option></select></label><label>Eindbeoordeling<select id="feedback-assessment"><option value="completed">Voltooid</option><option value="partially_completed">Deels voltooid</option><option value="not_completed">Niet voltooid</option></select></label><label class="task-feedback-check"><input id="feedback-missing-input" type="checkbox"> Benodigde input ontbrak</label><label class="task-feedback-check"><input id="feedback-missing-dependency" type="checkbox"> Afhankelijkheid was onduidelijk</label><label class="task-feedback-notes">Toelichting<textarea id="feedback-notes" maxlength="2000" placeholder="Optioneel en alleen binnen deze klant zichtbaar"></textarea></label></div><button class="primary-button" type="submit">Feedback opslaan</button></form>`
     : "";
   const verification = renderTaskVerification(canWrite);
-  const decision = task.required_input.length
+  const decision = !["verification", "history"].includes(task.readiness?.lane) && task.required_input.length
     ? `<section class="task-decision"><span>Eerst beslissen</span><strong>${escapeHtml(task.required_input[0])}</strong><div><p><b>Ja:</b> geef de pagina een logische, crawlbare plek in de sitestructuur.</p><p><b>Nee:</b> voeg haar samen of redirect haar en werk daarna de sitemap bij.</p></div></section>`
     : "";
-  const nextStepPanel = decision
-    ? ""
-    : `<section class="task-next-step" aria-label="Volgende stap"><span>Volgende stap</span><div><strong>${escapeHtml(nextStep[0])}</strong><p>${escapeHtml(nextStep[1])}</p></div></section>`;
-  content.innerHTML = `<article class="task-card"><header class="task-card-head"><div><span class="task-kicker">Bestaande taak</span><h3>${escapeHtml(task.title)}</h3><div class="task-meta"><span>${escapeHtml(taskRoleLabels[task.primary_role] || task.primary_role)}</span><span>${escapeHtml(effort)}</span><span class="task-priority ${escapeHtml(task.priority)}">${escapeHtml(labels[task.priority] || task.priority)} prioriteit</span></div></div><span class="task-status status-${escapeHtml(task.status)}">${escapeHtml(taskStatusLabels[task.status] || task.status)}</span></header>${nextStepPanel}${decision}<div class="task-columns"><section class="task-panel"><div class="task-section-heading"><span>01</span><h4>${task.readiness?.lane === "execute" ? "Wat moet ik doen?" : "Uitvoeringsstappen na beoordeling"}</h4></div><ol>${task.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol></section><section class="task-panel task-criteria"><div class="task-section-heading"><span>02</span><h4>Wanneer is het klaar?</h4></div><ul>${task.acceptance_criteria.map((criterion) => `<li>${escapeHtml(criterion)}</li>`).join("")}</ul></section></div>${controls}${verification}${feedbackSummary}${feedbackForm}</article>`;
+  const nextStepPanel = `<section class="task-next-step" aria-label="Volgende stap"><span>Volgende stap</span><div><strong>${escapeHtml(nextStep[0])}</strong><p>${escapeHtml(nextStep[1])}</p></div></section>`;
+  content.innerHTML = `<article class="task-card"><header class="task-card-head"><div><span class="task-kicker">Bestaande taak</span><h3>${escapeHtml(task.title)}</h3><div class="task-meta"><span>${escapeHtml(taskRoleLabels[task.primary_role] || task.primary_role)}</span><span>${escapeHtml(effort)}</span><span class="task-priority ${escapeHtml(task.priority)}">${escapeHtml(labels[task.priority] || task.priority)} prioriteit</span></div></div><span class="task-status status-${escapeHtml(task.status)}">${escapeHtml(taskStatusLabels[task.status] || task.status)}</span></header>${nextStepPanel}${decision}<div class="task-columns"><section class="task-panel"><div class="task-section-heading"><span>01</span><h4>${["verification", "history"].includes(task.readiness?.lane) ? "Oorspronkelijke uitvoeringsstappen (ter referentie)" : task.readiness?.lane === "execute" ? "Wat moet ik doen?" : "Uitvoeringsstappen na beoordeling"}</h4></div><ol>${task.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol></section><section class="task-panel task-criteria"><div class="task-section-heading"><span>02</span><h4>Wanneer is het klaar?</h4></div><ul>${task.acceptance_criteria.map((criterion) => `<li>${escapeHtml(criterion)}</li>`).join("")}</ul></section></div>${controls}${verification}${feedbackSummary}${feedbackForm}</article>`;
 }
 
 function renderTaskVerification(canWrite) {
@@ -3161,6 +3204,8 @@ function renderTaskVerification(canWrite) {
   const ruleLabels = {passed: "Geslaagd", failed: "Niet geslaagd", error: "Niet controleerbaar"};
   const blockingExplanation = verificationActive
     ? "De controle loopt. Je kunt dit venster sluiten en later terugkomen."
+    : ["verification", "history"].includes(task.readiness?.lane)
+      ? "Dit signaal vraagt om herstelcontrole of is al afgehandeld. Beoordeel de passende nameting en stem daarna de taakstatus af. Meld geen uitvoering die niet is gedaan."
     : task.status !== "implemented"
       ? "Meld de taak eerst als ‘Uitgevoerd’. Daarna kan SEO Monitor het resultaat controleren."
       : plan.missing_roles.length
@@ -3213,7 +3258,7 @@ async function startRecommendationVerification() {
     const verification = await api(`/api/v1/recommendation-tasks/${task.id}/verifications`, {method: "POST"});
     state.recommendationVerifications = [verification, ...(state.recommendationVerifications || [])];
     state.recommendationVerificationPlan = {...state.recommendationVerificationPlan, can_request: false};
-    renderRecommendationTask(state.issues.find((issue) => issue.id === state.selectedIssueId));
+    renderRecommendationTask((state.selectedIssue?.id === state.selectedIssueId ? state.selectedIssue : state.issues.find((issue) => issue.id === state.selectedIssueId)));
     message.textContent = "Gerichte controle staat in de wachtrij.";
   } catch (error) {
     message.textContent = `Controle starten mislukt: ${error.message}`;
@@ -3236,7 +3281,7 @@ async function saveTaskScope(event) {
         url: $("#task-scope-url").value.trim(),
       }),
     });
-    await loadIssueRecommendation(state.issues.find((issue) => issue.id === state.selectedIssueId));
+    await loadIssueRecommendation((state.selectedIssue?.id === state.selectedIssueId ? state.selectedIssue : state.issues.find((issue) => issue.id === state.selectedIssueId)));
     message.textContent = "URL-scope bijgewerkt.";
   } catch (error) {
     message.textContent = `URL toevoegen mislukt: ${error.message}`;
@@ -3250,7 +3295,7 @@ async function removeTaskScope(taskUrlId) {
   message.textContent = "URL wordt verwijderd…";
   try {
     await api(`/api/v1/recommendation-tasks/${task.id}/urls/${taskUrlId}`, {method: "DELETE"});
-    await loadIssueRecommendation(state.issues.find((issue) => issue.id === state.selectedIssueId));
+    await loadIssueRecommendation((state.selectedIssue?.id === state.selectedIssueId ? state.selectedIssue : state.issues.find((issue) => issue.id === state.selectedIssueId)));
     message.textContent = "URL uit de verificatiescope verwijderd.";
   } catch (error) {
     message.textContent = `URL verwijderen mislukt: ${error.message}`;
@@ -3263,7 +3308,7 @@ async function createRecommendationTask() {
   message.textContent = "Taak wordt aangemaakt…";
   try {
     await api(`/api/v1/issues/${state.selectedIssueId}/recommendation-task`, {method: "POST"});
-    await loadIssueRecommendation(state.issues.find((issue) => issue.id === state.selectedIssueId));
+    await loadIssueRecommendation((state.selectedIssue?.id === state.selectedIssueId ? state.selectedIssue : state.issues.find((issue) => issue.id === state.selectedIssueId)));
     message.textContent = "Uitvoeringstaak aangemaakt.";
   } catch (error) {
     message.textContent = `Aanmaken mislukt: ${error.message}`;
@@ -3290,7 +3335,7 @@ async function saveRecommendationTask() {
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify(payload),
     });
-    await loadIssueRecommendation(state.issues.find((issue) => issue.id === state.selectedIssueId));
+    await loadIssueRecommendation((state.selectedIssue?.id === state.selectedIssueId ? state.selectedIssue : state.issues.find((issue) => issue.id === state.selectedIssueId)));
     message.textContent = "Taak bijgewerkt.";
   } catch (error) {
     message.textContent = `Bijwerken mislukt: ${error.message}`;
@@ -3322,7 +3367,7 @@ async function saveRecommendationFeedback(event) {
       body: JSON.stringify(payload),
     });
     state.recommendationFeedback.unshift(feedback);
-    renderRecommendationTask(state.issues.find((issue) => issue.id === state.selectedIssueId));
+    renderRecommendationTask((state.selectedIssue?.id === state.selectedIssueId ? state.selectedIssue : state.issues.find((issue) => issue.id === state.selectedIssueId)));
     message.textContent = "Feedback opgeslagen.";
   } catch (error) {
     message.textContent = `Opslaan mislukt: ${error.message}`;
@@ -3448,7 +3493,7 @@ $("#confirm-mfa").addEventListener("click", async () => {
     await api("/api/v1/me/mfa/confirm", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({code:$("#mfa-confirm-code").value})});
     state.currentUser.mfa_enabled = true; state.currentUser.mfa_required = false;
     $("#mfa-message").textContent = "Tweestapsverificatie is actief.";
-    await loadClients();
+    await loadClients(null, null, false);
     showView(viewFromHash(), false);
     window.setTimeout(() => $("#mfa-dialog").close(), 800);
   } catch (error) { $("#mfa-message").textContent = error.message; }
@@ -3456,6 +3501,11 @@ $("#confirm-mfa").addEventListener("click", async () => {
 $("#profile-toggle").addEventListener("click", () => { const open = $("#profile-popover").classList.toggle("hidden") === false; $("#profile-toggle").setAttribute("aria-expanded", String(open)); });
 $("#mobile-nav-toggle").addEventListener("click", () => { const open = $("#app").classList.toggle("mobile-nav-open"); $("#mobile-nav-toggle").setAttribute("aria-expanded", String(open)); });
 function clearWebsiteViewState() {
+  state.signalsWebsiteId = null;
+  state.signalsRequest = null;
+  state.signalsError = false;
+  state.selectedIssueId = null;
+  state.selectedIssue = null;
   state.clientReport = null;
   state.jobListings = [];
   state.jobSummary = null;
@@ -3493,8 +3543,11 @@ function clearWebsiteViewState() {
 }
 
 async function refreshSelectedWebsite(loadSignals = true) {
-  if (state.currentView === "changes") await loadChanges();
-  if (loadSignals) await loadIssues();
+  loadTaskNotifications().catch(() => {});
+  if (state.currentView === "reports") await Promise.all([loadClientReport(), loadReportSnapshots()]);
+  if (state.currentView === "changes") { await ensureSignals(); await loadChanges(); }
+  if (loadSignals && ["dashboard", "actions", "urls"].includes(state.currentView)) await ensureSignals();
+  if (state.currentView === "tasks") await loadTaskCenter();
   if (state.currentView === "integrations") await loadIntegrations();
   if (state.currentView === "insights") await loadConsultantInsights();
   if (["contentAnalysis", "opportunities"].includes(state.currentView)) await loadContentAnalysis();
@@ -3510,8 +3563,8 @@ $("#client-select").addEventListener("change", async () => {
   localStorage.removeItem(WEBSITE_STORAGE_KEY);
   clearWebsiteViewState();
   $("#website-select").innerHTML = "";
-  await loadWebsites();
-  if (clientId === $("#client-select").value) await refreshSelectedWebsite(false);
+  await loadWebsites(null, false);
+  if (clientId === $("#client-select").value) await refreshSelectedWebsite();
 });
 $("#website-select").addEventListener("change", async () => {
   localStorage.setItem(WEBSITE_STORAGE_KEY, $("#website-select").value);
@@ -3726,7 +3779,11 @@ api("/api/v1/me").then(async (user) => {
     await openMfaSetup();
     return false;
   }
-  await loadClients();
+  state.issuesLoading = true;
+  state.operationsLoading = true;
+  state.jobSummary = null;
+  if (await openWorkPreviewLink()) return false;
+  await loadClients(null, null, false);
   return true;
 }).then(async (workspaceReady) => {
   if (!workspaceReady) return;
@@ -3743,5 +3800,5 @@ api("/api/v1/me").then(async (user) => {
     $("#integration-message").textContent = integrationMessages[integrationResult] || "De koppeling is niet voltooid. Probeer opnieuw.";
     $("#integration-message").classList.remove("hidden");
     window.history.replaceState({}, "", `/app#${VIEW_HASHES.integrations}`);
-  } else if (!await openWorkPreviewLink()) showView(viewFromHash(), false);
-}).catch(() => showLogin());
+  } else showView(viewFromHash(), false);
+}).catch((error) => { const loading = $("#workspace-loading"); if (loading) { loading.classList.remove("hidden"); loading.textContent = `Laden mislukt: ${error.message}. Vernieuw de pagina om opnieuw te proberen.`; } });
