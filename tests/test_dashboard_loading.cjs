@@ -12,7 +12,7 @@ async function run() {
   const pending = [];
   const context = {state,$,escapeHtml:s=>s,labels:{},groupChanges:rows=>rows,changeGroupLabel:()=>'',crawlRunMetrics:()=>({summary:''}),durationLabel:()=>'',renderIntegrationWarning(){},
     api:path=>{requests.push(path);return new Promise((resolve,reject)=>pending.push({path,resolve,reject}));}};
-  vm.runInNewContext(code, context);
+  vm.runInNewContext(source.slice(source.indexOf("async function readWebsiteChanges("), source.indexOf("async function loadChanges(")) + code, context);
   const first = context.loadDashboard();
   const same = context.loadDashboard();
   assert.equal(requests.length,5,'concurrent dashboard requests are deduplicated');

@@ -8,7 +8,7 @@ to label one page. Historical inspection and task detail load concurrently.
 
 Normal startup shows an explicit loading status, then activates the requested view.
 Signal/URL inventory reads are deduplicated while in flight and reused within the selected
-website. The dashboard, signal, URL and change views request that inventory when needed;
+website. The signal and URL views request that inventory when needed;
 other screens do not block on it. Reports, report archives and vacancies no longer load
 as a side effect of every signal refresh. Website switches invalidate the inventory and
 reload the current view. No shared/persistent cross-user data cache was introduced.
@@ -25,7 +25,7 @@ behavior are unchanged; this release does not invent proof of work or recovery.
 
 ## Boundaries and acceptance
 
-The URL inventory itself remains paginated in batches of 1000; dashboard/signal inventory
+The URL inventory itself remains paginated in batches of 1000; signal inventory
 queries may still need backend optimization after measuring. This change removes known
 unnecessary/duplicate work, not every possible latency source.
 
@@ -59,3 +59,26 @@ Regression checks cover summary/list grouping parity, active-only and website is
 bounded output, authorization, URL labels and lightweight snapshot queries, independent
 panel rendering, failure states, real zeros, deduplication and stale responses.
 Production loading times still require a new browser measurement after deployment.
+
+## Acceptance corrections (22 September 2026)
+
+Change tables, search, regular details and domain-swap details use `normalized_url`
+from the changes response; they no longer require the complete signal/URL inventory.
+Missing labels render as text, not as a link to "Onbekende URL". Dashboard and change
+views share only an in-flight history read for the selected website. All pages remain
+included before grouping; there is no truncated history or persistent shared cache.
+Website changes invalidate this read, and late successes/errors cannot replace the
+current change view. Failed reads can be retried by reopening the view.
+
+URL inventory and task center distinguish loading, failure and successful empty data.
+Task loads have request and website/client guards, including A–B–A switches. Previous
+rows and counts disappear while new data loads. Dashboard failures retain a safe error
+category (HTTP status, expired session, or connection/processing failure) without
+logging credentials or response bodies. Authentication behavior is unchanged.
+
+Production acceptance observed an intermittent HUMAN changes failure and a session
+interruption; their underlying cause has not been established. These changes remove
+unnecessary reads and improve diagnosis, but do not claim to fix session expiry or
+all production latency. Verify both pilot sites after a separately approved release.
+Regression coverage: `node tests/test_loading_regressions.cjs` plus the existing five
+UI checks. No dependency, migration or worker change is required.

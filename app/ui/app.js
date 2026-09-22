@@ -47,7 +47,9 @@ async function apiResponse(path, options = {}) {
       : typeof payload.detail === "object" && payload.detail
         ? JSON.stringify(payload.detail)
         : payload.detail;
-    throw new Error(detail || `API-fout ${response.status}`);
+    const error = new Error(detail || `API-fout ${response.status}`);
+    error.status = response.status;
+    throw error;
   }
   return response;
 }
@@ -1719,7 +1721,7 @@ function showView(view, updateHash = true) {
   if (["clients", "team"].includes(view)) { applyOrganizationPresentation(view); loadOrganization(); }
   if (["actions", "urls"].includes(view)) ensureSignals().then(() => { if (state.currentView === "urls") renderUrls(); });
   if (view === "urls") renderUrls();
-  if (view === "changes") ensureSignals().then(() => loadChanges()).catch(() => renderTableState("#change-rows", 5, "Wijzigingen konden niet worden geladen. Probeer het later opnieuw.", true));
+  if (view === "changes") loadChanges();
   if (view === "vacancies") loadJobListings().catch(() => renderTableState("#vacancy-rows", 4, "Vacatures konden niet worden geladen. Probeer het later opnieuw.", true));
   if (view === "operations") { loadOperations(); startOperationsPolling(); } else stopOperationsPolling();
   if (updateHash) window.history.replaceState({}, "", `#${VIEW_HASHES[view]}`);
@@ -1833,8 +1835,14 @@ function renderTaskNotifications() {
 
 async function loadTaskCenter() {
   const websiteId = $("#website-select").value;
-  if (!websiteId) { state.recommendationTasks = []; renderTaskCenter(); return; }
-  $("#task-center-message").textContent = "Taken worden geladen…";
+  const requestId = state.tasksRequestId = (state.tasksRequestId || 0) + 1;
+  const clientId = $("#client-select").value;
+  const current = () => requestId === state.tasksRequestId && websiteId === $("#website-select").value && clientId === $("#client-select").value;
+  state.tasksLoading = Boolean(websiteId);
+  state.tasksError = null;
+  state.recommendationTasks = [];
+  renderTaskCenter();
+  if (!websiteId) return;
   try {
     const params = new URLSearchParams({status: $("#task-status-filter").value || "active", limit:"500"});
     const filters = [["primary_role", "#task-role-filter"], ["priority", "#task-priority-filter"], ["verification_status", "#task-verification-filter"], ["search", "#task-search"]];
@@ -1842,12 +1850,13 @@ async function loadTaskCenter() {
     const ownerFilter = $("#task-owner-filter").value;
     if (ownerFilter === "unassigned") params.set("unassigned", "true");
     else if (ownerFilter) params.set("assigned_to_user_id", ownerFilter);
-    const clientId = $("#client-select").value;
     const [tasks, notifications, members] = await Promise.all([
       api(`/api/v1/websites/${websiteId}/recommendation-tasks?${params}`),
       api(`/api/v1/websites/${websiteId}/task-notifications?limit=50`),
       ["superuser", "admin"].includes(state.currentUser?.role) ? api(`/api/v1/clients/${clientId}/members`).catch(() => []) : Promise.resolve([]),
     ]);
+    if (!current()) return;
+    state.tasksLoading = false;
     state.recommendationTasks = tasks; state.taskNotifications = notifications; state.taskMembers = members;
     const roles = [...new Set(tasks.map((task) => task.primary_role))].sort();
     const selectedRole = $("#task-role-filter").value;
@@ -1857,10 +1866,24 @@ async function loadTaskCenter() {
     $("#task-owner-filter").innerHTML = `<option value="">Iedereen</option><option value="unassigned">Niet toegewezen</option>${taskAssigneeOptions().map((member) => `<option value="${member.id}">${escapeHtml(member.display_name || member.email)}${member.id === state.currentUser?.id ? " (jij)" : ""}</option>`).join("")}`;
     $("#task-owner-filter").value = selectedOwner;
     renderTaskCenter(); renderTaskNotifications(); $("#task-center-message").textContent = "";
-  } catch (error) { $("#task-center-message").textContent = `Taken konden niet worden geladen: ${error.message}`; }
+  } catch (error) {
+    if (!current()) return;
+    state.tasksLoading = false;
+    state.tasksError = `Taken konden niet worden geladen: ${error.message}`;
+    renderTaskCenter();
+  }
 }
 
 function renderTaskCenter() {
+  if (state.tasksLoading || state.tasksError) {
+    $("#task-summary").innerHTML = "";
+    $("#task-list").innerHTML = "";
+    $("#task-result-count").textContent = "";
+    $("#task-empty").classList.add("hidden");
+    $("#task-center-message").textContent = state.tasksError || "Taken worden geladen…";
+    return;
+  }
+  $("#task-center-message").textContent = "";
   const tasks = state.recommendationTasks;
   const counts = {open:0, in_progress:0, waiting_for_input:0, verification:0};
   for (const task of tasks) { if (task.status === "open" || task.status === "planned") counts.open += 1; if (task.status === "in_progress") counts.in_progress += 1; if (task.status === "waiting_for_input") counts.waiting_for_input += 1; if (["queued","running","manual_review"].includes(task.verification_status)) counts.verification += 1; }
@@ -1927,8 +1950,9 @@ async function loadIssues() {
   } catch (error) {
     if (requestId !== state.issuesRequestId || websiteId !== $("#website-select").value || clientId !== $("#client-select").value) return;
     state.issuesLoading = false;
-    render();
     state.signalsError = true;
+    render();
+    if (state.currentView === "urls") renderUrls();
     if (state.currentView === "dashboard") renderDashboard();
     $("#result-count").textContent = `Signalen konden niet worden geladen: ${error.message}`;
     return;
@@ -2025,6 +2049,18 @@ function urlIndexState(url) {
 
 function renderUrls() {
   window.loadInternalLinks?.();
+  if (state.issuesLoading || state.signalsError) {
+    const message = state.signalsError ? "URL’s konden niet worden geladen. Open URL’s opnieuw om te proberen." : "URL’s worden geladen…";
+    renderTableState("#url-rows", 8, message, Boolean(state.signalsError));
+    $("#url-result-count").textContent = message;
+    $("#url-empty").classList.add("hidden");
+    $("#url-page-label").textContent = "";
+    $("#url-previous-page").disabled = true;
+    $("#url-next-page").disabled = true;
+    $("#url-coverage-summary").innerHTML = "";
+    $("#url-coverage-context").textContent = message;
+    return;
+  }
   const query = $("#url-search").value.trim().toLowerCase();
   const status = $("#url-status-filter").value;
   const indexation = $("#url-index-filter").value;
@@ -2119,20 +2155,11 @@ async function loadDashboard() {
   if (state.dashboard?.websiteId === websiteId && state.dashboard.loading) return state.dashboard.promise;
   const dashboard = {websiteId, loading: true, panels: {}, data: {}};
   state.dashboard = dashboard;
-  const readChanges = async () => {
-    const changes = [];
-    for (let offset = 0; ; offset += 1000) {
-      const batch = await api(`/api/v1/websites/${websiteId}/changes?limit=1000&offset=${offset}`);
-      if (state.dashboard !== dashboard) return [];
-      changes.push(...batch);
-      if (batch.length < 1000) return groupChanges(changes);
-    }
-  };
   const canAdmin = ["superuser", "admin"].includes(state.currentUser?.role);
   const clientId = $("#client-select").value;
   const loaders = {
     signals: () => api(`/api/v1/websites/${websiteId}/issue-summary`),
-    changes: readChanges,
+    changes: async () => groupChanges(await readWebsiteChanges(websiteId)),
     crawl: () => api(`/api/v1/websites/${websiteId}/crawl-runs?limit=1`),
     performance: () => api(`/api/v1/websites/${websiteId}/client-report?period=month`),
     vacancies: () => api(`/api/v1/websites/${websiteId}/job-listings`),
@@ -2150,9 +2177,11 @@ async function loadDashboard() {
       dashboard.data[key] = result;
       dashboard.panels[key] = "ready";
       if (key === "integrations") state.integrationHealth = result;
-    } catch (_error) {
+    } catch (error) {
       if (state.dashboard !== dashboard) return;
       dashboard.panels[key] = "error";
+      dashboard.errors ||= {};
+      dashboard.errors[key] = error.status ? `HTTP ${error.status}` : error.message === "Niet aangemeld" ? "Sessie verlopen" : "Verbinding of gegevensverwerking mislukt";
     }
     if (state.currentView === "dashboard") renderDashboard();
   })).finally(() => { dashboard.loading = false; });
@@ -2192,7 +2221,7 @@ function renderDashboard() {
     const status = dashboard?.panels[key] || "loading";
     if (status === "ready") continue;
     for (const target of targets) $("#dashboard-" + target).textContent = status === "error"
-      ? "Dit onderdeel kon niet worden geladen. Open Overzicht opnieuw om te proberen."
+      ? `Dit onderdeel kon niet worden geladen (${dashboard.errors?.[key] || "onbekende fout"}). Open Overzicht opnieuw om te proberen.`
       : "Gegevens worden geladen…";
   }
 }
@@ -2566,26 +2595,57 @@ function changeLabel(change) {
   return known[change.change_type] || change.change_type.replaceAll("_", " ");
 }
 
+async function readWebsiteChanges(websiteId) {
+  if (state.changesRead?.websiteId === websiteId) return state.changesRead.promise;
+  const request = {websiteId};
+  state.changesRead = request;
+  request.promise = (async () => {
+    const changes = [];
+    for (let offset = 0; ; offset += 1000) {
+      const batch = await api(`/api/v1/websites/${websiteId}/changes?limit=1000&offset=${offset}`);
+      if (state.changesRead !== request) return [];
+      changes.push(...batch);
+      if (batch.length < 1000) return changes;
+    }
+  })();
+  try { return await request.promise; }
+  finally { if (state.changesRead === request) state.changesRead = null; }
+}
+
 async function loadChanges() {
   const websiteId = $("#website-select").value;
   if (!websiteId) return;
   const requestId = ++state.changesRequestId;
+  state.changesLoading = true;
+  state.changesError = null;
+  $("#change-empty").classList.add("hidden");
+  $("#change-result-count").textContent = "";
+  $("#change-page-label").textContent = "";
+  $("#change-previous-page").disabled = true;
+  $("#change-next-page").disabled = true;
   renderTableState("#change-rows", 5, "Wijzigingen worden geladen…");
-  const changes = [];
-  for (let offset = 0; ; offset += 1000) {
-    const batch = await api(`/api/v1/websites/${websiteId}/changes?limit=1000&offset=${offset}`);
+  try {
+    const changes = await readWebsiteChanges(websiteId);
     if (requestId !== state.changesRequestId || websiteId !== $("#website-select").value) return;
-    changes.push(...batch);
-    if (batch.length < 1000) break;
+    state.changesLoading = false;
+    state.changes = changes;
+    state.changeGroups = groupChanges(state.changes);
+    const selected = $("#change-type-filter").value;
+    const types = [...new Set(state.changeGroups.flatMap((group) => group.changes.map((change) => change.change_type)))].sort();
+    $("#change-type-filter").innerHTML = `<option value="">Alle wijzigingstypen</option>${types.map((type) => `<option value="${escapeHtml(type)}">${escapeHtml(changeLabel({change_type: type}))}</option>`).join("")}`;
+    if (types.includes(selected)) $("#change-type-filter").value = selected;
+    state.changePage = 1;
+    renderChanges();
+  } catch (error) {
+    if (requestId !== state.changesRequestId || websiteId !== $("#website-select").value) return;
+    state.changesLoading = false;
+    state.changesError = `Wijzigingen konden niet worden geladen: ${error.message}. Open Wijzigingen opnieuw om te proberen.`;
+    renderChanges();
   }
-  state.changes = changes;
-  state.changeGroups = groupChanges(state.changes);
-  const selected = $("#change-type-filter").value;
-  const types = [...new Set(state.changeGroups.flatMap((group) => group.changes.map((change) => change.change_type)))].sort();
-  $("#change-type-filter").innerHTML = `<option value="">Alle wijzigingstypen</option>${types.map((type) => `<option value="${escapeHtml(type)}">${escapeHtml(changeLabel({change_type: type}))}</option>`).join("")}`;
-  if (types.includes(selected)) $("#change-type-filter").value = selected;
-  state.changePage = 1;
-  renderChanges();
+}
+
+function changeUrl(group, urlId = group.url_id) {
+  return group.changes.find((change) => change.url_id === urlId && change.normalized_url)?.normalized_url || state.urls.get(urlId) || "";
 }
 
 function renderTableState(selector, columns, message, error = false) {
@@ -2681,12 +2741,17 @@ function changeGroupLabel(group) {
 }
 
 function renderChanges() {
+  if (state.changesLoading || state.changesError) {
+    renderTableState("#change-rows", 5, state.changesError || "Wijzigingen worden geladen…", Boolean(state.changesError));
+    $("#change-empty").classList.add("hidden");
+    return;
+  }
   const query = $("#change-search").value.trim().toLowerCase();
   const type = $("#change-type-filter").value;
   const days = Number($("#change-period-filter").value || 0);
   const since = days ? Date.now() - days * 86400000 : 0;
   state.changeFiltered = state.changeGroups.filter((group) => {
-    const url = state.urls.get(group.url_id) || "";
+    const url = group.incident_type === "domain_swap" ? group.affected_url_ids.map((id) => changeUrl(group, id)).join(" ") : changeUrl(group);
     const text = `${url} ${group.changes.map((change) => `${changeLabel(change)} ${change.field_name || ""}`).join(" ")}`.toLowerCase();
     return (!type || group.changes.some((change) => change.change_type === type)) && (!since || new Date(group.detected_at).getTime() >= since) && (!query || text.includes(query));
   });
@@ -2697,10 +2762,10 @@ function renderChanges() {
   $("#change-rows").innerHTML = rows.map((group) => {
     const url = group.incident_type === "domain_swap"
       ? `${group.affected_url_ids.length} geraakte URL’s`
-      : state.urls.get(group.url_id) || "Onbekende URL";
+      : changeUrl(group) || "Onbekende URL";
     const parts = [...new Set(group.changes.map(changeLabel))];
     const importance = group.changes.some((change) => change.importance === "high") ? "high" : group.changes.some((change) => change.importance === "medium") ? "medium" : "low";
-    const urlCell = group.incident_type === "domain_swap"
+    const urlCell = (group.incident_type === "domain_swap" || !changeUrl(group))
       ? `<span class="change-url">${escapeHtml(url)}</span>`
       : `<a class="change-url" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a>`;
     return `<tr><td><time datetime="${escapeHtml(group.detected_at)}">${new Date(group.detected_at).toLocaleString("nl-NL")}</time></td><td>${urlCell}</td><td><div class="change-row-summary"><span class="change-kind">${escapeHtml(changeGroupLabel(group))}</span><span class="change-importance ${importance}"><small>Relevantie</small>${escapeHtml(labels[importance])}</span></div></td><td><span class="change-parts">${parts.length}</span></td><td><button class="detail-button" data-change-group-id="${group.id}">Bekijk</button></td></tr>`;
@@ -2723,7 +2788,7 @@ async function showChangeGroup(groupId) {
   const group = state.changeGroups.find((item) => item.id === groupId);
   if (!group) return;
   if (group.incident_type === "domain_swap") {
-    const affectedUrls = group.affected_url_ids.map((urlId) => state.urls.get(urlId) || "Onbekende URL").sort();
+    const affectedUrls = group.affected_url_ids.map((urlId) => changeUrl(group, urlId) || "Onbekende URL").sort();
     $("#change-detail-title").textContent = "Websitebrede domeinverwisseling";
     $("#change-detail-url").textContent = `${affectedUrls.length} geraakte URL’s`;
     $("#change-detail-url").removeAttribute("href");
@@ -2739,10 +2804,11 @@ async function showChangeGroup(groupId) {
     return;
   }
   const changes = await Promise.all(group.changes.map((change) => api(`/api/v1/changes/${change.id}`)));
-  const url = state.urls.get(group.url_id) || "Onbekende URL";
+  const url = changeUrl(group) || "Onbekende URL";
   $("#change-detail-title").textContent = changeGroupLabel(group);
   $("#change-detail-url").textContent = url;
-  $("#change-detail-url").href = url;
+  if (changeUrl(group)) $("#change-detail-url").href = url;
+  else $("#change-detail-url").removeAttribute("href");
   const previousDate = group.previous_checked_at ? new Date(group.previous_checked_at).toLocaleString("nl-NL") : "Geen eerdere meting";
   const currentDate = group.current_checked_at ? new Date(group.current_checked_at).toLocaleString("nl-NL") : new Date(group.detected_at).toLocaleString("nl-NL");
   $("#change-detail-date").textContent = `${previousDate} → ${currentDate}`;
@@ -3543,6 +3609,14 @@ $("#profile-toggle").addEventListener("click", () => { const open = $("#profile-
 $("#mobile-nav-toggle").addEventListener("click", () => { const open = $("#app").classList.toggle("mobile-nav-open"); $("#mobile-nav-toggle").setAttribute("aria-expanded", String(open)); });
 function clearWebsiteViewState() {
   state.dashboard = null;
+  state.changesRead = null;
+  state.changesLoading = true;
+  state.changesError = null;
+  state.tasksRequestId = (state.tasksRequestId || 0) + 1;
+  state.tasksLoading = true;
+  state.tasksError = null;
+  state.recommendationTasks = [];
+  state.taskMembers = [];
   state.signalsWebsiteId = null;
   state.signalsRequest = null;
   state.signalsError = false;
@@ -3580,6 +3654,8 @@ function clearWebsiteViewState() {
   $("#operations-load-message").textContent = "";
   $("#type-filter").innerHTML = '<option value="">Alle issue-types</option>';
   render();
+  if (state.currentView === "tasks") renderTaskCenter();
+  if (state.currentView === "urls") renderUrls();
   if (state.currentView === "changes") renderTableState("#change-rows", 5, "Wijzigingen worden geladen…");
   if (state.currentView === "operations") renderOperations();
 }
@@ -3587,7 +3663,7 @@ function clearWebsiteViewState() {
 async function refreshSelectedWebsite(loadSignals = true) {
   loadTaskNotifications().catch(() => {});
   if (state.currentView === "reports") await Promise.all([loadClientReport(), loadReportSnapshots()]);
-  if (state.currentView === "changes") { await ensureSignals(); await loadChanges(); }
+  if (state.currentView === "changes") await loadChanges();
   if (loadSignals && ["actions", "urls"].includes(state.currentView)) await ensureSignals();
   if (state.currentView === "tasks") await loadTaskCenter();
   if (state.currentView === "integrations") await loadIntegrations();
