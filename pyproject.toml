@@ -28,11 +28,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<9", "pytest-cov>=6,<7", "ruff>=0.8,<1"]
-render = ["playwright==1.61.0"]
+dev = ["pytest>=8,<10", "pytest-cov>=6,<8", "ruff>=0.8,<1"]
+render = ["playwright==1.64.1"]
 security = [
   "bandit>=1.8,<2",
-  "cyclonedx-bom>=6,<8",
+  "cyclonedx-bom>=6,<9",
   "detect-secrets>=1.5,<2",
   "pip-audit>=2.7,<3",
 ]
